@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 import * as XLSX from "xlsx";
 import { Prisma } from "@prisma/client";
 import fs from "fs";
@@ -17,6 +18,8 @@ interface Anomalie {
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const source = (formData.get("source") as string) || "EXCEL";
@@ -209,8 +212,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const historiques = await db.importHistorique.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,

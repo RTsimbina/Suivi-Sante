@@ -36,7 +36,24 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error) {
-      setError('Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.');
+      // Vérifier si le compte est verrouillé
+      const emailTrimmed = email.toLowerCase().trim();
+      const response = await fetch('/api/auth/check-lockout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailTrimmed }),
+      });
+      if (response.ok) {
+        const lockData = await response.json();
+        if (lockData.locked) {
+          const mins = Math.ceil(lockData.remainingMs / 60000);
+          setError(`Compte temporairement verrouillé. Réessayez dans ${mins} minute${mins > 1 ? 's' : ''}. Trop de tentatives échouées.`);
+        } else {
+          setError('Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.');
+        }
+      } else {
+        setError('Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.');
+      }
     } else if (result?.ok) {
       window.location.href = '/';
     }

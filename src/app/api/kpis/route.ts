@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 import { Prisma } from "@prisma/client";
 
 function diffDays(a: Date, b: Date): number {
@@ -12,8 +13,10 @@ function round2(n: number | null | undefined): number {
   return Math.round(n * 100) / 100;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     // Fetch all dossiers with relations for in-memory computation
     const allDossiers = await db.dossier.findMany({
       include: {

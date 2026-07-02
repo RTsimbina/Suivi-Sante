@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 import SDK from "z-ai-web-dev-sdk";
 import fs from "fs";
 import path from "path";
@@ -121,6 +122,8 @@ Instructions: Réponds en français de manière concise et professionnelle. Base
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const body = await request.json();
     const { question } = body;
 

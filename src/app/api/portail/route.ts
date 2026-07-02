@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { checkAuth } from "@/lib/authorize";
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const body = await request.json();
     const { query } = body;
 

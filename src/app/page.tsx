@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
-  FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
+  FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 import UserMenu from '@/components/smartflow/user-menu';
 import DirectionView from '@/components/smartflow/direction-view';
 import ReceptionView from '@/components/smartflow/reception-view';
@@ -23,8 +24,9 @@ import ImportView from '@/components/smartflow/import-view';
 import ReportingView from '@/components/smartflow/reporting-view';
 import PortailView from '@/components/smartflow/portail-view';
 import DossierForm from '@/components/smartflow/dossier-form';
+import UsersView from '@/components/smartflow/users-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail';
+type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -36,21 +38,23 @@ interface Kpis {
   volumeMensuel: { mois: string; nbDossiers: number }[];
 }
 
-const navItems: { key: View; label: string; icon: typeof LayoutDashboard; badge?: string; section?: string }[] = [
-  { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard, section: 'PILOTAGE' },
-  { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE' },
-  { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE' },
-  { key: 'reception', label: 'Réception', icon: Inbox, section: 'TRAITEMENT' },
-  { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT' },
-  { key: 'comptabilite', label: 'Comptabilité', icon: Calculator, section: 'TRAITEMENT' },
-  { key: 'import', label: 'Import ISA/SAGE', icon: Upload, section: 'TRAITEMENT' },
-  { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE' },
-  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA' },
-  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA' },
-  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT' },
+const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; badge?: string; section?: string; roles: string[] }[] = [
+  { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard, section: 'PILOTAGE', roles: ['ADMINISTRATEUR'] },
+  { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
+  { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'] },
+  { key: 'reception', label: 'Réception', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
+  { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'TECHNIQUE'] },
+  { key: 'comptabilite', label: 'Comptabilité', icon: Calculator, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
+  { key: 'import', label: 'Import ISA/SAGE', icon: Upload, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
+  { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
+  { key: 'users', label: 'Utilisateurs', icon: Users, section: 'FINANCE', roles: ['ADMINISTRATEUR'] },
+  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR'] },
+  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
+  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'UTILISATEUR'] },
 ];
 
 export default function Home() {
+  const { role, isAuthenticated, isLoading: authLoading } = useAuth();
   const [view, setView] = useState<View>('direction');
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loadingKpis, setLoadingKpis] = useState(true);
@@ -58,10 +62,33 @@ export default function Home() {
   const [formOpen, setFormOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
+  // Filtrer la navigation selon le rôle
+  const navItems = useMemo(() => {
+    if (!role) return [];
+    return allNavItems.filter(item => item.roles.includes(role));
+  }, [role]);
+
+  // Définir la vue par défaut selon le rôle
+  useEffect(() => {
+    if (role && navItems.length > 0) {
+      const currentAllowed = navItems.find(n => n.key === view);
+      if (!currentAllowed) {
+        setView(navItems[0].key);
+      }
+    }
+  }, [role, navItems, view]);
+
+  // Vérifier si l'utilisateur peut créer des dossiers
+  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL';
+
   useEffect(() => {
     async function fetchKpis() {
       try {
         const res = await fetch('/api/kpis');
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
         const data = await res.json();
         setKpis(data);
       } catch {
@@ -70,8 +97,8 @@ export default function Home() {
         setLoadingKpis(false);
       }
     }
-    fetchKpis();
-  }, []);
+    if (isAuthenticated) fetchKpis();
+  }, [isAuthenticated]);
 
   function handleNav(key: View) {
     setView(key);
@@ -92,6 +119,18 @@ export default function Home() {
     acc[section].push(item);
     return acc;
   }, {});
+
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-gray-50/50">
@@ -160,20 +199,22 @@ export default function Home() {
 
         {/* Footer */}
         <div className="p-3 border-t">
-          <Dialog open={formOpen} onOpenChange={setFormOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs h-8">
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Nouveau dossier
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Enregistrer un nouveau dossier</DialogTitle>
-              </DialogHeader>
-              <DossierForm key={formKey} onSuccess={handleDossierCreated} />
-            </DialogContent>
-          </Dialog>
+          {canCreateDossier && (
+            <Dialog open={formOpen} onOpenChange={setFormOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs h-8">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Nouveau dossier
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Enregistrer un nouveau dossier</DialogTitle>
+                </DialogHeader>
+                <DossierForm key={formKey} onSuccess={handleDossierCreated} />
+              </DialogContent>
+            </Dialog>
+          )}
           <div className="px-3 py-2 mt-2 rounded-lg bg-muted/50">
             <p className="text-[10px] text-muted-foreground">SmartFlow IA v2.0</p>
             <p className="text-[10px] text-muted-foreground">Données au 25 Juin 2026</p>
@@ -214,6 +255,7 @@ export default function Home() {
           {view === 'ia' && <IaView />}
           {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-white overflow-hidden"><ChatView /></div>}
           {view === 'portail' && <PortailView />}
+          {view === 'users' && <UsersView />}
         </main>
       </div>
     </div>

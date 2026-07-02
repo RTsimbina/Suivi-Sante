@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { checkAuth } from "@/lib/authorize";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -14,6 +15,8 @@ function round2(n: number | null | undefined): number {
 
 export async function GET(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const { searchParams } = new URL(request.url);
     const q = (searchParams.get("q") || "").trim();
 

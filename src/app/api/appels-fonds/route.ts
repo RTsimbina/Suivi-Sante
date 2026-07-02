@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 
 export async function GET(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const { searchParams } = new URL(request.url);
     const contratId = searchParams.get("contratId") || undefined;
     const statut = searchParams.get("statut") || undefined;
@@ -29,6 +32,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const body = await request.json();
     const { contratId, montant, dateAppel, observations } = body;
 

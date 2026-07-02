@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 
 const VALID_STATUTS = [
   "RECU",
@@ -26,6 +27,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const { id } = await params;
 
     const body = await request.json();

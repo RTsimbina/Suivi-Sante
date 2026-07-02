@@ -2,27 +2,15 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 
-// Routes publiques qui ne nécessitent pas d'authentification
+// Seules ces routes sont véritablement publiques (pas besoin de token)
 const PUBLIC_PATHS = ['/login'];
-const PUBLIC_API_PREFIXES = [
-  '/api/auth/',
-  '/api/kpis',
-  '/api/ia',
-  '/api/chat',
-  '/api/dossiers',
-  '/api/import',
-  '/api/contrats',
-  '/api/appels-fonds',
-  '/api/portail',
-  '/api/upload',
-];
+const AUTH_API_PATHS = ['/api/auth/'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Autoriser les routes publiques
+  // 1. Autoriser les routes publiques (page de login)
   if (PUBLIC_PATHS.some((path) => pathname === path)) {
-    // Si l'utilisateur est déjà connecté, rediriger vers l'accueil
     const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
@@ -33,30 +21,50 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Autoriser les API publiques
-  if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  // 2. Autoriser les routes NextAuth (connexion/déconnexion)
+  if (AUTH_API_PATHS.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.next();
   }
 
-  // Autoriser les assets statiques et les fichiers Next.js internes
+  // 3. Autoriser les assets statiques et fichiers Next.js internes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
-    pathname.includes('.') // fichiers statiques (images, css, etc.)
+    pathname.includes('.')
   ) {
     return NextResponse.next();
   }
 
-  // Vérifier le token JWT
+  // 4. Pour TOUTES les autres routes (pages ET API), vérifier le token JWT
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
 
   if (!token) {
+    // Si c'est une route API, renvoyer 401 JSON au lieu de rediriger
+    if (pathname.startsWith('/api/')) {
+      return Response.json(
+        { erreur: 'Non authentifié. Veuillez vous reconnecter.' },
+        { status: 401 }
+      );
+    }
+    // Sinon rediriger vers la page de login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // 5. Ajouter les infos utilisateur dans les headers pour les routes API
+  if (pathname.startsWith('/api/')) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-user-id', token.id as string);
+    requestHeaders.set('x-user-role', token.role as string);
+    requestHeaders.set('x-user-email', token.email as string);
+
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
   }
 
   return NextResponse.next();
@@ -64,7 +72,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all paths except static files and api routes handled above
     '/((?!_next/static|_next/image|favicon.ico|robots.txt|logo.svg).*)',
   ],
 };

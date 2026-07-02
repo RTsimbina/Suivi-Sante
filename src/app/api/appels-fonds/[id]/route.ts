@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const { id } = await params;
     const body = await request.json();
     const { statut, datePaiement, reference } = body;

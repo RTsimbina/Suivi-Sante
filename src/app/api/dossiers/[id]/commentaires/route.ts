@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkAuth } from "@/lib/authorize";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const { id } = await params;
     const commentaires = await db.commentaire.findMany({
       where: { dossierId: id },
@@ -17,6 +20,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authError = await checkAuth(request);
+    if (authError) return authError;
     const { id } = await params;
     const body = await request.json();
     const { contenu, prive } = body;
