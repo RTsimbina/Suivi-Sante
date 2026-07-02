@@ -94,6 +94,13 @@ export async function POST(request: NextRequest) {
       typeDossier,
       gestionnaireAccueilId,
       montantReclame,
+      assure,
+      nSS,
+      prestataire,
+      dateSoins,
+      moyenPaiement,
+      observations,
+      source,
     } = body;
 
     // Validate required fields
@@ -116,6 +123,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const historiqueInit = JSON.stringify([
+      { date: new Date().toISOString(), statut: "RECU", commentaire: "Dossier créé manuellement" },
+    ]);
+
     const dossier = await db.dossier.create({
       data: {
         numeroDossier,
@@ -125,8 +136,15 @@ export async function POST(request: NextRequest) {
         typeDossier,
         gestionnaireAccueilId: gestionnaireAccueilId || null,
         montantReclame: montantReclame || 0,
+        assure: assure || null,
+        nSS: nSS || null,
+        prestataire: prestataire || null,
+        dateSoins: dateSoins ? new Date(dateSoins) : null,
+        moyenPaiement: moyenPaiement || null,
+        observations: observations || null,
         statut: "RECU",
-        source: "MANUEL",
+        source: source || "MANUEL",
+        historique: historiqueInit,
       },
       include: {
         societe: true,

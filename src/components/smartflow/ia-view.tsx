@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, ShieldAlert, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, TrendingUp, FileX, AlertOctagon, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -28,6 +28,17 @@ interface IaData {
     typeAnomalie: string;
     details: string;
   }[];
+  piecesManquantes: {
+    numeroDossier: string;
+    beneficiaire: string;
+    societeNom: string;
+    joursEnAnalyse: number;
+  }[];
+  incoherences: {
+    numeroDossier: string;
+    typeIncoherence: string;
+    description: string;
+  }[];
   previsions: {
     volumeAttendu: number;
     chargeParGestionnaire: {
@@ -43,6 +54,14 @@ interface IaData {
 const anomalieLabel: Record<string, string> = {
   ECART_MONTANT: 'Écart de montant',
   DECOMPTE_MANQUANT: 'Décompte manquant',
+};
+
+const incoherenceLabel: Record<string, string> = {
+  PAYE_SANS_MONTANT: 'Payé sans montant',
+  PAIEMENT_SANS_DECOMPTE: 'Paiement sans décompte',
+  VALIDE_SANS_MONTANT: 'Validé sans montant',
+  REJET_SANS_MOTIF: 'Rejeté sans motif',
+  DATE_INCOHERENTE: 'Date incohérente',
 };
 
 function getRisqueColor(risque: number): string {
@@ -67,6 +86,7 @@ export default function IaView() {
   const [data, setData] = useState<IaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function fetchData() {
@@ -88,6 +108,18 @@ export default function IaView() {
     fetchData();
   }, []);
 
+  function toggleCard(key: string) {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -105,9 +137,8 @@ export default function IaView() {
   if (loading || !data) {
     return (
       <div className="space-y-6 p-4">
-        {/* Skeleton pour les alertes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Card key={i}>
               <CardContent className="pt-6 space-y-3">
                 <Skeleton className="h-5 w-40" />
@@ -117,7 +148,6 @@ export default function IaView() {
             </Card>
           ))}
         </div>
-        {/* Skeleton pour le milieu */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardContent className="pt-6 space-y-3">
@@ -136,7 +166,6 @@ export default function IaView() {
             </CardContent>
           </Card>
         </div>
-        {/* Skeleton pour les prévisions */}
         <Card>
           <CardContent className="pt-6 space-y-3">
             <Skeleton className="h-6 w-48" />
@@ -149,12 +178,13 @@ export default function IaView() {
     );
   }
 
-  const { retards, anomalies, previsions } = data;
+  const { retards, anomalies, piecesManquantes, incoherences, previsions } = data;
 
   return (
     <div className="space-y-6 p-4">
-      {/* Section 1 : Cartes d'alerte */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Section 1 : 5 Cartes d'alerte */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Carte 1 : Dossiers en retard */}
         <Card className="border-red-200 bg-red-50 dark:bg-red-950/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -176,6 +206,7 @@ export default function IaView() {
           </CardContent>
         </Card>
 
+        {/* Carte 2 : Anomalies détectées */}
         <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -197,6 +228,7 @@ export default function IaView() {
           </CardContent>
         </Card>
 
+        {/* Carte 3 : Risque de retard */}
         <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -217,11 +249,63 @@ export default function IaView() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Carte 4 : Pièces justificatives manquantes (orange/amber, cliquable) */}
+        <Card
+          className="border-amber-300 bg-amber-50/80 dark:bg-amber-950/30 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => toggleCard('pieces')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                <FileX className="size-5 text-amber-700" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
+                  Pièces manquantes
+                </p>
+                <p className="text-2xl font-bold text-amber-900 dark:text-amber-300">
+                  {piecesManquantes.length}
+                </p>
+              </div>
+              <ChevronDown className={`ml-auto size-4 text-amber-500 transition-transform ${expandedCards.has('pieces') ? 'rotate-180' : ''}`} />
+            </div>
+            <p className="mt-2 text-xs text-amber-700/80 dark:text-amber-500/80">
+              Dossiers sans justificatifs depuis &gt;3 jours
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Carte 5 : Incohérences de traitement (red, cliquable) */}
+        <Card
+          className="border-red-300 bg-red-50/80 dark:bg-red-950/30 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => toggleCard('incoherences')}
+        >
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/50">
+                <AlertOctagon className="size-5 text-red-700" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-400">
+                  Incohérences
+                </p>
+                <p className="text-2xl font-bold text-red-900 dark:text-red-300">
+                  {incoherences.length}
+                </p>
+              </div>
+              <ChevronDown className={`ml-auto size-4 text-red-500 transition-transform ${expandedCards.has('incoherences') ? 'rotate-180' : ''}`} />
+            </div>
+            <p className="mt-2 text-xs text-red-700/80 dark:text-red-500/80">
+              Anomalies de traitement des dossiers
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Section 2 : Deux colonnes */}
+      {/* Section 2 : Dossiers en retard + Anomalies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Colonne gauche : Dossiers en retard */}
+        {/* Dossiers en retard */}
         <Card>
           <CardHeader className="pb-0">
             <CardTitle className="text-base flex items-center gap-2">
@@ -259,13 +343,7 @@ export default function IaView() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={
-                              r.joursRetard > 10
-                                ? 'font-bold text-red-600'
-                                : 'text-foreground'
-                            }
-                          >
+                          <span className={r.joursRetard > 10 ? 'font-bold text-red-600' : 'text-foreground'}>
                             {r.joursRetard} j
                           </span>
                         </TableCell>
@@ -279,7 +357,7 @@ export default function IaView() {
           </CardContent>
         </Card>
 
-        {/* Colonne droite : Anomalies détectées */}
+        {/* Anomalies détectées */}
         <Card>
           <CardHeader className="pb-0">
             <CardTitle className="text-base flex items-center gap-2">
@@ -318,6 +396,100 @@ export default function IaView() {
         </Card>
       </div>
 
+      {/* Section 2b : Détails expansibles — Pièces manquantes */}
+      {expandedCards.has('pieces') && (
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileX className="size-4 text-amber-600" />
+              Pièces justificatives manquantes
+              <Badge variant="outline" className="ml-2 border-amber-300 bg-amber-100 text-amber-800">
+                {piecesManquantes.length} dossier{piecesManquantes.length !== 1 ? 's' : ''}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="max-h-96 overflow-y-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-xs">N° Dossier</TableHead>
+                    <TableHead className="text-xs">Bénéficiaire</TableHead>
+                    <TableHead className="text-xs">Société</TableHead>
+                    <TableHead className="text-xs text-right">Jours en analyse</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {piecesManquantes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        Aucun dossier sans pièces justificatives
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    piecesManquantes.map((p) => (
+                      <TableRow key={p.numeroDossier}>
+                        <TableCell className="font-mono text-xs">{p.numeroDossier}</TableCell>
+                        <TableCell className="text-sm">{p.beneficiaire}</TableCell>
+                        <TableCell className="text-sm">{p.societeNom}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={p.joursEnAnalyse > 7 ? 'font-bold text-amber-700' : 'text-foreground'}>
+                            {p.joursEnAnalyse} j
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Section 2c : Détails expansibles — Incohérences */}
+      {expandedCards.has('incoherences') && (
+        <Card>
+          <CardHeader className="pb-0">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertOctagon className="size-4 text-red-600" />
+              Incohérences de traitement
+              <Badge variant="outline" className="ml-2 border-red-300 bg-red-100 text-red-800">
+                {incoherences.length} incohérence{incoherences.length !== 1 ? 's' : ''}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
+              {incoherences.length === 0 ? (
+                <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+                  Aucune incohérence détectée
+                </div>
+              ) : (
+                incoherences.map((inc, idx) => (
+                  <Card
+                    key={`${inc.numeroDossier}-${idx}`}
+                    className="border-red-200 bg-red-50/50 dark:bg-red-950/20 py-4 gap-3"
+                  >
+                    <CardContent className="px-4 pb-0 pt-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {inc.numeroDossier}
+                        </span>
+                        <Badge variant="outline" className="border-red-300 bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 dark:border-red-700">
+                          {incoherenceLabel[inc.typeIncoherence] || inc.typeIncoherence}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-foreground">{inc.description}</p>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Section 3 : Prévisions */}
       <Card>
         <CardHeader className="pb-0">
@@ -327,7 +499,6 @@ export default function IaView() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4 space-y-6">
-          {/* Volume attendu */}
           <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-6">
             <div>
               <p className="text-sm text-muted-foreground">Volume attendu par mois</p>
@@ -343,7 +514,6 @@ export default function IaView() {
             </div>
           </div>
 
-          {/* Tableau des gestionnaires */}
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -369,7 +539,6 @@ export default function IaView() {
             </Table>
           </div>
 
-          {/* Barre de progression du risque */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Indicateur de risque de retard</span>

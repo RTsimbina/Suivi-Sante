@@ -1,0 +1,272 @@
+'use client';
+
+import { useState, useRef, type FormEvent, useEffect } from 'react';
+import { Plus, Upload, X, Loader2, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
+
+interface Societe { id: string; nom: string; }
+interface Gestionnaire { id: string; nom: string; service: string; }
+
+const TYPES = [
+  { value: 'HOSPITALISATION', label: 'Hospitalisation' },
+  { value: 'CONSULTATION', label: 'Consultation' },
+  { value: 'PHARMACIE', label: 'Pharmacie' },
+  { value: 'MATERNITE', label: 'Maternité' },
+  { value: 'CHIRURGIE', label: 'Chirurgie' },
+  { value: 'EXAMEN', label: 'Examen' },
+  { value: 'SOINS DENTAIRES', label: 'Soins Dentaires' },
+  { value: 'OPTIQUE', label: 'Optique' },
+];
+
+const MOYENS = [
+  { value: 'VIREMENT', label: 'Virement bancaire' },
+  { value: 'CHEQUE', label: 'Chèque' },
+  { value: 'ESPECES', label: 'Espèces' },
+];
+
+const JUSTIF_TYPES = ['FACTURE', 'ORDONNANCE', 'RIB', 'CARNET_SOINS', 'DECOMPTE', 'AUTRE'];
+const JUSTIF_LABELS: Record<string, string> = { FACTURE: 'Facture', ORDONNANCE: 'Ordonnance', RIB: 'RIB', CARNET_SOINS: 'Carnet de soins', DECOMPTE: 'Décompte', AUTRE: 'Autre' };
+
+interface UploadedFile { file: File; type: string; id: string; }
+
+export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
+  const [societes, setSocietes] = useState<Societe[]>([]);
+  const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Champs du formulaire
+  const [beneficiaire, setBeneficiaire] = useState('');
+  const [assure, setAssure] = useState('');
+  const [nSS, setNSS] = useState('');
+  const [societeId, setSocieteId] = useState('');
+  const [dateSoins, setDateSoins] = useState('');
+  const [prestataire, setPrestataire] = useState('');
+  const [typeDossier, setTypeDossier] = useState('');
+  const [montantReclame, setMontantReclame] = useState('');
+  const [moyenPaiement, setMoyenPaiement] = useState('');
+  const [observations, setObservations] = useState('');
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+
+  useEffect(() => {
+    fetch('/api/dossiers/societes').then(r => r.json()).then(setSocietes).catch(() => {});
+    fetch('/api/dossiers/gestionnaires?service=ACCUEIL').then(r => r.json()).then(setGestionnaires).catch(() => {});
+  }, []);
+
+  function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const newFiles = Array.from(e.target.files || []);
+    const uploaded: UploadedFile[] = newFiles.map(f => ({
+      file: f, type: 'AUTRE', id: Math.random().toString(36).slice(2),
+    }));
+    setFiles(prev => [...prev, ...uploaded]);
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  function removeFile(id: string) { setFiles(prev => prev.filter(f => f.id !== id)); }
+  function updateFileType(id: string, type: string) { setFiles(prev => prev.map(f => f.id === id ? { ...f, type } : f)); }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!beneficiaire || !societeId || !typeDossier || !montantReclame) {
+      toast.error('Veuillez remplir les champs obligatoires (*)');
+      return;
+    }
+    setLoading(true);
+    try {
+      // Générer numéro de dossier
+      const count = await fetch('/api/dossiers?limit=1').then(r => r.json());
+      const total = count.pagination?.total || 0;
+      const numeroDossier = `DOS-2026-${String(total + 1).padStart(6, '0')}`;
+
+      const res = await fetch('/api/dossiers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numeroDossier,
+          dateReception: new Date().toISOString().split('T')[0],
+          societeId,
+          beneficiaire,
+          typeDossier,
+          montantReclame: parseFloat(montantReclame),
+          gestionnaireAccueilId: gestionnaires[0]?.id || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Erreur de création');
+      }
+
+      const dossier = await res.json();
+
+      // Mettre à jour les champs additionnels
+      const updateData: Record<string, unknown> = {};
+      if (assure) updateData.assure = assure;
+      if (nSS) updateData.nSS = nSS;
+      if (prestataire) updateData.prestataire = prestataire;
+      if (dateSoins) updateData.dateSoins = new Date(dateSoins);
+      if (moyenPaiement) updateData.moyenPaiement = moyenPaiement;
+      if (observations) updateData.observations = observations;
+
+      if (Object.keys(updateData).length > 0) {
+        await fetch(`/api/dossiers/${dossier.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData),
+        });
+      }
+
+      // Uploader les justificatifs
+      if (files.length > 0) {
+        setUploadingFiles(files.map(f => f.id));
+        for (const f of files) {
+          try {
+            const fd = new FormData();
+            fd.append('file', f.file);
+            fd.append('dossierId', dossier.id);
+            fd.append('type', f.type);
+            await fetch('/api/upload', { method: 'POST', body: fd });
+          } catch { /* skip individual errors */ }
+          setUploadingFiles(prev => prev.filter(x => x !== f.id));
+        }
+      }
+
+      toast.success(`Dossier ${numeroDossier} créé avec succès`);
+      // Reset
+      setBeneficiaire(''); setAssure(''); setNSS(''); setSocieteId(''); setDateSoins('');
+      setPrestataire(''); setTypeDossier(''); setMontantReclame(''); setMoyenPaiement(''); setObservations('');
+      setFiles([]);
+      onSuccess?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la création');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="p-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+          <Plus className="size-5 text-emerald-600" />
+          Nouveau dossier de remboursement
+        </h3>
+
+        {/* Section 1: Bénéficiaire */}
+        <div className="space-y-1">
+          <h4 className="text-sm font-semibold text-foreground">Informations du bénéficiaire</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label>Bénéficiaire *</Label>
+              <Input value={beneficiaire} onChange={e => setBeneficiaire(e.target.value)} placeholder="Nom complet" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Assuré</Label>
+              <Input value={assure} onChange={e => setAssure(e.target.value)} placeholder="Nom de l'assuré" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>N° Sécurité Sociale</Label>
+              <Input value={nSS} onChange={e => setNSS(e.target.value)} placeholder="SS-XXXXXX" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Entreprise cliente *</Label>
+              <select value={societeId} onChange={e => setSocieteId(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors" required>
+                <option value="">Sélectionner...</option>
+                {societes.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Date des soins</Label>
+              <Input type="date" value={dateSoins} onChange={e => setDateSoins(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Prestataire médical</Label>
+              <Input value={prestataire} onChange={e => setPrestataire(e.target.value)} placeholder="Nom du prestataire" />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Section 2: Dossier */}
+        <div className="space-y-1">
+          <h4 className="text-sm font-semibold text-foreground">Détails du dossier</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label>Type de soins *</Label>
+              <select value={typeDossier} onChange={e => setTypeDossier(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors" required>
+                <option value="">Sélectionner...</option>
+                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Montant réclamé (Ar) *</Label>
+              <Input type="number" step="0.01" value={montantReclame} onChange={e => setMontantReclame(e.target.value)} placeholder="0.00" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Moyen de paiement</Label>
+              <select value={moyenPaiement} onChange={e => setMoyenPaiement(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors">
+                <option value="">Sélectionner...</option>
+                {MOYENS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Section 3: Observations */}
+        <div className="space-y-1.5">
+          <Label>Observations</Label>
+          <Textarea value={observations} onChange={e => setObservations(e.target.value)} placeholder="Observations éventuelles..." rows={3} />
+        </div>
+
+        <Separator />
+
+        {/* Section 4: Justificatifs */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <FileText className="size-4 text-emerald-600" />
+            Justificatifs
+          </h4>
+          <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center hover:border-emerald-400 transition-colors cursor-pointer" onClick={() => fileRef.current?.click()}>
+            <Upload className="size-5 mx-auto text-muted-foreground mb-1" />
+            <p className="text-xs text-muted-foreground">Cliquez pour ajouter des fichiers (PDF, JPG, PNG — max 10 Mo)</p>
+            <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" className="hidden" onChange={addFiles} />
+          </div>
+          {files.length > 0 && (
+            <div className="space-y-2">
+              {files.map(f => (
+                <div key={f.id} className="flex items-center gap-2 rounded-md border p-2">
+                  <FileText className="size-4 text-muted-foreground shrink-0" />
+                  <span className="text-xs flex-1 truncate">{f.file.name}</span>
+                  <select value={f.type} onChange={e => updateFileType(f.id, e.target.value)} className="h-7 text-xs rounded border bg-transparent px-1">
+                    {JUSTIF_TYPES.map(t => <option key={t} value={t}>{JUSTIF_LABELS[t]}</option>)}
+                  </select>
+                  {uploadingFiles.includes(f.id) && <Loader2 className="size-3.5 animate-spin text-emerald-600" />}
+                  <button type="button" onClick={() => removeFile(f.id)} className="text-red-500 hover:text-red-700">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-700">
+            {loading ? <><Loader2 className="size-4 animate-spin mr-2" /> Enregistrement...</> : <><Plus className="size-4 mr-2" /> Enregistrer le dossier</>}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}

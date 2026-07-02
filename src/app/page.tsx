@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
-  FileText, Menu, X, Sparkles,
+  FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import UserMenu from '@/components/smartflow/user-menu';
 import DirectionView from '@/components/smartflow/direction-view';
 import ReceptionView from '@/components/smartflow/reception-view';
 import TechniqueView from '@/components/smartflow/technique-view';
@@ -17,8 +18,13 @@ import ComptabiliteView from '@/components/smartflow/comptabilite-view';
 import IaView from '@/components/smartflow/ia-view';
 import ChatView from '@/components/smartflow/chat-view';
 import DossiersView from '@/components/smartflow/dossiers-view';
+import KanbanView from '@/components/smartflow/kanban-view';
+import ImportView from '@/components/smartflow/import-view';
+import ReportingView from '@/components/smartflow/reporting-view';
+import PortailView from '@/components/smartflow/portail-view';
+import DossierForm from '@/components/smartflow/dossier-form';
 
-type View = 'direction' | 'reception' | 'technique' | 'comptabilite' | 'ia' | 'chat' | 'dossiers';
+type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -30,14 +36,18 @@ interface Kpis {
   volumeMensuel: { mois: string; nbDossiers: number }[];
 }
 
-const navItems: { key: View; label: string; icon: typeof LayoutDashboard; badge?: string }[] = [
-  { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard },
-  { key: 'dossiers', label: 'Dossiers', icon: FileText },
-  { key: 'reception', label: 'Réception', icon: Inbox },
-  { key: 'technique', label: 'Service Technique', icon: Wrench },
-  { key: 'comptabilite', label: 'Comptabilité', icon: Calculator },
-  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA' },
-  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat' },
+const navItems: { key: View; label: string; icon: typeof LayoutDashboard; badge?: string; section?: string }[] = [
+  { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard, section: 'PILOTAGE' },
+  { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE' },
+  { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE' },
+  { key: 'reception', label: 'Réception', icon: Inbox, section: 'TRAITEMENT' },
+  { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT' },
+  { key: 'comptabilite', label: 'Comptabilité', icon: Calculator, section: 'TRAITEMENT' },
+  { key: 'import', label: 'Import ISA/SAGE', icon: Upload, section: 'TRAITEMENT' },
+  { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE' },
+  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA' },
+  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA' },
+  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT' },
 ];
 
 export default function Home() {
@@ -45,6 +55,8 @@ export default function Home() {
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loadingKpis, setLoadingKpis] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     async function fetchKpis() {
@@ -65,6 +77,21 @@ export default function Home() {
     setView(key);
     setSidebarOpen(false);
   }
+
+  function handleDossierCreated() {
+    setFormOpen(false);
+    setFormKey(k => k + 1);
+    // Re-fetch KPIs
+    fetch('/api/kpis').then(r => r.json()).then(setKpis).catch(() => {});
+  }
+
+  // Group nav items by section
+  const sections = navItems.reduce<Record<string, typeof navItems>>((acc, item) => {
+    const section = item.section || 'OTHER';
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(item);
+    return acc;
+  }, {});
 
   return (
     <div className="min-h-screen flex bg-gray-50/50">
@@ -94,40 +121,61 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation grouped by section */}
         <ScrollArea className="flex-1 py-2">
-          <nav className="space-y-0.5 px-3">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = view === item.key;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => handleNav(item.key)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    active
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )}
-                >
-                  <Icon className={cn('h-4 w-4', active && 'text-emerald-600')} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {item.badge && (
-                    <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-emerald-200 text-emerald-600 bg-emerald-50">
-                      {item.badge}
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
+          <nav className="space-y-3 px-3">
+            {Object.entries(sections).map(([section, items]) => (
+              <div key={section}>
+                <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3 mb-1">{section}</p>
+                <div className="space-y-0.5">
+                  {items.map((item) => {
+                    const Icon = item.icon;
+                    const active = view === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => handleNav(item.key)}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                          active
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        )}
+                      >
+                        <Icon className={cn('h-4 w-4', active && 'text-emerald-600')} />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.badge && (
+                          <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-emerald-200 text-emerald-600 bg-emerald-50">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
         </ScrollArea>
 
         {/* Footer */}
         <div className="p-3 border-t">
-          <div className="px-3 py-2 rounded-lg bg-muted/50">
-            <p className="text-[10px] text-muted-foreground">Version MVP</p>
+          <Dialog open={formOpen} onOpenChange={setFormOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs h-8">
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Nouveau dossier
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Enregistrer un nouveau dossier</DialogTitle>
+              </DialogHeader>
+              <DossierForm key={formKey} onSuccess={handleDossierCreated} />
+            </DialogContent>
+          </Dialog>
+          <div className="px-3 py-2 mt-2 rounded-lg bg-muted/50">
+            <p className="text-[10px] text-muted-foreground">SmartFlow IA v2.0</p>
             <p className="text-[10px] text-muted-foreground">Données au 25 Juin 2026</p>
           </div>
         </div>
@@ -149,18 +197,23 @@ export default function Home() {
               <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
               En ligne
             </Badge>
+            <UserMenu />
           </div>
         </header>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {view === 'direction' && <DirectionView kpis={kpis} loading={loadingKpis} />}
+          {view === 'dossiers' && <DossiersView />}
+          {view === 'kanban' && <div className="h-[calc(100vh-8rem)]"><KanbanView /></div>}
           {view === 'reception' && <ReceptionView kpis={kpis} loading={loadingKpis} />}
           {view === 'technique' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
           {view === 'comptabilite' && <ComptabiliteView kpis={kpis} loading={loadingKpis} />}
+          {view === 'import' && <ImportView />}
+          {view === 'reporting' && <ReportingView />}
           {view === 'ia' && <IaView />}
           {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-white overflow-hidden"><ChatView /></div>}
-          {view === 'dossiers' && <DossiersView />}
+          {view === 'portail' && <PortailView />}
         </main>
       </div>
     </div>

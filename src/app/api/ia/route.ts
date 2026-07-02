@@ -16,6 +16,9 @@ export async function GET() {
         gestionnaireAccueil: true,
         gestionnaireTechnique: true,
         gestionnaireCompta: true,
+        justificatifs: {
+          select: { id: true },
+        },
       },
     });
 
@@ -131,6 +134,91 @@ export async function GET() {
       }
     }
 
+    // ─── PIÈCES JUSTIFICATIVES MANQUANTES ──────────────────────
+    const piecesManquantes: {
+      numeroDossier: string;
+      beneficiaire: string;
+      societeNom: string;
+      joursEnAnalyse: number;
+    }[] = [];
+
+    for (const d of allDossiers) {
+      // Dossiers en analyse depuis >3 jours sans aucun justificatif
+      if (d.statut === "EN_ANALYSE" && d.dateTraitementTechnique) {
+        const jours = diffDays(NOW, d.dateTraitementTechnique);
+        if (jours > 3 && (!d.justificatifs || d.justificatifs.length === 0)) {
+          piecesManquantes.push({
+            numeroDossier: d.numeroDossier,
+            beneficiaire: d.beneficiaire,
+            societeNom: d.societe.nom,
+            joursEnAnalyse: jours,
+          });
+        }
+      }
+    }
+
+    // Sort by joursEnAnalyse descending
+    piecesManquantes.sort((a, b) => b.joursEnAnalyse - a.joursEnAnalyse);
+
+    // ─── INCOHÉRENCES DE TRAITEMENT ────────────────────────────
+    const incoherences: {
+      numeroDossier: string;
+      typeIncoherence: string;
+      description: string;
+    }[] = [];
+
+    for (const d of allDossiers) {
+      // Dossier PAYE mais montantPaye = 0 or null
+      if (d.statut === "PAYE" && (!d.montantPaye || d.montantPaye === 0)) {
+        incoherences.push({
+          numeroDossier: d.numeroDossier,
+          typeIncoherence: "PAYE_SANS_MONTANT",
+          description: `Dossier marqué comme payé mais sans montant de paiement renseigné.`,
+        });
+      }
+
+      // Dossier EN_PAIEMENT but no dateReceptionDecompte
+      if (d.statut === "EN_PAIEMENT" && !d.dateReceptionDecompte) {
+        incoherences.push({
+          numeroDossier: d.numeroDossier,
+          typeIncoherence: "PAIEMENT_SANS_DECOMPTE",
+          description: `Dossier en paiement mais aucune date de réception de décompte n'est renseignée.`,
+        });
+      }
+
+      // Dossier VALIDE but no montantValide
+      if (d.statut === "VALIDE" && (!d.montantValide || d.montantValide === 0)) {
+        incoherences.push({
+          numeroDossier: d.numeroDossier,
+          typeIncoherence: "VALIDE_SANS_MONTANT",
+          description: `Dossier marqué comme validé mais sans montant validé renseigné.`,
+        });
+      }
+
+      // Dossier REJETE but no motifRejet
+      if (d.statut === "REJETE" && (!d.motifRejet || d.motifRejet.trim() === "")) {
+        incoherences.push({
+          numeroDossier: d.numeroDossier,
+          typeIncoherence: "REJET_SANS_MOTIF",
+          description: `Dossier rejeté sans motif de rejet renseigné.`,
+        });
+      }
+
+      // datePaiement < dateReception (impossible)
+      if (d.datePaiement && d.dateReception) {
+        if (d.datePaiement < d.dateReception) {
+          incoherences.push({
+            numeroDossier: d.numeroDossier,
+            typeIncoherence: "DATE_INCOHERENTE",
+            description: `La date de paiement (${d.datePaiement.toISOString().split("T")[0]}) est antérieure à la date de réception (${d.dateReception.toISOString().split("T")[0]}).`,
+          });
+        }
+      }
+    }
+
+    // Sort by type then numeroDossier
+    incoherences.sort((a, b) => a.typeIncoherence.localeCompare(b.typeIncoherence) || a.numeroDossier.localeCompare(b.numeroDossier));
+
     // ─── PREVISIONS ────────────────────────────────────────────
     // Volume attendu: projected monthly volume based on average so far (months 1-6 of 2026)
     const months2026 = new Map<string, number>();
@@ -227,6 +315,8 @@ export async function GET() {
     return NextResponse.json({
       retards,
       anomalies,
+      piecesManquantes,
+      incoherences,
       previsions: {
         volumeAttendu,
         chargeParGestionnaire,
