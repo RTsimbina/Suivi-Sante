@@ -340,8 +340,8 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                 {/* Bénéficiaire */}
                 <InfoSection title="Bénéficiaire & Assuré">
                   <InfoRow label="Bénéficiaire" value={dossier.beneficiaire} icon={User} />
-                  <InfoRow label="Assuré" value={dossier.assure} />
-                  <InfoRow label="N° SS" value={dossier.nSS} />
+                  <InfoRow label="Assuré" value={dossier.assure?.nom || dossier.assureId || null} />
+                  <InfoRow label="N° SS" value={dossier.assure?.nSS || dossier.nSS} />
                   <InfoRow label="Société" value={dossier.societe?.nom} icon={Building2} />
                 </InfoSection>
 
@@ -370,7 +370,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                 {/* Soins */}
                 <InfoSection title="Soins & Paiement">
                   <InfoRow label="Date des soins" value={dossier.dateSoins ? formatDate(dossier.dateSoins) : null} icon={Calendar} />
-                  <InfoRow label="Prestataire" value={dossier.prestataire} />
+                  <InfoRow label="Prestataire" value={dossier.prestataire?.nom || dossier.prestataireLegacy || null} />
                   <InfoRow label="Moyen de paiement" value={dossier.moyenPaiement} />
                   {dossier.referencePaiement && (
                     <InfoRow label="Réf. paiement" value={dossier.referencePaiement} />

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus, Users,
+  Heart, Stethoscope, Building2, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,8 +26,11 @@ import ReportingView from '@/components/smartflow/reporting-view';
 import PortailView from '@/components/smartflow/portail-view';
 import DossierForm from '@/components/smartflow/dossier-form';
 import UsersView from '@/components/smartflow/users-view';
+import AssuresView from '@/components/smartflow/assures-view';
+import PrestatairesView from '@/components/smartflow/prestataires-view';
+import ConfigurationView from '@/components/smartflow/configuration-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users';
+type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -48,6 +52,10 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'import', label: 'Import ISA/SAGE', icon: Upload, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
   { key: 'users', label: 'Utilisateurs', icon: Users, section: 'FINANCE', roles: ['ADMINISTRATEUR'] },
+  { key: 'assures', label: 'Assurés', icon: Heart, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
+  { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
+  { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
+  { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR'] },
   { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'UTILISATEUR'] },
@@ -256,6 +264,10 @@ export default function Home() {
           {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-white overflow-hidden"><ChatView /></div>}
           {view === 'portail' && <PortailView />}
           {view === 'users' && <UsersView />}
+          {view === 'assures' && <AssuresView />}
+          {view === 'prestataires' && <PrestatairesView />}
+          {view === 'societes' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
+          {view === 'configuration' && <ConfigurationView />}
         </main>
       </div>
     </div>

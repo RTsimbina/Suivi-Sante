@@ -11,6 +11,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: { id },
       include: {
         societe: true,
+        assure: true,
+        prestataire: true,
         gestionnaireAccueil: true,
         gestionnaireTechnique: true,
         gestionnaireCompta: true,

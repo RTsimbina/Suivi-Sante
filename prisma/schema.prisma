@@ -25,8 +25,11 @@ model Utilisateur {
 model Societe {
   id        String    @id @default(cuid())
   nom       String
+  baremes   Bareme[]
   dossiers  Dossier[]
   contrats  Contrat[]
+  courriels Courriel[]
+  assures   Assure[]
   createdAt DateTime  @default(now())
 }
 
@@ -83,9 +86,12 @@ model Dossier {
   createur                  Utilisateur?  @relation("CreateurDossier", fields: [createurId], references: [id])
 
   // Informations complémentaires du cahier des charges
-  assure                    String?
-  nSS                       String?       // Numéro de sécurité sociale
-  prestataire               String?       // Nom du prestataire médical
+  assureId                  String?
+  assure                    Assure?      @relation("AssureDossier", fields: [assureId], references: [id])
+  nSS                       String?       // Numéro de sécurité sociale (compatibilité)
+  prestataireId             String?
+  prestataire               Prestataire? @relation("PrestataireDossier", fields: [prestataireId], references: [id])
+  prestataireLegacy         String?       // Nom du prestataire médical (champ de compatibilité)
   dateSoins                 DateTime?     // Date des soins
   moyenPaiement             String?       // VIREMENT, CHEQUE, ESPECES
   observations              String?
@@ -121,6 +127,7 @@ model Dossier {
   commentaires              Commentaire[]
   justificatifs             Justificatif[]
   importations              ImportDossier[]
+  courriel                  Courriel?
 }
 
 model Commentaire {
@@ -159,6 +166,21 @@ model ImportHistorique {
   dossiers      ImportDossier[]
 }
 
+model Bareme {
+  id              String   @id @default(cuid())
+  societeId       String
+  societe         Societe  @relation(fields: [societeId], references: [id])
+  prestation      String
+  tauxCouverture  Float
+  plafond         Float
+  description     String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([societeId, prestation])
+}
+
 model ImportDossier {
   id               String         @id @default(cuid())
   importId         String
@@ -169,4 +191,71 @@ model ImportDossier {
   statutImport     String         @default("SUCCES") // SUCCES, ERREUR, IGNORE
   erreur           String?
   donnees          String         @default("{}") // JSON des données brutes de la ligne
+}
+
+model Assure {
+  id              String     @id @default(cuid())
+  societeId       String
+  societe         Societe    @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  nom             String
+  nSS             String?    @unique  // Numéro de sécurité sociale
+  prenom          String?
+  dateNaissance   DateTime?
+  sexe            String?    // M, F
+  telephone       String?
+  email           String?
+  adresse         String?
+  actif           Boolean    @default(true)
+  dossiers        Dossier[]  @relation("AssureDossier")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Prestataire {
+  id              String     @id @default(cuid())
+  nom             String
+  type            String     // HOPITAL, CLINIQUE, PHARMACIE, CABINET_MEDICAL, LABORATOIRE, DENTAIRE, OPTICIEN, AUTRE
+  telephone       String?
+  email           String?
+  adresse         String?
+  nif             String?    // Numéro d'identification fiscale
+  statut          String?    // STATUT_JURIDIQUE
+  rib             String?    // Relevé d'identité bancaire
+  actif           Boolean    @default(true)
+  dossiers        Dossier[]  @relation("PrestataireDossier")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Courriel {
+  id              String     @id @default(cuid())
+  type            String     // FACTURE_PRESTATAIRE or DOSSIER_REMBOURSEMENT
+  expediteur      String     // sender name/company
+  objet           String     // subject line
+  societeId       String?
+  societe         Societe?   @relation(fields: [societeId], references: [id])
+  beneficiaire    String?    // patient/beneficiary name (for remboursement)
+  montant         Float?     // amount if mentioned
+  dateCourriel    DateTime   @default(now())
+  dateSoins       DateTime?  // date of medical service
+  prestataire     String?    // healthcare provider name
+  statut          String     @default("RECU") // RECU, TRAITE, REJETE
+  traitePar       String?    // user who processed it
+  dateTraitement  DateTime?
+  observations    String?
+  dossierId       String?    @unique
+  dossier         Dossier?   @relation(fields: [dossierId], references: [id])
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model MessageBot {
+  id              String   @id @default(cuid())
+  canal           String   // WHATSAPP, TELEGRAM, MESSENGER
+  expeditieurId   String
+  expeditieurNom  String
+  message         String
+  reponse         String
+  lu              Boolean  @default(false)
+  createdAt       DateTime   @default(now())
 }

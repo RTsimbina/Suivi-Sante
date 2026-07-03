@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'localhost',
   port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
+  secure: Number(process.env.SMTP_PORT) === 465,
   auth: {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
@@ -37,4 +37,15 @@ export async function envoyerEmail(opts: {
       contentType: a.contentType || 'application/pdf',
     })),
   });
+}
+
+// ─── Vérification de la connexion SMTP ─────────────────────────────────────
+export async function verifierSMTP(): Promise<{ ok: boolean; erreur?: string }> {
+  try {
+    await transporter.verify();
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, erreur: msg };
+  }
 }

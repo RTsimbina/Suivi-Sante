@@ -39,6 +39,9 @@ export const API_PERMISSIONS: Record<
   '/api/import': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],
   },
+  '/api/technique/import-isa': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+  },
   '/api/contrats': {
     roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
     methods: {
@@ -71,6 +74,47 @@ export const API_PERMISSIONS: Record<
   },
   '/api/reporting': {
     roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
+  },
+  '/api/technique/societes': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    methods: {
+      POST: ['ADMINISTRATEUR'],
+      PUT: ['ADMINISTRATEUR'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
+  },
+  '/api/technique/baremes': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR'],
+    methods: {
+      POST: ['ADMINISTRATEUR'],
+      PUT: ['ADMINISTRATEUR'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
+  },
+  '/api/assures': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    methods: {
+      POST: ['ADMINISTRATEUR'],
+      PUT: ['ADMINISTRATEUR'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
+  },
+  '/api/prestataires': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    methods: {
+      POST: ['ADMINISTRATEUR'],
+      PUT: ['ADMINISTRATEUR'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
+  },
+  '/api/bot-messages': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  '/api/email-mensuel': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL'],
+    methods: {
+      DELETE: ['ADMINISTRATEUR'],
+    },
   },
 };
 

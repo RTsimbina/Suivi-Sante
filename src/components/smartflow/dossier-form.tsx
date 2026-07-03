@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, type FormEvent, useEffect } from 'react';
-import { Plus, Upload, X, Loader2, FileText } from 'lucide-react';
+import { useState, useRef, useCallback, type FormEvent, useEffect } from 'react';
+import { Plus, Upload, X, Loader2, FileText, Calculator, AlertTriangle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,20 @@ import { toast } from 'sonner';
 
 interface Societe { id: string; nom: string; }
 interface Gestionnaire { id: string; nom: string; service: string; }
+interface AssureOption { id: string; nom: string; prenom: string | null; nSS: string | null; societeId: string; }
+interface PrestataireOption { id: string; nom: string; type: string; }
+
+interface CalculResult {
+  bareme: string;
+  tauxCouverture: number;
+  plafond: number;
+  calcul: {
+    montantRembourse: number;
+    ticketModerateur: number;
+  };
+  plafondAtteint: boolean;
+  explication: string;
+}
 
 const TYPES = [
   { value: 'HOSPITALISATION', label: 'Hospitalisation' },
@@ -50,16 +64,69 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
   const [societeId, setSocieteId] = useState('');
   const [dateSoins, setDateSoins] = useState('');
   const [prestataire, setPrestataire] = useState('');
+  const [assuresList, setAssuresList] = useState<AssureOption[]>([]);
+  const [prestatairesList, setPrestatairesList] = useState<PrestataireOption[]>([]);
   const [typeDossier, setTypeDossier] = useState('');
   const [montantReclame, setMontantReclame] = useState('');
   const [moyenPaiement, setMoyenPaiement] = useState('');
   const [observations, setObservations] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
 
+  // Ticket modérateur auto-calculation
+  const [calculResult, setCalculResult] = useState<CalculResult | null>(null);
+  const [calculLoading, setCalculLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     fetch('/api/dossiers/societes').then(r => r.json()).then(setSocietes).catch(() => {});
     fetch('/api/dossiers/gestionnaires?service=ACCUEIL').then(r => r.json()).then(setGestionnaires).catch(() => {});
+    fetch('/api/assures?limit=200').then(r => r.json()).then(data => setAssuresList(data.assures || [])).catch(() => {});
+    fetch('/api/prestataires?limit=200').then(r => r.json()).then(data => setPrestatairesList(data.prestataires || [])).catch(() => {});
   }, []);
+
+  // Debounced barème calculation
+  const fetchCalcul = useCallback(async () => {
+    if (!societeId || !typeDossier || !montantReclame || parseFloat(montantReclame) <= 0) {
+      setCalculResult(null);
+      return;
+    }
+    setCalculLoading(true);
+    try {
+      const res = await fetch('/api/technique/baremes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          societeId,
+          prestation: typeDossier,
+          montantReclame: parseFloat(montantReclame),
+        }),
+      });
+      if (!res.ok) {
+        setCalculResult(null);
+        return;
+      }
+      const data = await res.json();
+      setCalculResult(data);
+    } catch {
+      setCalculResult(null);
+    } finally {
+      setCalculLoading(false);
+    }
+  }, [societeId, typeDossier, montantReclame]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!societeId || !typeDossier || !montantReclame || parseFloat(montantReclame) <= 0) {
+      setCalculResult(null);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchCalcul();
+    }, 500);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [societeId, typeDossier, montantReclame, fetchCalcul]);
 
   function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const newFiles = Array.from(e.target.files || []);
@@ -72,6 +139,10 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
 
   function removeFile(id: string) { setFiles(prev => prev.filter(f => f.id !== id)); }
   function updateFileType(id: string, type: string) { setFiles(prev => prev.map(f => f.id === id ? { ...f, type } : f)); }
+
+  function formatAr(amount: number) {
+    return amount.toLocaleString('fr-FR') + ' Ar';
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -86,18 +157,26 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
       const total = count.pagination?.total || 0;
       const numeroDossier = `DOS-2026-${String(total + 1).padStart(6, '0')}`;
 
+      const postData: Record<string, unknown> = {
+        numeroDossier,
+        dateReception: new Date().toISOString().split('T')[0],
+        societeId,
+        beneficiaire,
+        typeDossier,
+        montantReclame: parseFloat(montantReclame),
+        gestionnaireAccueilId: gestionnaires[0]?.id || null,
+      };
+
+      // Auto-fill ticket modérateur fields if calculation is available
+      if (calculResult) {
+        postData.montantValide = calculResult.calcul.montantRembourse;
+        postData.ticketModerateur = calculResult.calcul.ticketModerateur;
+      }
+
       const res = await fetch('/api/dossiers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          numeroDossier,
-          dateReception: new Date().toISOString().split('T')[0],
-          societeId,
-          beneficiaire,
-          typeDossier,
-          montantReclame: parseFloat(montantReclame),
-          gestionnaireAccueilId: gestionnaires[0]?.id || null,
-        }),
+        body: JSON.stringify(postData),
       });
 
       if (!res.ok) {
@@ -109,9 +188,9 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
 
       // Mettre à jour les champs additionnels
       const updateData: Record<string, unknown> = {};
-      if (assure) updateData.assure = assure;
+      if (assure) updateData.assureId = assure;
       if (nSS) updateData.nSS = nSS;
-      if (prestataire) updateData.prestataire = prestataire;
+      if (prestataire) updateData.prestataireId = prestataire;
       if (dateSoins) updateData.dateSoins = new Date(dateSoins);
       if (moyenPaiement) updateData.moyenPaiement = moyenPaiement;
       if (observations) updateData.observations = observations;
@@ -144,6 +223,7 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
       setBeneficiaire(''); setAssure(''); setNSS(''); setSocieteId(''); setDateSoins('');
       setPrestataire(''); setTypeDossier(''); setMontantReclame(''); setMoyenPaiement(''); setObservations('');
       setFiles([]);
+      setCalculResult(null);
       onSuccess?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erreur lors de la création');
@@ -170,7 +250,20 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
             </div>
             <div className="space-y-1.5">
               <Label>Assuré</Label>
-              <Input value={assure} onChange={e => setAssure(e.target.value)} placeholder="Nom de l'assuré" />
+              <select value={assure} onChange={e => {
+                const sel = e.target.value;
+                setAssure(sel);
+                const found = assuresList.find(a => a.id === sel);
+                if (found) {
+                  setNSS(found.nSS || '');
+                  if (!societeId && found.societeId) setSocieteId(found.societeId);
+                }
+              }} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors">
+                <option value="">Sélectionner...</option>
+                {assuresList.filter(a => !societeId || a.societeId === societeId).map(a => (
+                  <option key={a.id} value={a.id}>{a.prenom ? `${a.prenom} ${a.nom}` : a.nom}{a.nSS ? ` (${a.nSS})` : ''}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label>N° Sécurité Sociale</Label>
@@ -189,7 +282,12 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
             </div>
             <div className="space-y-1.5">
               <Label>Prestataire médical</Label>
-              <Input value={prestataire} onChange={e => setPrestataire(e.target.value)} placeholder="Nom du prestataire" />
+              <select value={prestataire} onChange={e => setPrestataire(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors">
+                <option value="">Sélectionner...</option>
+                {prestatairesList.filter(p => p.actif !== false).map(p => (
+                  <option key={p.id} value={p.id}>{p.nom} ({p.type})</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -220,6 +318,59 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
             </div>
           </div>
         </div>
+
+        {/* Auto-calculation: Ticket modérateur */}
+        {calculLoading && (
+          <div className="flex items-center gap-2 text-sm text-emerald-600">
+            <Loader2 className="size-4 animate-spin" />
+            <span>Calcul du ticket modérateur en cours...</span>
+          </div>
+        )}
+
+        {!calculLoading && calculResult && (
+          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/60 overflow-hidden">
+            <div className="p-4 space-y-3">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                  <Calculator className="size-4" />
+                  <Sparkles className="size-3.5 text-amber-500" />
+                  <span>Calcul automatique</span>
+                </div>
+                {calculResult.plafondAtteint && (
+                  <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 gap-1">
+                    <AlertTriangle className="size-3" />
+                    Plafond atteint
+                  </Badge>
+                )}
+              </div>
+
+              {/* Barème info */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-emerald-700/80">
+                <span><span className="font-medium text-emerald-800">Barème :</span> {calculResult.bareme}</span>
+                <span><span className="font-medium text-emerald-800">Taux de couverture :</span> {calculResult.tauxCouverture}%</span>
+                <span><span className="font-medium text-emerald-800">Plafond :</span> {formatAr(calculResult.plafond)}</span>
+              </div>
+
+              {/* Two columns: Montant remboursé / Ticket modérateur */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-emerald-100/70 border border-emerald-200/60 p-3 text-center">
+                  <p className="text-xs font-medium text-emerald-700 mb-1">Montant remboursé</p>
+                  <p className="text-lg font-bold text-emerald-700">{formatAr(calculResult.calcul.montantRembourse)}</p>
+                </div>
+                <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3 text-center">
+                  <p className="text-xs font-medium text-amber-700 mb-1">Ticket modérateur</p>
+                  <p className="text-lg font-bold text-amber-700">{formatAr(calculResult.calcul.ticketModerateur)}</p>
+                </div>
+              </div>
+
+              {/* Explanation */}
+              {calculResult.explication && (
+                <p className="text-xs text-emerald-700/70 italic">{calculResult.explication}</p>
+              )}
+            </div>
+          </Card>
+        )}
 
         <Separator />
 
