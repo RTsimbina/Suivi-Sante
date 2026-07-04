@@ -31,8 +31,20 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl;
     const withBaremes = searchParams.get('withBaremes') === 'true';
+    const search = (searchParams.get('search') || '').trim();
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { nom: { contains: search, mode: 'insensitive' } },
+        { telephone: { contains: search } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { nif: { contains: search } },
+      ];
+    }
 
     const societes = await db.societe.findMany({
+      where,
       orderBy: { nom: 'asc' },
       include: {
         baremes: withBaremes
@@ -41,7 +53,7 @@ export async function GET(request: NextRequest) {
               orderBy: { prestation: 'asc' },
             }
           : false,
-        _count: { select: { dossiers: true, contrats: true, baremes: true } },
+        _count: { select: { dossiers: true, contrats: true, assures: true, baremes: true } },
       },
     });
 
@@ -63,8 +75,13 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { nom, baremes } = body as {
+    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = body as {
       nom: string;
+      adresse?: string;
+      telephone?: string;
+      email?: string;
+      nif?: string;
+      contactPrincipal?: string;
       baremes?: BaremeInput[];
     };
 
@@ -116,6 +133,11 @@ export async function POST(request: NextRequest) {
     const societe = await db.societe.create({
       data: {
         nom: nom.trim(),
+        ...(adresse ? { adresse: adresse.trim() } : {}),
+        ...(telephone ? { telephone: telephone.trim() } : {}),
+        ...(email ? { email: email.trim() } : {}),
+        ...(nif ? { nif: nif.trim() } : {}),
+        ...(contactPrincipal ? { contactPrincipal: contactPrincipal.trim() } : {}),
         baremes: baremes && baremes.length > 0
           ? {
               create: baremes.map((b) => ({

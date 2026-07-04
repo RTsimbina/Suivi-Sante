@@ -116,6 +116,15 @@ export const API_PERMISSIONS: Record<
       DELETE: ['ADMINISTRATEUR'],
     },
   },
+  '/api/reception/courriels': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'ACCUEIL'],
+      PUT: ['ADMINISTRATEUR', 'ACCUEIL'],
+      PATCH: ['ADMINISTRATEUR', 'ACCUEIL'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
+  },
 };
 
 // ─── Fonctions d'autorisation ────────────────────────────────────────────────

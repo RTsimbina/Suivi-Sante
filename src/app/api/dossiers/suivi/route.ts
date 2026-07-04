@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       take: 20,
     });
 
-    const NOW = new Date("2026-06-25");
+    const NOW = new Date();
 
     // Enrichir chaque dossier avec les informations de suivi de traitement et paiement
     const enriched = dossiers.map((d) => {

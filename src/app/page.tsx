@@ -29,6 +29,7 @@ import UsersView from '@/components/smartflow/users-view';
 import AssuresView from '@/components/smartflow/assures-view';
 import PrestatairesView from '@/components/smartflow/prestataires-view';
 import ConfigurationView from '@/components/smartflow/configuration-view';
+import SocietesView from '@/components/smartflow/societes-view';
 
 type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration';
 
@@ -225,7 +226,7 @@ export default function Home() {
           )}
           <div className="px-3 py-2 mt-2 rounded-lg bg-muted/50">
             <p className="text-[10px] text-muted-foreground">SmartFlow IA v2.0</p>
-            <p className="text-[10px] text-muted-foreground">Données au 25 Juin 2026</p>
+            <p className="text-[10px] text-muted-foreground">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           </div>
         </div>
       </aside>
@@ -266,7 +267,7 @@ export default function Home() {
           {view === 'users' && <UsersView />}
           {view === 'assures' && <AssuresView />}
           {view === 'prestataires' && <PrestatairesView />}
-          {view === 'societes' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
+          {view === 'societes' && <SocietesView />}
           {view === 'configuration' && <ConfigurationView />}
         </main>
       </div>

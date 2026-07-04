@@ -50,6 +50,7 @@ export default function ConfigurationView() {
   const [smtpStatus, setSmtpStatus] = useState<{ ok: boolean; erreur?: string } | null>(null);
   const [filterCanal, setFilterCanal] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [botStatus, setBotStatus] = useState<Record<string, { actif: boolean; details?: string }>>({});
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -70,6 +71,11 @@ export default function ConfigurationView() {
     fetch('/api/email-mensuel')
       .then(r => r.json())
       .then(setSmtpStatus)
+      .catch(() => {});
+    // Vérifier statut bots côté serveur
+    fetch('/api/bot-status')
+      .then(r => r.json())
+      .then(setBotStatus)
       .catch(() => {});
   }, [fetchMessages]);
 
@@ -118,9 +124,9 @@ export default function ConfigurationView() {
   };
 
   const bots: BotStatus[] = [
-    { nom: 'WhatsApp Bot', canal: 'WHATSAPP', actif: !!process.env.NEXT_PUBLIC_WHATSAPP || false, messagesTotal: messages.filter(m => m.canal === 'WHATSAPP').length, icon: MessageSquare, couleur: 'text-green-600 bg-green-50' },
-    { nom: 'Telegram Bot', canal: 'TELEGRAM', actif: !!process.env.NEXT_PUBLIC_TELEGRAM || false, messagesTotal: messages.filter(m => m.canal === 'TELEGRAM').length, icon: Send, couleur: 'text-blue-600 bg-blue-50' },
-    { nom: 'Messenger Bot', canal: 'MESSENGER', actif: !!process.env.NEXT_PUBLIC_MESSENGER || false, messagesTotal: messages.filter(m => m.canal === 'MESSENGER').length, icon: Bot, couleur: 'text-indigo-600 bg-indigo-50' },
+    { nom: 'WhatsApp Bot', canal: 'WHATSAPP', actif: botStatus?.whatsapp?.actif || false, messagesTotal: messages.filter(m => m.canal === 'WHATSAPP').length, icon: MessageSquare, couleur: 'text-green-600 bg-green-50' },
+    { nom: 'Telegram Bot', canal: 'TELEGRAM', actif: botStatus?.telegram?.actif || false, messagesTotal: messages.filter(m => m.canal === 'TELEGRAM').length, icon: Send, couleur: 'text-blue-600 bg-blue-50' },
+    { nom: 'Messenger Bot', canal: 'MESSENGER', actif: botStatus?.messenger?.actif || false, messagesTotal: messages.filter(m => m.canal === 'MESSENGER').length, icon: Bot, couleur: 'text-indigo-600 bg-indigo-50' },
   ];
 
   return (
@@ -149,8 +155,8 @@ export default function ConfigurationView() {
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Actif
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] text-gray-500">
-                            <XCircle className="h-3 w-3 mr-1" /> Non configuré
+                          <Badge variant="outline" className="text-[10px] text-gray-500" title={botStatus?.[bot.canal.toLowerCase()]?.details}>
+                            <XCircle className="h-3 w-3 mr-1" /> {botStatus?.[bot.canal.toLowerCase()]?.details || 'Non configuré'}
                           </Badge>
                         )}
                         <span className="text-[11px] text-muted-foreground">{bot.messagesTotal} msg</span>

@@ -72,8 +72,13 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { nom, baremes } = body as {
+    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = body as {
       nom?: string;
+      adresse?: string;
+      telephone?: string;
+      email?: string;
+      nif?: string;
+      contactPrincipal?: string;
       baremes?: BaremeInput[];
     };
 
@@ -174,6 +179,11 @@ export async function PUT(
         where: { id },
         data: {
           ...(nom ? { nom: nom.trim() } : {}),
+          ...(adresse !== undefined ? { adresse: adresse?.trim() || null } : {}),
+          ...(telephone !== undefined ? { telephone: telephone?.trim() || null } : {}),
+          ...(email !== undefined ? { email: email?.trim() || null } : {}),
+          ...(nif !== undefined ? { nif: nif?.trim() || null } : {}),
+          ...(contactPrincipal !== undefined ? { contactPrincipal: contactPrincipal?.trim() || null } : {}),
         },
         include: {
           baremes: { orderBy: { prestation: 'asc' } },

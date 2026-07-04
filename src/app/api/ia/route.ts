@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 
-const NOW = new Date("2026-06-25");
+const NOW = new Date();
 
 function diffDays(a: Date, b: Date): number {
   const ms = a.getTime() - b.getTime();

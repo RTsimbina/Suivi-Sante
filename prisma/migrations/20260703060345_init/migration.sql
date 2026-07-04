@@ -5,11 +5,14 @@ CREATE TABLE "Utilisateur" (
     "nom" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "role" TEXT NOT NULL DEFAULT 'UTILISATEUR',
+    "societeId" TEXT,
     "actif" BOOLEAN NOT NULL DEFAULT true,
     "avatar" TEXT,
+    "zaiUserId" TEXT,
     "dernierLogin" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Utilisateur_societeId_fkey" FOREIGN KEY ("societeId") REFERENCES "Societe" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -67,10 +70,9 @@ CREATE TABLE "Dossier" (
     "typeDossier" TEXT NOT NULL,
     "gestionnaireAccueilId" TEXT,
     "createurId" TEXT,
-    "assureId" TEXT,
+    "assure" TEXT,
     "nSS" TEXT,
-    "prestataireId" TEXT,
-    "prestataireLegacy" TEXT,
+    "prestataire" TEXT,
     "dateSoins" DATETIME,
     "moyenPaiement" TEXT,
     "observations" TEXT,
@@ -95,8 +97,6 @@ CREATE TABLE "Dossier" (
     CONSTRAINT "Dossier_societeId_fkey" FOREIGN KEY ("societeId") REFERENCES "Societe" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Dossier_gestionnaireAccueilId_fkey" FOREIGN KEY ("gestionnaireAccueilId") REFERENCES "Gestionnaire" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Dossier_createurId_fkey" FOREIGN KEY ("createurId") REFERENCES "Utilisateur" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Dossier_assureId_fkey" FOREIGN KEY ("assureId") REFERENCES "Assure" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Dossier_prestataireId_fkey" FOREIGN KEY ("prestataireId") REFERENCES "Prestataire" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Dossier_gestionnaireTechniqueId_fkey" FOREIGN KEY ("gestionnaireTechniqueId") REFERENCES "Gestionnaire" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Dossier_gestionnaireComptaId_fkey" FOREIGN KEY ("gestionnaireComptaId") REFERENCES "Gestionnaire" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -140,20 +140,6 @@ CREATE TABLE "ImportHistorique" (
 );
 
 -- CreateTable
-CREATE TABLE "Bareme" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "societeId" TEXT NOT NULL,
-    "prestation" TEXT NOT NULL,
-    "tauxCouverture" REAL NOT NULL,
-    "plafond" REAL NOT NULL,
-    "description" TEXT,
-    "active" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Bareme_societeId_fkey" FOREIGN KEY ("societeId") REFERENCES "Societe" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
-
--- CreateTable
 CREATE TABLE "ImportDossier" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "importId" TEXT NOT NULL,
@@ -166,74 +152,11 @@ CREATE TABLE "ImportDossier" (
     CONSTRAINT "ImportDossier_dossierId_fkey" FOREIGN KEY ("dossierId") REFERENCES "Dossier" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
--- CreateTable
-CREATE TABLE "Assure" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "societeId" TEXT NOT NULL,
-    "nom" TEXT NOT NULL,
-    "nSS" TEXT,
-    "prenom" TEXT,
-    "dateNaissance" DATETIME,
-    "sexe" TEXT,
-    "telephone" TEXT,
-    "email" TEXT,
-    "adresse" TEXT,
-    "actif" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Assure_societeId_fkey" FOREIGN KEY ("societeId") REFERENCES "Societe" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "Prestataire" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "nom" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "telephone" TEXT,
-    "email" TEXT,
-    "adresse" TEXT,
-    "nif" TEXT,
-    "statut" TEXT,
-    "rib" TEXT,
-    "actif" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
-);
-
--- CreateTable
-CREATE TABLE "Courriel" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "type" TEXT NOT NULL,
-    "expediteur" TEXT NOT NULL,
-    "objet" TEXT NOT NULL,
-    "societeId" TEXT,
-    "beneficiaire" TEXT,
-    "montant" REAL,
-    "dateCourriel" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "dateSoins" DATETIME,
-    "prestataire" TEXT,
-    "statut" TEXT NOT NULL DEFAULT 'RECU',
-    "traitePar" TEXT,
-    "dateTraitement" DATETIME,
-    "observations" TEXT,
-    "dossierId" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Courriel_societeId_fkey" FOREIGN KEY ("societeId") REFERENCES "Societe" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Courriel_dossierId_fkey" FOREIGN KEY ("dossierId") REFERENCES "Dossier" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "Utilisateur_email_key" ON "Utilisateur"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Utilisateur_zaiUserId_key" ON "Utilisateur"("zaiUserId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Dossier_numeroDossier_key" ON "Dossier"("numeroDossier");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Bareme_societeId_prestation_key" ON "Bareme"("societeId", "prestation");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Assure_nSS_key" ON "Assure"("nSS");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Courriel_dossierId_key" ON "Courriel"("dossierId");

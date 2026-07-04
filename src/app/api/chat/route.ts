@@ -3,9 +3,22 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import SDK from "z-ai-web-dev-sdk";
 import fs from "fs";
-import path from "path";
 
-const config = JSON.parse(fs.readFileSync("/etc/.z-ai-config", "utf-8"));
+let _sdk: InstanceType<typeof SDK> | null = null;
+function getLLM(): InstanceType<typeof SDK> | null {
+  if (!_sdk) {
+    try {
+      const configPath = '/etc/.z-ai-config';
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        _sdk = new SDK(config);
+      }
+    } catch (e) {
+      console.error('[CHAT] Erreur chargement SDK:', e);
+    }
+  }
+  return _sdk;
+}
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -77,7 +90,7 @@ async function buildKpiContext(): Promise<string> {
     .join("\n");
 
   // Retard info
-  const NOW = new Date("2026-06-25");
+  const NOW = new Date();
   const retardsReception = allDossiers.filter(
     (d) => d.statut === "RECU" && diffDays(NOW, d.dateReception) > 5
   ).length;
@@ -94,7 +107,8 @@ async function buildKpiContext(): Promise<string> {
       diffDays(NOW, d.dateReceptionDecompte) > 5
   ).length;
 
-  return `Données SmartFlow IA — Tableau de bord (au 25 juin 2026):
+  const aujourd = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return `Données SmartFlow IA — Tableau de bord (au ${aujourd}):
 
 RÉSUMÉ GLOBAL:
 - Total dossiers: ${total}
@@ -145,7 +159,13 @@ Tu aides les gestionnaires et directeurs à comprendre les performances de leur 
 ${context}`;
 
     // 3. Call LLM
-    const llm = new SDK(config);
+    const llm = getLLM();
+    if (!llm) {
+      return NextResponse.json(
+        { error: "Service IA temporairement indisponible" },
+        { status: 503 }
+      );
+    }
     const result = await llm.createChatCompletion({
       model: "glm-4-flash",
       messages: [
