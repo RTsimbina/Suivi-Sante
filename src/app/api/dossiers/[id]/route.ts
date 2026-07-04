@@ -45,6 +45,19 @@ export async function PATCH(
     if (authError) return authError;
     const { id } = await params;
 
+    // ─── Isolation : UTILISATEUR ne peut modifier que ses propres dossiers ───
+    const userRole = request.headers.get('x-user-role');
+    const userId = request.headers.get('x-user-id');
+    if (userRole === 'UTILISATEUR') {
+      const dossier = await db.dossier.findFirst({
+        where: { id, createurId: userId },
+        select: { id: true },
+      });
+      if (!dossier) {
+        return NextResponse.json({ error: 'Dossier introuvable' }, { status: 404 });
+      }
+    }
+
     const body = await request.json();
     const { statut } = body;
 
@@ -83,14 +96,13 @@ export async function PATCH(
     }
 
     // Vérification du rôle pour cette transition
-    const userRole = request.headers.get('x-user-role');
-    const userId = request.headers.get('x-user-id');
+    const roleTransition = request.headers.get('x-user-role');
     const transitionKey = `${existing.statut}_${statut}`;
     const allowedRoles = ROLE_TRANSITIONS[transitionKey];
 
-    if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
+    if (allowedRoles && roleTransition && !allowedRoles.includes(roleTransition)) {
       return NextResponse.json(
-        { error: `Le rôle '${userRole}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
+        { error: `Le rôle '${roleTransition}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
         { status: 403 }
       );
     }

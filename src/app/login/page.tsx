@@ -142,12 +142,27 @@ export default function LoginPage() {
 
               {/* Forgot password link */}
               <div className="flex justify-end">
-                <a
-                  href="#"
+                <button
+                  type="button"
+                  onClick={() => {
+                    const emailInput = (document.getElementById('email') as HTMLInputElement);
+                    const emailVal = emailInput?.value?.trim();
+                    if (emailVal) {
+                      fetch('/api/auth/forgot-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: emailVal }),
+                      }).then(r => r.json()).then(data => {
+                        alert(data.message || 'Si un compte existe, un lien de réinitialisation a été envoyé.');
+                      }).catch(() => alert('Erreur réseau. Veuillez réessayer.'));
+                    } else {
+                      window.location.href = '/reset-password';
+                    }
+                  }}
                   className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline"
                 >
                   Mot de passe oublié ?
-                </a>
+                </button>
               </div>
 
               {/* Submit */}
