@@ -13,6 +13,11 @@ function genererHTMLRapportSociete(data: {
   montantEnCours: number;
   delaiMoyen: number;
   topPrestations: { type: string; count: number; montant: number }[];
+  parAssure: { nom: string; nbDossiers: number; montantReclame: number; montantPaye: number }[];
+  appelsFonds: { reference: string; montant: number; statut: string; datePaiement?: string | null }[];
+  fondsDisponibles: number;
+  budgetUtilise: number;
+  budgetTotal: number;
 }): string {
   const statutColors: Record<string, string> = {
     RECU: '#f59e0b', EN_ANALYSE: '#3b82f6', VALIDE: '#8b5cf6',
@@ -135,13 +140,13 @@ function genererHTMLRapportSociete(data: {
           </td>
         </tr>
 
-        <!-- Montants -->
+        <!-- Montants + Budget -->
         <tr>
           <td style="padding: 8px 32px 16px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb; border-radius:8px; padding:12px;">
               <tr>
                 <td style="padding:8px 12px;">
-                  <p style="margin:0; font-size:12px; color:#6b7280;">Montant payé</p>
+                  <p style="margin:0; font-size:12px; color:#6b7280;">Montant paye</p>
                   <p style="margin:2px 0 0 0; font-size:16px; font-weight:600; color:#059669;">${fmt(data.montantPaye)} AR</p>
                 </td>
                 <td style="padding:8px 12px;">
@@ -149,13 +154,70 @@ function genererHTMLRapportSociete(data: {
                   <p style="margin:2px 0 0 0; font-size:16px; font-weight:600; color:#d97706;">${fmt(data.montantEnCours)} AR</p>
                 </td>
                 <td style="padding:8px 12px;">
-                  <p style="margin:0; font-size:12px; color:#6b7280;">Délai moyen</p>
+                  <p style="margin:0; font-size:12px; color:#6b7280;">Delai moyen</p>
                   <p style="margin:2px 0 0 0; font-size:16px; font-weight:600; color:#2563eb;">${data.delaiMoyen} jours</p>
                 </td>
               </tr>
             </table>
           </td>
         </tr>
+
+        ${data.parAssure.length > 0 ? `
+        <!-- Depenses par salarie/famille -->
+        <tr>
+          <td style="padding: 4px 32px 8px 32px;">
+            <h3 style="margin:0 0 8px 0; font-size:14px; color:#374151;">Depenses par salarie / famille</h3>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+              <tr style="background:#f9fafb;">
+                <th style="padding:8px 12px; text-align:left; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Beneficiaire</th>
+                <th style="padding:8px 12px; text-align:center; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Nb dossiers</th>
+                <th style="padding:8px 12px; text-align:right; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Reclame</th>
+                <th style="padding:8px 12px; text-align:right; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Paye</th>
+              </tr>
+              ${data.parAssure.slice(0, 20).map(a => `
+              <tr>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; font-size:12px;">${a.nom}</td>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; text-align:center; font-size:12px;">${a.nbDossiers}</td>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; text-align:right; font-size:12px;">${fmt(a.montantReclame)} AR</td>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; text-align:right; font-size:12px;">${fmt(a.montantPaye)} AR</td>
+              </tr>`).join('')}
+            </table>
+          </td>
+        </tr>` : ''}
+
+        ${(data.appelsFonds.length > 0 || data.budgetTotal > 0) ? `
+        <!-- Budget et appels de fonds -->
+        <tr>
+          <td style="padding: 4px 32px 8px 32px;">
+            <h3 style="margin:0 0 8px 0; font-size:14px; color:#374151;">Budget et appels de fonds</h3>
+            ${data.budgetTotal > 0 ? `
+            <div style="background:#eff6ff; border-radius:8px; padding:12px; margin-bottom:8px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:4px 0;"><p style="margin:0; font-size:12px; color:#6b7280;">Budget annuel</p><p style="margin:2px 0 0 0; font-size:15px; font-weight:600; color:#1e40af;">${fmt(data.budgetTotal)} AR</p></td>
+                  <td style="padding:4px 0;"><p style="margin:0; font-size:12px; color:#6b7280;">Budget utilise</p><p style="margin:2px 0 0 0; font-size:15px; font-weight:600; color:#d97706;">${fmt(data.budgetUtilise)} AR</p></td>
+                  <td style="padding:4px 0;"><p style="margin:0; font-size:12px; color:#6b7280;">Fonds disponibles</p><p style="margin:2px 0 0 0; font-size:15px; font-weight:600; color:#059669;">${fmt(data.fondsDisponibles)} AR</p></td>
+                </tr>
+              </table>
+            </div>` : ''}
+            ${data.appelsFonds.length > 0 ? `
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+              <tr style="background:#f9fafb;">
+                <th style="padding:8px 12px; text-align:left; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Reference</th>
+                <th style="padding:8px 12px; text-align:right; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Montant</th>
+                <th style="padding:8px 12px; text-align:center; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Statut</th>
+                <th style="padding:8px 12px; text-align:center; font-size:11px; color:#6b7280; text-transform:uppercase; border-bottom:1px solid #e5e7eb;">Date paiement</th>
+              </tr>
+              ${data.appelsFonds.map(af => `
+              <tr>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; font-size:12px;">${af.reference}</td>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; text-align:right; font-size:12px;">${fmt(af.montant)} AR</td>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; text-align:center; font-size:12px;">${af.statut}</td>
+                <td style="padding:6px 12px; border-bottom:1px solid #f3f4f6; text-align:center; font-size:12px;">${af.datePaiement || 'En attente'}</td>
+              </tr>`).join('')}
+            </table>` : ''}
+          </td>
+        </tr>` : ''}
 
         <!-- Pied de page -->
         <tr>
@@ -188,10 +250,10 @@ export async function envoyerRapportMensuel(): Promise<{
   const nomsMois = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
   const periode = `${nomsMois[moisPrecedent.getMonth()]} ${moisPrecedent.getFullYear()}`;
 
-  // Récupérer toutes les sociétés actives avec leurs contrats
+  // Récupérer toutes les sociétés actives avec leurs contrats et appels de fonds
   const societes = await db.societe.findMany({
     include: {
-      contrats: { where: { statut: 'ACTIF' } },
+      contrats: { where: { statut: 'ACTIF' }, include: { appelsDeFonds: { orderBy: { createdAt: 'desc' } } } },
       _count: { select: { dossiers: true } },
     },
   });
@@ -247,6 +309,33 @@ export async function envoyerRapportMensuel(): Promise<{
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
+      // Depenses par assure (beneficiaire)
+      const assureMap = new Map<string, { nom: string; nbDossiers: number; montantReclame: number; montantPaye: number }>();
+      for (const d of dossiers) {
+        const key = d.beneficiaire;
+        const existing = assureMap.get(key) || { nom: key, nbDossiers: 0, montantReclame: 0, montantPaye: 0 };
+        existing.nbDossiers++;
+        existing.montantReclame += d.montantReclame;
+        existing.montantPaye += d.montantPaye || 0;
+        assureMap.set(key, existing);
+      }
+      const parAssure = Array.from(assureMap.values()).sort((a, b) => b.montantReclame - a.montantReclame);
+
+      // Appels de fonds regles et budget
+      const tousContrats = await db.contrat.findMany({
+        where: { societeId: societe.id },
+        include: { appelsDeFonds: true },
+      });
+      const budgetTotal = tousContrats.reduce((s, c) => s + c.budgetAnnuel, 0);
+      const budgetUtilise = tousContrats.reduce((s, c) => s + c.budgetUtilise, 0);
+      const fondsDisponibles = budgetTotal - budgetUtilise;
+      const appelsFonds = tousContrats.flatMap(c => c.appelsDeFonds).map(af => ({
+        reference: af.reference,
+        montant: af.montant,
+        statut: af.statut,
+        datePaiement: af.datePaiement ? af.datePaiement.toLocaleDateString('fr-FR') : null,
+      }));
+
       // Destinataires : email de la société (si disponible) + contacts contrat
       const destinataires: string[] = [];
       // Vérifier si la société a un email de contact (on pourrait ajouter un champ email à Societe)
@@ -268,6 +357,11 @@ export async function envoyerRapportMensuel(): Promise<{
         montantEnCours,
         delaiMoyen,
         topPrestations,
+        parAssure,
+        appelsFonds,
+        fondsDisponibles,
+        budgetUtilise,
+        budgetTotal,
       });
 
       await envoyerEmail({
@@ -303,6 +397,11 @@ export async function envoyerTestEmail(destinataire: string): Promise<{ ok: bool
       montantEnCours: 0,
       delaiMoyen: 0,
       topPrestations: [],
+      parAssure: [],
+      appelsFonds: [],
+      fondsDisponibles: 0,
+      budgetUtilise: 0,
+      budgetTotal: 0,
     });
 
     await envoyerEmail({

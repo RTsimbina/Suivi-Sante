@@ -7,6 +7,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
+
+    // ─── Isolation : UTILISATEUR ne peut voir que ses propres dossiers ───
+    const userRole = request.headers.get('x-user-role');
+    const userId = request.headers.get('x-user-id');
+    if (userRole === 'UTILISATEUR') {
+      const dossier = await db.dossier.findFirst({
+        where: { id, createurId: userId },
+        select: { id: true },
+      });
+      if (!dossier) {
+        return NextResponse.json({ error: 'Dossier introuvable' }, { status: 404 });
+      }
+    }
+
     const dossier = await db.dossier.findUnique({
       where: { id },
       include: {

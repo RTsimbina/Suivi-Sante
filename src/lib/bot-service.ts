@@ -43,6 +43,47 @@ export async function sauvegarderMessage(msg: MessageBotIncoming, reponse: strin
   }
 }
 
+// ─── Identification et isolation des données bots ─────────────────────────
+
+// En mémoire : association ID expéditeur (téléphone/chatId) → assure vérifié
+const botSessions = new Map<string, { assureId: string; assureNom: string; societeId: string; verifieA: Date }>();
+const SESSION_TTL = 4 * 60 * 60 * 1000; // 4h
+
+async function identifierExpediteur(msg: MessageBotIncoming): Promise<{ assureId: string; assureNom: string; societeId: string } | null> {
+  const cached = botSessions.get(msg.expeditieurId);
+  if (cached && (Date.now() - cached.verifieA.getTime()) < SESSION_TTL) {
+    return { assureId: cached.assureId, assureNom: cached.assureNom, societeId: cached.societeId };
+  }
+  const assure = await db.assure.findFirst({
+    where: { telephone: { contains: msg.expeditieurId.replace(/[^\d+]/g, '') }, actif: true },
+    include: { societe: { select: { id: true, nom: true } } },
+  });
+  if (assure) {
+    const session = { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId, verifieA: new Date() };
+    botSessions.set(msg.expeditieurId, session);
+    return session;
+  }
+  return null;
+}
+
+async function verifierNSS(nss: string, expediteurId: string): Promise<string> {
+  const assure = await db.assure.findFirst({
+    where: { nSS: nss.trim(), actif: true },
+    include: { societe: { select: { id: true, nom: true } } },
+  });
+  if (!assure) return 'Numero de securite sociale non reconnu. Verifiez et reessayez.';
+  botSessions.set(expediteurId, { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId, verifieA: new Date() });
+  return `Identite confirmee. Bienvenue ${assure.prenom || ''} ${assure.nom} (${assure.societe.nom}).\nVous pouvez maintenant consulter vos dossiers avec /dossier ou /mesdossiers.`;
+}
+
+async function mesDossiers(assureId: string, assureNom: string): Promise<string> {
+  const dossiers = await db.dossier.findMany({ where: { assureId }, include: { societe: { select: { nom: true } } }, orderBy: { createdAt: 'desc' }, take: 10 });
+  if (dossiers.length === 0) return `${assureNom}, vous n'avez aucun dossier enregistre.`;
+  const statutLabels: Record<string, string> = { RECU: 'Recu', EN_ANALYSE: 'En analyse', VALIDE: 'Valide', EN_COMPTABILITE: 'En comptabilite', EN_PAIEMENT: 'En paiement', PAYE: 'Paye', REJETE: 'Rejete' };
+  const lignes = dossiers.map(d => `- ${d.numeroDossier}: ${statutLabels[d.statut] || d.statut} — ${d.montantReclame.toLocaleString('fr-FR')} AR${d.montantPaye ? ` (Paye: ${d.montantPaye.toLocaleString('fr-FR')} AR)` : ''}`);
+  return `${assureNom}, voici vos ${dossiers.length} dernier(s) dossier(s):\n${lignes.join('\n')}`;
+}
+
 // ─── Recherche d'assuré par nom ou NSS ──────────────────────────────────────
 async function chercherAssure(query: string): Promise<string> {
   const q = query.trim();
@@ -106,8 +147,23 @@ async function chercherPrestataire(query: string): Promise<string> {
 }
 
 // ─── Suivi d'un dossier par numéro ──────────────────────────────────────────
-async function suiviDossier(numero: string): Promise<string> {
+async function suiviDossier(numero: string, expediteurId?: string): Promise<string> {
   const q = numero.trim().toUpperCase();
+
+  // Si l'expediteur est identifie, verifier que le dossier lui appartient
+  if (expediteurId) {
+    const session = botSessions.get(expediteurId);
+    if (session) {
+      const assureDossiers = await db.dossier.findMany({
+        where: { assureId: session.assureId, numeroDossier: { contains: q } },
+        select: { id: true }, take: 1,
+      });
+      if (assureDossiers.length === 0) {
+        return `Aucun dossier "${numero}" ne vous est associe. Vous ne pouvez consulter que vos propres dossiers.`;
+      }
+    }
+  }
+
   const dossier = await db.dossier.findFirst({
     where: {
       OR: [
@@ -262,7 +318,9 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
     return [
       'SmartFlow IA — Commandes disponibles:',
       '',
-      '/assure [nom ou NSS] — Rechercher un assuré',
+      '/verifier [NSS] — Vous identifier (obligatoire pour acceder a vos donnees)',
+      '/mesdossiers — Voir vos dossiers (apres identification)',
+      '/assure [nom ou NSS] — Rechercher un assure',
       '/prestataire [nom] — Rechercher un prestataire médical',
       '/dossier [numéro] — Suivre l\'état d\'un dossier',
       '/calcul [société] [prestation] [montant] — Calculer le remboursement',
@@ -278,6 +336,19 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
     ].join('\n');
   }
 
+  // Commande /verifier [NSS]
+  if (lowerText.startsWith('/verifier ')) {
+    const nss = texte.slice('/verifier '.length).trim();
+    return await verifierNSS(nss, msg.expeditieurId);
+  }
+
+  // Commande /mesdossiers
+  if (lowerText === '/mesdossiers' || lowerText === '/mes dossiers') {
+    const ident = await identifierExpediteur(msg);
+    if (!ident) return 'Vous devez d\'abord vous identifier. Envoyez /verifier [votre numero de securite sociale].';
+    return await mesDossiers(ident.assureId, ident.assureNom);
+  }
+
   // Commande /assure
   if (lowerText.startsWith('/assure ')) {
     const query = texte.slice('/assure '.length);
@@ -290,10 +361,10 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
     return await chercherPrestataire(query);
   }
 
-  // Commande /dossier
+  // Commande /dossier (avec controle d'acces)
   if (lowerText.startsWith('/dossier ')) {
     const numero = texte.slice('/dossier '.length);
-    return await suiviDossier(numero);
+    return await suiviDossier(numero, msg.expeditieurId);
   }
 
   // Commande /calcul
