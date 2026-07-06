@@ -137,6 +137,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ─── MONTANTS NÉGATIFS ─────────────────────────────────────
+    for (const d of allDossiers) {
+      if (d.montantReclame < 0) {
+        anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant r\u00e9clam\u00e9 n\u00e9gatif: ${d.montantReclame} Ar` });
+      }
+      if (d.montantValide !== null && d.montantValide !== undefined && d.montantValide < 0) {
+        anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant valid\u00e9 n\u00e9gatif: ${d.montantValide} Ar` });
+      }
+      if (d.montantPaye !== null && d.montantPaye !== undefined && d.montantPaye < 0) {
+        anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant pay\u00e9 n\u00e9gatif: ${d.montantPaye} Ar` });
+      }
+    }
+
+    // ─── DOUBLONS ─────────────────────────────────────────────
+    const doublons: { numeroDossier1: string; numeroDossier2: string; beneficiaire: string; motif: string }[] = [];
+    for (let i = 0; i < allDossiers.length; i++) {
+      for (let j = i + 1; j < allDossiers.length; j++) {
+        const a = allDossiers[i], b = allDossiers[j];
+        const sameBenef = a.beneficiaire.toLowerCase().trim() === b.beneficiaire.toLowerCase().trim();
+        const sameSociete = a.societeId === b.societeId;
+        const sameType = a.typeDossier === b.typeDossier;
+        const sameDate = a.dateSoins && b.dateSoins && a.dateSoins.toISOString().split("T")[0] === b.dateSoins.toISOString().split("T")[0];
+        const sameMontant = a.montantReclame === b.montantReclame && a.montantReclame > 0;
+        let motif = "";
+        if (sameBenef && sameSociete && sameType && sameDate) motif = "M\u00eame b\u00e9n\u00e9ficiaire, soci\u00e9t\u00e9, type et date de soins";
+        else if (sameBenef && sameSociete && sameType && sameMontant) motif = "M\u00eame b\u00e9n\u00e9ficiaire, soci\u00e9t\u00e9, type et montant";
+        if (motif) doublons.push({ numeroDossier1: a.numeroDossier, numeroDossier2: b.numeroDossier, beneficiaire: a.beneficiaire, motif });
+      }
+    }
+
     // ─── PIÈCES JUSTIFICATIVES MANQUANTES ──────────────────────
     const piecesManquantes: {
       numeroDossier: string;
@@ -318,6 +348,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       retards,
       anomalies,
+      doublons,
       piecesManquantes,
       incoherences,
       previsions: {

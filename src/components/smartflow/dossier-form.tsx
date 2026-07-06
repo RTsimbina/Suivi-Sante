@@ -43,6 +43,13 @@ const MOYENS = [
   { value: 'VIREMENT', label: 'Virement bancaire' },
   { value: 'CHEQUE', label: 'Chèque' },
   { value: 'ESPECES', label: 'Espèces' },
+  { value: 'MOBILE_MONEY', label: 'Mobile Money' },
+  { value: 'AUTRE', label: 'Autre' },
+];
+
+const CATEGORIES = [
+  { value: 'REMBOURSEMENT_ASSURE', label: 'Remboursement assuré' },
+  { value: 'REGLEMENT_PRESTATAIRE', label: 'Règlement prestataire' },
 ];
 
 const JUSTIF_TYPES = ['FACTURE', 'ORDONNANCE', 'RIB', 'CARNET_SOINS', 'DECOMPTE', 'AUTRE'];
@@ -70,6 +77,7 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
   const [montantReclame, setMontantReclame] = useState('');
   const [moyenPaiement, setMoyenPaiement] = useState('');
   const [observations, setObservations] = useState('');
+  const [categorieDossier, setCategorieDossier] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
 
   // Ticket modérateur auto-calculation
@@ -163,6 +171,7 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
         societeId,
         beneficiaire,
         typeDossier,
+        categorieDossier: categorieDossier || undefined,
         montantReclame: parseFloat(montantReclame),
         gestionnaireAccueilId: gestionnaires[0]?.id || null,
       };
@@ -221,7 +230,7 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
       toast.success(`Dossier ${numeroDossier} créé avec succès`);
       // Reset
       setBeneficiaire(''); setAssure(''); setNSS(''); setSocieteId(''); setDateSoins('');
-      setPrestataire(''); setTypeDossier(''); setMontantReclame(''); setMoyenPaiement(''); setObservations('');
+      setPrestataire(''); setTypeDossier(''); setCategorieDossier(''); setMontantReclame(''); setMoyenPaiement(''); setObservations('');
       setFiles([]);
       setCalculResult(null);
       onSuccess?.();
@@ -303,6 +312,13 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
               <select value={typeDossier} onChange={e => setTypeDossier(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors" required>
                 <option value="">Sélectionner...</option>
                 {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Catégorie</Label>
+              <select value={categorieDossier} onChange={e => setCategorieDossier(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors">
+                <option value="">Sélectionner...</option>
+                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
