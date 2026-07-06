@@ -21,7 +21,7 @@ export const API_PERMISSIONS: Record<
   '/api/dossiers': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
     methods: {
-      POST: ['ADMINISTRATEUR', 'ACCUEIL'],         // Créer un dossier
+      POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
       DELETE: ['ADMINISTRATEUR'],
       PATCH: ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE'], // Changer statut
@@ -31,7 +31,7 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
   '/api/ia': {
-    roles: ['ADMINISTRATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
   },
   '/api/chat': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
@@ -59,7 +59,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/portail': {
-    roles: ['ADMINISTRATEUR', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
   },
   '/api/upload': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
@@ -115,6 +115,26 @@ export const API_PERMISSIONS: Record<
     methods: {
       DELETE: ['ADMINISTRATEUR'],
     },
+  },
+  '/api/alertes': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+  },
+  '/api/entreprise-contacts': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'ACCUEIL'],
+      PUT: ['ADMINISTRATEUR', 'ACCUEIL'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
+  },
+  '/api/societes': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+  },
+  '/api/baremes': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR'],
+  },
+  '/api/entreprises': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
   },
   '/api/reception/courriels': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],

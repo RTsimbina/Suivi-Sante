@@ -36,6 +36,7 @@ export default function SocietesView() {
   const [editing, setEditing] = useState<Societe | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [contratsMap, setContratsMap] = useState<Record<string, { reference: string; budgetAnnuel: number; budgetUtilise: number; solde: number; statut: string; dateFin: string }[]>>({});
 
   // Formulaire
   const [formNom, setFormNom] = useState('');
@@ -60,6 +61,27 @@ export default function SocietesView() {
   }, [search]);
 
   useEffect(() => { fetchSocietes(); }, [fetchSocietes]);
+
+  useEffect(() => {
+    async function fetchContrats() {
+      try {
+        const res = await fetch('/api/contrats');
+        if (res.ok) {
+          const data = await res.json();
+          const map: Record<string, typeof contratsMap[string]> = {};
+          for (const c of (Array.isArray(data) ? data : [])) {
+            const sid = c.societe?.id;
+            if (sid) {
+              if (!map[sid]) map[sid] = [];
+              map[sid].push({ reference: c.reference, budgetAnnuel: c.budgetAnnuel, budgetUtilise: c.budgetUtilise, solde: c.budgetAnnuel - c.budgetUtilise, statut: c.statut, dateFin: c.dateFin });
+            }
+          }
+          setContratsMap(map);
+        }
+      } catch { /* silent */ }
+    }
+    fetchContrats();
+  }, []);
 
   function resetForm() {
     setFormNom(''); setFormAdresse(''); setFormTelephone('');
@@ -272,6 +294,38 @@ export default function SocietesView() {
                         <p className="font-medium">{new Date(soc.createdAt).toLocaleDateString('fr-FR')}</p>
                       </div>
                     </div>
+                    {/* Contrats associés et solde */}
+                    {(contratsMap[soc.id] || []).length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold text-foreground mb-2">Contrats et soldes disponibles</p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="border-b">
+                              <tr className="text-left">
+                                <th className="py-1.5 pr-2 font-medium text-muted-foreground">Référence</th>
+                                <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Budget</th>
+                                <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Utilisé</th>
+                                <th className="py-1.5 pr-2 font-medium text-muted-foreground text-right">Solde</th>
+                                <th className="py-1.5 font-medium text-muted-foreground text-center">Statut</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {contratsMap[soc.id]!.map(c => (
+                                <tr key={c.reference} className="border-b last:border-0">
+                                  <td className="py-1.5 pr-2 font-mono">{c.reference}</td>
+                                  <td className="py-1.5 pr-2 text-right">{c.budgetAnnuel.toLocaleString('fr-FR')} Ar</td>
+                                  <td className="py-1.5 pr-2 text-right text-amber-600">{c.budgetUtilise.toLocaleString('fr-FR')} Ar</td>
+                                  <td className={`py-1.5 pr-2 text-right font-medium ${c.solde < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{c.solde.toLocaleString('fr-FR')} Ar</td>
+                                  <td className="py-1.5 text-center">
+                                    <Badge variant="outline" className={`text-[9px] ${c.statut === 'ACTIF' ? 'border-emerald-200 text-emerald-700' : c.statut === 'EXPIRE' ? 'border-red-200 text-red-700' : 'border-amber-200 text-amber-700'}`}>{c.statut}</Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

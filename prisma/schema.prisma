@@ -35,6 +35,7 @@ model Societe {
   contrats  Contrat[]
   courriels Courriel[]
   assures   Assure[]
+  contacts  EntrepriseContact[]
   createdAt DateTime  @default(now())
 }
 
@@ -85,6 +86,7 @@ model Dossier {
   societe                   Societe      @relation(fields: [societeId], references: [id])
   beneficiaire              String
   typeDossier               String
+  categorieDossier           String?       // REMBOURSEMENT_ASSURE, REGLEMENT_PRESTATAIRE
   gestionnaireAccueilId     String?
   gestionnaireAccueil       Gestionnaire? @relation("GestionnaireAccueil", fields: [gestionnaireAccueilId], references: [id])
   createurId                String?
@@ -263,4 +265,18 @@ model MessageBot {
   reponse         String
   lu              Boolean  @default(false)
   createdAt       DateTime   @default(now())
+}
+
+model EntrepriseContact {
+  id              String    @id @default(cuid())
+  societeId       String
+  societe         Societe   @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  nom             String
+  prenom          String?
+  fonction        String?   // RH, FINANCE, AUTRE
+  telephone       String?
+  email           String?
+  actif           Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }

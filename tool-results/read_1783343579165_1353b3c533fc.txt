@@ -1,0 +1,639 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import {
+     5→  Dialog,
+     6→  DialogContent,
+     7→  DialogHeader,
+     8→  DialogTitle,
+     9→  DialogDescription,
+    10→} from '@/components/ui/dialog';
+    11→import { Badge } from '@/components/ui/badge';
+    12→import { Button } from '@/components/ui/button';
+    13→import { Textarea } from '@/components/ui/textarea';
+    14→import { Separator } from '@/components/ui/separator';
+    15→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    16→import {
+    17→  Select,
+    18→  SelectContent,
+    19→  SelectItem,
+    20→  SelectTrigger,
+    21→  SelectValue,
+    22→} from '@/components/ui/select';
+    23→import { Skeleton } from '@/components/ui/skeleton';
+    24→import { ScrollArea } from '@/components/ui/scroll-area';
+    25→import {
+    26→  FileText,
+    27→  Download,
+    28→  Clock,
+    29→  User,
+    30→  Building2,
+    31→  Calendar,
+    32→  CreditCard,
+    33→  MessageSquare,
+    34→  Send,
+    35→  Loader2,
+    36→  Eye,
+    37→  EyeOff,
+    38→  Paperclip,
+    39→  X,
+    40→  CheckCircle2,
+    41→  AlertCircle,
+    42→  ArrowRight,
+    43→  Upload,
+    44→} from 'lucide-react';
+    45→import { useToast } from '@/hooks/use-toast';
+    46→import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
+    47→import { cn } from '@/lib/utils';
+    48→
+    49→// ── Types ──────────────────────────────────────────────────────────────────
+    50→
+    51→interface DossierDetail {
+    52→  id: string;
+    53→  numeroDossier: string;
+    54→  dateReception: string;
+    55→  beneficiaire: string;
+    56→  assure: string | null;
+    57→  nSS: string | null;
+    58→  typeDossier: string;
+    59→  statut: string;
+    60→  source: string;
+    61→  prestataire: string | null;
+    62→  dateSoins: string | null;
+    63→  moyenPaiement: string | null;
+    64→  observations: string | null;
+    65→  montantReclame: number;
+    66→  montantValide: number | null;
+    67→  ticketModerateur: number | null;
+    68→  partPatient: number | null;
+    69→  partEntreprise: number | null;
+    70→  motifRejet: string | null;
+    71→  dateTraitementTechnique: string | null;
+    72→  dateReceptionDecompte: string | null;
+    73→  datePaiement: string | null;
+    74→  referencePaiement: string | null;
+    75→  montantPaye: number | null;
+    76→  historiqueParsed: HistoriqueEntry[];
+    77→  societe: { id: string; nom: string };
+    78→  gestionnaireAccueil: { id: string; nom: string; service: string } | null;
+    79→  gestionnaireTechnique: { id: string; nom: string; service: string } | null;
+    80→  gestionnaireCompta: { id: string; nom: string; service: string } | null;
+    81→  createur: { id: string; nom: string; email: string; role: string } | null;
+    82→  commentaires: CommentaireWithAuteur[];
+    83→  justificatifs: {
+    84→    id: string;
+    85→    type: string;
+    86→    nomFichier: string;
+    87→    chemin: string;
+    88→    tailleKo: number | null;
+    89→    createdAt: string;
+    90→  }[];
+    91→}
+    92→
+    93→interface CommentaireWithAuteur {
+    94→  id: string;
+    95→  contenu: string;
+    96→  prive: boolean;
+    97→  createdAt: string;
+    98→  auteur: { id: string; nom: string; email: string; role: string } | null;
+    99→}
+   100→
+   101→interface HistoriqueEntry {
+   102→  date: string;
+   103→  statut: string;
+   104→  commentaire?: string;
+   105→  userId?: string;
+   106→}
+   107→
+   108→const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
+   109→
+   110→const JUSTIFICATIF_LABELS: Record<string, string> = {
+   111→  FACTURE: 'Facture',
+   112→  ORDONNANCE: 'Ordonnance',
+   113→  RIB: 'RIB',
+   114→  CARNET_SOINS: 'Carnet de soins',
+   115→  DECOMPTE: 'Décompte',
+   116→  AUTRE: 'Autre',
+   117→};
+   118→
+   119→const JUSTIFICATIF_COLORS: Record<string, string> = {
+   120→  FACTURE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+   121→  ORDONNANCE: 'bg-sky-50 text-sky-700 border-sky-200',
+   122→  RIB: 'bg-amber-50 text-amber-700 border-amber-200',
+   123→  CARNET_SOINS: 'bg-purple-50 text-purple-700 border-purple-200',
+   124→  DECOMPTE: 'bg-orange-50 text-orange-700 border-orange-200',
+   125→  AUTRE: 'bg-gray-50 text-gray-600 border-gray-200',
+   126→};
+   127→
+   128→const HISTORIQUE_STATUT_COLORS: Record<string, string> = {
+   129→  RECU: 'bg-slate-500',
+   130→  EN_ANALYSE: 'bg-amber-500',
+   131→  VALIDE: 'bg-emerald-500',
+   132→  EN_COMPTABILITE: 'bg-sky-500',
+   133→  EN_PAIEMENT: 'bg-indigo-500',
+   134→  PAYE: 'bg-teal-500',
+   135→  REJETE: 'bg-red-500',
+   136→};
+   137→
+   138→// ── Component ──────────────────────────────────────────────────────────────
+   139→
+   140→interface DossierDetailProps {
+   141→  dossierId: string;
+   142→  onClose: () => void;
+   143→}
+   144→
+   145→export default function DossierDetail({ dossierId, onClose }: DossierDetailProps) {
+   146→  const { toast } = useToast();
+   147→  const [dossier, setDossier] = useState<DossierDetail | null>(null);
+   148→  const [loading, setLoading] = useState(true);
+   149→  const [commentaire, setCommentaire] = useState('');
+   150→  const [commentPrive, setCommentPrive] = useState(false);
+   151→  const [sendingComment, setSendingComment] = useState(false);
+   152→  const [activeTab, setActiveTab] = useState<'info' | 'historique' | 'commentaires' | 'justificatifs'>('info');
+   153→  const [uploadFile, setUploadFile] = useState<File | null>(null);
+   154→  const [uploadType, setUploadType] = useState('FACTURE');
+   155→  const [uploading, setUploading] = useState(false);
+   156→
+   157→  const handleUpload = async () => {
+   158→    if (!uploadFile || !dossierId) return;
+   159→    setUploading(true);
+   160→    try {
+   161→      const formData = new FormData();
+   162→      formData.append('file', uploadFile);
+   163→      formData.append('dossierId', dossierId);
+   164→      formData.append('type', uploadType);
+   165→      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+   166→      if (!res.ok) {
+   167→        const err = await res.json();
+   168→        toast({ title: 'Erreur', description: err.erreur || "Échec de l'upload", variant: 'destructive' });
+   169→        return;
+   170→      }
+   171→      toast({ title: 'Fichier ajouté', description: `${uploadFile.name} a été téléchargé avec succès` });
+   172→      setUploadFile(null);
+   173→      const fileInput = document.getElementById('upload-justificatif') as HTMLInputElement;
+   174→      if (fileInput) fileInput.value = '';
+   175→      fetchDossier();
+   176→    } catch {
+   177→      toast({ title: 'Erreur réseau', description: "Impossible de télécharger le fichier", variant: 'destructive' });
+   178→    } finally {
+   179→      setUploading(false);
+   180→    }
+   181→  };
+   182→
+   183→  const fetchDossier = useCallback(async () => {
+   184→    setLoading(true);
+   185→    try {
+   186→      const res = await fetch(`/api/dossiers/${dossierId}/detail`);
+   187→      if (res.ok) {
+   188→        const data = await res.json();
+   189→        setDossier(data);
+   190→      } else {
+   191→        toast({ title: 'Erreur', description: 'Dossier introuvable', variant: 'destructive' });
+   192→        onClose();
+   193→      }
+   194→    } catch {
+   195→      toast({ title: 'Erreur', description: 'Erreur de chargement', variant: 'destructive' });
+   196→    } finally {
+   197→      setLoading(false);
+   198→    }
+   199→  }, [dossierId, onClose, toast]);
+   200→
+   201→  useEffect(() => {
+   202→    fetchDossier();
+   203→  }, [fetchDossier]);
+   204→
+   205→  const handleAddComment = async () => {
+   206→    if (!commentaire.trim()) return;
+   207→    setSendingComment(true);
+   208→    try {
+   209→      const res = await fetch(`/api/dossiers/${dossierId}/commentaires`, {
+   210→        method: 'POST',
+   211→        headers: { 'Content-Type': 'application/json' },
+   212→        body: JSON.stringify({ contenu: commentaire, prive: commentPrive }),
+   213→      });
+   214→      if (res.ok) {
+   215→        const newComment = await res.json();
+   216→        setDossier((prev) => prev ? { ...prev, commentaires: [...prev.commentaires, newComment] } : prev);
+   217→        setCommentaire('');
+   218→        toast({ title: 'Commentaire ajouté' });
+   219→      }
+   220→    } catch {
+   221→      toast({ title: 'Erreur', description: "Impossible d'ajouter le commentaire", variant: 'destructive' });
+   222→    } finally {
+   223→      setSendingComment(false);
+   224→    }
+   225→  };
+   226→
+   227→  const handleStatutChange = async (newStatut: string) => {
+   228→    try {
+   229→      const res = await fetch(`/api/dossiers/${dossierId}`, {
+   230→        method: 'PATCH',
+   231→        headers: { 'Content-Type': 'application/json' },
+   232→        body: JSON.stringify({ statut: newStatut }),
+   233→      });
+   234→      if (res.ok) {
+   235→        fetchDossier();
+   236→        toast({ title: 'Statut mis à jour', description: statutLabel(newStatut) });
+   237→      }
+   238→    } catch {
+   239→      toast({ title: 'Erreur', description: 'Impossible de changer le statut', variant: 'destructive' });
+   240→    }
+   241→  };
+   242→
+   243→  if (loading) {
+   244→    return (
+   245→      <Dialog open onOpenChange={() => onClose()}>
+   246→        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-hidden p-0">
+   247→          <div className="p-6 space-y-4">
+   248→            <Skeleton className="h-6 w-64" />
+   249→            <Skeleton className="h-4 w-40" />
+   250→            <div className="grid grid-cols-2 gap-4 pt-4">
+   251→              {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+   252→            </div>
+   253→          </div>
+   254→        </DialogContent>
+   255→      </Dialog>
+   256→    );
+   257→  }
+   258→
+   259→  if (!dossier) return null;
+   260→
+   261→  const tabs = [
+   262→    { key: 'info' as const, label: 'Informations', icon: FileText },
+   263→    { key: 'historique' as const, label: `Historique (${dossier.historiqueParsed?.length || 0})`, icon: Clock },
+   264→    { key: 'commentaires' as const, label: `Commentaires (${dossier.commentaires?.length || 0})`, icon: MessageSquare },
+   265→    { key: 'justificatifs' as const, label: `Pièces (${dossier.justificatifs?.length || 0})`, icon: Paperclip },
+   266→  ];
+   267→
+   268→  return (
+   269→    <Dialog open onOpenChange={() => onClose()}>
+   270→      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden p-0 flex flex-col">
+   271→        {/* Header */}
+   272→        <div className="px-6 pt-6 pb-4 border-b shrink-0">
+   273→          <DialogHeader>
+   274→            <div className="flex items-start justify-between gap-4">
+   275→              <div className="min-w-0">
+   276→                <DialogTitle className="text-lg">
+   277→                  <span className="font-mono text-emerald-600">{dossier.numeroDossier}</span>
+   278→                  <span className="mx-2 text-muted-foreground">—</span>
+   279→                  {dossier.beneficiaire}
+   280→                </DialogTitle>
+   281→                <DialogDescription className="mt-1 flex items-center gap-3 flex-wrap">
+   282→                  <span className="flex items-center gap-1 text-xs">
+   283→                    <Building2 className="h-3 w-3" />
+   284→                    {dossier.societe?.nom}
+   285→                  </span>
+   286→                  <span className="flex items-center gap-1 text-xs">
+   287→                    <Calendar className="h-3 w-3" />
+   288→                    {formatDate(dossier.dateReception)}
+   289→                  </span>
+   290→                  <Badge variant="outline" className={cn('text-xs', statutColor(dossier.statut))}>
+   291→                    {statutLabel(dossier.statut)}
+   292→                  </Badge>
+   293→                </DialogDescription>
+   294→              </div>
+   295→              <Select value={dossier.statut} onValueChange={handleStatutChange}>
+   296→                <SelectTrigger className="h-9 w-40 text-xs">
+   297→                  <SelectValue />
+   298→                </SelectTrigger>
+   299→                <SelectContent>
+   300→                  {STATUTS.map((s) => (
+   301→                    <SelectItem key={s} value={s} className="text-xs">
+   302→                      {statutLabel(s)}
+   303→                    </SelectItem>
+   304→                  ))}
+   305→                </SelectContent>
+   306→              </Select>
+   307→            </div>
+   308→          </DialogHeader>
+   309→
+   310→          {/* Tabs */}
+   311→          <div className="flex gap-1 mt-4 border-b -mb-px">
+   312→            {tabs.map((tab) => {
+   313→              const Icon = tab.icon;
+   314→              return (
+   315→                <button
+   316→                  key={tab.key}
+   317→                  type="button"
+   318→                  onClick={() => setActiveTab(tab.key)}
+   319→                  className={cn(
+   320→                    'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+   321→                    activeTab === tab.key
+   322→                      ? 'border-emerald-600 text-emerald-700'
+   323→                      : 'border-transparent text-muted-foreground hover:text-foreground'
+   324→                  )}
+   325→                >
+   326→                  <Icon className="h-3.5 w-3.5" />
+   327→                  {tab.label}
+   328→                </button>
+   329→              );
+   330→            })}
+   331→          </div>
+   332→        </div>
+   333→
+   334→        {/* Content */}
+   335→        <ScrollArea className="flex-1 min-h-0">
+   336→          <div className="p-6">
+   337→            {/* Tab: Informations */}
+   338→            {activeTab === 'info' && (
+   339→              <div className="space-y-6">
+   340→                {/* Bénéficiaire */}
+   341→                <InfoSection title="Bénéficiaire & Assuré">
+   342→                  <InfoRow label="Bénéficiaire" value={dossier.beneficiaire} icon={User} />
+   343→                  <InfoRow label="Assuré" value={dossier.assure?.nom || dossier.assureId || null} />
+   344→                  <InfoRow label="N° SS" value={dossier.assure?.nSS || dossier.nSS} />
+   345→                  <InfoRow label="Société" value={dossier.societe?.nom} icon={Building2} />
+   346→                </InfoSection>
+   347→
+   348→                {/* Dossier */}
+   349→                <InfoSection title="Détails du dossier">
+   350→                  <InfoRow label="Type" value={typeDossierLabel(dossier.typeDossier)} />
+   351→                  <InfoRow label="Source" value={dossier.source} />
+   352→                  <InfoRow label="Montant réclamé" value={formatMontant(dossier.montantReclame)} icon={CreditCard} highlight />
+   353→                  {dossier.montantValide !== null && (
+   354→                    <InfoRow label="Montant validé" value={formatMontant(dossier.montantValide)} />
+   355→                  )}
+   356→                  {dossier.montantPaye !== null && (
+   357→                    <InfoRow label="Montant payé" value={formatMontant(dossier.montantPaye)} />
+   358→                  )}
+   359→                  {dossier.motifRejet && (
+   360→                    <div className="flex items-start gap-2 py-1.5">
+   361→                      <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+   362→                      <div>
+   363→                        <p className="text-xs text-muted-foreground">Motif de rejet</p>
+   364→                        <p className="text-sm font-medium text-red-600">{dossier.motifRejet}</p>
+   365→                      </div>
+   366→                    </div>
+   367→                  )}
+   368→                </InfoSection>
+   369→
+   370→                {/* Soins */}
+   371→                <InfoSection title="Soins & Paiement">
+   372→                  <InfoRow label="Date des soins" value={dossier.dateSoins ? formatDate(dossier.dateSoins) : null} icon={Calendar} />
+   373→                  <InfoRow label="Prestataire" value={dossier.prestataire?.nom || dossier.prestataireLegacy || null} />
+   374→                  <InfoRow label="Moyen de paiement" value={dossier.moyenPaiement} />
+   375→                  {dossier.referencePaiement && (
+   376→                    <InfoRow label="Réf. paiement" value={dossier.referencePaiement} />
+   377→                  )}
+   378→                </InfoSection>
+   379→
+   380→                {/* Gestionnaires */}
+   381→                <InfoSection title="Gestionnaires">
+   382→                  <InfoRow label="Accueil" value={dossier.gestionnaireAccueil?.nom} />
+   383→                  <InfoRow label="Technique" value={dossier.gestionnaireTechnique?.nom} />
+   384→                  <InfoRow label="Comptabilité" value={dossier.gestionnaireCompta?.nom} />
+   385→                  <InfoRow label="Créé par" value={dossier.createur?.nom} />
+   386→                </InfoSection>
+   387→
+   388→                {/* Observations */}
+   389→                {dossier.observations && (
+   390→                  <InfoSection title="Observations">
+   391→                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{dossier.observations}</p>
+   392→                  </InfoSection>
+   393→                )}
+   394→              </div>
+   395→            )}
+   396→
+   397→            {/* Tab: Historique */}
+   398→            {activeTab === 'historique' && (
+   399→              <div className="space-y-1">
+   400→                {dossier.historiqueParsed && dossier.historiqueParsed.length > 0 ? (
+   401→                  dossier.historiqueParsed.map((entry, i) => (
+   402→                    <div key={i} className="flex gap-3 relative">
+   403→                      {/* Timeline line */}
+   404→                      {i < dossier.historiqueParsed.length - 1 && (
+   405→                        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200" />
+   406→                      )}
+   407→                      {/* Dot */}
+   408→                      <div className={cn(
+   409→                        'h-6 w-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 z-10',
+   410→                        HISTORIQUE_STATUT_COLORS[entry.statut] || 'bg-gray-400',
+   411→                        'text-white'
+   412→                      )}>
+   413→                        {i === dossier.historiqueParsed.length - 1 ? (
+   414→                          <CheckCircle2 className="h-3.5 w-3.5" />
+   415→                        ) : (
+   416→                          <ArrowRight className="h-3 w-3" />
+   417→                        )}
+   418→                      </div>
+   419→                      {/* Content */}
+   420→                      <div className="pb-6 min-w-0">
+   421→                        <div className="flex items-center gap-2 flex-wrap">
+   422→                          <Badge variant="outline" className={cn('text-xs', statutColor(entry.statut))}>
+   423→                            {statutLabel(entry.statut)}
+   424→                          </Badge>
+   425→                          <span className="text-xs text-muted-foreground">
+   426→                            {formatDate(entry.date)}
+   427→                          </span>
+   428→                        </div>
+   429→                        {entry.commentaire && (
+   430→                          <p className="text-sm text-muted-foreground mt-1">{entry.commentaire}</p>
+   431→                        )}
+   432→                      </div>
+   433→                    </div>
+   434→                  ))
+   435→                ) : (
+   436→                  <p className="text-sm text-muted-foreground text-center py-8">
+   437→                    Aucun historique disponible
+   438→                  </p>
+   439→                )}
+   440→              </div>
+   441→            )}
+   442→
+   443→            {/* Tab: Commentaires */}
+   444→            {activeTab === 'commentaires' && (
+   445→              <div className="space-y-4">
+   446→                {/* Add comment form */}
+   447→                <Card className="border-emerald-100">
+   448→                  <CardContent className="p-4 space-y-3">
+   449→                    <div className="flex items-center gap-2">
+   450→                      <Textarea
+   451→                        placeholder="Ajouter un commentaire..."
+   452→                        className="min-h-[60px] resize-y text-sm"
+   453→                        rows={2}
+   454→                        value={commentaire}
+   455→                        onChange={(e) => setCommentaire(e.target.value)}
+   456→                      />
+   457→                    </div>
+   458→                    <div className="flex items-center justify-between">
+   459→                      <button
+   460→                        type="button"
+   461→                        onClick={() => setCommentPrive(!commentPrive)}
+   462→                        className={cn(
+   463→                          'flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors',
+   464→                          commentPrive ? 'bg-amber-50 text-amber-700' : 'text-muted-foreground hover:text-foreground'
+   465→                        )}
+   466→                      >
+   467→                        {commentPrive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   468→                        {commentPrive ? 'Commentaire interne' : 'Visible par tous'}
+   469→                      </button>
+   470→                      <Button
+   471→                        size="sm"
+   472→                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-8"
+   473→                        onClick={handleAddComment}
+   474→                        disabled={sendingComment || !commentaire.trim()}
+   475→                      >
+   476→                        {sendingComment ? (
+   477→                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   478→                        ) : (
+   479→                          <Send className="h-3.5 w-3.5 mr-1" />
+   480→                        )}
+   481→                        Envoyer
+   482→                      </Button>
+   483→                    </div>
+   484→                  </CardContent>
+   485→                </Card>
+   486→
+   487→                {/* Comments list */}
+   488→                <div className="space-y-3 max-h-96 overflow-y-auto">
+   489→                  {dossier.commentaires && dossier.commentaires.length > 0 ? (
+   490→                    dossier.commentaires.map((c) => (
+   491→                      <div key={c.id} className="flex gap-3 p-3 rounded-lg bg-muted/30">
+   492→                        <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+   493→                          <User className="h-4 w-4 text-emerald-600" />
+   494→                        </div>
+   495→                        <div className="flex-1 min-w-0">
+   496→                          <div className="flex items-center gap-2">
+   497→                            <span className="text-sm font-medium">{c.auteur?.nom || 'Utilisateur'}</span>
+   498→                            {c.prive && (
+   499→                              <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-600 bg-amber-50">
+   500→                                <EyeOff className="h-2.5 w-2.5 mr-0.5" />
+   501→                                Interne
+   502→                              </Badge>
+   503→                            )}
+   504→                            <span className="text-xs text-muted-foreground">
+   505→                              {formatDate(c.createdAt)}
+   506→                            </span>
+   507→                          </div>
+   508→                          <p className="text-sm text-muted-foreground mt-1">{c.contenu}</p>
+   509→                        </div>
+   510→                      </div>
+   511→                    ))
+   512→                  ) : (
+   513→                    <p className="text-sm text-muted-foreground text-center py-8">
+   514→                      Aucun commentaire pour ce dossier
+   515→                    </p>
+   516→                  )}
+   517→                </div>
+   518→              </div>
+   519→            )}
+   520→
+   521→            {/* Tab: Justificatifs */}
+   522→            {activeTab === 'justificatifs' && (
+   523→              <div className="space-y-3">
+   524→                {/* Upload form */}
+   525→                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end p-3 rounded-lg border border-dashed bg-muted/30">
+   526→                  <div className="flex-1 space-y-1">
+   527→                    <label className="text-xs font-medium text-muted-foreground">Fichier (PDF, JPG, PNG, max 10 Mo)</label>
+   528→                    <input
+   529→                      type="file"
+   530→                      id="upload-justificatif"
+   531→                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+   532→                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+   533→                      className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+   534→                    />
+   535→                  </div>
+   536→                  <Select value={uploadType} onValueChange={setUploadType}>
+   537→                    <SelectTrigger className="h-9 w-full sm:w-40">
+   538→                      <SelectValue />
+   539→                    </SelectTrigger>
+   540→                    <SelectContent>
+   541→                      <SelectItem value="FACTURE">Facture</SelectItem>
+   542→                      <SelectItem value="ORDONNANCE">Ordonnance</SelectItem>
+   543→                      <SelectItem value="RIB">RIB</SelectItem>
+   544→                      <SelectItem value="CARNET_SOINS">Carnet de soins</SelectItem>
+   545→                      <SelectItem value="DECOMPTE">Décompte</SelectItem>
+   546→                      <SelectItem value="AUTRE">Autre</SelectItem>
+   547→                    </SelectContent>
+   548→                  </Select>
+   549→                  <Button
+   550→                    size="sm"
+   551→                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 gap-1 shrink-0"
+   552→                    onClick={handleUpload}
+   553→                    disabled={uploading || !uploadFile}
+   554→                  >
+   555→                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+   556→                    Ajouter
+   557→                  </Button>
+   558→                </div>
+   559→
+   560→                {dossier.justificatifs && dossier.justificatifs.length > 0 ? (
+   561→                  dossier.justificatifs.map((j) => (
+   562→                    <div
+   563→                      key={j.id}
+   564→                      className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+   565→                    >
+   566→                      <div className="h-10 w-10 rounded-md bg-emerald-50 flex items-center justify-center shrink-0">
+   567→                        <FileText className="h-5 w-5 text-emerald-600" />
+   568→                      </div>
+   569→                      <div className="flex-1 min-w-0">
+   570→                        <p className="text-sm font-medium truncate">{j.nomFichier}</p>
+   571→                        <div className="flex items-center gap-2 mt-0.5">
+   572→                          <Badge variant="outline" className={cn('text-[10px]', JUSTIFICATIF_COLORS[j.type] || JUSTIFICATIF_COLORS.AUTRE)}>
+   573→                            {JUSTIFICATIF_LABELS[j.type] || j.type}
+   574→                          </Badge>
+   575→                          {j.tailleKo && (
+   576→                            <span className="text-xs text-muted-foreground">{j.tailleKo} Ko</span>
+   577→                          )}
+   578→                          <span className="text-xs text-muted-foreground">{formatDate(j.createdAt)}</span>
+   579→                        </div>
+   580→                      </div>
+   581→                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1" asChild>
+   582→                        <a href={`/api/upload?id=${j.id}`} download={j.nomFichier} target="_blank" rel="noopener noreferrer">
+   583→                          <Download className="h-3.5 w-3.5" />
+   584→                          Télécharger
+   585→                        </a>
+   586→                      </Button>
+   587→                    </div>
+   588→                  ))
+   589→                ) : (
+   590→                  <div className="text-center py-12">
+   591→                    <Paperclip className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+   592→                    <p className="text-sm text-muted-foreground">
+   593→                      Aucun justificatif téléchargé pour ce dossier
+   594→                    </p>
+   595→                  </div>
+   596→                )}
+   597→              </div>
+   598→            )}
+   599→          </div>
+   600→        </ScrollArea>
+   601→      </DialogContent>
+   602→    </Dialog>
+   603→  );
+   604→}
+   605→
+   606→// ── Sub-components ──────────────────────────────────────────────────────────
+   607→
+   608→function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
+   609→  return (
+   610→    <div>
+   611→      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h4>
+   612→      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">{children}</div>
+   613→    </div>
+   614→  );
+   615→}
+   616→
+   617→function InfoRow({
+   618→  label,
+   619→  value,
+   620→  icon: Icon,
+   621→  highlight,
+   622→}: {
+   623→  label: string;
+   624→  value: string | null | undefined;
+   625→  icon?: React.ComponentType<{ className?: string }>;
+   626→  highlight?: boolean;
+   627→}) {
+   628→  return (
+   629→    <div className="flex items-start gap-2 py-1.5">
+   630→      {Icon && <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
+   631→      <div className="min-w-0">
+   632→        <p className="text-xs text-muted-foreground">{label}</p>
+   633→        <p className={cn('text-sm', highlight ? 'font-semibold text-emerald-700' : 'font-medium')}>
+   634→          {value || <span className="text-muted-foreground font-normal">—</span>}
+   635→        </p>
+   636→      </div>
+   637→    </div>
+   638→  );
+   639→}

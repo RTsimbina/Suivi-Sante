@@ -1,0 +1,933 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useState, useEffect, useRef, useCallback } from 'react';
+     4→     4→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     5→     5→import { Badge } from '@/components/ui/badge';
+     6→     6→import { Button } from '@/components/ui/button';
+     7→     7→import { Input } from '@/components/ui/input';
+     8→     8→import { Label } from '@/components/ui/label';
+     9→     9→import { Skeleton } from '@/components/ui/skeleton';
+    10→    10→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    11→    11→import {
+    12→    12→  Dialog,
+    13→    13→  DialogContent,
+    14→    14→  DialogHeader,
+    15→    15→  DialogTitle,
+    16→    16→  DialogFooter,
+    17→    17→} from '@/components/ui/dialog';
+    18→    18→import {
+    19→    19→  Select,
+    20→    20→  SelectContent,
+    21→    21→  SelectItem,
+    22→    22→  SelectTrigger,
+    23→    23→  SelectValue,
+    24→    24→} from '@/components/ui/select';
+    25→    25→import {
+    26→    26→  Table,
+    27→    27→  TableBody,
+    28→    28→  TableCell,
+    29→    29→  TableHead,
+    30→    30→  TableHeader,
+    31→    31→  TableRow,
+    32→    32→} from '@/components/ui/table';
+    33→    33→import {
+    34→    34→  ClipboardCheck,
+    35→    35→  CheckCircle2,
+    36→    36→  XCircle,
+    37→    37→  Loader2,
+    38→    38→  Clock,
+    39→    39→  Currency,
+    40→    40→  Plus,
+    41→    41→  Pencil,
+    42→    42→  Trash2,
+    43→    43→  Upload,
+    44→    44→  FileSpreadsheet,
+    45→    45→  Calculator,
+    46→    46→  Building2,
+    47→    47→  AlertTriangle,
+    48→    48→  CheckCircle,
+    49→    49→  XCircle as XCircleIcon,
+    50→    50→} from 'lucide-react';
+    51→    51→import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+    52→    52→import { toast } from 'sonner';
+    53→    53→import { formatMontant, formatMontantCourt } from './format';
+    54→    54→
+    55→    55→interface TechniqueViewProps {
+    56→    56→  kpis: {
+    57→    57→    technique: { totalAnalyses: number; totalValides: number; totalRejetes: number; delaiMoyenAnalyse: number; montantTotalValide: number; enCours: number };
+    58→    58→    productivite: { gestionnaireNom: string; service: string; nbDossiers: number; montantTraite: number; tempsMoyenTraitement: number }[];
+    59→    59→  } | null;
+    60→    60→  loading: boolean;
+    61→    61→}
+    62→    62→
+    63→    63→const PRESTATIONS = [
+    64→    64→  'HOSPITALISATION',
+    65→    65→  'CONSULTATION',
+    66→    66→  'PHARMACIE',
+    67→    67→  'MATERNITE',
+    68→    68→  'CHIRURGIE',
+    69→    69→  'EXAMEN',
+    70→    70→  'SOINS DENTAIRES',
+    71→    71→  'OPTIQUE',
+    72→    72→] as const;
+    73→    73→
+    74→    74→type PrestationType = (typeof PRESTATIONS)[number];
+    75→    75→
+    76→    76→const PRESTATION_LABELS: Record<PrestationType, string> = {
+    77→    77→  HOSPITALISATION: 'Hospitalisation',
+    78→    78→  CONSULTATION: 'Consultation',
+    79→    79→  PHARMACIE: 'Pharmacie',
+    80→    80→  MATERNITE: 'Maternité',
+    81→    81→  CHIRURGIE: 'Chirurgie',
+    82→    82→  EXAMEN: 'Examen',
+    83→    83→  'SOINS DENTAIRES': 'Soins Dentaires',
+    84→    84→  OPTIQUE: 'Optique',
+    85→    85→};
+    86→    86→
+    87→    87→interface BaremeRow {
+    88→    88→  prestation: PrestationType;
+    89→    89→  tauxCouverture: number;
+    90→    90→  plafond: number;
+    91→    91→  description: string;
+    92→    92→}
+    93→    93→
+    94→    94→interface Societe {
+    95→    95→  id: string;
+    96→    96→  nom: string;
+    97→    97→  baremes: BaremeRow[];
+    98→    98→  nbDossiers?: number;
+    99→    99→  nbBaremes?: number;
+   100→   100→}
+   101→   101→
+   102→   102→interface CalculResult {
+   103→   103→  bareme: { tauxCouverture: number; plafond: number };
+   104→   104→  montantCouvert: number;
+   105→   105→  montantRembourse: number;
+   106→   106→  ticketModerateur: number;
+   107→   107→  explication: string;
+   108→   108→}
+   109→   109→
+   110→   110→interface ImportResult {
+   111→   111→  nbLignes: number;
+   112→   112→  nbSucces: number;
+   113→   113→  nbErreurs: number;
+   114→   114→  tauxSucces: number;
+   115→   115→  erreurs: { ligne: number; message: string }[];
+   116→   116→}
+   117→   117→
+   118→   118→const emptyBaremes = (): BaremeRow[] =>
+   119→   119→  PRESTATIONS.map((p) => ({
+   120→   120→    prestation: p,
+   121→   121→    tauxCouverture: 0,
+   122→   122→    plafond: 0,
+   123→   123→    description: '',
+   124→   124→  }));
+   125→   125→
+   126→   126→const kpiDefs = [
+   127→   127→  { key: 'totalAnalyses', label: 'Dossiers analysés', icon: ClipboardCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+   128→   128→  { key: 'totalValides', label: 'Validés', icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50' },
+   129→   129→  { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
+   130→   130→  { key: 'enCours', label: 'En cours', icon: Loader2, color: 'text-amber-600', bg: 'bg-amber-50' },
+   131→   131→  { key: 'delaiMoyenAnalyse', label: 'Délai moyen (j)', icon: Clock, color: 'text-sky-600', bg: 'bg-sky-50' },
+   132→   132→  { key: 'montantTotalValide', label: 'Montant validé', icon: Currency, color: 'text-emerald-600', bg: 'bg-emerald-50', format: true },
+   133→   133→];
+   134→   134→
+   135→   135→const PIE_COLORS = ['#f59e0b', '#10b981', '#ef4444'];
+   136→   136→
+   137→   137→export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
+   138→   138→  // ─── State: Sociétés & Barèmes ───
+   139→   139→  const [societes, setSocietes] = useState<Societe[]>([]);
+   140→   140→  const [societesLoading, setSocietesLoading] = useState(false);
+   141→   141→  const [dialogOpen, setDialogOpen] = useState(false);
+   142→   142→  const [editingSociete, setEditingSociete] = useState<Societe | null>(null);
+   143→   143→  const [societeNom, setSocieteNom] = useState('');
+   144→   144→  const [baremesForm, setBaremesForm] = useState<BaremeRow[]>(emptyBaremes());
+   145→   145→  const [savingSociete, setSavingSociete] = useState(false);
+   146→   146→  const [deletingId, setDeletingId] = useState<string | null>(null);
+   147→   147→
+   148→   148→  // ─── State: Calcul Ticket Modérateur ───
+   149→   149→  const [calcSocieteId, setCalcSocieteId] = useState('');
+   150→   150→  const [calcPrestation, setCalcPrestation] = useState('');
+   151→   151→  const [calcMontant, setCalcMontant] = useState('');
+   152→   152→  const [calculating, setCalculating] = useState(false);
+   153→   153→  const [calcResult, setCalcResult] = useState<CalculResult | null>(null);
+   154→   154→
+   155→   155→  // ─── State: Import ISA ───
+   156→   156→  const [importFile, setImportFile] = useState<File | null>(null);
+   157→   157→  const [importing, setImporting] = useState(false);
+   158→   158→  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+   159→   159→  const [isDragging, setIsDragging] = useState(false);
+   160→   160→  const fileInputRef = useRef<HTMLInputElement>(null);
+   161→   161→
+   162→   162→  // ─── Fetch sociétés ───
+   163→   163→  const fetchSocietes = useCallback(async () => {
+   164→   164→    setSocietesLoading(true);
+   165→   165→    try {
+   166→   166→      const res = await fetch('/api/technique/societes');
+   167→   167→      if (!res.ok) throw new Error('Erreur de chargement');
+   168→   168→      const data = await res.json();
+   169→   169→      setSocietes(Array.isArray(data) ? data : data.societes ?? []);
+   170→   170→    } catch {
+   171→   171→      toast.error('Impossible de charger les sociétés');
+   172→   172→    } finally {
+   173→   173→      setSocietesLoading(false);
+   174→   174→    }
+   175→   175→  }, []);
+   176→   176→
+   177→   177→  useEffect(() => {
+   178→   178→    fetchSocietes();
+   179→   179→  }, [fetchSocietes]);
+   180→   180→
+   181→   181→  // ─── Handlers: Sociétés & Barèmes ───
+   182→   182→  const openCreateDialog = () => {
+   183→   183→    setEditingSociete(null);
+   184→   184→    setSocieteNom('');
+   185→   185→    setBaremesForm(emptyBaremes());
+   186→   186→    setDialogOpen(true);
+   187→   187→  };
+   188→   188→
+   189→   189→  const openEditDialog = (societe: Societe) => {
+   190→   190→    setEditingSociete(societe);
+   191→   191→    setSocieteNom(societe.nom);
+   192→   192→    setBaremesForm(
+   193→   193→      PRESTATIONS.map((p) => {
+   194→   194→        const existing = societe.baremes?.find((b) => b.prestation === p);
+   195→   195→        return existing ?? { prestation: p, tauxCouverture: 0, plafond: 0, description: '' };
+   196→   196→      })
+   197→   197→    );
+   198→   198→    setDialogOpen(true);
+   199→   199→  };
+   200→   200→
+   201→   201→  const handleSaveSociete = async () => {
+   202→   202→    if (!societeNom.trim()) {
+   203→   203→      toast.error('Le nom de la société est requis');
+   204→   204→      return;
+   205→   205→    }
+   206→   206→    setSavingSociete(true);
+   207→   207→    try {
+   208→   208→      const body = { nom: societeNom.trim(), baremes: baremesForm };
+   209→   209→      let res: Response;
+   210→   210→      if (editingSociete) {
+   211→   211→        res = await fetch(`/api/technique/societes/${editingSociete.id}`, {
+   212→   212→          method: 'PUT',
+   213→   213→          headers: { 'Content-Type': 'application/json' },
+   214→   214→          body: JSON.stringify(body),
+   215→   215→        });
+   216→   216→      } else {
+   217→   217→        res = await fetch('/api/technique/societes', {
+   218→   218→          method: 'POST',
+   219→   219→          headers: { 'Content-Type': 'application/json' },
+   220→   220→          body: JSON.stringify(body),
+   221→   221→        });
+   222→   222→      }
+   223→   223→      if (!res.ok) {
+   224→   224→        const err = await res.json().catch(() => ({}));
+   225→   225→        throw new Error(err.error || 'Erreur lors de la sauvegarde');
+   226→   226→      }
+   227→   227→      toast.success(editingSociete ? 'Société mise à jour' : 'Société créée avec succès');
+   228→   228→      setDialogOpen(false);
+   229→   229→      fetchSocietes();
+   230→   230→    } catch (err: unknown) {
+   231→   231→      toast.error(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+   232→   232→    } finally {
+   233→   233→      setSavingSociete(false);
+   234→   234→    }
+   235→   235→  };
+   236→   236→
+   237→   237→  const handleDeleteSociete = async (id: string) => {
+   238→   238→    setDeletingId(id);
+   239→   239→    try {
+   240→   240→      const res = await fetch(`/api/technique/societes/${id}`, { method: 'DELETE' });
+   241→   241→      if (!res.ok) throw new Error('Erreur lors de la suppression');
+   242→   242→      toast.success('Société supprimée');
+   243→   243→      fetchSocietes();
+   244→   244→    } catch {
+   245→   245→      toast.error('Impossible de supprimer la société');
+   246→   246→    } finally {
+   247→   247→      setDeletingId(null);
+   248→   248→    }
+   249→   249→  };
+   250→   250→
+   251→   251→  const updateBaremeField = (
+   252→   252→    index: number,
+   253→   253→    field: keyof Omit<BaremeRow, 'prestation'>,
+   254→   254→    value: string | number
+   255→   255→  ) => {
+   256→   256→    setBaremesForm((prev) =>
+   257→   257→      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+   258→   258→    );
+   259→   259→  };
+   260→   260→
+   261→   261→  // ─── Handlers: Calcul ───
+   262→   262→  const handleCalculer = async () => {
+   263→   263→    if (!calcSocieteId || !calcPrestation || !calcMontant) {
+   264→   264→      toast.error('Veuillez remplir tous les champs');
+   265→   265→      return;
+   266→   266→    }
+   267→   267→    const montant = parseFloat(calcMontant);
+   268→   268→    if (isNaN(montant) || montant <= 0) {
+   269→   269→      toast.error('Le montant doit être un nombre positif');
+   270→   270→      return;
+   271→   271→    }
+   272→   272→    setCalculating(true);
+   273→   273→    setCalcResult(null);
+   274→   274→    try {
+   275→   275→      const res = await fetch('/api/technique/baremes', {
+   276→   276→        method: 'POST',
+   277→   277→        headers: { 'Content-Type': 'application/json' },
+   278→   278→        body: JSON.stringify({
+   279→   279→          societeId: calcSocieteId,
+   280→   280→          prestation: calcPrestation,
+   281→   281→          montantReclame: montant,
+   282→   282→        }),
+   283→   283→      });
+   284→   284→      if (!res.ok) {
+   285→   285→        const err = await res.json().catch(() => ({}));
+   286→   286→        throw new Error(err.error || 'Erreur de calcul');
+   287→   287→      }
+   288→   288→      const data = await res.json();
+   289→   289→      setCalcResult(data);
+   290→   290→    } catch (err: unknown) {
+   291→   291→      toast.error(err instanceof Error ? err.message : 'Erreur lors du calcul');
+   292→   292→    } finally {
+   293→   293→      setCalculating(false);
+   294→   294→    }
+   295→   295→  };
+   296→   296→
+   297→   297→  // ─── Handlers: Import ISA ───
+   298→   298→  const handleDragOver = (e: React.DragEvent) => {
+   299→   299→    e.preventDefault();
+   300→   300→    setIsDragging(true);
+   301→   301→  };
+   302→   302→
+   303→   303→  const handleDragLeave = (e: React.DragEvent) => {
+   304→   304→    e.preventDefault();
+   305→   305→    setIsDragging(false);
+   306→   306→  };
+   307→   307→
+   308→   308→  const handleDrop = (e: React.DragEvent) => {
+   309→   309→    e.preventDefault();
+   310→   310→    setIsDragging(false);
+   311→   311→    const file = e.dataTransfer.files[0];
+   312→   312→    if (file && file.name.endsWith('.xlsx')) {
+   313→   313→      setImportFile(file);
+   314→   314→      setImportResult(null);
+   315→   315→    } else {
+   316→   316→      toast.error('Veuillez déposer un fichier .xlsx');
+   317→   317→    }
+   318→   318→  };
+   319→   319→
+   320→   320→  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+   321→   321→    const file = e.target.files?.[0];
+   322→   322→    if (file) {
+   323→   323→      setImportFile(file);
+   324→   324→      setImportResult(null);
+   325→   325→    }
+   326→   326→  };
+   327→   327→
+   328→   328→  const handleImport = async () => {
+   329→   329→    if (!importFile) {
+   330→   330→      toast.error('Veuillez sélectionner un fichier');
+   331→   331→      return;
+   332→   332→    }
+   333→   333→    setImporting(true);
+   334→   334→    setImportResult(null);
+   335→   335→    try {
+   336→   336→      const formData = new FormData();
+   337→   337→      formData.append('file', importFile);
+   338→   338→      formData.append('source', 'ISA');
+   339→   339→      const res = await fetch('/api/technique/import-isa', {
+   340→   340→        method: 'POST',
+   341→   341→        body: formData,
+   342→   342→      });
+   343→   343→      if (!res.ok) {
+   344→   344→        const err = await res.json().catch(() => ({}));
+   345→   345→        throw new Error(err.error || "Erreur lors de l'import");
+   346→   346→      }
+   347→   347→      const data = await res.json();
+   348→   348→      setImportResult(data);
+   349→   349→      if (data.nbErreurs === 0) {
+   350→   350→        toast.success(`Import réussi : ${data.nbSucces} lignes traitées`);
+   351→   351→      } else {
+   352→   352→        toast.warning(`Import partiel : ${data.nbSucces} succès, ${data.nbErreurs} erreurs`);
+   353→   353→      }
+   354→   354→    } catch (err: unknown) {
+   355→   355→      toast.error(err instanceof Error ? err.message : "Erreur lors de l'import");
+   356→   356→    } finally {
+   357→   357→      setImporting(false);
+   358→   358→    }
+   359→   359→  };
+   360→   360→
+   361→   361→  // ─── Render: Loading state ───
+   362→   362→  if (loading || !kpis) {
+   363→   363→    return (
+   364→   364→      <div className="space-y-6">
+   365→   365→        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+   366→   366→          {Array.from({ length: 6 }).map((_, i) => (
+   367→   367→            <Card key={i}><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
+   368→   368→          ))}
+   369→   369→        </div>
+   370→   370→        <div className="grid md:grid-cols-2 gap-4">
+   371→   371→          <Card><CardContent className="p-4"><Skeleton className="h-64 w-full" /></CardContent></Card>
+   372→   372→          <Card><CardContent className="p-4"><Skeleton className="h-64 w-full" /></CardContent></Card>
+   373→   373→        </div>
+   374→   374→      </div>
+   375→   375→    );
+   376→   376→  }
+   377→   377→
+   378→   378→  const pieData = [
+   379→   379→    { name: 'En cours', value: kpis.technique.enCours },
+   380→   380→    { name: 'Validés', value: kpis.technique.totalValides },
+   381→   381→    { name: 'Rejetés', value: kpis.technique.totalRejetes },
+   382→   382→  ].filter((d) => d.value > 0);
+   383→   383→
+   384→   384→  const techGestionnaires = kpis.productivite.filter((p) => p.service === 'TECHNIQUE');
+   385→   385→
+   386→   386→  return (
+   387→   387→    <div className="space-y-6">
+   388→   388→      {/* ─── Section 1: KPI Cards ─── */}
+   389→   389→      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+   390→   390→        {kpiDefs.map((def) => {
+   391→   391→          const val = kpis.technique[def.key as keyof typeof kpis.technique] as number;
+   392→   392→          const Icon = def.icon;
+   393→   393→          return (
+   394→   394→            <Card key={def.key}>
+   395→   395→              <CardContent className="p-4 flex flex-col gap-2">
+   396→   396→                <div className="flex items-center gap-2">
+   397→   397→                  <div className={`p-2 rounded-lg ${def.bg}`}>
+   398→   398→                    <Icon className={`h-4 w-4 ${def.color}`} />
+   399→   399→                  </div>
+   400→   400→                  <span className="text-xs text-muted-foreground font-medium">{def.label}</span>
+   401→   401→                </div>
+   402→   402→                <p className="text-2xl font-bold tracking-tight">
+   403→   403→                  {def.format ? formatMontantCourt(val) : val.toLocaleString('fr-FR')}
+   404→   404→                </p>
+   405→   405→              </CardContent>
+   406→   406→            </Card>
+   407→   407→          );
+   408→   408→        })}
+   409→   409→      </div>
+   410→   410→
+   411→   411→      {/* ─── Pie Chart + Performance Table ─── */}
+   412→   412→      <div className="grid md:grid-cols-2 gap-4">
+   413→   413→        <Card>
+   414→   414→          <CardHeader className="pb-2">
+   415→   415→            <CardTitle className="text-sm font-medium">Répartition des statuts</CardTitle>
+   416→   416→          </CardHeader>
+   417→   417→          <CardContent className="flex items-center justify-center">
+   418→   418→            <ResponsiveContainer width="100%" height={280}>
+   419→   419→              <PieChart>
+   420→   420→                <Pie
+   421→   421→                  data={pieData}
+   422→   422→                  cx="50%"
+   423→   423→                  cy="50%"
+   424→   424→                  innerRadius={60}
+   425→   425→                  outerRadius={100}
+   426→   426→                  dataKey="value"
+   427→   427→                  label={({ name, percent }: { name: string; percent: number }) =>
+   428→   428→                    `${name} ${(percent * 100).toFixed(0)}%`
+   429→   429→                  }
+   430→   430→                  labelLine={false}
+   431→   431→                >
+   432→   432→                  {pieData.map((_, idx) => (
+   433→   433→                    <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+   434→   434→                  ))}
+   435→   435→                </Pie>
+   436→   436→                <Tooltip />
+   437→   437→              </PieChart>
+   438→   438→            </ResponsiveContainer>
+   439→   439→          </CardContent>
+   440→   440→        </Card>
+   441→   441→
+   442→   442→        <Card>
+   443→   443→          <CardHeader className="pb-2">
+   444→   444→            <CardTitle className="text-sm font-medium">Performance gestionnaires techniques</CardTitle>
+   445→   445→          </CardHeader>
+   446→   446→          <CardContent className="max-h-80 overflow-y-auto">
+   447→   447→            <table className="w-full text-sm">
+   448→   448→              <thead className="sticky top-0 bg-background">
+   449→   449→                <tr className="border-b text-left text-muted-foreground">
+   450→   450→                  <th className="pb-2 font-medium">Nom</th>
+   451→   451→                  <th className="pb-2 font-medium text-right">Dossiers</th>
+   452→   452→                  <th className="pb-2 font-medium text-right">Montant</th>
+   453→   453→                  <th className="pb-2 font-medium text-right">Tps moyen (j)</th>
+   454→   454→                </tr>
+   455→   455→              </thead>
+   456→   456→              <tbody>
+   457→   457→                {techGestionnaires.map((p, i) => (
+   458→   458→                  <tr key={i} className="border-b last:border-0">
+   459→   459→                    <td className="py-2 font-medium">{p.gestionnaireNom}</td>
+   460→   460→                    <td className="py-2 text-right">{p.nbDossiers}</td>
+   461→   461→                    <td className="py-2 text-right">{formatMontantCourt(p.montantTraite)}</td>
+   462→   462→                    <td className="py-2 text-right">{p.tempsMoyenTraitement}</td>
+   463→   463→                  </tr>
+   464→   464→                ))}
+   465→   465→              </tbody>
+   466→   466→            </table>
+   467→   467→          </CardContent>
+   468→   468→        </Card>
+   469→   469→      </div>
+   470→   470→
+   471→   471→      {/* ─── Section 2: Tabs ─── */}
+   472→   472→      <Tabs defaultValue="societes" className="w-full">
+   473→   473→        <TabsList>
+   474→   474→          <TabsTrigger value="societes" className="gap-1.5">
+   475→   475→            <Building2 className="h-4 w-4" />
+   476→   476→            <span className="hidden sm:inline">Sociétés &amp; Barèmes</span>
+   477→   477→            <span className="sm:hidden">Sociétés</span>
+   478→   478→          </TabsTrigger>
+   479→   479→          <TabsTrigger value="calcul" className="gap-1.5">
+   480→   480→            <Calculator className="h-4 w-4" />
+   481→   481→            <span className="hidden sm:inline">Calcul Ticket Modérateur</span>
+   482→   482→            <span className="sm:hidden">Calcul TM</span>
+   483→   483→          </TabsTrigger>
+   484→   484→          <TabsTrigger value="import" className="gap-1.5">
+   485→   485→            <Upload className="h-4 w-4" />
+   486→   486→            <span className="hidden sm:inline">Import ISA</span>
+   487→   487→            <span className="sm:hidden">Import</span>
+   488→   488→          </TabsTrigger>
+   489→   489→        </TabsList>
+   490→   490→
+   491→   491→        {/* ────────────────────────────────────────────────
+   492→   492→            Tab 1: Sociétés & Barèmes
+   493→   493→        ──────────────────────────────────────────────── */}
+   494→   494→        <TabsContent value="societes">
+   495→   495→          <Card>
+   496→   496→            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+   497→   497→              <CardTitle className="text-base font-semibold">Sociétés &amp; Barèmes</CardTitle>
+   498→   498→              <Button onClick={openCreateDialog} size="sm" className="gap-1.5">
+   499→   499→                <Plus className="h-4 w-4" />
+   500→   500→                Ajouter une société
+   501→   501→              </Button>
+   502→   502→            </CardHeader>
+   503→   503→            <CardContent>
+   504→   504→              {societesLoading ? (
+   505→   505→                <div className="space-y-3">
+   506→   506→                  {Array.from({ length: 3 }).map((_, i) => (
+   507→   507→                    <Skeleton key={i} className="h-10 w-full" />
+   508→   508→                  ))}
+   509→   509→                </div>
+   510→   510→              ) : societes.length === 0 ? (
+   511→   511→                <div className="text-center py-12 text-muted-foreground">
+   512→   512→                  <Building2 className="h-12 w-12 mx-auto mb-3 opacity-30" />
+   513→   513→                  <p className="text-sm">Aucune société enregistrée.</p>
+   514→   514→                  <p className="text-xs mt-1">Cliquez sur &quot;Ajouter une société&quot; pour commencer.</p>
+   515→   515→                </div>
+   516→   516→              ) : (
+   517→   517→                <Table>
+   518→   518→                  <TableHeader>
+   519→   519→                    <TableRow>
+   520→   520→                      <TableHead>Nom</TableHead>
+   521→   521→                      <TableHead className="text-center">Nb Dossiers</TableHead>
+   522→   522→                      <TableHead className="text-center">Nb Barèmes</TableHead>
+   523→   523→                      <TableHead className="text-right">Actions</TableHead>
+   524→   524→                    </TableRow>
+   525→   525→                  </TableHeader>
+   526→   526→                  <TableBody>
+   527→   527→                    {societes.map((s) => (
+   528→   528→                      <TableRow key={s.id}>
+   529→   529→                        <TableCell className="font-medium">{s.nom}</TableCell>
+   530→   530→                        <TableCell className="text-center">
+   531→   531→                          <Badge variant="secondary">{s.nbDossiers ?? 0}</Badge>
+   532→   532→                        </TableCell>
+   533→   533→                        <TableCell className="text-center">
+   534→   534→                          <Badge variant="outline">{s.nbBaremes ?? (s.baremes?.length ?? 0)}</Badge>
+   535→   535→                        </TableCell>
+   536→   536→                        <TableCell className="text-right">
+   537→   537→                          <div className="flex items-center justify-end gap-1">
+   538→   538→                            <Button
+   539→   539→                              variant="ghost"
+   540→   540→                              size="icon"
+   541→   541→                              className="h-8 w-8"
+   542→   542→                              onClick={() => openEditDialog(s)}
+   543→   543→                              title="Modifier"
+   544→   544→                            >
+   545→   545→                              <Pencil className="h-4 w-4 text-emerald-600" />
+   546→   546→                            </Button>
+   547→   547→                            <Button
+   548→   548→                              variant="ghost"
+   549→   549→                              size="icon"
+   550→   550→                              className="h-8 w-8"
+   551→   551→                              onClick={() => handleDeleteSociete(s.id)}
+   552→   552→                              disabled={deletingId === s.id}
+   553→   553→                              title="Supprimer"
+   554→   554→                            >
+   555→   555→                              {deletingId === s.id ? (
+   556→   556→                                <Loader2 className="h-4 w-4 animate-spin text-red-500" />
+   557→   557→                              ) : (
+   558→   558→                                <Trash2 className="h-4 w-4 text-red-500" />
+   559→   559→                              )}
+   560→   560→                            </Button>
+   561→   561→                          </div>
+   562→   562→                        </TableCell>
+   563→   563→                      </TableRow>
+   564→   564→                    ))}
+   565→   565→                  </TableBody>
+   566→   566→                </Table>
+   567→   567→              )}
+   568→   568→            </CardContent>
+   569→   569→          </Card>
+   570→   570→
+   571→   571→          {/* ─── Create / Edit Dialog ─── */}
+   572→   572→          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   573→   573→            <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+   574→   574→              <DialogHeader>
+   575→   575→                <DialogTitle>
+   576→   576→                  {editingSociete ? 'Modifier la société' : 'Nouvelle société'}
+   577→   577→                </DialogTitle>
+   578→   578→              </DialogHeader>
+   579→   579→
+   580→   580→              <div className="space-y-4">
+   581→   581→                <div className="space-y-2">
+   582→   582→                  <Label htmlFor="societe-nom">Nom de la société</Label>
+   583→   583→                  <Input
+   584→   584→                    id="societe-nom"
+   585→   585→                    placeholder="Ex: CNAPS, MNS, STM..."
+   586→   586→                    value={societeNom}
+   587→   587→                    onChange={(e) => setSocieteNom(e.target.value)}
+   588→   588→                  />
+   589→   589→                </div>
+   590→   590→
+   591→   591→                <div className="space-y-3">
+   592→   592→                  <Label className="text-sm font-semibold">Barèmes par type de prestation</Label>
+   593→   593→                  <div className="rounded-lg border">
+   594→   594→                    <Table>
+   595→   595→                      <TableHeader>
+   596→   596→                        <TableRow>
+   597→   597→                          <TableHead className="w-[180px]">Prestation</TableHead>
+   598→   598→                          <TableHead className="text-center w-[130px]">Taux (%)</TableHead>
+   599→   599→                          <TableHead className="text-center w-[150px]">Plafond (Ar)</TableHead>
+   600→   600→                          <TableHead>Description</TableHead>
+   601→   601→                        </TableRow>
+   602→   602→                      </TableHeader>
+   603→   603→                      <TableBody>
+   604→   604→                        {baremesForm.map((row, idx) => (
+   605→   605→                          <TableRow key={row.prestation}>
+   606→   606→                            <TableCell className="font-medium text-sm">
+   607→   607→                              {PRESTATION_LABELS[row.prestation]}
+   608→   608→                            </TableCell>
+   609→   609→                            <TableCell>
+   610→   610→                              <Input
+   611→   611→                                type="number"
+   612→   612→                                min={0}
+   613→   613→                                max={100}
+   614→   614→                                className="h-8 text-center"
+   615→   615→                                value={row.tauxCouverture || ''}
+   616→   616→                                placeholder="0"
+   617→   617→                                onChange={(e) =>
+   618→   618→                                  updateBaremeField(
+   619→   619→                                    idx,
+   620→   620→                                    'tauxCouverture',
+   621→   621→                                    Math.min(100, Math.max(0, Number(e.target.value) || 0))
+   622→   622→                                  )
+   623→   623→                                }
+   624→   624→                              />
+   625→   625→                            </TableCell>
+   626→   626→                            <TableCell>
+   627→   627→                              <Input
+   628→   628→                                type="number"
+   629→   629→                                min={0}
+   630→   630→                                className="h-8 text-center"
+   631→   631→                                value={row.plafond || ''}
+   632→   632→                                placeholder="0"
+   633→   633→                                onChange={(e) =>
+   634→   634→                                  updateBaremeField(
+   635→   635→                                    idx,
+   636→   636→                                    'plafond',
+   637→   637→                                    Math.max(0, Number(e.target.value) || 0)
+   638→   638→                                  )
+   639→   639→                                }
+   640→   640→                              />
+   641→   641→                            </TableCell>
+   642→   642→                            <TableCell>
+   643→   643→                              <Input
+   644→   644→                                className="h-8"
+   645→   645→                                value={row.description}
+   646→   646→                                placeholder="Optionnel"
+   647→   647→                                onChange={(e) =>
+   648→   648→                                  updateBaremeField(idx, 'description', e.target.value)
+   649→   649→                                }
+   650→   650→                              />
+   651→   651→                            </TableCell>
+   652→   652→                          </TableRow>
+   653→   653→                        ))}
+   654→   654→                      </TableBody>
+   655→   655→                    </Table>
+   656→   656→                  </div>
+   657→   657→                </div>
+   658→   658→              </div>
+   659→   659→
+   660→   660→              <DialogFooter>
+   661→   661→                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+   662→   662→                  Annuler
+   663→   663→                </Button>
+   664→   664→                <Button onClick={handleSaveSociete} disabled={savingSociete} className="gap-1.5">
+   665→   665→                  {savingSociete ? (
+   666→   666→                    <Loader2 className="h-4 w-4 animate-spin" />
+   667→   667→                  ) : (
+   668→   668→                    <CheckCircle2 className="h-4 w-4" />
+   669→   669→                  )}
+   670→   670→                  {savingSociete ? 'Enregistrement...' : 'Enregistrer'}
+   671→   671→                </Button>
+   672→   672→              </DialogFooter>
+   673→   673→            </DialogContent>
+   674→   674→          </Dialog>
+   675→   675→        </TabsContent>
+   676→   676→
+   677→   677→        {/* ────────────────────────────────────────────────
+   678→   678→            Tab 2: Calcul Ticket Modérateur
+   679→   679→        ──────────────────────────────────────────────── */}
+   680→   680→        <TabsContent value="calcul">
+   681→   681→          <div className="grid lg:grid-cols-2 gap-4">
+   682→   682→            <Card>
+   683→   683→              <CardHeader>
+   684→   684→                <CardTitle className="text-base font-semibold flex items-center gap-2">
+   685→   685→                  <Calculator className="h-5 w-5 text-emerald-600" />
+   686→   686→                  Calcul du Ticket Modérateur
+   687→   687→                </CardTitle>
+   688→   688→              </CardHeader>
+   689→   689→              <CardContent className="space-y-4">
+   690→   690→                <div className="space-y-2">
+   691→   691→                  <Label htmlFor="calc-societe">Société</Label>
+   692→   692→                  <Select value={calcSocieteId} onValueChange={setCalcSocieteId}>
+   693→   693→                    <SelectTrigger id="calc-societe" className="w-full">
+   694→   694→                      <SelectValue placeholder="Sélectionner une société" />
+   695→   695→                    </SelectTrigger>
+   696→   696→                    <SelectContent>
+   697→   697→                      {societes.map((s) => (
+   698→   698→                        <SelectItem key={s.id} value={s.id}>
+   699→   699→                          {s.nom}
+   700→   700→                        </SelectItem>
+   701→   701→                      ))}
+   702→   702→                    </SelectContent>
+   703→   703→                  </Select>
+   704→   704→                </div>
+   705→   705→
+   706→   706→                <div className="space-y-2">
+   707→   707→                  <Label htmlFor="calc-prestation">Type de prestation</Label>
+   708→   708→                  <Select value={calcPrestation} onValueChange={setCalcPrestation}>
+   709→   709→                    <SelectTrigger id="calc-prestation" className="w-full">
+   710→   710→                      <SelectValue placeholder="Sélectionner un type" />
+   711→   711→                    </SelectTrigger>
+   712→   712→                    <SelectContent>
+   713→   713→                      {PRESTATIONS.map((p) => (
+   714→   714→                        <SelectItem key={p} value={p}>
+   715→   715→                          {PRESTATION_LABELS[p]}
+   716→   716→                        </SelectItem>
+   717→   717→                      ))}
+   718→   718→                    </SelectContent>
+   719→   719→                  </Select>
+   720→   720→                </div>
+   721→   721→
+   722→   722→                <div className="space-y-2">
+   723→   723→                  <Label htmlFor="calc-montant">Montant réclamé (Ar)</Label>
+   724→   724→                  <Input
+   725→   725→                    id="calc-montant"
+   726→   726→                    type="number"
+   727→   727→                    min={0}
+   728→   728→                    placeholder="Ex: 250000"
+   729→   729→                    value={calcMontant}
+   730→   730→                    onChange={(e) => setCalcMontant(e.target.value)}
+   731→   731→                  />
+   732→   732→                </div>
+   733→   733→
+   734→   734→                <Button
+   735→   735→                  onClick={handleCalculer}
+   736→   736→                  disabled={calculating || !calcSocieteId || !calcPrestation || !calcMontant}
+   737→   737→                  className="w-full gap-2"
+   738→   738→                >
+   739→   739→                  {calculating ? (
+   740→   740→                    <Loader2 className="h-4 w-4 animate-spin" />
+   741→   741→                  ) : (
+   742→   742→                    <Calculator className="h-4 w-4" />
+   743→   743→                  )}
+   744→   744→                  {calculating ? 'Calcul en cours...' : 'Calculer'}
+   745→   745→                </Button>
+   746→   746→              </CardContent>
+   747→   747→            </Card>
+   748→   748→
+   749→   749→            {calcResult && (
+   750→   750→              <Card>
+   751→   751→                <CardHeader>
+   752→   752→                  <CardTitle className="text-base font-semibold">Résultat du calcul</CardTitle>
+   753→   753→                </CardHeader>
+   754→   754→                <CardContent className="space-y-4">
+   755→   755→                  <div className="rounded-lg border p-4 space-y-3">
+   756→   756→                    <div className="flex justify-between items-center text-sm">
+   757→   757→                      <span className="text-muted-foreground">Barème appliqué</span>
+   758→   758→                      <span className="font-medium">
+   759→   759→                        {calcResult.bareme.tauxCouverture}% — Plafond : {formatMontant(calcResult.bareme.plafond)}
+   760→   760→                      </span>
+   761→   761→                    </div>
+   762→   762→                    <div className="flex justify-between items-center text-sm">
+   763→   763→                      <span className="text-muted-foreground">Montant couvert</span>
+   764→   764→                      <span className="font-medium">{formatMontant(calcResult.montantCouvert)}</span>
+   765→   765→                    </div>
+   766→   766→                  </div>
+   767→   767→
+   768→   768→                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+   769→   769→                    <p className="text-xs text-emerald-700 mb-1 font-medium">Montant remboursé</p>
+   770→   770→                    <p className="text-3xl font-bold text-emerald-700">
+   771→   771→                      {formatMontant(calcResult.montantRembourse)}
+   772→   772→                    </p>
+   773→   773→                  </div>
+   774→   774→
+   775→   775→                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+   776→   776→                    <p className="text-xs text-orange-700 mb-1 font-medium">Ticket modérateur</p>
+   777→   777→                    <p className="text-3xl font-bold text-orange-700">
+   778→   778→                      {formatMontant(calcResult.ticketModerateur)}
+   779→   779→                    </p>
+   780→   780→                  </div>
+   781→   781→
+   782→   782→                  {calcResult.explication && (
+   783→   783→                    <div className="rounded-lg border bg-muted/50 p-3">
+   784→   784→                      <p className="text-xs text-muted-foreground font-medium mb-1">Explication</p>
+   785→   785→                      <p className="text-sm text-muted-foreground">{calcResult.explication}</p>
+   786→   786→                    </div>
+   787→   787→                  )}
+   788→   788→                </CardContent>
+   789→   789→              </Card>
+   790→   790→            )}
+   791→   791→
+   792→   792→            {!calcResult && !calculating && (
+   793→   793→              <Card className="flex items-center justify-center min-h-[200px]">
+   794→   794→                <div className="text-center text-muted-foreground">
+   795→   795→                  <Calculator className="h-12 w-12 mx-auto mb-3 opacity-20" />
+   796→   796→                  <p className="text-sm">Remplissez le formulaire et cliquez sur &quot;Calculer&quot;</p>
+   797→   797→                  <p className="text-xs mt-1">Le résultat s&apos;affichera ici.</p>
+   798→   798→                </div>
+   799→   799→              </Card>
+   800→   800→            )}
+   801→   801→          </div>
+   802→   802→        </TabsContent>
+   803→   803→
+   804→   804→        {/* ────────────────────────────────────────────────
+   805→   805→            Tab 3: Import ISA
+   806→   806→        ──────────────────────────────────────────────── */}
+   807→   807→        <TabsContent value="import">
+   808→   808→          <Card>
+   809→   809→            <CardHeader>
+   810→   810→              <CardTitle className="text-base font-semibold flex items-center gap-2">
+   811→   811→                <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+   812→   812→                Import fichier ISA
+   813→   813→              </CardTitle>
+   814→   814→            </CardHeader>
+   815→   815→            <CardContent className="space-y-4">
+   816→   816→              {/* Drop zone */}
+   817→   817→              <div
+   818→   818→                onDragOver={handleDragOver}
+   819→   819→                onDragLeave={handleDragLeave}
+   820→   820→                onDrop={handleDrop}
+   821→   821→                onClick={() => fileInputRef.current?.click()}
+   822→   822→                className={`
+   823→   823→                  relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8
+   824→   824→                  cursor-pointer transition-colors
+   825→   825→                  ${isDragging
+   826→   826→                    ? 'border-emerald-500 bg-emerald-50'
+   827→   827→                    : importFile
+   828→   828→                      ? 'border-emerald-300 bg-emerald-50/50'
+   829→   829→                      : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'
+   830→   830→                  }
+   831→   831→                `}
+   832→   832→              >
+   833→   833→                <input
+   834→   834→                  ref={fileInputRef}
+   835→   835→                  type="file"
+   836→   836→                  accept=".xlsx"
+   837→   837→                  onChange={handleFileSelect}
+   838→   838→                  className="hidden"
+   839→   839→                />
+   840→   840→                {importFile ? (
+   841→   841→                  <>
+   842→   842→                    <FileSpreadsheet className="h-10 w-10 text-emerald-600 mb-2" />
+   843→   843→                    <p className="text-sm font-medium">{importFile.name}</p>
+   844→   844→                    <p className="text-xs text-muted-foreground mt-1">
+   845→   845→                      {(importFile.size / 1024).toFixed(1)} Ko — Cliquez ou déposez pour changer
+   846→   846→                    </p>
+   847→   847→                  </>
+   848→   848→                ) : (
+   849→   849→                  <>
+   850→   850→                    <Upload className="h-10 w-10 text-muted-foreground/40 mb-2" />
+   851→   851→                    <p className="text-sm font-medium">
+   852→   852→                      Glissez-déposez votre fichier <span className="text-emerald-600 font-semibold">.xlsx</span> ici
+   853→   853→                    </p>
+   854→   854→                    <p className="text-xs text-muted-foreground mt-1">ou cliquez pour sélectionner</p>
+   855→   855→                  </>
+   856→   856→                )}
+   857→   857→              </div>
+   858→   858→
+   859→   859→              <Button
+   860→   860→                onClick={handleImport}
+   861→   861→                disabled={importing || !importFile}
+   862→   862→                className="w-full gap-2 sm:w-auto"
+   863→   863→              >
+   864→   864→                {importing ? (
+   865→   865→                  <Loader2 className="h-4 w-4 animate-spin" />
+   866→   866→                ) : (
+   867→   867→                  <Upload className="h-4 w-4" />
+   868→   868→                )}
+   869→   869→                {importing ? 'Import en cours...' : 'Importer le fichier'}
+   870→   870→              </Button>
+   871→   871→
+   872→   872→              {/* Results */}
+   873→   873→              {importResult && (
+   874→   874→                <div className="space-y-4 mt-4">
+   875→   875→                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   876→   876→                    <Card className="p-4">
+   877→   877→                      <p className="text-xs text-muted-foreground">Lignes traitées</p>
+   878→   878→                      <p className="text-2xl font-bold">{importResult.nbLignes}</p>
+   879→   879→                    </Card>
+   880→   880→                    <Card className="p-4">
+   881→   881→                      <p className="text-xs text-emerald-600">Succès</p>
+   882→   882→                      <p className="text-2xl font-bold text-emerald-700">{importResult.nbSucces}</p>
+   883→   883→                    </Card>
+   884→   884→                    <Card className="p-4">
+   885→   885→                      <p className="text-xs text-red-500">Erreurs</p>
+   886→   886→                      <p className="text-2xl font-bold text-red-600">{importResult.nbErreurs}</p>
+   887→   887→                    </Card>
+   888→   888→                    <Card className="p-4">
+   889→   889→                      <p className="text-xs text-muted-foreground">Taux de succès</p>
+   890→   890→                      <p className="text-2xl font-bold">{importResult.tauxSucces.toFixed(1)}%</p>
+   891→   891→                    </Card>
+   892→   892→                  </div>
+   893→   893→
+   894→   894→                  {importResult.erreurs && importResult.erreurs.length > 0 && (
+   895→   895→                    <Card className="p-4">
+   896→   896→                      <div className="flex items-center gap-2 mb-3">
+   897→   897→                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+   898→   898→                        <p className="text-sm font-semibold">Détail des erreurs</p>
+   899→   899→                      </div>
+   900→   900→                      <div className="max-h-64 overflow-y-auto space-y-2">
+   901→   901→                        {importResult.erreurs.map((err, i) => (
+   902→   902→                          <div
+   903→   903→                            key={i}
+   904→   904→                            className="flex items-start gap-2 text-sm rounded-md border border-red-100 bg-red-50 p-2"
+   905→   905→                          >
+   906→   906→                            <XCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+   907→   907→                            <div>
+   908→   908→                              <span className="font-medium text-red-700">Ligne {err.ligne} :</span>{' '}
+   909→   909→                              <span className="text-red-600">{err.message}</span>
+   910→   910→                            </div>
+   911→   911→                          </div>
+   912→   912→                        ))}
+   913→   913→                      </div>
+   914→   914→                    </Card>
+   915→   915→                  )}
+   916→   916→
+   917→   917→                  {importResult.nbErreurs === 0 && (
+   918→   918→                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+   919→   919→                      <CheckCircle className="h-5 w-5 text-emerald-600" />
+   920→   920→                      <p className="text-sm text-emerald-700 font-medium">
+   921→   921→                        Toutes les lignes ont été importées avec succès !
+   922→   922→                      </p>
+   923→   923→                    </div>
+   924→   924→                  )}
+   925→   925→                </div>
+   926→   926→              )}
+   927→   927→            </CardContent>
+   928→   928→          </Card>
+   929→   929→        </TabsContent>
+   930→   930→      </Tabs>
+   931→   931→    </div>
+   932→   932→  );
+   933→   933→}
