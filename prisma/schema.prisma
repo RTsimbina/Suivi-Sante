@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Seeder — exécuter avec : npx prisma db seed ou npm run db:seed
+// Le seed utilise tsx (installé globalement ou via npx) pour compiler le TypeScript
+// Il crée : 5 utilisateurs démo, 15 sociétés, 10 gestionnaires, 15 contrats,
+// ~20 appels de fonds, 250 dossiers, ~60 commentaires, des assurés, prestataires et barèmes
+
 model Utilisateur {
   id            String    @id @default(cuid())
   email         String    @unique

@@ -7,11 +7,6 @@ const db = new PrismaClient();
 const TYPES_DOSSIER = ['HOSPITALISATION', 'CONSULTATION', 'PHARMACIE', 'MATERNITE', 'CHIRURGIE', 'EXAMEN', 'SOINS DENTAIRES', 'OPTIQUE'];
 const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
 const MOYENS_PAIEMENT = ['VIREMENT', 'CHEQUE', 'ESPECES'];
-const PRESTATAIRES = [
-  'Clinique Sainte Marie', 'Hôpital Principal', 'Centre Médical Albert', 'Pharmacie Centrale',
-  'Cabinet Dentaire Blanc', 'Laboratoire BioMad', 'Centre Optique Vision Plus',
-  'Maternité Fleur de Vie', 'Hôpital Militaire', 'Policlinique du Nord',
-];
 const OBSERVATIONS = [
   'Urgence prise en charge', 'Dossier prioritaire', 'A vérifier avec la mutuelle',
   'Réclamation client en cours', 'Deuxième avis médical requis', '',
@@ -25,6 +20,32 @@ const NOMS_MALAGASY = [
 const PRENOMS_MALAGASY = [
   'Rakotonirina', 'Rasoanaivo', 'Andrianjaka', 'Randriamanalina', 'Rakotomanga',
   'Andriamananjara', 'Rasolofomanana', 'Rakotobe', 'Andrianarisoa', 'Ramiandrisoa',
+];
+
+// Prestataires médicaux structurés
+const PRESTATAIRES_DATA = [
+  { nom: 'Clinique Sainte Marie', type: 'CLINIQUE', telephone: '032 12 345 67', email: 'contact@clinique-saintemarie.mg', adresse: 'Lot VJ 34 Antanimena, Antananarivo', nif: '4001234567' },
+  { nom: 'Hôpital Principal', type: 'HOPITAL', telephone: '020 22 345 67', email: 'info@hopital-principal.mg', adresse: 'Avenue de l\'Indépendance, Antananarivo', nif: '4002345678' },
+  { nom: 'Centre Médical Albert', type: 'CABINET_MEDICAL', telephone: '034 56 789 01', email: 'rdv@cm-albert.mg', adresse: 'Anosy, Antananarivo', nif: '4003456789' },
+  { nom: 'Pharmacie Centrale', type: 'PHARMACIE', telephone: '020 22 456 78', email: 'commande@pharmacie-centrale.mg', adresse: 'Place Behorizy, Antananarivo', nif: '4004567890' },
+  { nom: 'Cabinet Dentaire Blanc', type: 'DENTAIRE', telephone: '033 67 890 12', email: 'blanc.dental@gmail.com', adresse: 'Analakely, Antananarivo', nif: '4005678901' },
+  { nom: 'Laboratoire BioMad', type: 'LABORATOIRE', telephone: '020 22 567 89', email: 'lab@biomad.mg', adresse: 'Isotry, Antananarivo', nif: '4006789012' },
+  { nom: 'Centre Optique Vision Plus', type: 'OPTICIEN', telephone: '034 78 901 23', email: 'visionplus@optique.mg', adresse: 'Tana Water Front, Antananarivo', nif: '4007890123' },
+  { nom: 'Maternité Fleur de Vie', type: 'CLINIQUE', telephone: '020 24 678 90', email: 'maternite@fleurdevie.mg', adresse: 'Ampefiloha, Antananarivo', nif: '4008901234' },
+  { nom: 'Hôpital Militaire', type: 'HOPITAL', telephone: '020 22 789 01', email: 'admin@hopital-militaire.mg', adresse: 'Soarano, Antananarivo', nif: '4009012345' },
+  { nom: 'Policlinique du Nord', type: 'CLINIQUE', telephone: '032 89 012 34', email: 'contact@policlinique-nord.mg', adresse: 'Antsahamarina, Antananarivo', nif: '4010123456' },
+];
+
+// Barèmes par prestation (taux et plafonds)
+const BAREMES_DATA = [
+  { prestation: 'HOSPITALISATION', tauxCouverture: 80, plafond: 5_000_000, description: 'Prise en charge hospitalisation complète' },
+  { prestation: 'CONSULTATION', tauxCouverture: 70, plafond: 100_000, description: 'Consultation médicale générale ou spécialisée' },
+  { prestation: 'PHARMACIE', tauxCouverture: 60, plafond: 200_000, description: 'Médicaments sur ordonnance' },
+  { prestation: 'MATERNITE', tauxCouverture: 85, plafond: 3_000_000, description: 'Suivi de grossesse et accouchement' },
+  { prestation: 'CHIRURGIE', tauxCouverture: 80, plafond: 10_000_000, description: 'Interventions chirurgicales' },
+  { prestation: 'EXAMEN', tauxCouverture: 75, plafond: 500_000, description: 'Examens de laboratoire et imagerie' },
+  { prestation: 'SOINS DENTAIRES', tauxCouverture: 60, plafond: 300_000, description: 'Soins dentaires courants et prothèses' },
+  { prestation: 'OPTIQUE', tauxCouverture: 50, plafond: 250_000, description: 'Lunettes et lentilles correctrices' },
 ];
 
 function randomInt(min: number, max: number) {
@@ -47,12 +68,16 @@ function generateNumeroDossier(index: number): string {
   return `DOS-2026-${String(index).padStart(6, '0')}`;
 }
 
+function generateNSS(): string {
+  return `SS-${randomInt(100000, 999999)}`;
+}
+
 async function main() {
   console.log('🌱 Début du seeding SmartFlow IA...');
 
-  // ── Utilisateurs ──
+  // ── 1. Utilisateurs démo ──
   const passwordHash = await hash('SmartFlow@2026', 10);
-  const utilisateurs = [
+  const utilisateursData = [
     { email: 'admin@smartflow.mg', nom: 'Administrateur Système', password: passwordHash, role: 'ADMINISTRATEUR' },
     { email: 'accueil@smartflow.mg', nom: 'Ravao Andrianjaka', password: passwordHash, role: 'ACCUEIL' },
     { email: 'technique@smartflow.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
@@ -60,16 +85,16 @@ async function main() {
     { email: 'utilisateur@smartflow.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
   ];
 
-  for (const u of utilisateurs) {
+  for (const u of utilisateursData) {
     await db.utilisateur.upsert({
       where: { email: u.email },
       update: {},
       create: u,
     });
   }
-  console.log(`  ✅ ${utilisateurs.length} utilisateurs créés`);
+  console.log(`  ✅ ${utilisateursData.length} utilisateurs démo créés`);
 
-  // ── Sociétés ──
+  // ── 2. Sociétés ──
   const societesData = [
     'TELMA Madagascar', 'JIRAMA', 'Airtel Madagascar', 'BOA Madagascar',
     'BNI Madagascar', 'Société Générale MDG', 'Total Energies MDG',
@@ -89,7 +114,82 @@ async function main() {
   }
   console.log(`  ✅ ${societesData.length} sociétés créées`);
 
-  // ── Gestionnaires ──
+  // ── 3. Barèmes (liés aux sociétés) ──
+  let baremeCount = 0;
+  const societeIds = Object.values(societes);
+  for (const societeId of societeIds) {
+    for (const b of BAREMES_DATA) {
+      // Variations aléatoires des taux par société (±10%)
+      const tauxVariation = b.tauxCouverture + randomInt(-10, 10);
+      const plafondVariation = Math.round(b.plafond * (0.8 + Math.random() * 0.4));
+      await db.bareme.create({
+        data: {
+          societeId,
+          prestation: b.prestation,
+          tauxCouverture: Math.max(30, Math.min(100, tauxVariation)),
+          plafond: plafondVariation,
+          description: b.description,
+          active: true,
+        },
+      });
+      baremeCount++;
+    }
+  }
+  console.log(`  ✅ ${baremeCount} barèmes créés (${BAREMES_DATA.length} prestations × ${societesData.length} sociétés)`);
+
+  // ── 4. Prestataires médicaux ──
+  const prestatairesMap: Record<string, string> = {};
+  for (const p of PRESTATAIRES_DATA) {
+    const created = await db.prestataire.upsert({
+      where: { id: p.nom.replace(/[^a-zA-Z]/g, '').toLowerCase().slice(0, 20) },
+      update: {},
+      create: { id: crypto.randomBytes(8).toString('hex'), ...p },
+    });
+    prestatairesMap[p.nom] = created.id;
+  }
+  // Ajouter quelques prestataires supplémentaires
+  const prestatairesExtra = [
+    { nom: 'Hôpital Andrianarisoa', type: 'HOPITAL', telephone: '020 23 456 78', email: 'contact@hopital-andria.mg', adresse: 'Ambohimanarina', nif: '4011234567' },
+    { nom: 'Pharmacie du Centre', type: 'PHARMACIE', telephone: '020 22 345 67', email: 'info@pharmacie-centre.mg', adresse: 'Ankatso', nif: '4012345678' },
+    { nom: 'Labo Analyses Plus', type: 'LABORATOIRE', telephone: '034 12 345 67', email: 'lab@analysesplus.mg', adresse: 'Mahamasina', nif: '4013456789' },
+  ];
+  for (const p of prestatairesExtra) {
+    const created = await db.prestataire.create({ data: p });
+    prestatairesMap[p.nom] = created.id;
+  }
+  console.log(`  ✅ ${PRESTATAIRES_DATA.length + prestatairesExtra.length} prestataires créés`);
+
+  // ── 5. Assurés (3-5 par société) ──
+  const assuresBySociete: Record<string, string[]> = {};
+  let assureCount = 0;
+  for (const [nomSociete, societeId] of Object.entries(societes)) {
+    const nbAssures = randomInt(3, 6);
+    assuresBySociete[societeId] = [];
+    for (let a = 0; a < nbAssures; a++) {
+      const nss = generateNSS();
+      const prenom = randomItem(NOMS_MALAGASY);
+      const nomFamille = randomItem(PRENOMS_MALAGASY);
+      const assure = await db.assure.create({
+        data: {
+          societeId,
+          nom: nomFamille,
+          prenom,
+          nSS: nss,
+          dateNaissance: randomDate(new Date('1960-01-01'), new Date('2000-12-31')),
+          sexe: Math.random() > 0.5 ? 'M' : 'F',
+          telephone: `034 ${randomInt(10, 99)} ${randomInt(100, 999)} ${randomInt(10, 99)}`,
+          email: `${prenom.toLowerCase()}.${nomFamille.toLowerCase().slice(0, 6)}@${nomSociete.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8)}.mg`,
+          adresse: `Antananarivo, Madagascar`,
+          actif: true,
+        },
+      });
+      assuresBySociete[societeId].push(assure.id);
+      assureCount++;
+    }
+  }
+  console.log(`  ✅ ${assureCount} assurés créés (${Math.round(assureCount / societesData.length)}/société en moyenne)`);
+
+  // ── 6. Gestionnaires ──
   const gestionnairesData = [
     { nom: 'Ravao A.', service: 'ACCUEIL' },
     { nom: 'Nirina R.', service: 'ACCUEIL' },
@@ -110,7 +210,7 @@ async function main() {
   }
   console.log(`  ✅ ${gestionnairesData.length} gestionnaires créés`);
 
-  // ── Contrats ──
+  // ── 7. Contrats ──
   const contrats: string[] = [];
   for (const [nom, societeId] of Object.entries(societes)) {
     const budget = randomFloat(50_000_000, 500_000_000);
@@ -129,7 +229,7 @@ async function main() {
   }
   console.log(`  ✅ ${contrats.length} contrats créés`);
 
-  // ── Appels de fonds ──
+  // ── 8. Appels de fonds ──
   let appelCount = 0;
   for (const contratId of contrats.slice(0, 8)) {
     const nbAppels = randomInt(1, 4);
@@ -151,14 +251,17 @@ async function main() {
   }
   console.log(`  ✅ ${appelCount} appels de fonds créés`);
 
-  // ── Dossiers (250) ──
+  // ── 9. Dossiers (250) — liés aux assurés et prestataires ──
   const accueilIds = Object.values(gestionnaires).filter(g => g.service === 'ACCUEIL').map(g => g.id);
   const techniqueIds = Object.values(gestionnaires).filter(g => g.service === 'TECHNIQUE').map(g => g.id);
   const comptaIds = Object.values(gestionnaires).filter(g => g.service === 'COMPTABILITE').map(g => g.id);
-  const societeIds = Object.values(societes);
 
   const utilisateursList = await db.utilisateur.findMany();
   const accueilUser = utilisateursList.find(u => u.role === 'ACCUEIL')!;
+  const utilisateurDemo = utilisateursList.find(u => u.role === 'UTILISATEUR')!;
+
+  const prestataireIds = Object.values(prestatairesMap);
+  const allAssureIds = Object.values(assuresBySociete).flat();
 
   let dossierCount = 0;
   const statutWeights: Record<string, number> = {
@@ -194,6 +297,15 @@ async function main() {
     const datePaiement = estPaye ? randomDate(dateReceptionDecompte || dateTraitementTechnique || dateReception, new Date('2026-06-25')) : null;
     const montantPaye = estPaye ? randomFloat((montantValide || montantReclame) * 0.85, (montantValide || montantReclame)) : null;
 
+    // Choisir une société et lier à un assuré de cette société
+    const dossierSocieteId = randomItem(societeIds);
+    const assuresOfSociete = assuresBySociete[dossierSocieteId] || [];
+    const assureId = assuresOfSociete.length > 0 ? randomItem(assuresOfSociete) : null;
+
+    // Choisir un prestataire
+    const prestataireId = randomItem(prestataireIds);
+    const prestataire = PRESTATAIRES_DATA.find(p => prestatairesMap[p.nom] === prestataireId);
+
     // Historique JSON
     const historique = [];
     historique.push({ date: dateReception.toISOString(), statut: 'RECU', commentaire: 'Dossier reçu à l\'accueil' });
@@ -213,17 +325,22 @@ async function main() {
       historique.push({ date: datePaiement.toISOString(), statut: 'PAYE', commentaire: 'Paiement effectué' });
     }
 
+    // Pour ~10% des dossiers, les attribuer à l'utilisateur démo
+    const createur = (i % 10 === 0) ? utilisateurDemo.id : accueilUser.id;
+
     await db.dossier.create({
       data: {
         numeroDossier: generateNumeroDossier(i),
         dateReception,
-        societeId: randomItem(societeIds),
+        societeId: dossierSocieteId,
         beneficiaire: `${randomItem(NOMS_MALAGASY)} ${randomItem(PRENOMS_MALAGASY)}`,
         typeDossier: randomItem(TYPES_DOSSIER),
         gestionnaireAccueilId: randomItem(accueilIds),
-        createurId: accueilUser.id,
-        nSS: `SS-${randomInt(100000, 999999)}`,
-        prestataireLegacy: randomItem(PRESTATAIRES),
+        createurId: createur,
+        assureId,
+        nSS: assureId ? null : generateNSS(), // NSS dupliqué dans le nom du bénéficiaire si pas d'assuré lié
+        prestataireId,
+        prestataireLegacy: prestataire?.nom || randomItem(PRESTATAIRES_DATA).nom,
         dateSoins: randomDate(new Date('2025-11-01'), dateReception),
         moyenPaiement: randomItem(MOYENS_PAIEMENT),
         observations: randomItem(OBSERVATIONS) || null,
@@ -247,9 +364,9 @@ async function main() {
     });
     dossierCount++;
   }
-  console.log(`  ✅ ${dossierCount} dossiers créés`);
+  console.log(`  ✅ ${dossierCount} dossiers créés (liés aux assurés et prestataires)`);
 
-  // ── Commentaires (pour quelques dossiers) ──
+  // ── 10. Commentaires (pour quelques dossiers) ──
   const someDossiers = await db.dossier.findMany({ take: 30 });
   const users = await db.utilisateur.findMany();
   let commentCount = 0;
@@ -280,7 +397,46 @@ async function main() {
   }
   console.log(`  ✅ ${commentCount} commentaires créés`);
 
+  // ── 11. Quelques courriels de démonstration ──
+  const courrielsData = [
+    {
+      type: 'FACTURE_PRESTATAIRE', expediteur: 'Clinique Sainte Marie',
+      objet: 'Facture #INV-2026-0456 - Hospitalisation Mme Rasoa',
+      societeId: societes['TELMA Madagascar'], beneficiaire: 'Rasoa Rasoanaivo',
+      montant: 1_250_000, prestataire: 'Clinique Sainte Marie', statut: 'RECU',
+    },
+    {
+      type: 'DOSSIER_REMBOURSEMENT', expediteur: 'Jean-Pierre Rakoto',
+      objet: 'Demande de remboursement consultation',
+      societeId: societes['JIRAMA'], beneficiaire: 'Andry Randriamanalina',
+      montant: 85_000, prestataire: 'Centre Médical Albert', statut: 'TRAITE',
+    },
+    {
+      type: 'FACTURE_PRESTATAIRE', expediteur: 'Laboratoire BioMad',
+      objet: 'Facture analyses laboratoire - Batch Juin 2026',
+      societeId: societes['Airtel Madagascar'], beneficiaire: null,
+      montant: 2_340_000, prestataire: 'Laboratoire BioMad', statut: 'RECU',
+    },
+  ];
+  let courrielCount = 0;
+  for (const c of courrielsData) {
+    await db.courriel.create({
+      data: {
+        ...c,
+        dateCourriel: randomDate(new Date('2026-06-01'), new Date('2026-06-25')),
+        dateSoins: randomDate(new Date('2026-05-01'), new Date('2026-06-20')),
+        traitePar: c.statut === 'TRAITE' ? 'Ravao A.' : null,
+        dateTraitement: c.statut === 'TRAITE' ? new Date('2026-06-20') : null,
+      },
+    });
+    courrielCount++;
+  }
+  console.log(`  ✅ ${courrielCount} courriels de démonstration créés`);
+
   console.log('\n✅ Seeding terminé avec succès !');
+  console.log(`   📊 Résumé : ${utilisateursData.length} utilisateurs, ${societesData.length} sociétés, ${baremeCount} barèmes,`);
+  console.log(`   ${PRESTATAIRES_DATA.length + prestatairesExtra.length} prestataires, ${assureCount} assurés, ${contrats.length} contrats,`);
+  console.log(`   ${appelCount} appels de fonds, ${dossierCount} dossiers, ${commentCount} commentaires, ${courrielCount} courriels.`);
 }
 
 main()

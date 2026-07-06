@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 const DEMO_CREDENTIALS = [
-  { email: 'admin@smartflow.mg', role: 'Administrateur' },
-  { email: 'accueil@smartflow.mg', role: 'Accueil' },
-  { email: 'technique@smartflow.mg', role: 'Technique' },
-  { email: 'compta@smartflow.mg', role: 'Comptabilité' },
+  { email: 'admin@smartflow.mg', role: 'Administrateur', color: 'bg-red-100 text-red-700 border-red-200' },
+  { email: 'accueil@smartflow.mg', role: 'Accueil', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { email: 'technique@smartflow.mg', role: 'Technique', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { email: 'compta@smartflow.mg', role: 'Comptabilité', color: 'bg-green-100 text-green-700 border-green-200' },
+  { email: 'utilisateur@smartflow.mg', role: 'Utilisateur', color: 'bg-purple-100 text-purple-700 border-purple-200' },
 ];
 
 export default function LoginPage() {
@@ -228,19 +229,19 @@ export default function LoginPage() {
                     setPassword('SmartFlow@2026');
                     setError('');
                   }}
-                  className="w-full flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-sm hover:bg-emerald-50 hover:border-emerald-200 transition-colors cursor-pointer"
+                  className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-all cursor-pointer hover:shadow-sm hover:scale-[1.01] active:scale-[0.99] ${cred.color}`}
                 >
-                  <span className="font-mono text-xs text-foreground">
+                  <span className="font-mono text-xs font-medium">
                     {cred.email}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/60">
                     {cred.role}
                   </span>
                 </button>
               ))}
             </div>
             <p className="text-[11px] text-muted-foreground text-center mt-3">
-              Mot de passe : <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">SmartFlow@2026</code>
+              Mot de passe commun : <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">SmartFlow@2026</code>
             </p>
           </CardContent>
         </Card>
