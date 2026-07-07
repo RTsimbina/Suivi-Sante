@@ -57,9 +57,9 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
   { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
-  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR'] },
+  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
-  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'UTILISATEUR'] },
+  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
 ];
 
 export default function Home() {
@@ -88,7 +88,7 @@ export default function Home() {
   }, [role, navItems, view]);
 
   // Vérifier si l'utilisateur peut créer des dossiers
-  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL';
+  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE';
 
   useEffect(() => {
     async function fetchKpis() {

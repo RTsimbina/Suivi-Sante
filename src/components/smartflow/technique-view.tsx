@@ -47,6 +47,9 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle as XCircleIcon,
+  ShieldAlert,
+  TrendingDown,
+  Filter,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { toast } from 'sonner';
@@ -159,6 +162,15 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ─── State: Exclusions / Dépassements ───
+  const [exclusions, setExclusions] = useState<Array<{
+    id: string; numeroDossier: string; beneficiaire: string; societeNom: string;
+    typeDossier: string; montantReclame: number; montantValide: number | null;
+    ticketModerateur: number | null; statut: string; motifRejet: string | null;
+  }>>([]);
+  const [exclusionsLoading, setExclusionsLoading] = useState(false);
+  const [exclusionFilter, setExclusionFilter] = useState<'all' | 'depassement' | 'exclusion' | 'rejete'>('all');
+
   // ─── Fetch sociétés ───
   const fetchSocietes = useCallback(async () => {
     setSocietesLoading(true);
@@ -177,6 +189,44 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   useEffect(() => {
     fetchSocietes();
   }, [fetchSocietes]);
+
+  // ─── Fetch Exclusions / Dépassements ───
+  const fetchExclusions = useCallback(async () => {
+    setExclusionsLoading(true);
+    try {
+      const res = await fetch('/api/dossiers?limit=500&statut=VALIDE,REJETE');
+      if (res.ok) {
+        const data = await res.json();
+        const allDossiers = data.dossiers || [];
+        // Identifier les dépassements (montantValide < montantReclame) et exclusions (montantValide = 0)
+        const exclus = allDossiers.filter((d: { montantReclame: number; montantValide: number | null; statut: string }) =>
+          d.statut === 'REJETE' ||
+          (d.montantValide !== null && d.montantValide < d.montantReclame) ||
+          (d.montantValide === 0 && d.montantReclame > 0)
+        );
+        setExclusions(exclus.map((d: { id: string; numeroDossier: string; beneficiaire: string; societe: { nom: string } | null; typeDossier: string; montantReclame: number; montantValide: number | null; ticketModerateur: number | null; statut: string; motifRejet: string | null }) => ({
+          id: d.id,
+          numeroDossier: d.numeroDossier,
+          beneficiaire: d.beneficiaire,
+          societeNom: d.societe?.nom || '—',
+          typeDossier: d.typeDossier,
+          montantReclame: d.montantReclame,
+          montantValide: d.montantValide,
+          ticketModerateur: d.ticketModerateur,
+          statut: d.statut,
+          motifRejet: d.motifRejet,
+        })));
+      }
+    } catch {
+      // silencieux
+    } finally {
+      setExclusionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExclusions();
+  }, [fetchExclusions]);
 
   // ─── Handlers: Sociétés & Barèmes ───
   const openCreateDialog = () => {
@@ -485,6 +535,11 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
             <Upload className="h-4 w-4" />
             <span className="hidden sm:inline">Import ISA</span>
             <span className="sm:hidden">Import</span>
+          </TabsTrigger>
+          <TabsTrigger value="exclusions" className="gap-1.5">
+            <ShieldAlert className="h-4 w-4" />
+            <span className="hidden sm:inline">Exclusions / Dépassements</span>
+            <span className="sm:hidden">Exclusions</span>
           </TabsTrigger>
         </TabsList>
 
@@ -924,6 +979,141 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                   )}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ────────────────────────────────────────────────
+            Tab 4: Exclusions / Dépassements de plafond
+        ──────────────────────────────────────────────── */}
+        <TabsContent value="exclusions">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-red-500" />
+                Exclusions & Dépassements de plafond
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <select
+                  value={exclusionFilter}
+                  onChange={(e) => setExclusionFilter(e.target.value as typeof exclusionFilter)}
+                  className="h-8 text-xs rounded-md border bg-transparent px-2"
+                >
+                  <option value="all">Tous</option>
+                  <option value="depassement">Dépassements</option>
+                  <option value="exclusion">Exclusions totales</option>
+                  <option value="rejete">Rejetés</option>
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {exclusionsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : (() => {
+                const filtered = exclusions.filter((d) => {
+                  if (exclusionFilter === 'depassement') return d.montantValide !== null && d.montantValide > 0 && d.montantValide < d.montantReclame;
+                  if (exclusionFilter === 'exclusion') return d.montantValide === 0 && d.montantReclame > 0;
+                  if (exclusionFilter === 'rejete') return d.statut === 'REJETE';
+                  return true;
+                });
+
+                // KPI résumé
+                const totalDepassement = filtered.filter(d => d.montantValide !== null && d.montantValide > 0 && d.montantValide < d.montantReclame).length;
+                const totalExclusion = filtered.filter(d => d.montantValide === 0 && d.montantReclame > 0).length;
+                const totalRejete = filtered.filter(d => d.statut === 'REJETE').length;
+                const montantPerdu = filtered.reduce((acc, d) => {
+                  if (d.montantValide !== null) return acc + (d.montantReclame - d.montantValide);
+                  return acc + d.montantReclame;
+                }, 0);
+
+                return (
+                  <div className="space-y-4">
+                    {/* KPI exclusions */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                        <p className="text-[10px] text-amber-600 uppercase tracking-wide font-medium">Dépassements</p>
+                        <p className="text-xl font-bold text-amber-700">{totalDepassement}</p>
+                      </div>
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center">
+                        <p className="text-[10px] text-red-600 uppercase tracking-wide font-medium">Exclusions totales</p>
+                        <p className="text-xl font-bold text-red-700">{totalExclusion}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-center">
+                        <p className="text-[10px] text-gray-600 uppercase tracking-wide font-medium">Rejetés</p>
+                        <p className="text-xl font-bold text-gray-700">{totalRejete}</p>
+                      </div>
+                      <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+                        <p className="text-[10px] text-violet-600 uppercase tracking-wide font-medium">Montant non couvert</p>
+                        <p className="text-xl font-bold text-violet-700">{formatMontantCourt(montantPerdu)}</p>
+                      </div>
+                    </div>
+
+                    {/* Tableau */}
+                    {filtered.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <ShieldAlert className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">Aucune exclusion ou dépassement détecté.</p>
+                        <p className="text-xs mt-1">Tous les dossiers validés sont dans les plafonds.</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>N° Dossier</TableHead>
+                            <TableHead>Bénéficiaire</TableHead>
+                            <TableHead>Société</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead className="text-right">Réclamé</TableHead>
+                            <TableHead className="text-right">Validé</TableHead>
+                            <TableHead className="text-right">Écart</TableHead>
+                            <TableHead>Statut</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.slice(0, 100).map((d) => {
+                            const ecart = d.montantValide !== null ? d.montantReclame - d.montantValide : d.montantReclame;
+                            const isExclusion = d.montantValide === 0 && d.montantReclame > 0;
+                            const isRejete = d.statut === 'REJETE';
+                            return (
+                              <TableRow key={d.id} className={isExclusion ? 'bg-red-50/50' : isRejete ? 'bg-gray-50/50' : 'bg-amber-50/50'}>
+                                <TableCell className="font-mono text-xs">{d.numeroDossier}</TableCell>
+                                <TableCell className="text-xs">{d.beneficiaire}</TableCell>
+                                <TableCell className="text-xs">{d.societeNom}</TableCell>
+                                <TableCell className="text-xs">{d.typeDossier}</TableCell>
+                                <TableCell className="text-right text-xs font-medium">{formatMontant(d.montantReclame)}</TableCell>
+                                <TableCell className="text-right text-xs">{d.montantValide !== null ? formatMontant(d.montantValide) : '—'}</TableCell>
+                                <TableCell className="text-right text-xs font-bold" style={{color: isExclusion ? '#dc2626' : '#d97706'}}>
+                                  {formatMontant(ecart)}
+                                </TableCell>
+                                <TableCell>
+                                  {isRejete ? (
+                                    <Badge variant="outline" className="text-[10px] border-red-200 text-red-600 bg-red-50">
+                                      Rejeté
+                                    </Badge>
+                                  ) : isExclusion ? (
+                                    <Badge variant="outline" className="text-[10px] border-red-200 text-red-600 bg-red-50">
+                                      Exclusion
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-600 bg-amber-50">
+                                      Dépassement
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
