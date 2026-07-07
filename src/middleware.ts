@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server';
 // Seules ces routes sont véritablement publiques (pas besoin de token)
 const PUBLIC_PATHS = ['/login'];
 const AUTH_API_PATHS = ['/api/auth/'];
-const WEBHOOK_API_PATHS = ['/api/webhook/', '/api/bot-status']; // WhatsApp, Telegram, Messenger, bot-status
+const WEBHOOK_API_PATHS = ['/api/webhook/', '/api/bot-status', '/api/setup']; // WhatsApp, Telegram, Messenger, bot-status, setup
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
