@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SmartFlow IA — Suivi des Dossiers Santé",
+  title: "SUIVI SANTE — Gestion des Dossiers de Santé",
   description: "Plateforme intelligente de suivi des dossiers de santé. Centralisation Excel, ISA et SAGE avec analyses IA en temps réel.",
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",

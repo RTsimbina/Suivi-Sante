@@ -457,7 +457,7 @@ function ChatTab() {
             <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 mb-4">
               <Bot className="size-7 text-emerald-600" />
             </div>
-            <h2 className="text-lg font-semibold text-foreground mb-1">Assistant IA SmartFlow</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-1">Assistant IA</h2>
             <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
               Posez vos questions sur les dossiers, les remboursements, les statistiques ou tout
               autre sujet lié à la gestion.

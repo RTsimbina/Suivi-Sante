@@ -58,7 +58,7 @@ export default function ReportingView() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rapport-smartflow-2026-${String(rapportMois).padStart(2, '0')}.pdf`;
+      a.download = `rapport-suivi-sante-2026-${String(rapportMois).padStart(2, '0')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();

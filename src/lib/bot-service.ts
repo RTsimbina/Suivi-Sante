@@ -271,7 +271,7 @@ async function reponseIA(question: string): Promise<string> {
       _sum: { montantReclame: true, montantPaye: true },
     });
 
-    let contexte = 'SmartFlow IA — Plateforme de gestion des dossiers de santé.\n\nStatistiques actuelles:\n';
+    let contexte = 'Suivi Santé — Plateforme de gestion des dossiers de santé.\n\nStatistiques actuelles:\n';
     for (const s of stats) {
       contexte += `- ${s.statut}: ${s._count.id} dossiers`;
       if (s._sum.montantReclame) contexte += `, ${Math.round(s._sum.montantReclame).toLocaleString('fr-FR')} AR réclamés`;
@@ -284,7 +284,7 @@ async function reponseIA(question: string): Promise<string> {
       messages: [
         {
           role: 'system',
-          content: `Tu es l'assistant bot SmartFlow IA. Tu réponds aux questions des assurés et prestataires médicalux concernant leurs dossiers de remboursement de soins de santé à Madagascar.
+          content: `Tu es l'assistant bot Suivi Santé. Tu réponds aux questions des assurés et prestataires médicalux concernant leurs dossiers de remboursement de soins de santé à Madagascar.
 Tu réponds en français, de manière concise et courtoise. Utilise les données fournies pour répondre.
 Si on te demande le solde, le remboursement, ou le statut d'un dossier précis, invite l'utilisateur à fournir le numéro de dossier.
 Commandes disponibles: /assure [nom], /prestataire [nom], /dossier [numéro], /calcul [société] [prestation] [montant], /aide
@@ -308,7 +308,7 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
 
   // Message vide
   if (!texte) {
-    return 'Bonjour ! Je suis le bot SmartFlow IA. Envoyez /aide pour voir les commandes disponibles.';
+    return 'Bonjour ! Je suis le bot Suivi Santé. Envoyez /aide pour voir les commandes disponibles.';
   }
 
   // Commandes
@@ -316,7 +316,7 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
 
   if (lowerText === '/aide' || lowerText === '/help' || lowerText === 'aide' || lowerText === 'help') {
     return [
-      'SmartFlow IA — Commandes disponibles:',
+      'Suivi Santé — Commandes disponibles:',
       '',
       '/verifier [NSS] — Vous identifier (obligatoire pour acceder a vos donnees)',
       '/mesdossiers — Voir vos dossiers (apres identification)',

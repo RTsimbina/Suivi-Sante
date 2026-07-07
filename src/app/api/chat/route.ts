@@ -108,7 +108,7 @@ async function buildKpiContext(): Promise<string> {
   ).length;
 
   const aujourd = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-  return `Données SmartFlow IA — Tableau de bord (au ${aujourd}):
+  return `Données Suivi Santé — Tableau de bord (au ${aujourd}):
 
 RÉSUMÉ GLOBAL:
 - Total dossiers: ${total}
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
     const context = await buildKpiContext();
 
     // 2. Build system prompt with context
-    const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour SmartFlow IA, une plateforme de traitement des dossiers de soins de santé en Algérie.
+    const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour Suivi Santé, une plateforme de traitement des dossiers de soins de santé en Algérie.
 
 Tu aides les gestionnaires et directeurs à comprendre les performances de leur service de traitement des dossiers médicaux. Tu as accès aux données en temps réel du système.
 

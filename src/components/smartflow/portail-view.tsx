@@ -366,7 +366,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'init-1',
     role: 'bot',
-    content: 'Bonjour ! Je suis l\'assistant SmartFlow. Comment puis-je vous aider ?',
+    content: 'Bonjour ! Je suis l\'assistant Suivi Santé. Comment puis-je vous aider ?',
     timestamp: new Date(Date.now() - 120000),
   },
   {
@@ -490,7 +490,7 @@ function ChatbotTab() {
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">SmartFlow IA - Assistant</p>
+              <p className="text-sm font-semibold text-white">Suivi Santé - Assistant</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="h-2 w-2 rounded-full bg-green-300 animate-pulse" />
                 <p className="text-[10px] text-emerald-100">En ligne</p>

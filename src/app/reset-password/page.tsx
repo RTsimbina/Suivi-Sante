@@ -80,7 +80,7 @@ function ResetPasswordForm() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">SmartFlow IA</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
           </div>
           <Card className="rounded-xl border shadow-sm">
             <CardContent className="p-8">
@@ -111,7 +111,7 @@ function ResetPasswordForm() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
             <Sparkles className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">SmartFlow IA</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Réinitialisation du mot de passe
           </p>

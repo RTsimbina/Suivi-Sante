@@ -73,7 +73,7 @@ function generateNSS(): string {
 }
 
 async function main() {
-  console.log('🌱 Début du seeding SmartFlow IA...');
+  console.log('🌱 Début du seeding Suivi Santé...');
 
   // ── 1. Utilisateurs démo ──
   const passwordHash = await hash('SmartFlow@2026', 10);

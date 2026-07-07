@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     status: 'active',
-    bot: 'SmartFlow IA Telegram Bot',
+    bot: 'Suivi Santé Telegram Bot',
     webhook_info: `Envoyez GET ?set_webhook=true&url=https://votre-domaine.com/api/webhook/telegram pour configurer`,
   });
 }

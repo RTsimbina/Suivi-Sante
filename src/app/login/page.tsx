@@ -68,7 +68,7 @@ export default function LoginPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
             <Sparkles className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">SmartFlow IA</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Suivi des Dossiers Santé
           </p>
@@ -99,7 +99,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="nom@smartflow.mg"
+                    placeholder="nom@suivisante.mg"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
@@ -248,7 +248,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2026 SmartFlow IA — Tous droits réservés
+          © 2026 Suivi Santé — Tous droits réservés
         </p>
       </div>
     </div>

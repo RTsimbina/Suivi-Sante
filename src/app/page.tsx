@@ -160,7 +160,7 @@ export default function Home() {
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="font-bold text-sm leading-tight">SmartFlow IA</h1>
+              <h1 className="font-bold text-sm leading-tight">Suivi Santé</h1>
               <p className="text-[10px] text-muted-foreground">Suivi des Dossiers Santé</p>
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function Home() {
             </Dialog>
           )}
           <div className="px-3 py-2 mt-2 rounded-lg bg-muted/50">
-            <p className="text-[10px] text-muted-foreground">SmartFlow IA v2.0</p>
+            <p className="text-[10px] text-muted-foreground">Suivi Santé v2.0</p>
             <p className="text-[10px] text-muted-foreground">{new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           </div>
         </div>
@@ -240,7 +240,7 @@ export default function Home() {
           </Button>
           <div className="flex items-center gap-2">
             {(() => { const Icon = navItems.find(n => n.key === view)?.icon || LayoutDashboard; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}
-            <h2 className="font-semibold text-sm">{navItems.find(n => n.key === view)?.label || 'SmartFlow IA'}</h2>
+            <h2 className="font-semibold text-sm">{navItems.find(n => n.key === view)?.label || 'Suivi Santé'}</h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] border-emerald-200 text-emerald-600">

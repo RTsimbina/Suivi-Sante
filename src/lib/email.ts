@@ -26,7 +26,7 @@ export async function envoyerEmail(opts: {
   if (opts.destinataires.length === 0) return;
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || 'smartflow@exemple.mg',
+    from: process.env.SMTP_FROM || 'suivi-sante@exemple.mg',
     to: opts.destinataires.join(', '),
     subject: opts.sujet,
     text: opts.texte,

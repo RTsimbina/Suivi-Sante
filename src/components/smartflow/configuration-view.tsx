@@ -296,7 +296,7 @@ export default function ConfigurationView() {
                           <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.message}</p>
                         </div>
                         <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
-                          <p className="text-xs font-medium text-blue-700 mb-0.5">Réponse SmartFlow</p>
+                          <p className="text-xs font-medium text-blue-700 mb-0.5">Réponse Suivi Santé</p>
                           <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.reponse}</p>
                         </div>
                       </div>

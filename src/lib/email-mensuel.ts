@@ -67,7 +67,7 @@ function genererHTMLRapportSociete(data: {
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">SmartFlow IA</h1>
+                  <h1 style="margin:0; color:#ffffff; font-size:20px; font-weight:700;">Suivi Santé</h1>
                   <p style="margin:4px 0 0 0; color:rgba(255,255,255,0.85); font-size:13px;">Rapport Mensuel de Gestion des Dossiers Santé</p>
                 </td>
                 <td align="right">
@@ -223,7 +223,7 @@ function genererHTMLRapportSociete(data: {
         <tr>
           <td style="background:#f9fafb; padding:16px 32px; border-top:1px solid #e5e7eb;">
             <p style="margin:0; font-size:11px; color:#9ca3af; text-align:center;">
-              Ce rapport est généré automatiquement par SmartFlow IA — Plateforme de gestion des dossiers de santé.
+              Ce rapport est généré automatiquement par Suivi Santé — Plateforme de gestion des dossiers de santé.
               <br>Pour toute question, contactez votre gestionnaire de compte.
             </p>
           </td>
@@ -366,7 +366,7 @@ export async function envoyerRapportMensuel(): Promise<{
 
       await envoyerEmail({
         destinataires,
-        sujet: `SmartFlow IA — Rapport Mensuel ${periode} — ${societe.nom}`,
+        sujet: `Suivi Santé — Rapport Mensuel ${periode} — ${societe.nom}`,
         texte: `Veuillez trouver ci-joint le rapport mensuel de gestion des dossiers de santé pour ${societe.nom} — ${periode}.`,
         html,
       });
@@ -406,9 +406,9 @@ export async function envoyerTestEmail(destinataire: string): Promise<{ ok: bool
 
     await envoyerEmail({
       destinataires: [destinataire],
-      sujet: 'SmartFlow IA — Email de test',
-      texte: 'Ceci est un email de test depuis la plateforme SmartFlow IA.',
-      html: html.replace('Société Test', 'Email de Test — SmartFlow IA'),
+      sujet: 'Suivi Santé — Email de test',
+      texte: 'Ceci est un email de test depuis la plateforme Suivi Santé.',
+      html: html.replace('Société Test', 'Email de Test — Suivi Santé'),
     });
 
     return { ok: true };

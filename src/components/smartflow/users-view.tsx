@@ -268,7 +268,7 @@ export default function UsersView() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-email">Adresse e-mail</Label>
-                <Input id="u-email" type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="nom@smartflow.mg" required />
+                <Input id="u-email" type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="nom@suivisante.mg" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-password">

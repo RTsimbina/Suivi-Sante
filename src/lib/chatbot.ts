@@ -26,7 +26,7 @@ try {
  * Système prompt pour le chatbot multicanal.
  * Se concentre sur les informations accessibles au public (pas de données sensibles).
  */
-const CHATBOT_SYSTEM_PROMPT = `Tu es l'assistant virtuel de SmartFlow IA, une plateforme de gestion des dossiers de soins de santé à Madagascar.
+const CHATBOT_SYSTEM_PROMPT = `Tu es l'assistant virtuel de Suivi Santé, une plateforme de gestion des dossiers de soins de santé à Madagascar.
 
 Tu aides les utilisateurs à :
 - Vérifier le statut d'un dossier (ils doivent fournir le numéro de dossier)
@@ -39,7 +39,7 @@ RÈGLES STRICTES DE CONFIDENTIALITÉ :
 - Ne JAMAIS révéler de données médicales, de numéros de sécurité sociale ou d'adresses
 - Si on te demande le statut d'un dossier, demande le numéro de dossier au format DOS-2026-XXXXXX
 - Tu peux uniquement communiquer : le numéro de dossier, le statut de traitement, et les dates de réception/paiement
-- Pour TOUTE demande d'informations détaillées, oriente vers le portail SmartFlow IA ou le service RH
+- Pour TOUTE demande d'informations détaillées, oriente vers le portail Suivi Santé ou le service RH
 - Réponds TOUJOURS en français
 - Sois concis et professionnel
 - Si tu n'as pas l'information, dis-le honnêtement
@@ -81,7 +81,7 @@ async function findDossierSummary(numeroDossier: string): Promise<string | null>
 
     // Informations sensibles : indiquer leur présence sans révéler le contenu
     if (dossier.motifRejet) {
-      summary += `\nUn motif de rejet a été enregistré. Pour plus de détails, veuillez contacter votre service RH ou vous connecter au portail SmartFlow IA.`;
+      summary += `\nUn motif de rejet a été enregistré. Pour plus de détails, veuillez contacter votre service RH ou vous connecter au portail Suivi Santé.`;
     }
 
     return summary;
@@ -129,7 +129,7 @@ export async function generateChatbotResponse(
 
     // Limiter la longueur pour les canaux SMS/messagerie
     if (channel === 'whatsapp' && response.length > 1600) {
-      return response.substring(0, 1550) + '...\n\n(Pour plus de détails, connectez-vous à SmartFlow IA)';
+      return response.substring(0, 1550) + '...\n\n(Pour plus de détails, connectez-vous à Suivi Santé)';
     }
 
     return response;

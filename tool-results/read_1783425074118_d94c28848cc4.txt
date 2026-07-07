@@ -1,0 +1,687 @@
+     1→import { NextResponse } from 'next/server';
+     2→import { PrismaClient } from '@prisma/client';
+     3→import { hash } from 'bcryptjs';
+     4→
+     5→// Ce endpoint initialise la base de données PostgreSQL sur Vercel
+     6→// 1. Crée les tables (DDL)  2. Insère les données de démo
+     7→// Protégé par SETUP_TOKEN — à appeler UNE SEULE FOIS après le déploiement
+     8→// GET /api/setup?token=VOTRE_TOKEN
+     9→
+    10→// ─── DDL SQL : création de toutes les tables ──────────────────────────────────
+    11→const CREATE_TABLES_SQL = `
+    12→CREATE SCHEMA IF NOT EXISTS "public";
+    13→
+    14→CREATE TABLE IF NOT EXISTS "Utilisateur" (
+    15→    "id" TEXT NOT NULL,
+    16→    "email" TEXT NOT NULL,
+    17→    "nom" TEXT NOT NULL,
+    18→    "password" TEXT NOT NULL,
+    19→    "role" TEXT NOT NULL DEFAULT 'UTILISATEUR',
+    20→    "actif" BOOLEAN NOT NULL DEFAULT true,
+    21→    "avatar" TEXT,
+    22→    "dernierLogin" TIMESTAMP(3),
+    23→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    24→    "updatedAt" TIMESTAMP(3) NOT NULL,
+    25→    CONSTRAINT "Utilisateur_pkey" PRIMARY KEY ("id")
+    26→);
+    27→CREATE UNIQUE INDEX IF NOT EXISTS "Utilisateur_email_key" ON "Utilisateur"("email");
+    28→
+    29→CREATE TABLE IF NOT EXISTS "Societe" (
+    30→    "id" TEXT NOT NULL,
+    31→    "nom" TEXT NOT NULL,
+    32→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    33→    CONSTRAINT "Societe_pkey" PRIMARY KEY ("id")
+    34→);
+    35→
+    36→CREATE TABLE IF NOT EXISTS "Gestionnaire" (
+    37→    "id" TEXT NOT NULL,
+    38→    "nom" TEXT NOT NULL,
+    39→    "service" TEXT NOT NULL,
+    40→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    41→    CONSTRAINT "Gestionnaire_pkey" PRIMARY KEY ("id")
+    42→);
+    43→
+    44→CREATE TABLE IF NOT EXISTS "Contrat" (
+    45→    "id" TEXT NOT NULL,
+    46→    "societeId" TEXT NOT NULL,
+    47→    "reference" TEXT NOT NULL,
+    48→    "budgetAnnuel" DOUBLE PRECISION NOT NULL,
+    49→    "budgetUtilise" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    50→    "dateDebut" TIMESTAMP(3) NOT NULL,
+    51→    "dateFin" TIMESTAMP(3) NOT NULL,
+    52→    "statut" TEXT NOT NULL DEFAULT 'ACTIF',
+    53→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    54→    "updatedAt" TIMESTAMP(3) NOT NULL,
+    55→    CONSTRAINT "Contrat_pkey" PRIMARY KEY ("id")
+    56→);
+    57→
+    58→CREATE TABLE IF NOT EXISTS "AppelDeFonds" (
+    59→    "id" TEXT NOT NULL,
+    60→    "contratId" TEXT NOT NULL,
+    61→    "montant" DOUBLE PRECISION NOT NULL,
+    62→    "dateAppel" TIMESTAMP(3) NOT NULL,
+    63→    "datePaiement" TIMESTAMP(3),
+    64→    "reference" TEXT,
+    65→    "statut" TEXT NOT NULL DEFAULT 'EN_ATTENTE',
+    66→    "observations" TEXT,
+    67→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    68→    "updatedAt" TIMESTAMP(3) NOT NULL,
+    69→    CONSTRAINT "AppelDeFonds_pkey" PRIMARY KEY ("id")
+    70→);
+    71→
+    72→CREATE TABLE IF NOT EXISTS "Dossier" (
+    73→    "id" TEXT NOT NULL,
+    74→    "numeroDossier" TEXT NOT NULL,
+    75→    "dateReception" TIMESTAMP(3) NOT NULL,
+    76→    "societeId" TEXT NOT NULL,
+    77→    "beneficiaire" TEXT NOT NULL,
+    78→    "typeDossier" TEXT NOT NULL,
+    79→    "categorieDossier" TEXT,
+    80→    "gestionnaireAccueilId" TEXT,
+    81→    "createurId" TEXT,
+    82→    "assureId" TEXT,
+    83→    "nSS" TEXT,
+    84→    "prestataireId" TEXT,
+    85→    "prestataireLegacy" TEXT,
+    86→    "dateSoins" TIMESTAMP(3),
+    87→    "moyenPaiement" TEXT,
+    88→    "observations" TEXT,
+    89→    "dateTraitementTechnique" TIMESTAMP(3),
+    90→    "montantReclame" DOUBLE PRECISION NOT NULL,
+    91→    "montantValide" DOUBLE PRECISION,
+    92→    "ticketModerateur" DOUBLE PRECISION,
+    93→    "partPatient" DOUBLE PRECISION,
+    94→    "partEntreprise" DOUBLE PRECISION,
+    95→    "gestionnaireTechniqueId" TEXT,
+    96→    "motifRejet" TEXT,
+    97→    "dateReceptionDecompte" TIMESTAMP(3),
+    98→    "datePaiement" TIMESTAMP(3),
+    99→    "referencePaiement" TEXT,
+   100→    "montantPaye" DOUBLE PRECISION,
+   101→    "gestionnaireComptaId" TEXT,
+   102→    "statut" TEXT NOT NULL DEFAULT 'RECU',
+   103→    "source" TEXT NOT NULL DEFAULT 'EXCEL',
+   104→    "historique" TEXT NOT NULL DEFAULT '[]',
+   105→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   106→    "updatedAt" TIMESTAMP(3) NOT NULL,
+   107→    CONSTRAINT "Dossier_pkey" PRIMARY KEY ("id")
+   108→);
+   109→CREATE UNIQUE INDEX IF NOT EXISTS "Dossier_numeroDossier_key" ON "Dossier"("numeroDossier");
+   110→
+   111→CREATE TABLE IF NOT EXISTS "Commentaire" (
+   112→    "id" TEXT NOT NULL,
+   113→    "dossierId" TEXT NOT NULL,
+   114→    "auteurId" TEXT,
+   115→    "contenu" TEXT NOT NULL,
+   116→    "prive" BOOLEAN NOT NULL DEFAULT false,
+   117→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   118→    CONSTRAINT "Commentaire_pkey" PRIMARY KEY ("id")
+   119→);
+   120→
+   121→CREATE TABLE IF NOT EXISTS "Justificatif" (
+   122→    "id" TEXT NOT NULL,
+   123→    "dossierId" TEXT NOT NULL,
+   124→    "type" TEXT NOT NULL,
+   125→    "nomFichier" TEXT NOT NULL,
+   126→    "chemin" TEXT NOT NULL,
+   127→    "tailleKo" DOUBLE PRECISION,
+   128→    "uploadedBy" TEXT,
+   129→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   130→    CONSTRAINT "Justificatif_pkey" PRIMARY KEY ("id")
+   131→);
+   132→
+   133→CREATE TABLE IF NOT EXISTS "ImportHistorique" (
+   134→    "id" TEXT NOT NULL,
+   135→    "source" TEXT NOT NULL,
+   136→    "nomFichier" TEXT NOT NULL,
+   137→    "nbLignes" INTEGER NOT NULL,
+   138→    "nbSucces" INTEGER NOT NULL DEFAULT 0,
+   139→    "nbErreurs" INTEGER NOT NULL DEFAULT 0,
+   140→    "rapport" TEXT NOT NULL DEFAULT '[]',
+   141→    "importePar" TEXT,
+   142→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   143→    CONSTRAINT "ImportHistorique_pkey" PRIMARY KEY ("id")
+   144→);
+   145→
+   146→CREATE TABLE IF NOT EXISTS "Bareme" (
+   147→    "id" TEXT NOT NULL,
+   148→    "societeId" TEXT NOT NULL,
+   149→    "prestation" TEXT NOT NULL,
+   150→    "tauxCouverture" DOUBLE PRECISION NOT NULL,
+   151→    "plafond" DOUBLE PRECISION NOT NULL,
+   152→    "description" TEXT,
+   153→    "active" BOOLEAN NOT NULL DEFAULT true,
+   154→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   155→    "updatedAt" TIMESTAMP(3) NOT NULL,
+   156→    CONSTRAINT "Bareme_pkey" PRIMARY KEY ("id")
+   157→);
+   158→CREATE UNIQUE INDEX IF NOT EXISTS "Bareme_societeId_prestation_key" ON "Bareme"("societeId", "prestation");
+   159→
+   160→CREATE TABLE IF NOT EXISTS "ImportDossier" (
+   161→    "id" TEXT NOT NULL,
+   162→    "importId" TEXT NOT NULL,
+   163→    "dossierId" TEXT,
+   164→    "numeroLigne" INTEGER NOT NULL,
+   165→    "statutImport" TEXT NOT NULL DEFAULT 'SUCCES',
+   166→    "erreur" TEXT,
+   167→    "donnees" TEXT NOT NULL DEFAULT '{}',
+   168→    CONSTRAINT "ImportDossier_pkey" PRIMARY KEY ("id")
+   169→);
+   170→
+   171→CREATE TABLE IF NOT EXISTS "Assure" (
+   172→    "id" TEXT NOT NULL,
+   173→    "societeId" TEXT NOT NULL,
+   174→    "nom" TEXT NOT NULL,
+   175→    "nSS" TEXT,
+   176→    "prenom" TEXT,
+   177→    "dateNaissance" TIMESTAMP(3),
+   178→    "sexe" TEXT,
+   179→    "telephone" TEXT,
+   180→    "email" TEXT,
+   181→    "adresse" TEXT,
+   182→    "actif" BOOLEAN NOT NULL DEFAULT true,
+   183→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   184→    "updatedAt" TIMESTAMP(3) NOT NULL,
+   185→    CONSTRAINT "Assure_pkey" PRIMARY KEY ("id")
+   186→);
+   187→CREATE UNIQUE INDEX IF NOT EXISTS "Assure_nSS_key" ON "Assure"("nSS");
+   188→
+   189→CREATE TABLE IF NOT EXISTS "Prestataire" (
+   190→    "id" TEXT NOT NULL,
+   191→    "nom" TEXT NOT NULL,
+   192→    "type" TEXT NOT NULL,
+   193→    "telephone" TEXT,
+   194→    "email" TEXT,
+   195→    "adresse" TEXT,
+   196→    "nif" TEXT,
+   197→    "statut" TEXT,
+   198→    "rib" TEXT,
+   199→    "actif" BOOLEAN NOT NULL DEFAULT true,
+   200→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   201→    "updatedAt" TIMESTAMP(3) NOT NULL,
+   202→    CONSTRAINT "Prestataire_pkey" PRIMARY KEY ("id")
+   203→);
+   204→
+   205→CREATE TABLE IF NOT EXISTS "Courriel" (
+   206→    "id" TEXT NOT NULL,
+   207→    "type" TEXT NOT NULL,
+   208→    "expediteur" TEXT NOT NULL,
+   209→    "objet" TEXT NOT NULL,
+   210→    "societeId" TEXT,
+   211→    "beneficiaire" TEXT,
+   212→    "montant" DOUBLE PRECISION,
+   213→    "dateCourriel" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   214→    "dateSoins" TIMESTAMP(3),
+   215→    "prestataire" TEXT,
+   216→    "statut" TEXT NOT NULL DEFAULT 'RECU',
+   217→    "traitePar" TEXT,
+   218→    "dateTraitement" TIMESTAMP(3),
+   219→    "observations" TEXT,
+   220→    "dossierId" TEXT,
+   221→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   222→    "updatedAt" TIMESTAMP(3) NOT NULL,
+   223→    CONSTRAINT "Courriel_pkey" PRIMARY KEY ("id")
+   224→);
+   225→CREATE UNIQUE INDEX IF NOT EXISTS "Courriel_dossierId_key" ON "Courriel"("dossierId");
+   226→
+   227→CREATE TABLE IF NOT EXISTS "MessageBot" (
+   228→    "id" TEXT NOT NULL,
+   229→    "canal" TEXT NOT NULL,
+   230→    "expeditieurId" TEXT NOT NULL,
+   231→    "expeditieurNom" TEXT NOT NULL,
+   232→    "message" TEXT NOT NULL,
+   233→    "reponse" TEXT NOT NULL,
+   234→    "lu" BOOLEAN NOT NULL DEFAULT false,
+   235→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   236→    CONSTRAINT "MessageBot_pkey" PRIMARY KEY ("id")
+   237→);
+   238→
+   239→CREATE TABLE IF NOT EXISTS "EntrepriseContact" (
+   240→    "id" TEXT NOT NULL,
+   241→    "societeId" TEXT NOT NULL,
+   242→    "nom" TEXT NOT NULL,
+   243→    "prenom" TEXT,
+   244→    "fonction" TEXT,
+   245→    "telephone" TEXT,
+   246→    "email" TEXT,
+   247→    "actif" BOOLEAN NOT NULL DEFAULT true,
+   248→    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   249→    "updatedAt" TIMESTAMP(3) NOT NULL,
+   250→    CONSTRAINT "EntrepriseContact_pkey" PRIMARY KEY ("id")
+   251→);
+   252→`;
+   253→
+   254→const TYPES_DOSSIER = ['HOSPITALISATION', 'CONSULTATION', 'PHARMACIE', 'MATERNITE', 'CHIRURGIE', 'EXAMEN', 'SOINS DENTAIRES', 'OPTIQUE'];
+   255→const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
+   256→const MOYENS_PAIEMENT = ['VIREMENT', 'CHEQUE', 'ESPECES'];
+   257→const OBSERVATIONS = [
+   258→  'Urgence prise en charge', 'Dossier prioritaire', 'A vérifier avec la mutuelle',
+   259→  'Réclamation client en cours', 'Deuxième avis médical requis', '', '', '', '', '',
+   260→];
+   261→const NOMS_MALAGASY = [
+   262→  'Rakoto', 'Rasoa', 'Andry', 'Faly', 'Naina', 'Hery', 'Tiana', 'Mialy',
+   263→  'Jean', 'Marie', 'Pierre', 'Aline', 'Claude', 'Nirina', 'Haingo',
+   264→  'Tahiry', 'Sitraka', 'Lova', 'Fenitra', 'Ony',
+   265→];
+   266→const PRENOMS_MALAGASY = [
+   267→  'Rakotonirina', 'Rasoanaivo', 'Andrianjaka', 'Randriamanalina', 'Rakotomanga',
+   268→  'Andriamananjara', 'Rasolofomanana', 'Rakotobe', 'Andrianarisoa', 'Ramiandrisoa',
+   269→];
+   270→
+   271→const PRESTATAIRES_DATA = [
+   272→  { nom: 'Clinique Sainte Marie', type: 'CLINIQUE', telephone: '032 12 345 67', email: 'contact@clinique-saintemarie.mg', adresse: 'Lot VJ 34 Antanimena, Antananarivo', nif: '4001234567' },
+   273→  { nom: 'Hôpital Principal', type: 'HOPITAL', telephone: '020 22 345 67', email: 'info@hopital-principal.mg', adresse: "Avenue de l'Indépendance, Antananarivo", nif: '4002345678' },
+   274→  { nom: 'Centre Médical Albert', type: 'CABINET_MEDICAL', telephone: '034 56 789 01', email: 'rdv@cm-albert.mg', adresse: 'Anosy, Antananarivo', nif: '4003456789' },
+   275→  { nom: 'Pharmacie Centrale', type: 'PHARMACIE', telephone: '020 22 456 78', email: 'commande@pharmacie-centrale.mg', adresse: 'Place Behorizy, Antananarivo', nif: '4004567890' },
+   276→  { nom: 'Cabinet Dentaire Blanc', type: 'DENTAIRE', telephone: '033 67 890 12', email: 'blanc.dental@gmail.com', adresse: 'Analakely, Antananarivo', nif: '4005678901' },
+   277→  { nom: 'Laboratoire BioMad', type: 'LABORATOIRE', telephone: '020 22 567 89', email: 'lab@biomad.mg', adresse: 'Isotry, Antananarivo', nif: '4006789012' },
+   278→  { nom: 'Centre Optique Vision Plus', type: 'OPTICIEN', telephone: '034 78 901 23', email: 'visionplus@optique.mg', adresse: 'Tana Water Front, Antananarivo', nif: '4007890123' },
+   279→  { nom: 'Maternité Fleur de Vie', type: 'CLINIQUE', telephone: '020 24 678 90', email: 'maternite@fleurdevie.mg', adresse: 'Ampefiloha, Antananarivo', nif: '4008901234' },
+   280→  { nom: 'Hôpital Militaire', type: 'HOPITAL', telephone: '020 22 789 01', email: 'admin@hopital-militaire.mg', adresse: 'Soarano, Antananarivo', nif: '4009012345' },
+   281→  { nom: 'Policlinique du Nord', type: 'CLINIQUE', telephone: '032 89 012 34', email: 'contact@policlinique-nord.mg', adresse: 'Antsahamarina, Antananarivo', nif: '4010123456' },
+   282→];
+   283→
+   284→const BAREMES_DATA = [
+   285→  { prestation: 'HOSPITALISATION', tauxCouverture: 80, plafond: 5_000_000, description: 'Prise en charge hospitalisation complète' },
+   286→  { prestation: 'CONSULTATION', tauxCouverture: 70, plafond: 100_000, description: 'Consultation médicale générale ou spécialisée' },
+   287→  { prestation: 'PHARMACIE', tauxCouverture: 60, plafond: 200_000, description: 'Médicaments sur ordonnance' },
+   288→  { prestation: 'MATERNITE', tauxCouverture: 85, plafond: 3_000_000, description: 'Suivi de grossesse et accouchement' },
+   289→  { prestation: 'CHIRURGIE', tauxCouverture: 80, plafond: 10_000_000, description: 'Interventions chirurgicales' },
+   290→  { prestation: 'EXAMEN', tauxCouverture: 75, plafond: 500_000, description: 'Examens de laboratoire et imagerie' },
+   291→  { prestation: 'SOINS DENTAIRES', tauxCouverture: 60, plafond: 300_000, description: 'Soins dentaires courants et prothèses' },
+   292→  { prestation: 'OPTIQUE', tauxCouverture: 50, plafond: 250_000, description: 'Lunettes et lentilles correctrices' },
+   293→];
+   294→
+   295→const SOCIETES_DATA = [
+   296→  'TELMA Madagascar', 'JIRAMA', 'Airtel Madagascar', 'BOA Madagascar',
+   297→  'BNI Madagascar', 'Société Générale MDG', 'Total Energies MDG',
+   298→  'Shopee Madagascar', 'Coca Cola MAD', 'Colas Madagascar',
+   299→  'Orange Madagascar', 'Henkel Madagascar', 'Groupe Filatex',
+   300→  'SIFOR Madagascar', "Banque de l'Océan Indien",
+   301→];
+   302→
+   303→const GESTIONNAIRES_DATA = [
+   304→  { nom: 'Ravao A.', service: 'ACCUEIL' },
+   305→  { nom: 'Nirina R.', service: 'ACCUEIL' },
+   306→  { nom: 'Jean-Pierre R.', service: 'TECHNIQUE' },
+   307→  { nom: 'Haingo T.', service: 'TECHNIQUE' },
+   308→  { nom: 'Sitraka M.', service: 'TECHNIQUE' },
+   309→  { nom: 'Marie R.', service: 'COMPTABILITE' },
+   310→  { nom: 'Tahiry V.', service: 'COMPTABILITE' },
+   311→  { nom: 'Lova N.', service: 'TECHNIQUE' },
+   312→  { nom: 'Fenitra K.', service: 'ACCUEIL' },
+   313→  { nom: 'Ony D.', service: 'COMPTABILITE' },
+   314→];
+   315→
+   316→function randomInt(min: number, max: number) {
+   317→  return Math.floor(Math.random() * (max - min + 1)) + min;
+   318→}
+   319→function randomFloat(min: number, max: number) {
+   320→  return Math.round((Math.random() * (max - min) + min) * 100) / 100;
+   321→}
+   322→function randomItem<T>(arr: T[]): T {
+   323→  return arr[Math.floor(Math.random() * arr.length)];
+   324→}
+   325→function randomDate(start: Date, end: Date): Date {
+   326→  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+   327→}
+   328→function generateNumeroDossier(index: number): string {
+   329→  return `DOS-2026-${String(index).padStart(6, '0')}`;
+   330→}
+   331→function generateNSS(): string {
+   332→  return `SS-${randomInt(100000, 999999)}`;
+   333→}
+   334→
+   335→export async function GET(request: Request) {
+   336→  const { searchParams } = new URL(request.url);
+   337→  const token = searchParams.get('token');
+   338→
+   339→  if (!token || token !== process.env.SETUP_TOKEN) {
+   340→    return NextResponse.json({ error: 'Token de setup invalide' }, { status: 403 });
+   341→  }
+   342→
+   343→  const log: string[] = [];
+   344→  const db = new PrismaClient();
+   345→
+   346→  try {
+   347→    // ── Étape 1 : Créer les tables si elles n'existent pas ──
+   348→    const sqlStatements = CREATE_TABLES_SQL
+   349→      .split(';')
+   350→      .map(s => s.trim())
+   351→      .filter(s => s.length > 0);
+   352→
+   353→    for (const sql of sqlStatements) {
+   354→      try {
+   355→        await db.$executeRawUnsafe(sql);
+   356→      } catch (e: any) {
+   357→        if (!e.message?.includes('already exists')) {
+   358→          console.warn(`[SETUP] SQL warning: ${e.message?.slice(0, 100)}`);
+   359→        }
+   360→      }
+   361→    }
+   362→    log.push('Tables créées/vérifiées');
+   363→
+   364→    // ── Étape 2 : Vérifier si le seed est déjà fait ──
+   365→    const existingUsers = await db.utilisateur.count();
+   366→    if (existingUsers > 0) {
+   367→      return NextResponse.json({
+   368→        success: true,
+   369→        message: 'Base de données déjà initialisée',
+   370→        users: existingUsers,
+   371→        details: log,
+   372→      });
+   373→    }
+   374→
+   375→    // 1. Utilisateurs démo
+   376→    const passwordHash = await hash('SmartFlow@2026', 10);
+   377→    const utilisateursData = [
+   378→      { email: 'admin@smartflow.mg', nom: 'Administrateur Système', password: passwordHash, role: 'ADMINISTRATEUR' },
+   379→      { email: 'accueil@smartflow.mg', nom: 'Ravao Andrianjaka', password: passwordHash, role: 'ACCUEIL' },
+   380→      { email: 'technique@smartflow.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
+   381→      { email: 'compta@smartflow.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
+   382→      { email: 'utilisateur@smartflow.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
+   383→    ];
+   384→
+   385→    for (const u of utilisateursData) {
+   386→      await db.utilisateur.upsert({
+   387→        where: { email: u.email },
+   388→        update: {},
+   389→        create: u,
+   390→      });
+   391→    }
+   392→    log.push(`${utilisateursData.length} utilisateurs démo créés`);
+   393→
+   394→    // 2. Sociétés
+   395→    const societes: Record<string, string> = {};
+   396→    for (const nom of SOCIETES_DATA) {
+   397→      const s = await db.societe.create({ data: { nom } });
+   398→      societes[nom] = s.id;
+   399→    }
+   400→    log.push(`${SOCIETES_DATA.length} sociétés créées`);
+   401→
+   402→    // 3. Barèmes
+   403→    let baremeCount = 0;
+   404→    for (const societeId of Object.values(societes)) {
+   405→      for (const b of BAREMES_DATA) {
+   406→        const tauxVariation = b.tauxCouverture + randomInt(-10, 10);
+   407→        const plafondVariation = Math.round(b.plafond * (0.8 + Math.random() * 0.4));
+   408→        await db.bareme.create({
+   409→          data: {
+   410→            societeId,
+   411→            prestation: b.prestation,
+   412→            tauxCouverture: Math.max(30, Math.min(100, tauxVariation)),
+   413→            plafond: plafondVariation,
+   414→            description: b.description,
+   415→            active: true,
+   416→          },
+   417→        });
+   418→        baremeCount++;
+   419→      }
+   420→    }
+   421→    log.push(`${baremeCount} barèmes créés`);
+   422→
+   423→    // 4. Prestataires
+   424→    const prestatairesMap: Record<string, string> = {};
+   425→    for (const p of PRESTATAIRES_DATA) {
+   426→      const created = await db.prestataire.create({ data: p });
+   427→      prestatairesMap[p.nom] = created.id;
+   428→    }
+   429→    const prestatairesExtra = [
+   430→      { nom: 'Hôpital Andrianarisoa', type: 'HOPITAL', telephone: '020 23 456 78', email: 'contact@hopital-andria.mg', adresse: 'Ambohimanarina', nif: '4011234567' },
+   431→      { nom: 'Pharmacie du Centre', type: 'PHARMACIE', telephone: '020 22 345 67', email: 'info@pharmacie-centre.mg', adresse: 'Ankatso', nif: '4012345678' },
+   432→      { nom: 'Labo Analyses Plus', type: 'LABORATOIRE', telephone: '034 12 345 67', email: 'lab@analysesplus.mg', adresse: 'Mahamasina', nif: '4013456789' },
+   433→    ];
+   434→    for (const p of prestatairesExtra) {
+   435→      const created = await db.prestataire.create({ data: p });
+   436→      prestatairesMap[p.nom] = created.id;
+   437→    }
+   438→    log.push(`${PRESTATAIRES_DATA.length + prestatairesExtra.length} prestataires créés`);
+   439→
+   440→    // 5. Assurés
+   441→    const assuresBySociete: Record<string, string[]> = {};
+   442→    let assureCount = 0;
+   443→    for (const [nomSociete, societeId] of Object.entries(societes)) {
+   444→      const nbAssures = randomInt(3, 6);
+   445→      assuresBySociete[societeId] = [];
+   446→      for (let a = 0; a < nbAssures; a++) {
+   447→        const nss = generateNSS();
+   448→        const prenom = randomItem(NOMS_MALAGASY);
+   449→        const nomFamille = randomItem(PRENOMS_MALAGASY);
+   450→        const assure = await db.assure.create({
+   451→          data: {
+   452→            societeId,
+   453→            nom: nomFamille,
+   454→            prenom,
+   455→            nSS: nss,
+   456→            dateNaissance: randomDate(new Date('1960-01-01'), new Date('2000-12-31')),
+   457→            sexe: Math.random() > 0.5 ? 'M' : 'F',
+   458→            telephone: `034 ${randomInt(10, 99)} ${randomInt(100, 999)} ${randomInt(10, 99)}`,
+   459→            email: `${prenom.toLowerCase()}.${nomFamille.toLowerCase().slice(0, 6)}@${nomSociete.toLowerCase().replace(/[^a-z]/g, '').slice(0, 8)}.mg`,
+   460→            adresse: 'Antananarivo, Madagascar',
+   461→            actif: true,
+   462→          },
+   463→        });
+   464→        assuresBySociete[societeId].push(assure.id);
+   465→        assureCount++;
+   466→      }
+   467→    }
+   468→    log.push(`${assureCount} assurés créés`);
+   469→
+   470→    // 6. Gestionnaires
+   471→    const gestionnaires: Record<string, { id: string; service: string }> = {};
+   472→    for (const g of GESTIONNAIRES_DATA) {
+   473→      const created = await db.gestionnaire.create({ data: g });
+   474→      gestionnaires[g.nom] = { id: created.id, service: g.service };
+   475→    }
+   476→    log.push(`${GESTIONNAIRES_DATA.length} gestionnaires créés`);
+   477→
+   478→    // 7. Contrats
+   479→    const contrats: string[] = [];
+   480→    for (const [nom, societeId] of Object.entries(societes)) {
+   481→      const budget = randomFloat(50_000_000, 500_000_000);
+   482→      const contrat = await db.contrat.create({
+   483→        data: {
+   484→          societeId,
+   485→          reference: `CTR-${nom.slice(0, 4).toUpperCase().replace(/[^A-Z]/g, '')}-2026`,
+   486→          budgetAnnuel: budget,
+   487→          budgetUtilise: randomFloat(budget * 0.1, budget * 0.7),
+   488→          dateDebut: new Date('2026-01-01'),
+   489→          dateFin: new Date('2026-12-31'),
+   490→          statut: 'ACTIF',
+   491→        },
+   492→      });
+   493→      contrats.push(contrat.id);
+   494→    }
+   495→    log.push(`${contrats.length} contrats créés`);
+   496→
+   497→    // 8. Appels de fonds
+   498→    let appelCount = 0;
+   499→    for (const contratId of contrats.slice(0, 8)) {
+   500→      const nbAppels = randomInt(1, 4);
+   501→      for (let i = 0; i < nbAppels; i++) {
+   502→        const estRegle = Math.random() > 0.3;
+   503→        await db.appelDeFonds.create({
+   504→          data: {
+   505→            contratId,
+   506→            montant: randomFloat(2_000_000, 30_000_000),
+   507→            dateAppel: randomDate(new Date('2026-01-15'), new Date('2026-06-15')),
+   508→            datePaiement: estRegle ? randomDate(new Date('2026-02-01'), new Date('2026-06-25')) : null,
+   509→            reference: estRegle ? `PAIE-${randomInt(1000, 9999)}` : null,
+   510→            statut: estRegle ? 'REGLE' : 'EN_ATTENTE',
+   511→            observations: Math.random() > 0.7 ? 'Appel urgent pour renflouement' : null,
+   512→          },
+   513→        });
+   514→        appelCount++;
+   515→      }
+   516→    }
+   517→    log.push(`${appelCount} appels de fonds créés`);
+   518→
+   519→    // 9. Dossiers (250)
+   520→    const accueilIds = Object.values(gestionnaires).filter(g => g.service === 'ACCUEIL').map(g => g.id);
+   521→    const techniqueIds = Object.values(gestionnaires).filter(g => g.service === 'TECHNIQUE').map(g => g.id);
+   522→    const comptaIds = Object.values(gestionnaires).filter(g => g.service === 'COMPTABILITE').map(g => g.id);
+   523→    const utilisateursList = await db.utilisateur.findMany();
+   524→    const accueilUser = utilisateursList.find(u => u.role === 'ACCUEIL')!;
+   525→    const utilisateurDemo = utilisateursList.find(u => u.role === 'UTILISATEUR')!;
+   526→    const prestataireIds = Object.values(prestatairesMap);
+   527→    const societeIds = Object.values(societes);
+   528→
+   529→    const statutWeights: Record<string, number> = {
+   530→      RECU: 15, EN_ANALYSE: 15, VALIDE: 10, EN_COMPTABILITE: 8, EN_PAIEMENT: 12, PAYE: 30, REJETE: 10,
+   531→    };
+   532→    function weightedRandomStatut(): string {
+   533→      const total = Object.values(statutWeights).reduce((a, b) => a + b, 0);
+   534→      let r = Math.random() * total;
+   535→      for (const [statut, weight] of Object.entries(statutWeights)) {
+   536→        r -= weight;
+   537→        if (r <= 0) return statut;
+   538→      }
+   539→      return 'PAYE';
+   540→    }
+   541→
+   542→    let dossierCount = 0;
+   543→    for (let i = 1; i <= 250; i++) {
+   544→      const statut = weightedRandomStatut();
+   545→      const dateReception = randomDate(new Date('2026-01-02'), new Date('2026-06-24'));
+   546→      const montantReclame = randomFloat(15_000, 8_500_000);
+   547→      const estRejete = statut === 'REJETE';
+   548→      const estPaye = statut === 'PAYE';
+   549→      const estEnAnalyse = statut === 'EN_ANALYSE' || statut === 'VALIDE' || statut === 'EN_COMPTABILITE' || statut === 'EN_PAIEMENT' || estPaye;
+   550→      const dateTraitementTechnique = estEnAnalyse ? randomDate(dateReception, new Date('2026-06-24')) : null;
+   551→      const montantValide = estRejete ? null : randomFloat(montantReclame * 0.6, montantReclame * 1.0);
+   552→      const motifRejet = estRejete ? randomItem(['Pièces manquantes', 'Montant non conforme', 'Hors contrat', 'Dossier incomplet', 'Soins non couverts']) : null;
+   553→      const dateReceptionDecompte = ['EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'].includes(statut)
+   554→        ? randomDate(dateTraitementTechnique || dateReception, new Date('2026-06-24')) : null;
+   555→      const datePaiement = estPaye ? randomDate(dateReceptionDecompte || dateTraitementTechnique || dateReception, new Date('2026-06-25')) : null;
+   556→      const montantPaye = estPaye ? randomFloat((montantValide || montantReclame) * 0.85, (montantValide || montantReclame)) : null;
+   557→
+   558→      const dossierSocieteId = randomItem(societeIds);
+   559→      const assuresOfSociete = assuresBySociete[dossierSocieteId] || [];
+   560→      const assureId = assuresOfSociete.length > 0 ? randomItem(assuresOfSociete) : null;
+   561→      const prestataireId = randomItem(prestataireIds);
+   562→      const prestataire = PRESTATAIRES_DATA.find(p => prestatairesMap[p.nom] === prestataireId);
+   563→
+   564→      const historique: { date: string; statut: string; commentaire: string }[] = [];
+   565→      historique.push({ date: dateReception.toISOString(), statut: 'RECU', commentaire: "Dossier reçu à l'accueil" });
+   566→      if (dateTraitementTechnique) {
+   567→        historique.push({ date: dateTraitementTechnique.toISOString(), statut: 'EN_ANALYSE', commentaire: 'Transmis au service technique' });
+   568→        if (estRejete) {
+   569→          historique.push({ date: new Date(dateTraitementTechnique.getTime() + 86400000 * randomInt(2, 15)).toISOString(), statut: 'REJETE', commentaire: `Rejeté: ${motifRejet}` });
+   570→        }
+   571→        if (['VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'].includes(statut)) {
+   572→          historique.push({ date: new Date(dateTraitementTechnique.getTime() + 86400000 * randomInt(1, 10)).toISOString(), statut: 'VALIDE', commentaire: 'Validé par le service technique' });
+   573→        }
+   574→      }
+   575→      if (dateReceptionDecompte) {
+   576→        historique.push({ date: dateReceptionDecompte.toISOString(), statut: statut === 'EN_COMPTABILITE' ? 'EN_COMPTABILITE' : 'EN_PAIEMENT', commentaire: 'Décompte reçu en comptabilité' });
+   577→      }
+   578→      if (datePaiement) {
+   579→        historique.push({ date: datePaiement.toISOString(), statut: 'PAYE', commentaire: 'Paiement effectué' });
+   580→      }
+   581→
+   582→      const createur = (i % 10 === 0) ? utilisateurDemo.id : accueilUser.id;
+   583→
+   584→      await db.dossier.create({
+   585→        data: {
+   586→          numeroDossier: generateNumeroDossier(i),
+   587→          dateReception,
+   588→          societeId: dossierSocieteId,
+   589→          beneficiaire: `${randomItem(NOMS_MALAGASY)} ${randomItem(PRENOMS_MALAGASY)}`,
+   590→          typeDossier: randomItem(TYPES_DOSSIER),
+   591→          gestionnaireAccueilId: randomItem(accueilIds),
+   592→          createurId: createur,
+   593→          assureId,
+   594→          nSS: assureId ? null : generateNSS(),
+   595→          prestataireId,
+   596→          prestataireLegacy: prestataire?.nom || randomItem(PRESTATAIRES_DATA).nom,
+   597→          dateSoins: randomDate(new Date('2025-11-01'), dateReception),
+   598→          moyenPaiement: randomItem(MOYENS_PAIEMENT),
+   599→          observations: randomItem(OBSERVATIONS) || null,
+   600→          dateTraitementTechnique,
+   601→          montantReclame,
+   602→          montantValide,
+   603→          ticketModerateur: montantValide ? randomFloat(500, montantValide * 0.15) : null,
+   604→          partPatient: montantValide ? randomFloat(0, montantValide * 0.2) : null,
+   605→          partEntreprise: montantValide ? randomFloat(montantValide * 0.6, montantValide * 0.95) : null,
+   606→          gestionnaireTechniqueId: estEnAnalyse ? randomItem(techniqueIds) : null,
+   607→          motifRejet,
+   608→          dateReceptionDecompte,
+   609→          datePaiement,
+   610→          referencePaiement: estPaye ? `REF-${randomInt(100000, 999999)}` : null,
+   611→          montantPaye,
+   612→          gestionnaireComptaId: dateReceptionDecompte ? randomItem(comptaIds) : null,
+   613→          statut,
+   614→          source: randomItem(['EXCEL', 'ISA', 'SAGE', 'MANUEL']),
+   615→          historique: JSON.stringify(historique),
+   616→        },
+   617→      });
+   618→      dossierCount++;
+   619→    }
+   620→    log.push(`${dossierCount} dossiers créés`);
+   621→
+   622→    // 10. Commentaires
+   623→    const someDossiers = await db.dossier.findMany({ take: 30 });
+   624→    const users = await db.utilisateur.findMany();
+   625→    let commentCount = 0;
+   626→    const commentTexts = [
+   627→      'Dossier vérifié, en attente de validation supérieure.',
+   628→      'Pièce justificative reçue, traitement en cours.',
+   629→      'Montant confirmé par le prestataire.',
+   630→      'Rappel envoyé au service comptabilité.',
+   631→      "Client a appelé pour connaître l'avancement.",
+   632→      'Décompte corrigé après vérification.',
+   633→      'Conforme au contrat, passage en paiement.',
+   634→      'Attente retour du médecin conseil.',
+   635→    ];
+   636→    for (const d of someDossiers) {
+   637→      const nbComments = randomInt(1, 3);
+   638→      for (let j = 0; j < nbComments; j++) {
+   639→        await db.commentaire.create({
+   640→          data: {
+   641→            dossierId: d.id,
+   642→            auteurId: randomItem(users).id,
+   643→            contenu: randomItem(commentTexts),
+   644→            prive: Math.random() > 0.6,
+   645→            createdAt: randomDate(d.dateReception, new Date('2026-06-25')),
+   646→          },
+   647→        });
+   648→        commentCount++;
+   649→      }
+   650→    }
+   651→    log.push(`${commentCount} commentaires créés`);
+   652→
+   653→    // 11. Courriels
+   654→    const courrielsData = [
+   655→      { type: 'FACTURE_PRESTATAIRE', expediteur: 'Clinique Sainte Marie', objet: 'Facture #INV-2026-0456 - Hospitalisation Mme Rasoa', societeId: societes['TELMA Madagascar'], beneficiaire: 'Rasoa Rasoanaivo', montant: 1_250_000, prestataire: 'Clinique Sainte Marie', statut: 'RECU' },
+   656→      { type: 'DOSSIER_REMBOURSEMENT', expediteur: 'Jean-Pierre Rakoto', objet: 'Demande de remboursement consultation', societeId: societes['JIRAMA'], beneficiaire: 'Andry Randriamanalina', montant: 85_000, prestataire: 'Centre Médical Albert', statut: 'TRAITE' },
+   657→      { type: 'FACTURE_PRESTATAIRE', expediteur: 'Laboratoire BioMad', objet: 'Facture analyses laboratoire - Batch Juin 2026', societeId: societes['Airtel Madagascar'], beneficiaire: null, montant: 2_340_000, prestataire: 'Laboratoire BioMad', statut: 'RECU' },
+   658→    ];
+   659→    for (const c of courrielsData) {
+   660→      await db.courriel.create({
+   661→        data: {
+   662→          ...c,
+   663→          dateCourriel: randomDate(new Date('2026-06-01'), new Date('2026-06-25')),
+   664→          dateSoins: randomDate(new Date('2026-05-01'), new Date('2026-06-20')),
+   665→          traitePar: c.statut === 'TRAITE' ? 'Ravao A.' : null,
+   666→          dateTraitement: c.statut === 'TRAITE' ? new Date('2026-06-20') : null,
+   667→        },
+   668→      });
+   669→    }
+   670→    log.push('3 courriels créés');
+   671→
+   672→    return NextResponse.json({
+   673→      success: true,
+   674→      message: 'Base de données initialisée avec succès',
+   675→      details: log,
+   676→    });
+   677→  } catch (error: any) {
+   678→    console.error('[SETUP] Erreur:', error);
+   679→    return NextResponse.json({
+   680→      success: false,
+   681→      error: error.message || 'Erreur lors de l\'initialisation',
+   682→      details: log,
+   683→    }, { status: 500 });
+   684→  } finally {
+   685→    await db.$disconnect();
+   686→  }
+   687→}

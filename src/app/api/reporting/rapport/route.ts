@@ -140,12 +140,12 @@ export async function POST(request: NextRequest) {
 
     // Envoyer par email si destinataires fournis
     if (destinataires && destinataires.length > 0) {
-      const filename = `rapport-smartflow-${annee}-${String(mois).padStart(2, "0")}.pdf`;
+      const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
       try {
         await envoyerEmail({
           destinataires,
-          sujet: `SmartFlow IA — Rapport Mensuel ${data.periode}`,
-          texte: `Veuillez trouver ci-joint le rapport mensuel SmartFlow IA pour la période ${data.periode}.`,
+          sujet: `Suivi Santé — Rapport Mensuel ${data.periode}`,
+          texte: `Veuillez trouver ci-joint le rapport mensuel Suivi Santé pour la période ${data.periode}.`,
           attachments: [
             {
               filename,
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const filename = `rapport-smartflow-${annee}-${String(mois).padStart(2, "0")}.pdf`;
+    const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
@@ -188,7 +188,7 @@ export async function GET(request: NextRequest) {
     const data = await buildReportData(mois, annee);
     const pdfBuffer = await genererRapportMensuel(data);
 
-    const filename = `rapport-smartflow-${annee}-${String(mois).padStart(2, "0")}.pdf`;
+    const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",

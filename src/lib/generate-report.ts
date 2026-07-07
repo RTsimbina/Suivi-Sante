@@ -36,7 +36,7 @@ export async function genererRapportMensuel(data: ReportData): Promise<Buffer> {
   // ─── En-tête ──────────────────────────────────────────────
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('SmartFlow IA — Rapport Mensuel', 14, 20);
+  doc.text('Suivi Santé — Rapport Mensuel', 14, 20);
 
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
@@ -131,7 +131,7 @@ export async function genererRapportMensuel(data: ReportData): Promise<Buffer> {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'italic');
   doc.text(
-    `Document généré automatiquement par SmartFlow IA — ${data.dateGeneration}`,
+    `Document généré automatiquement par Suivi Santé — ${data.dateGeneration}`,
     14,
     pageHeight - 10
   );
