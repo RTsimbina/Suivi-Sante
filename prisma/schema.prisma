@@ -7,3 +7,261 @@ datasource db {
   url      = env("DATABASE_URL")
   relationMode = "prisma"
 }
+
+model Utilisateur {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  nom           String
+  password      String
+  role          String    @default("UTILISATEUR")
+  actif         Boolean   @default(true)
+  avatar        String?
+  dernierLogin  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  commentaires  Commentaire[]
+  dossiersCrees Dossier[]  @relation("CreateurDossier")
+}
+
+model Societe {
+  id        String    @id @default(cuid())
+  nom       String
+  baremes   Bareme[]
+  dossiers  Dossier[]
+  contrats  Contrat[]
+  courriels Courriel[]
+  assures   Assure[]
+  contacts  EntrepriseContact[]
+  createdAt DateTime  @default(now())
+}
+
+model Gestionnaire {
+  id                  String    @id @default(cuid())
+  nom                 String
+  service             String
+  dossiersAccueil     Dossier[] @relation("GestionnaireAccueil")
+  dossiersTechnique   Dossier[] @relation("GestionnaireTechnique")
+  dossiersCompta      Dossier[] @relation("GestionnaireCompta")
+  createdAt           DateTime   @default(now())
+}
+
+model Contrat {
+  id              String    @id @default(cuid())
+  societeId       String
+  societe         Societe   @relation(fields: [societeId], references: [id])
+  reference       String
+  budgetAnnuel    Float
+  budgetUtilise   Float     @default(0)
+  dateDebut       DateTime
+  dateFin         DateTime
+  statut          String    @default("ACTIF")
+  appelsDeFonds   AppelDeFonds[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model AppelDeFonds {
+  id            String    @id @default(cuid())
+  contratId     String
+  contrat       Contrat   @relation(fields: [contratId], references: [id])
+  montant       Float
+  dateAppel     DateTime
+  datePaiement  DateTime?
+  reference     String?
+  statut        String    @default("EN_ATTENTE")
+  observations  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Dossier {
+  id                        String       @id @default(cuid())
+  numeroDossier             String       @unique
+  dateReception             DateTime
+  societeId                 String
+  societe                   Societe      @relation(fields: [societeId], references: [id])
+  beneficiaire              String
+  typeDossier               String
+  categorieDossier           String?
+  gestionnaireAccueilId     String?
+  gestionnaireAccueil       Gestionnaire? @relation("GestionnaireAccueil", fields: [gestionnaireAccueilId], references: [id])
+  createurId                String?
+  createur                  Utilisateur?  @relation("CreateurDossier", fields: [createurId], references: [id])
+  assureId                  String?
+  assure                    Assure?      @relation("AssureDossier", fields: [assureId], references: [id])
+  nSS                       String?
+  prestataireId             String?
+  prestataire               Prestataire? @relation("PrestataireDossier", fields: [prestataireId], references: [id])
+  prestataireLegacy         String?
+  dateSoins                 DateTime?
+  moyenPaiement             String?
+  observations              String?
+  dateTraitementTechnique   DateTime?
+  montantReclame            Float
+  montantValide             Float?
+  ticketModerateur          Float?
+  partPatient               Float?
+  partEntreprise            Float?
+  gestionnaireTechniqueId   String?
+  gestionnaireTechnique     Gestionnaire? @relation("GestionnaireTechnique", fields: [gestionnaireTechniqueId], references: [id])
+  motifRejet                String?
+  dateReceptionDecompte     DateTime?
+  datePaiement              DateTime?
+  referencePaiement         String?
+  montantPaye               Float?
+  gestionnaireComptaId      String?
+  gestionnaireCompta        Gestionnaire? @relation("GestionnaireCompta", fields: [gestionnaireComptaId], references: [id])
+  statut                    String       @default("RECU")
+  source                    String       @default("EXCEL")
+  historique                String       @default("[]")
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  commentaires              Commentaire[]
+  justificatifs             Justificatif[]
+  importations              ImportDossier[]
+  courriel                  Courriel?
+}
+
+model Commentaire {
+  id          String   @id @default(cuid())
+  dossierId   String
+  dossier     Dossier  @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  auteurId    String?
+  auteur      Utilisateur? @relation(fields: [auteurId], references: [id])
+  contenu     String
+  prive       Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Justificatif {
+  id          String   @id @default(cuid())
+  dossierId   String
+  dossier     Dossier  @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  type        String
+  nomFichier  String
+  chemin      String
+  tailleKo    Float?
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+}
+
+model ImportHistorique {
+  id            String   @id @default(cuid())
+  source        String
+  nomFichier    String
+  nbLignes      Int
+  nbSucces      Int      @default(0)
+  nbErreurs     Int      @default(0)
+  rapport       String   @default("[]")
+  importePar    String?
+  createdAt     DateTime @default(now())
+  dossiers      ImportDossier[]
+}
+
+model Bareme {
+  id              String   @id @default(cuid())
+  societeId       String
+  societe         Societe  @relation(fields: [societeId], references: [id])
+  prestation      String
+  tauxCouverture  Float
+  plafond         Float
+  description     String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([societeId, prestation])
+}
+
+model ImportDossier {
+  id               String         @id @default(cuid())
+  importId         String
+  importHistorique ImportHistorique @relation(fields: [importId], references: [id])
+  dossierId        String?
+  dossier          Dossier?       @relation(fields: [dossierId], references: [id])
+  numeroLigne      Int
+  statutImport     String         @default("SUCCES")
+  erreur           String?
+  donnees          String         @default("{}")
+}
+
+model Assure {
+  id              String     @id @default(cuid())
+  societeId       String
+  societe         Societe    @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  nom             String
+  nSS             String?    @unique
+  prenom          String?
+  dateNaissance   DateTime?
+  sexe            String?
+  telephone       String?
+  email           String?
+  adresse         String?
+  actif           Boolean    @default(true)
+  dossiers        Dossier[]  @relation("AssureDossier")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Prestataire {
+  id              String     @id @default(cuid())
+  nom             String
+  type            String
+  telephone       String?
+  email           String?
+  adresse         String?
+  nif             String?
+  statut          String?
+  rib             String?
+  actif           Boolean    @default(true)
+  dossiers        Dossier[]  @relation("PrestataireDossier")
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Courriel {
+  id              String     @id @default(cuid())
+  type            String
+  expediteur      String
+  objet           String
+  societeId       String?
+  societe         Societe?   @relation(fields: [societeId], references: [id])
+  beneficiaire    String?
+  montant         Float?
+  dateCourriel    DateTime   @default(now())
+  dateSoins       DateTime?
+  prestataire     String?
+  statut          String     @default("RECU")
+  traitePar       String?
+  dateTraitement  DateTime?
+  observations    String?
+  dossierId       String?    @unique
+  dossier         Dossier?   @relation(fields: [dossierId], references: [id])
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model MessageBot {
+  id              String   @id @default(cuid())
+  canal           String
+  expeditieurId   String
+  expeditieurNom  String
+  message         String
+  reponse         String
+  lu              Boolean  @default(false)
+  createdAt       DateTime   @default(now())
+}
+
+model EntrepriseContact {
+  id              String    @id @default(cuid())
+  societeId       String
+  societe         Societe   @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  nom             String
+  prenom          String?
+  fonction        String?
+  telephone       String?
+  email           String?
+  actif           Boolean   @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}

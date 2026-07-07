@@ -1,11 +1,255 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
-import * as crypto from 'crypto';
 
 // Ce endpoint initialise la base de données PostgreSQL sur Vercel
-// Il est protégé par un token secret (SETUP_TOKEN)
-// À appeler UNE SEULE FOIS après le déploiement : GET /api/setup?token=VOTRE_TOKEN
+// 1. Crée les tables (DDL)  2. Insère les données de démo
+// Protégé par SETUP_TOKEN — à appeler UNE SEULE FOIS après le déploiement
+// GET /api/setup?token=VOTRE_TOKEN
+
+// ─── DDL SQL : création de toutes les tables ──────────────────────────────────
+const CREATE_TABLES_SQL = `
+CREATE SCHEMA IF NOT EXISTS "public";
+
+CREATE TABLE IF NOT EXISTS "Utilisateur" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT 'UTILISATEUR',
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "avatar" TEXT,
+    "dernierLogin" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Utilisateur_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Utilisateur_email_key" ON "Utilisateur"("email");
+
+CREATE TABLE IF NOT EXISTS "Societe" (
+    "id" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Societe_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Gestionnaire" (
+    "id" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
+    "service" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Gestionnaire_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Contrat" (
+    "id" TEXT NOT NULL,
+    "societeId" TEXT NOT NULL,
+    "reference" TEXT NOT NULL,
+    "budgetAnnuel" DOUBLE PRECISION NOT NULL,
+    "budgetUtilise" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "dateDebut" TIMESTAMP(3) NOT NULL,
+    "dateFin" TIMESTAMP(3) NOT NULL,
+    "statut" TEXT NOT NULL DEFAULT 'ACTIF',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Contrat_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "AppelDeFonds" (
+    "id" TEXT NOT NULL,
+    "contratId" TEXT NOT NULL,
+    "montant" DOUBLE PRECISION NOT NULL,
+    "dateAppel" TIMESTAMP(3) NOT NULL,
+    "datePaiement" TIMESTAMP(3),
+    "reference" TEXT,
+    "statut" TEXT NOT NULL DEFAULT 'EN_ATTENTE',
+    "observations" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "AppelDeFonds_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Dossier" (
+    "id" TEXT NOT NULL,
+    "numeroDossier" TEXT NOT NULL,
+    "dateReception" TIMESTAMP(3) NOT NULL,
+    "societeId" TEXT NOT NULL,
+    "beneficiaire" TEXT NOT NULL,
+    "typeDossier" TEXT NOT NULL,
+    "categorieDossier" TEXT,
+    "gestionnaireAccueilId" TEXT,
+    "createurId" TEXT,
+    "assureId" TEXT,
+    "nSS" TEXT,
+    "prestataireId" TEXT,
+    "prestataireLegacy" TEXT,
+    "dateSoins" TIMESTAMP(3),
+    "moyenPaiement" TEXT,
+    "observations" TEXT,
+    "dateTraitementTechnique" TIMESTAMP(3),
+    "montantReclame" DOUBLE PRECISION NOT NULL,
+    "montantValide" DOUBLE PRECISION,
+    "ticketModerateur" DOUBLE PRECISION,
+    "partPatient" DOUBLE PRECISION,
+    "partEntreprise" DOUBLE PRECISION,
+    "gestionnaireTechniqueId" TEXT,
+    "motifRejet" TEXT,
+    "dateReceptionDecompte" TIMESTAMP(3),
+    "datePaiement" TIMESTAMP(3),
+    "referencePaiement" TEXT,
+    "montantPaye" DOUBLE PRECISION,
+    "gestionnaireComptaId" TEXT,
+    "statut" TEXT NOT NULL DEFAULT 'RECU',
+    "source" TEXT NOT NULL DEFAULT 'EXCEL',
+    "historique" TEXT NOT NULL DEFAULT '[]',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Dossier_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Dossier_numeroDossier_key" ON "Dossier"("numeroDossier");
+
+CREATE TABLE IF NOT EXISTS "Commentaire" (
+    "id" TEXT NOT NULL,
+    "dossierId" TEXT NOT NULL,
+    "auteurId" TEXT,
+    "contenu" TEXT NOT NULL,
+    "prive" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Commentaire_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Justificatif" (
+    "id" TEXT NOT NULL,
+    "dossierId" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "nomFichier" TEXT NOT NULL,
+    "chemin" TEXT NOT NULL,
+    "tailleKo" DOUBLE PRECISION,
+    "uploadedBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Justificatif_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "ImportHistorique" (
+    "id" TEXT NOT NULL,
+    "source" TEXT NOT NULL,
+    "nomFichier" TEXT NOT NULL,
+    "nbLignes" INTEGER NOT NULL,
+    "nbSucces" INTEGER NOT NULL DEFAULT 0,
+    "nbErreurs" INTEGER NOT NULL DEFAULT 0,
+    "rapport" TEXT NOT NULL DEFAULT '[]',
+    "importePar" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ImportHistorique_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Bareme" (
+    "id" TEXT NOT NULL,
+    "societeId" TEXT NOT NULL,
+    "prestation" TEXT NOT NULL,
+    "tauxCouverture" DOUBLE PRECISION NOT NULL,
+    "plafond" DOUBLE PRECISION NOT NULL,
+    "description" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Bareme_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Bareme_societeId_prestation_key" ON "Bareme"("societeId", "prestation");
+
+CREATE TABLE IF NOT EXISTS "ImportDossier" (
+    "id" TEXT NOT NULL,
+    "importId" TEXT NOT NULL,
+    "dossierId" TEXT,
+    "numeroLigne" INTEGER NOT NULL,
+    "statutImport" TEXT NOT NULL DEFAULT 'SUCCES',
+    "erreur" TEXT,
+    "donnees" TEXT NOT NULL DEFAULT '{}',
+    CONSTRAINT "ImportDossier_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Assure" (
+    "id" TEXT NOT NULL,
+    "societeId" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
+    "nSS" TEXT,
+    "prenom" TEXT,
+    "dateNaissance" TIMESTAMP(3),
+    "sexe" TEXT,
+    "telephone" TEXT,
+    "email" TEXT,
+    "adresse" TEXT,
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Assure_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Assure_nSS_key" ON "Assure"("nSS");
+
+CREATE TABLE IF NOT EXISTS "Prestataire" (
+    "id" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "telephone" TEXT,
+    "email" TEXT,
+    "adresse" TEXT,
+    "nif" TEXT,
+    "statut" TEXT,
+    "rib" TEXT,
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Prestataire_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "Courriel" (
+    "id" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "expediteur" TEXT NOT NULL,
+    "objet" TEXT NOT NULL,
+    "societeId" TEXT,
+    "beneficiaire" TEXT,
+    "montant" DOUBLE PRECISION,
+    "dateCourriel" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "dateSoins" TIMESTAMP(3),
+    "prestataire" TEXT,
+    "statut" TEXT NOT NULL DEFAULT 'RECU',
+    "traitePar" TEXT,
+    "dateTraitement" TIMESTAMP(3),
+    "observations" TEXT,
+    "dossierId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "Courriel_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "Courriel_dossierId_key" ON "Courriel"("dossierId");
+
+CREATE TABLE IF NOT EXISTS "MessageBot" (
+    "id" TEXT NOT NULL,
+    "canal" TEXT NOT NULL,
+    "expeditieurId" TEXT NOT NULL,
+    "expeditieurNom" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "reponse" TEXT NOT NULL,
+    "lu" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "MessageBot_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "EntrepriseContact" (
+    "id" TEXT NOT NULL,
+    "societeId" TEXT NOT NULL,
+    "nom" TEXT NOT NULL,
+    "prenom" TEXT,
+    "fonction" TEXT,
+    "telephone" TEXT,
+    "email" TEXT,
+    "actif" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "EntrepriseContact_pkey" PRIMARY KEY ("id")
+);
+`;
 
 const TYPES_DOSSIER = ['HOSPITALISATION', 'CONSULTATION', 'PHARMACIE', 'MATERNITE', 'CHIRURGIE', 'EXAMEN', 'SOINS DENTAIRES', 'OPTIQUE'];
 const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
@@ -96,23 +340,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Token de setup invalide' }, { status: 403 });
   }
 
-  // Vérifier si la base est déjà initialisée
+  const log: string[] = [];
   const db = new PrismaClient();
+
   try {
+    // ── Étape 1 : Créer les tables si elles n'existent pas ──
+    const sqlStatements = CREATE_TABLES_SQL
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    for (const sql of sqlStatements) {
+      try {
+        await db.$executeRawUnsafe(sql);
+      } catch (e: any) {
+        if (!e.message?.includes('already exists')) {
+          console.warn(`[SETUP] SQL warning: ${e.message?.slice(0, 100)}`);
+        }
+      }
+    }
+    log.push('Tables créées/vérifiées');
+
+    // ── Étape 2 : Vérifier si le seed est déjà fait ──
     const existingUsers = await db.utilisateur.count();
     if (existingUsers > 0) {
       return NextResponse.json({
         success: true,
         message: 'Base de données déjà initialisée',
         users: existingUsers,
+        details: log,
       });
     }
-  } catch (e) {
-    // La base n'existe pas encore, on continue
-  }
 
-  const log: string[] = [];
-  try {
     // 1. Utilisateurs démo
     const passwordHash = await hash('SmartFlow@2026', 10);
     const utilisateursData = [
