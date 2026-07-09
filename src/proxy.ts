@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server';
 // Seules ces routes sont véritablement publiques (pas besoin de token)
 const PUBLIC_PATHS = ['/login'];
 const AUTH_API_PATHS = ['/api/auth/'];
-const WEBHOOK_API_PATHS = ['/api/webhook/', '/api/bot-status', '/api/setup']; // WhatsApp, Telegram, Messenger, bot-status, setup
+const WEBHOOK_API_PATHS = ['/api/webhook/', '/api/bot-status', '/api/setup', '/api/health']; // WhatsApp, Telegram, Messenger, bot-status, setup
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
