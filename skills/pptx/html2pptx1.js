@@ -302,9 +302,43 @@ function calculateWidthCompensation(el, slideWidthIn) {
   const compactTxt = txt.replace(/\s+/g, '');
   const isShortText = compactTxt.length > 0 && compactTxt.length <= COMPENSATION.AUTO_SHORT_TEXT_THRESHOLD;
   if (!isShortText || !single) {
-    if (isNarrowBodyTextForPptCompensation(el)) return 0.06;
-    if (isMediumSingleLineLabelForPptCompensation(el)) return 0.08;
-    return 0;
+    let f0 = 0;
+    if (isNarrowBodyTextForPptCompensation(el)) f0 = Math.max(f0, 0.06);
+    if (isMediumSingleLineLabelForPptCompensation(el)) f0 = Math.max(f0, 0.08);
+    // Single-line headings / large titles longer than the short-text threshold
+    // are still prone to a spurious extra wrap: the browser box is tight to the
+    // measured glyph run, and PPT's substitute font (Inter→Carlito, etc.) is a
+    // few percent wider, so the last word drops to a new line. Give these a
+    // modest widen. Downstream clip/slide clamping (see getAdjustedTextPosition
+    // and addElements) keeps the wider box from pushing into neighbours.
+    const fsHere = el.style?.fontSize || 0;
+    if (single && !el.noWrap && (isH || fsHere >= 18)) {
+      f0 = Math.max(f0, isH ? COMPENSATION.HEADING_WIDTH : COMPENSATION.HEADING_WIDTH * 0.8);
+    }
+    // Single-line labels with pronounced letter-spacing (all-caps footers,
+    // kickers, "EMPTY-NEST · DEFINITION · DATA" style captions) keep a box that
+    // is tight to the browser-measured glyph run. pptxgenjs applies charSpacing
+    // per glyph gap, so PPT's wider substitute font plus the tracking pushes the
+    // final token onto a 2nd line. The per-char letter-spacing bonus later in
+    // this function only runs for short text, so long tracked single-liners
+    // would otherwise fall through and wrap. Widen proportionally to the
+    // tracking ratio and run length, but only when the text plausibly already
+    // fits one line (est width — which ignores tracking — is within the measured
+    // box), so genuinely-wrapping paragraphs are never widened. Take the max
+    // with the weaker medium-label/narrow-body factors above rather than
+    // returning early, so a tracked medium label still gets enough room.
+    if (single && !el.noWrap && fsHere > 0) {
+      const csHere = el.style?.charSpacing || 0;
+      const ratio = csHere / fsHere;
+      if (ratio > 0.08) {
+        const boxWidthPt = (el.position?.w || 0) * 72;
+        if (boxWidthPt > 0 && estimateTextWidthPt(txt, fsHere) <= boxWidthPt * 1.3) {
+          const lenBoost = Math.min(1.6, 0.6 + compactTxt.length / 40);
+          f0 = Math.max(f0, Math.min(0.30, ratio * 0.9 * lenBoost));
+        }
+      }
+    }
+    return f0;
   }
 
   let f = isH ? COMPENSATION.HEADING_WIDTH : (el.position.w < slideWidthIn/3 && txt.length < 14 ? COMPENSATION.SINGLE_LINE_NARROW : COMPENSATION.SINGLE_LINE_NORMAL);
@@ -722,14 +756,32 @@ async function getBodyDimensions(page) {
 
 // Helper: Add background to slide
 async function addBackground(slideData, targetSlide, pres, tmpDir) {
+  const slideW = pres.presLayout ? pres.presLayout.width / EMU_PER_IN : 10;
+  const slideH = pres.presLayout ? pres.presLayout.height / EMU_PER_IN : 5.625;
+  // Rasterized CSS-gradient canvas background (linear/radial mesh) — emitted as
+  // a PNG data URL that covers the whole slide.
+  if (slideData.background.type === 'image' && slideData.background.dataUrl) {
+    try {
+      targetSlide.addImage({
+        data: slideData.background.dataUrl,
+        x: 0, y: 0, w: slideW, h: slideH,
+        sizing: { type: 'cover', w: slideW, h: slideH }
+      });
+      return;
+    } catch (err) {
+      console.warn(`[html2pptx] gradient background failed: ${err.message}`);
+      if (slideData.background.fallbackColor) {
+        targetSlide.background = { color: slideData.background.fallbackColor };
+      }
+      return;
+    }
+  }
   if (slideData.background.type === 'image' && slideData.background.path) {
     let imagePath = slideData.background.path.startsWith('file://')
       ? slideData.background.path.replace('file://', '')
       : slideData.background.path;
     // PptxGenJS slide.background = { path } is unreliable for local files;
     // use addImage at (0,0) covering the full slide instead.
-    const slideW = pres.presLayout ? pres.presLayout.width / EMU_PER_IN : 10;
-    const slideH = pres.presLayout ? pres.presLayout.height / EMU_PER_IN : 5.625;
     try {
       targetSlide.addImage({
         path: fixImageExtension(imagePath, tmpDir),
@@ -897,7 +949,7 @@ function addElements(slideData, targetSlide, pres, tmpDir) {
       // Hints set in extractSlideData (see baseStyle._* fields).
       const hasBrBreaks = el.style?._hasBrBreaks;
       const iconOnlyText = el.style?._isIcon === true;
-      const centerInFrame = el.style?._centerInFrame || iconOnlyText;
+      const centerInFrame = el.style?._centerInFrame || (iconOnlyText && !el.style?._inlineLeadGlyph);
       const hasContainerPadding = el.style?._hasContainerPadding;
 
       // When the element is a padded container that also rendered a shape behind
@@ -933,7 +985,7 @@ function addElements(slideData, targetSlide, pres, tmpDir) {
       // narrow box and wraps earlier. If extraction found clear free space up
       // to the next flex sibling, use it as the textbox's right edge.
       const preferredRightBound = el.style?._preferredRightBound;
-      if (!isRotatedText && Number.isFinite(preferredRightBound) &&
+      if (!isRotatedText && !el.style?._inlineLeadGlyph && Number.isFinite(preferredRightBound) &&
           preferredRightBound > adjustedX + adjustedW &&
           (align === 'left' || align === undefined)) {
         adjustedW = preferredRightBound - adjustedX;
@@ -1003,6 +1055,82 @@ function addElements(slideData, targetSlide, pres, tmpDir) {
       // Do not cap rotated frames: their width is often the visual height.
       if (!isRotatedText && adjustedW > MAX_TEXT_WIDTH_IN) adjustedW = MAX_TEXT_WIDTH_IN;
 
+      // ── Anti-wrap adjustments for single-line text ──────────────────────
+      // These run after the box width is finalized so we know the real frame.
+      {
+        const _txt = extractTextContent(el).replace(/\s+/g, ' ').trim();
+        const _compact = _txt.replace(/\s+/g, '');
+        const _fsPt = Number(el.style?.fontSize) || 0;
+        const _linePt = Number(el.style?.lineSpacing) || _fsPt * 1.35;
+        // Treat as one visual line when the source had no <br>/breakLine and the
+        // measured browser box is ≤ ~1.8 line-heights tall.
+        const _oneLine = _fsPt > 0 && !hasExplicitTextBreaks(el) &&
+          (Number(el.position?.h) || 0) * 72 <= _linePt * 1.8;
+
+        // (B) Shrink-to-fit: when a sub-8pt source font was clamped UP to the
+        // readability floor (see fontSizeClampRatio / getMinFontSize), the glyph
+        // run grows by that ratio. Inside a fixed-width container (card, side
+        // panel) the larger PPT font then overflows and wraps to a 2nd line,
+        // which collides with the row below (e.g. slide 11 "register() · login()
+        // · updateProfile()" over-running the object-oriented-design panel).
+        // The browser fit the text on one line at the intended smaller size, so
+        // reduce the font just enough to fit again — never below the raw source
+        // size, floored at 6pt for legibility.
+        const _clampRatio = Number(el.style?._fontSizeClampRatio) || 1;
+        if (_oneLine && !centerInFrame && _clampRatio > 1.01) {
+          const _boxPt = adjustedW * 72;
+          // The width heuristic runs a few percent under real renderers (PPT/
+          // LibreOffice substitute fonts are wider), so apply a safety factor
+          // when deciding whether the run will overflow and wrap.
+          const _estPt = estimateTextWidthPt(_txt, _fsPt) * 1.12;
+          if (_boxPt > 0 && _estPt > _boxPt) {
+            // The browser fit the run on one line at the intended (pre-clamp)
+            // source size, so undo the readability up-clamp — down to a 6pt
+            // legibility floor — which guarantees it fits again. Chasing a
+            // precise "fit" font is unreliable because real renderers run wider
+            // than the width heuristic.
+            const _rawPt = _fsPt / _clampRatio;
+            const _newFs = Math.max(6, _rawPt);
+            if (_newFs < _fsPt - 0.05) {
+              const _scale = _newFs / _fsPt;
+              el.style.fontSize = _newFs;
+              if (Array.isArray(el.text)) {
+                el.text.forEach(r => {
+                  if (r.options && Number(r.options.fontSize)) {
+                    r.options.fontSize = Math.max(6, r.options.fontSize * _scale);
+                  }
+                });
+              }
+            }
+          }
+        }
+
+        // (A) Minimum width for very short single-line labels. Tiny numeric /
+        // badge captions ("01", "PHP", "→") are measured tight to the browser
+        // glyph run; the wider PPT substitute font (plus any up-clamp) then wraps
+        // a 2-char label into two stacked chars (e.g. slide 18 card numbers
+        // "01" → "0"/"1"). Guarantee the frame is wide enough to hold the run on
+        // one line. Grow symmetrically around the current center so corner-
+        // anchored labels barely move. Only act when the current box is tight.
+        const _fsPt2 = Number(el.style?.fontSize) || 0;
+        if (!isRotatedText && !el.style?._inlineLeadGlyph && _oneLine && _fsPt2 > 0 &&
+            _compact.length > 0 && _compact.length <= 12) {
+          const _estPt2 = estimateTextWidthPt(_txt, _fsPt2);
+          const _curPt = adjustedW * 72;
+          if (_estPt2 > _curPt * 0.72) {
+            const _needIn = (_estPt2 * 1.18 + _fsPt2 * 0.35) / 72;
+            if (_needIn > adjustedW) {
+              const _grow = _needIn - adjustedW;
+              adjustedX -= _grow / 2;
+              adjustedW += _grow;
+              // Re-clamp to slide edges (skip for rotated frames handled above).
+              if (adjustedX < 0) { adjustedW += adjustedX; adjustedX = 0; }
+              if (adjustedX + adjustedW > slideWidthIn) adjustedX = Math.max(0, slideWidthIn - adjustedW);
+            }
+          }
+        }
+      }
+
       // Effective alignment / vertical alignment.
       // - center-in-frame containers (grid/flex place-items:center) → middle+center
       //   so single-char circular badges (.teacher, .thumb-num) sit at the visual
@@ -1050,7 +1178,44 @@ function addElements(slideData, targetSlide, pres, tmpDir) {
       if (el.style._pptxVert) textOptions.vert = el.style._pptxVert;
       if (el.style.transparency !== null && el.style.transparency !== undefined) textOptions.transparency = el.style.transparency;
       if (el.style.shadow) textOptions.shadow = el.style.shadow;
-      if (!el.style?._allowWrap && (el.noWrap || isShortAutoNoWrapText(el) || isHeadingWithBreaks)) textOptions.wrap = false;
+      // Headings with explicit <br> breaks normally render with wrap:false so
+      // PPT preserves the author's exact line breaks. But when a single
+      // break-delimited segment is itself wider than the frame (e.g. multi_3
+      // slide-2 "building foundation models." — a long second line that the
+      // browser re-wraps inside the column), wrap:false lets it bleed off to the
+      // right over neighbouring content. Detect that case and allow wrapping so
+      // the overflowing segment breaks like it does in the browser.
+      let headingBreaksOverflow = false;
+      if (isHeadingWithBreaks && Array.isArray(el.text)) {
+        const _hfs = Number(el.style?.fontSize) || 0;
+        const _boxPt = adjustedW * 72;
+        if (_hfs > 0 && _boxPt > 0) {
+          let _seg = '';
+          const _segPts = [];
+          const _flush = () => {
+            const s = _seg.replace(/\s+/g, ' ').trim();
+            if (s) _segPts.push(estimateTextWidthPt(s, _hfs));
+            _seg = '';
+          };
+          for (const run of el.text) {
+            const t = typeof run === 'string' ? run : (run && run.text) || '';
+            _seg += t;
+            if (run && run.options && run.options.breakLine) _flush();
+          }
+          _flush();
+          const _maxPt = _segPts.length ? Math.max(..._segPts) : 0;
+          if (_maxPt > _boxPt * 1.02) {
+            // A single <br>-segment is wider than the frame. With wrap:false it
+            // would bleed off to the right over adjacent content (multi_3
+            // slide-2 "building foundation models." running over the diagram
+            // card). Allow wrapping so the segment breaks like it does in the
+            // browser; the frame keeps its compensated width so short segments
+            // don't over-wrap.
+            headingBreaksOverflow = true;
+          }
+        }
+      }
+      if (!el.style?._allowWrap && (el.noWrap || isShortAutoNoWrapText(el) || (isHeadingWithBreaks && !headingBreaksOverflow))) textOptions.wrap = false;
 
       targetSlide.addText(textPayload, textOptions);
     }
@@ -1731,6 +1896,44 @@ async function extractSlideData(page, slideDims) {
       return stops.length >= 2 ? { angle, stops } : null;
     };
 
+    // Parse a single `radial-gradient(...)` layer. Handles the common authored
+    // forms: an optional leading config (shape / explicit "<rx>% <ry>%" size /
+    // "at <x>% <y>%" position) followed by colour stops. Position defaults to
+    // center; size defaults to cover (max dimension). Used both for mesh cover
+    // backgrounds and standalone glow "orb" divs.
+    const parseRadialGradientLayer = (layer) => {
+      const m = String(layer || '').trim().match(/^radial-gradient\((.*)\)$/i);
+      if (!m) return null;
+      const parts = splitCssTopLevel(m[1]);
+      if (parts.length < 2) return null;
+      let cxPct = 50, cyPct = 50, rxPct = null, ryPct = null, shape = 'ellipse';
+      let stopParts = parts;
+      const first = parts[0].trim();
+      const isColorFirst = /^(rgba?\(|hsla?\(|#|transparent\b)/i.test(first);
+      const isConfig = !isColorFirst &&
+        /(^|\s)(at|circle|ellipse|closest-side|closest-corner|farthest-side|farthest-corner)\b/i.test(first) ||
+        (!isColorFirst && /^[\d.]+%\s+[\d.]+%/.test(first));
+      if (isConfig) {
+        stopParts = parts.slice(1);
+        const atM = first.match(/at\s+([\d.]+)%\s+([\d.]+)%/i);
+        if (atM) { cxPct = parseFloat(atM[1]); cyPct = parseFloat(atM[2]); }
+        if (/\bcircle\b/i.test(first)) shape = 'circle';
+        const sizeM = first.replace(/\bat\b.*$/i, '').match(/([\d.]+)%\s+([\d.]+)%/);
+        if (sizeM) { rxPct = parseFloat(sizeM[1]); ryPct = parseFloat(sizeM[2]); }
+      }
+      const stops = stopParts.map((part, idx) => {
+        const p = part.trim();
+        const cm = p.match(/^(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-fA-F]{3,8}|transparent|[a-zA-Z]+)\s*(.*)$/i);
+        if (!cm) return null;
+        const posM = cm[2].match(/(-?[\d.]+)%/);
+        return {
+          color: cm[1],
+          pos: posM ? Math.max(0, Math.min(1, parseFloat(posM[1]) / 100)) : (stopParts.length === 1 ? 0 : idx / (stopParts.length - 1))
+        };
+      }).filter(Boolean);
+      return stops.length >= 2 ? { type: 'radial', cxPct, cyPct, rxPct, ryPct, shape, stops } : null;
+    };
+
     const isFullyTransparentCssColor = (colorStr) => {
       const c = String(colorStr || '').trim().toLowerCase();
       if (!c) return false;
@@ -1812,7 +2015,9 @@ async function extractSlideData(page, slideDims) {
     };
 
     const renderLinearGradientBackground = (bgImage, widthPx, heightPx) => {
-      const layers = splitCssTopLevel(bgImage).map(parseLinearGradientLayer).filter(Boolean);
+      const layers = splitCssTopLevel(bgImage)
+        .map(l => parseLinearGradientLayer(l) || parseRadialGradientLayer(l))
+        .filter(Boolean);
       if (layers.length === 0 || widthPx <= 0 || heightPx <= 0) return null;
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(widthPx));
@@ -1820,15 +2025,40 @@ async function extractSlideData(page, slideDims) {
       const ctx = canvas.getContext('2d');
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
+      // CSS paints the first-listed layer on top, so draw in reverse (last first).
       for (const layer of layers.reverse()) {
-        const rad = layer.angle * Math.PI / 180;
-        const vx = Math.sin(rad);
-        const vy = -Math.cos(rad);
-        const len = Math.abs(canvas.width * vx) + Math.abs(canvas.height * vy) || Math.max(canvas.width, canvas.height);
-        const grad = ctx.createLinearGradient(cx - vx * len / 2, cy - vy * len / 2, cx + vx * len / 2, cy + vy * len / 2);
-        for (const stop of layer.stops) grad.addColorStop(stop.pos, stop.color);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (layer.type === 'radial') {
+          const rcx = (layer.cxPct / 100) * canvas.width;
+          const rcy = (layer.cyPct / 100) * canvas.height;
+          // Default size (no explicit "<rx>% <ry>%") is farthest-corner: the
+          // distance from the center to the furthest box corner. Using the box's
+          // max dimension instead pushes the fade past the edges, so the glow
+          // gets clipped into a boxy square (visible on the cover "orb" glows).
+          const dx = Math.max(rcx, canvas.width - rcx);
+          const dy = Math.max(rcy, canvas.height - rcy);
+          const farCorner = Math.sqrt(dx * dx + dy * dy);
+          let rx = layer.rxPct != null ? (layer.rxPct / 100) * canvas.width : farCorner;
+          let ry = layer.ryPct != null ? (layer.ryPct / 100) * canvas.height : farCorner;
+          rx = Math.max(1, rx); ry = Math.max(1, ry);
+          ctx.save();
+          ctx.translate(rcx, rcy);
+          ctx.scale(1, ry / rx); // squash the circular gradient into an ellipse
+          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+          for (const stop of layer.stops) grad.addColorStop(Math.max(0, Math.min(1, stop.pos)), stop.color);
+          ctx.fillStyle = grad;
+          // Fill generously in the transformed space so the ellipse covers the box.
+          ctx.fillRect(-canvas.width * 2, -canvas.height * 2, canvas.width * 4, canvas.height * 4);
+          ctx.restore();
+        } else {
+          const rad = layer.angle * Math.PI / 180;
+          const vx = Math.sin(rad);
+          const vy = -Math.cos(rad);
+          const len = Math.abs(canvas.width * vx) + Math.abs(canvas.height * vy) || Math.max(canvas.width, canvas.height);
+          const grad = ctx.createLinearGradient(cx - vx * len / 2, cy - vy * len / 2, cx + vx * len / 2, cy + vy * len / 2);
+          for (const stop of layer.stops) grad.addColorStop(stop.pos, stop.color);
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
       }
       return canvas.toDataURL('image/png');
     };
@@ -2204,10 +2434,23 @@ async function extractSlideData(page, slideDims) {
           path: urlMatch[1]
         };
       } else {
-        background = {
-          type: 'color',
-          value: rgbToHex(bgColor)
-        };
+        // Not a url() — this is a CSS gradient (linear/radial mesh) used as the
+        // slide canvas background (e.g. multi_3 cover `.cover-bg` grad-mesh).
+        // Rasterize it to a PNG so the full colour transition survives; the flat
+        // bgColor is kept only as a fallback if the raster fails.
+        const canvasGrad = renderLinearGradientBackground(bgImage, bodyWPx, bodyHPx);
+        if (canvasGrad) {
+          background = {
+            type: 'image',
+            dataUrl: canvasGrad,
+            fallbackColor: rgbToHex(bgColor)
+          };
+        } else {
+          background = {
+            type: 'color',
+            value: rgbToHex(bgColor)
+          };
+        }
       }
     } else {
       background = {
@@ -2948,6 +3191,50 @@ async function extractSlideData(page, slideDims) {
       blockTextChildren.forEach(c => { c._treatAsP = true; });
     });
 
+    // Inline sibling spans of very different font sizes on the SAME line, e.g.
+    // <div><span class="ch-num">01</span><span class="ch-num-tail">/ 04</span></div>
+    // where 01 is 140px and "/ 04" is 38px. Emitting each span as its own text
+    // frame anchors both at their individual bounding-box tops; because the small
+    // span's box sits at the big span's baseline (CSS vertical-align:baseline), it
+    // renders far below the big number in PPT instead of hugging its bottom-right.
+    // Merge such a row into ONE rich-text frame so PowerPoint baseline-aligns the
+    // runs exactly like the browser. Restricted to normal (non-flex/grid) flow and
+    // a clear size gap so flex "label … value" rows (justify-between) are untouched.
+    document.querySelectorAll('*').forEach(parent => {
+      if (parent._treatAsP || parent._directTextOnly || parent._skipTextExtraction) return;
+      if (parent.closest('p,h1,h2,h3,h4,h5,h6,li')) return;
+      const pdisp = window.getComputedStyle(parent).display;
+      if (pdisp === 'flex' || pdisp === 'inline-flex' || pdisp === 'grid' || pdisp === 'inline-grid') return;
+      const kids = Array.from(parent.children);
+      if (kids.length < 2) return;
+      const textKids = kids.filter(c => c.textContent.trim());
+      if (textKids.length < 2) return;
+      // Every text-bearing child must be an inline (non-block) span-like element.
+      const allInline = textKids.every(c =>
+        INLINE_TEXT_CHILD_TAGS.includes(c.tagName) && !_isBlockDisplay(c)
+      );
+      if (!allInline) return;
+      // No direct text at the parent level (handled by the _directTextOnly pass).
+      const hasDirectText = Array.from(parent.childNodes).some(n =>
+        n.nodeType === Node.TEXT_NODE && n.textContent.trim()
+      );
+      if (hasDirectText) return;
+      // All children must share one visual row (vertical overlap).
+      const rects = textKids.map(c => c.getBoundingClientRect());
+      if (rects.some(r => r.width === 0 || r.height === 0)) return;
+      const rowTop = Math.max(...rects.map(r => r.top));
+      const rowBottom = Math.min(...rects.map(r => r.bottom));
+      if (rowBottom <= rowTop) return; // no common vertical band → not one line
+      // Require a clear font-size gap — this is the case where separate frames
+      // misalign. Similarly-sized siblings already line up when split.
+      const sizes = textKids.map(c => parseFloat(window.getComputedStyle(c).fontSize) || 0);
+      const maxS = Math.max(...sizes), minS = Math.min(...sizes);
+      if (!(minS > 0 && maxS / minS >= 1.4)) return;
+      parent._treatAsP = true;
+      parent._mergeInlineRow = true;
+      textKids.forEach(c => { c._mergedIntoInlineRow = true; });
+    });
+
     // Effective z-index — a descendant of a z-indexed ancestor paints inside
     // that ancestor's stacking context (per CSS painting rules). In our flat
     // z-index model we approximate that by promoting each element's z-index
@@ -3054,6 +3341,15 @@ async function extractSlideData(page, slideDims) {
     document.querySelectorAll('*').forEach((el) => {
       if (processed.has(el)) return;
 
+      // Inline spans that were merged into a single parent rich-text frame by the
+      // same-line size-gap pre-pass. The parent emits their text as runs; emitting
+      // them again here would duplicate the glyphs.
+      if (el._mergedIntoInlineRow) {
+        processed.add(el);
+        el.querySelectorAll('*').forEach(child => processed.add(child));
+        return;
+      }
+
       // ── Icon elements (Material Icons / Font Awesome / Bootstrap Icons / etc.) ──
       if (el._isIcon) {
         // If this icon is inside a text container, parseInlineFormatting emits it
@@ -3158,10 +3454,34 @@ async function extractSlideData(page, slideDims) {
         return;
       }
 
+      // Rasterize <canvas> (ECharts / Chart.js data visualizations) to a PNG so
+      // charts survive into the deck. The canvas is already painted by the time
+      // extraction runs (see the chart-render wait after page load). A blank or
+      // not-yet-painted canvas produces a tiny transparent PNG — skip those.
+      if (el.tagName === 'CANVAS') {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 1 && rect.height > 1) {
+          let dataUrl = null;
+          try { dataUrl = el.toDataURL('image/png'); } catch (e) { dataUrl = null; }
+          if (dataUrl && dataUrl.length > 2000) {
+            elements.push({
+              type: 'image',
+              src: dataUrl,
+              objectFit: 'fill',
+              zIndex: getEffectiveZIndex(el),
+              position: rectPosition(rect)
+            });
+          }
+        }
+        processed.add(el);
+        el.querySelectorAll('*').forEach(child => processed.add(child));
+        return;
+      }
+
       // Silently skip media/embed elements that we cannot render in PPT
       // (these would otherwise emit empty shapes from the container fallback)
       if (el.tagName === 'IFRAME' || el.tagName === 'VIDEO' || el.tagName === 'AUDIO' ||
-          el.tagName === 'CANVAS' || el.tagName === 'EMBED' || el.tagName === 'OBJECT' ||
+          el.tagName === 'EMBED' || el.tagName === 'OBJECT' ||
           el.tagName === 'SOURCE' || el.tagName === 'TRACK' || el.tagName === 'PARAM') {
         processed.add(el);
         el.querySelectorAll('*').forEach(child => processed.add(child));
@@ -3733,8 +4053,30 @@ async function extractSlideData(page, slideDims) {
               const isShortPaddedBadgeShape = ownShapeText && ownShapeText.length <= 24 &&
                 (shapePadX + shapePadY) > 0 && rect.height <= 48 && rect.width <= 260;
               if (isShortPaddedBadgeShape) {
-                const extraX = Math.min(0.025, Math.max(0.012, shapePosition.w * 0.04));
+                let extraX = Math.min(0.025, Math.max(0.012, shapePosition.w * 0.04));
                 const extraY = Math.min(0.014, Math.max(0.006, shapePosition.h * 0.06));
+                // Horizontal inflation gives an isolated badge visual breathing
+                // room, but when badges sit in a tight row (e.g. slide-26
+                // HTML/CSS/JS stack pills 6px apart, or slide-27 dep-chips)
+                // inflating both facing edges by ~1.5px collapses the gap and the
+                // borders look fused. Skip horizontal inflation when a same-row
+                // sibling is close; keep the (harmless) vertical inflation.
+                try {
+                  const sibs = el.parentElement ? Array.from(el.parentElement.children) : [];
+                  let minGapPx = Infinity;
+                  for (const s of sibs) {
+                    if (s === el) continue;
+                    const r = s.getBoundingClientRect();
+                    const vOverlap = Math.min(rect.bottom, r.bottom) - Math.max(rect.top, r.top);
+                    if (vOverlap <= 2) continue; // not on the same row
+                    let gap = Infinity;
+                    if (r.left >= rect.right) gap = r.left - rect.right;
+                    else if (r.right <= rect.left) gap = rect.left - r.right;
+                    else continue; // horizontally overlapping — ignore
+                    if (gap < minGapPx) minGapPx = gap;
+                  }
+                  if (Number.isFinite(minGapPx) && minGapPx < 16) extraX = 0;
+                } catch (e) { /* keep default extraX */ }
                 shapePosition = {
                   x: shapePosition.x - extraX,
                   y: shapePosition.y - extraY,
@@ -4202,6 +4544,20 @@ async function extractSlideData(page, slideDims) {
       // intended font, so PPT lines are taller than the box can hold —
       // addElements scales the text frame height by this ratio to compensate.
       baseStyle._fontSizeClampRatio = fontSizeClampRatio(computed.fontSize, text);
+      // Merged inline row (big number + small tail on one baseline): the parent
+      // div's own line-height is sized for its small inherited font, so forcing
+      // it as the paragraph line spacing crushes the large child run's line box
+      // and the tall glyph overflows upward over the element above. Size the line
+      // spacing to the tallest child run instead (its own line-height ≈ 1).
+      if (el._mergeInlineRow) {
+        let maxChildFsPt = 0;
+        el.querySelectorAll('*').forEach((c) => {
+          if (!c.textContent || !c.textContent.trim()) return;
+          const fsPt = pxToFontSize(window.getComputedStyle(c).fontSize, c.textContent);
+          if (fsPt > maxChildFsPt) maxChildFsPt = fsPt;
+        });
+        baseStyle.lineSpacing = maxChildFsPt > 0 ? maxChildFsPt : null;
+      }
       // Hints consumed by addElements (prefixed with _ so they don't accidentally
       // pass through to PptxGenJS textOptions):
       // - _hasBrBreaks: element contains <br>; pptxgenjs would otherwise apply
@@ -4226,9 +4582,26 @@ async function extractSlideData(page, slideDims) {
       const textIsIconOnly = isIconOnlyText(text);
       if (textIsIconOnly) {
         baseStyle.fontFace = _fc.symbol || "Segoe UI Symbol";
-        baseStyle.align = "center";
         baseStyle.lineSpacing = null;
         baseStyle.margin = [0, 0, 0, 0];
+        // An inline lead-in glyph (e.g. slide-27 dep-chip "→" before the label)
+        // has a following inline sibling that carries text. Centering it inside
+        // its own tight frame both wastes the natural margin before the label and
+        // risks a right-bleed collision. Left-anchor so the glyph stays at its
+        // measured x and the ~margin gap to the following text is preserved.
+        let inlineLeadGlyph = false;
+        try {
+          const sib = el.nextSibling;
+          inlineLeadGlyph = !!(sib && (
+            (sib.nodeType === 3 && sib.textContent.trim().length > 0) ||
+            (sib.nodeType === 1 && (sib.textContent || '').trim().length > 0)));
+        } catch (e) { /* default false */ }
+        if (inlineLeadGlyph) {
+          baseStyle.align = "left";
+          baseStyle._inlineLeadGlyph = true;
+        } else {
+          baseStyle.align = "center";
+        }
       }
       baseStyle._isIcon = textIsIconOnly;
       baseStyle._clipBounds = getNearestTextClipBounds(el);
@@ -4239,14 +4612,29 @@ async function extractSlideData(page, slideDims) {
         text.length <= 24 &&
         rect.height <= 48 &&
         (computed.whiteSpace === 'nowrap' || (parseFloat(computed.borderRadius) || 0) > 0);
+      // A compound inline chip has BOTH a child element that renders as its own
+      // box AND a direct text node (e.g. slide-27 dep-chip:
+      // `<span class="arrow">→</span>Order Processing`). Its two pieces sit
+      // side-by-side on one line, so centering the text piece inside its own
+      // tight, wrap:none frame makes it bleed leftward and collide with the
+      // preceding arrow glyph. Keep such text left-anchored.
+      const isCompoundInline = (() => {
+        try {
+          const hasChildText = Array.from(el.children || []).some(c => (c.textContent || '').trim().length > 0);
+          const hasDirectText = Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim().length > 0);
+          return hasChildText && hasDirectText;
+        } catch (e) { return false; }
+      })();
       if (isShortPaddedBadgeText) {
-        baseStyle._centerInFrame = true;
         // The measured badge rect already includes CSS padding. Re-applying
         // that padding as PPT text inset leaves very little usable width for
-        // compact labels such as T1/T2/T3/T4.
+        // compact labels such as T1/T2/T3/T4 — zero it either way.
         baseStyle._zeroTextInset = true;
         baseStyle.margin = [0, 0, 0, 0];
-        if (baseStyle.align === 'left') baseStyle.align = 'center';
+        if (!isCompoundInline) {
+          baseStyle._centerInFrame = true;
+          if (baseStyle.align === 'left') baseStyle.align = 'center';
+        }
       }
       if (textShadow) baseStyle.shadow = textShadow;
 
@@ -4443,14 +4831,36 @@ async function html2pptx(htmlFile, pres, options = {}) {
 
       // External web-font CSS can block parser-executed scripts and keep
       // DOMContentLoaded from firing. Fonts are mapped to PPT-safe faces later,
-      // so Google font downloads must not block conversion.
+      // so remote font downloads must not block conversion.
+      //
+      // CRITICAL: A local <link href="global.css"> whose file starts with
+      // `@import url(<remote-font-css>)` will NOT apply ANY of its own rules
+      // until every pending remote @import resolves or errors. Chromium keeps
+      // those @import stylesheet requests pending indefinitely on file:// pages
+      // under waitUntil:'domcontentloaded', so the local stylesheet's rules
+      // (.slide { height:720px }, :root { --accent } …) never take effect — the
+      // slide collapses to height 0, backgrounds/colors vanish, and
+      // justify-center content is pushed to negative Y. To avoid this we
+      // short-circuit ALL remote requests by resource type:
+      //   - stylesheet → fulfill empty CSS immediately (unblocks local sheets;
+      //                  fonts are remapped to PPT-safe faces downstream anyway)
+      //   - font       → abort (never needed for layout/measurement)
+      //   - script     → allow (e.g. cdn.tailwindcss.com — required for layout)
+      //   - image/other→ allow (remote images may be real slide content)
       try {
-        await page.route(/https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i, async (route) => {
-          const url = route.request().url();
-          if (/fonts\.googleapis\.com/i.test(url)) {
-            await route.fulfill({ status: 200, contentType: "text/css", body: "" });
-          } else {
-            await route.abort();
+        await page.route(/^https?:\/\//i, async (route) => {
+          let type = '';
+          try { type = route.request().resourceType(); } catch (e) { /* ignore */ }
+          try {
+            if (type === 'stylesheet') {
+              await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+            } else if (type === 'font') {
+              await route.abort();
+            } else {
+              await route.continue();
+            }
+          } catch (e) {
+            try { await route.abort(); } catch (e2) { /* ignore */ }
           }
         });
       } catch (e) { /* ignore */ }
@@ -4534,10 +4944,20 @@ async function html2pptx(htmlFile, pres, options = {}) {
 
       bodyDimensions = await getBodyDimensions(page);
 
-      await page.setViewportSize({
-        width: Math.round(bodyDimensions.width),
-        height: Math.round(bodyDimensions.height)
-      });
+      // Defensive clamp: the viewport resize is meant to GROW the page to
+      // capture overflowing content, never to shrink it below the authored
+      // design size. If a stylesheet failed to apply (e.g. a fixed-size .slide
+      // measured 0 tall before its CSS loaded), setting the viewport to that
+      // degenerate size would collapse justify-center/absolute layouts and push
+      // content to negative coordinates. Keep at least the current viewport
+      // size and a sane 16:9 floor derived from the measured width.
+      const curVp = page.viewportSize() || { width: 1280, height: 720 };
+      const measuredW = Math.round(bodyDimensions.width) || curVp.width;
+      const minHeightFromWidth = Math.round(measuredW * (720 / 1280));
+      const vpW = Math.max(measuredW, curVp.width, 320);
+      const vpH = Math.max(Math.round(bodyDimensions.height), curVp.height, minHeightFromWidth, 240);
+
+      await page.setViewportSize({ width: vpW, height: vpH });
 
       // Force a layout reflow after viewport resize so flex centering takes effect
       await page.evaluate(() => void document.body.offsetHeight);
@@ -4545,6 +4965,29 @@ async function html2pptx(htmlFile, pres, options = {}) {
 
       // Re-read body dimensions after reflow to capture correct layout
       bodyDimensions = await getBodyDimensions(page);
+
+      // Chart libraries (ECharts / Chart.js) paint into <canvas> asynchronously
+      // after their CDN script loads, and re-draw (with entry animation) on the
+      // viewport resize above. Wait until every canvas has real pixels — polled
+      // via toDataURL length — so extractSlideData captures the finished chart
+      // instead of a blank canvas. Bounded so pages without charts (or with
+      // canvases that never paint, e.g. offline CDN) don't stall the run.
+      try {
+        const hasCanvas = await page.evaluate(() => document.querySelectorAll('canvas').length > 0);
+        if (hasCanvas) {
+          await page.waitForFunction(() => {
+            const cs = Array.from(document.querySelectorAll('canvas'));
+            if (cs.length === 0) return true;
+            return cs.every(c => {
+              const r = c.getBoundingClientRect();
+              if (r.width <= 1 || r.height <= 1) return true; // ignore hidden/degenerate
+              try { return c.toDataURL('image/png').length > 2000; } catch (e) { return true; }
+            });
+          }, { timeout: 6000, polling: 250 }).catch(() => {});
+          // Small settle for entry animations to reach their final frame.
+          await page.waitForTimeout(400);
+        }
+      } catch (e) { /* ignore — charts are best-effort */ }
 
       const slideWIn = pres.presLayout ? pres.presLayout.width / EMU_PER_IN : 10;
       const slideHIn = pres.presLayout ? pres.presLayout.height / EMU_PER_IN : 5.625;
