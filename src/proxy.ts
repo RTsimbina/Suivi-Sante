@@ -7,7 +7,7 @@ const PUBLIC_PATHS = ['/login'];
 const AUTH_API_PATHS = ['/api/auth/'];
 const WEBHOOK_API_PATHS = ['/api/webhook/', '/api/bot-status', '/api/setup']; // WhatsApp, Telegram, Messenger, bot-status, setup
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Autoriser les routes publiques (page de login)
