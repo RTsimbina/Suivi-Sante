@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import ZAI from "z-ai-web-dev-sdk";
+
+// ─── Direct fetch to ZAI API (bypasses SDK filesystem dependency) ──────────
+const ZAI_BASE_URL = process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1";
+const ZAI_API_KEY = process.env.ZAI_API_KEY;
+const ZAI_TOKEN = process.env.ZAI_TOKEN;
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -131,28 +135,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Fetch KPI data and build context
+    // 1. Check API configuration
+    if (!ZAI_API_KEY || !ZAI_TOKEN) {
+      console.error("[CHAT] ZAI_API_KEY ou ZAI_TOKEN non configurés");
+      return NextResponse.json(
+        { error: "Service IA non configuré. Contactez l'administrateur." },
+        { status: 503 }
+      );
+    }
+
+    // 2. Fetch KPI data and build context
     const context = await buildKpiContext();
 
-    // 2. Build system prompt with context
+    // 3. Build system prompt with context
     const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour Suivi Santé, une plateforme de traitement des dossiers de soins de santé à Madagascar.
 
 Tu aides les gestionnaires et directeurs à comprendre les performances de leur service de traitement des dossiers médicaux. Tu as accès aux données en temps réel du système. Les montants sont en Ariary (Ar).
 
 ${context}`;
 
-    // 3. Call LLM via z-ai-web-dev-sdk
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: "assistant", content: systemPrompt },
-        { role: "user", content: question },
-      ],
-      thinking: { type: "disabled" },
+    // 4. Call LLM API directly via fetch (bypasses SDK filesystem dependency)
+    const url = `${ZAI_BASE_URL}/chat/completions`;
+    const completion = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${ZAI_API_KEY}`,
+        "X-Token": ZAI_TOKEN,
+        "X-Z-AI-From": "Z",
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "assistant", content: systemPrompt },
+          { role: "user", content: question },
+        ],
+        thinking: { type: "disabled" },
+      }),
     });
 
-    // 4. Return response
-    const content = completion?.choices?.[0]?.message?.content || "Désolé, je n'ai pas pu générer de réponse.";
+    if (!completion.ok) {
+      const errorText = await completion.text();
+      console.error("[CHAT] API error:", completion.status, errorText);
+      return NextResponse.json(
+        { error: "Erreur lors de l'appel au service IA", detail: `HTTP ${completion.status}` },
+        { status: 502 }
+      );
+    }
+
+    const data = await completion.json();
+
+    // 5. Return response
+    const content = data?.choices?.[0]?.message?.content || "Désolé, je n'ai pas pu générer de réponse.";
     return NextResponse.json({
       reponse: content,
     });
