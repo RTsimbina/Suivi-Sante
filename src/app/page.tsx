@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import UserMenu from '@/components/smartflow/user-menu';
 import DirectionView from '@/components/smartflow/direction-view';
-import ReceptionView from '@/components/smartflow/reception-view';
 import TechniqueView from '@/components/smartflow/technique-view';
 import ComptabiliteView from '@/components/smartflow/comptabilite-view';
 import IaView from '@/components/smartflow/ia-view';
@@ -31,11 +30,10 @@ import PrestatairesView from '@/components/smartflow/prestataires-view';
 import ConfigurationView from '@/components/smartflow/configuration-view';
 import SocietesView from '@/components/smartflow/societes-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'reception' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
-  reception: { totalEnregistres: number; tempsMoyenAvantTransfert: number; enAttente: number };
   technique: { totalAnalyses: number; totalValides: number; totalRejetes: number; delaiMoyenAnalyse: number; montantTotalValide: number; enCours: number };
   comptabilite: { decomptesRecus: number; paiementsEffectues: number; montantTotalPaye: number; enCoursPaiement: number };
   productivite: { gestionnaireNom: string; service: string; nbDossiers: number; montantTraite: number; tempsMoyenTraitement: number }[];
@@ -48,7 +46,6 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'import', label: 'Accueil', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'] },
-  { key: 'reception', label: 'Réception', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'TECHNIQUE'] },
   { key: 'comptabilite', label: 'Comptabilité', icon: Calculator, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
   { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
@@ -262,7 +259,6 @@ export default function Home() {
           {view === 'direction' && <DirectionView kpis={kpis} loading={loadingKpis} />}
           {view === 'dossiers' && <DossiersView />}
           {view === 'kanban' && <div className="h-[calc(100vh-8rem)]"><KanbanView /></div>}
-          {view === 'reception' && <ReceptionView kpis={kpis} loading={loadingKpis} />}
           {view === 'technique' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
           {view === 'comptabilite' && <ComptabiliteView kpis={kpis} loading={loadingKpis} />}
           {view === 'import' && <ImportView />}
