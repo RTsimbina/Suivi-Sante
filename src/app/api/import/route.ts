@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const source = (formData.get("source") as string) || "EXCEL";
+    const categorieDossier = (formData.get("categorie") as string) || "";
 
     if (!file) {
       return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
@@ -55,6 +56,14 @@ export async function POST(request: NextRequest) {
       const societeNom = String(row["Societe"] || row["societe"] || row["Entreprise"] || "").trim();
       const typeDossier = String(row["TypeDossier"] || row["typeDossier"] || row["Type"] || "").trim();
       const montantReclame = parseFloat(String(row["MontantReclame"] || row["montantReclame"] || row["Montant"] || "0"));
+
+      // Catégorie du dossier : depuis Excel ou paramètre du formulaire
+      const VALID_CATEGORIES = ["REMBOURSEMENT_ASSURE", "REGLEMENT_PRESTATAIRE"];
+      let catDossier = String(row["CategorieDossier"] || row["categorieDossier"] || row["Categorie"] || "").trim().toUpperCase();
+      if (!VALID_CATEGORIES.includes(catDossier) && VALID_CATEGORIES.includes(categorieDossier.toUpperCase())) {
+        catDossier = categorieDossier.toUpperCase();
+      }
+      if (!VALID_CATEGORIES.includes(catDossier)) catDossier = "";
 
       // Validations
       if (!numeroDossier) {
@@ -144,6 +153,7 @@ export async function POST(request: NextRequest) {
             dateReception,
             beneficiaire,
             typeDossier: typeDossier || "CONSULTATION",
+            categorieDossier: catDossier || null,
             societe: societe ? { connect: { id: societe.id } } : undefined,
             montantReclame: montantReclame || 0,
             statut: "RECU",
