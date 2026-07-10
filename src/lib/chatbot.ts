@@ -2,18 +2,12 @@
  * ─── Assistant IA multicanal ────────────────────────────────────────────
  * 
  * Module partagé pour les webhooks WhatsApp, Telegram et Messenger.
- * Utilise le z-ai-web-dev-sdk (glm-4-flash) pour répondre aux questions
- * des utilisateurs sur leurs dossiers de santé.
- * 
- * Prêt pour une migration vers Gemini ou un autre modèle LLM.
+ * Utilise le module LLM unifié (z-ai-web-dev-sdk + fallback).
  * ──────────────────────────────────────────────────────────────────────────
  */
 
 import { db } from '@/lib/db';
-
-const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.openai.com/v1';
-const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+import { callLLM } from '@/lib/llm';
 
 /**
  * Système prompt pour le chatbot multicanal.
@@ -106,33 +100,11 @@ export async function generateChatbotResponse(
 
     const systemPrompt = `${CHATBOT_SYSTEM_PROMPT}${contextEnrichment}\n\nCanal de communication : ${channel}. Adapte brièvement ton style (plus concis pour WhatsApp, plus détaillé pour Messenger).`;
 
-    if (!LLM_API_KEY) {
+    const response = await callLLM(systemPrompt, userMessage);
+
+    if (!response) {
       return 'Le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
     }
-
-    const completion = await fetch(`${LLM_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLM_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-      }),
-    });
-
-    if (!completion.ok) {
-      const errText = await completion.text();
-      console.error(`[CHATBOT:${channel}] API error:`, completion.status, errText);
-      return 'Désolé, une erreur est survenue lors du traitement de votre demande. Veuillez réessayer.';
-    }
-
-    const data = await completion.json();
-    const response = data?.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu générer de réponse.';
 
     // Limiter la longueur pour les canaux SMS/messagerie
     if (channel === 'whatsapp' && response.length > 1600) {
