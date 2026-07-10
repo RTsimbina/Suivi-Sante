@@ -45,12 +45,12 @@ interface Kpis {
 
 const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; badge?: string; section?: string; roles: string[] }[] = [
   { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard, section: 'PILOTAGE', roles: ['ADMINISTRATEUR'] },
+  { key: 'import', label: 'Accueil', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'] },
   { key: 'reception', label: 'Réception', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'TECHNIQUE'] },
   { key: 'comptabilite', label: 'Comptabilité', icon: Calculator, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
-  { key: 'import', label: 'Import ISA/SAGE', icon: Upload, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
   { key: 'users', label: 'Utilisateurs', icon: Users, section: 'FINANCE', roles: ['ADMINISTRATEUR'] },
   { key: 'assures', label: 'Assurés', icon: Heart, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
@@ -82,7 +82,13 @@ export default function Home() {
     if (role && navItems.length > 0) {
       const currentAllowed = navItems.find(n => n.key === view);
       if (!currentAllowed) {
-        setView(navItems[0].key);
+        // Le rôle ACCUEIL démarre sur l'Accueil (import), les autres sur leur première vue
+        if (role === 'ACCUEIL') {
+          const accueilView = navItems.find(n => n.key === 'import');
+          setView(accueilView ? accueilView.key : navItems[0].key);
+        } else {
+          setView(navItems[0].key);
+        }
       }
     }
   }, [role, navItems, view]);

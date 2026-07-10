@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 interface Societe { id: string; nom: string; }
 interface Gestionnaire { id: string; nom: string; service: string; }
 interface AssureOption { id: string; nom: string; prenom: string | null; nSS: string | null; societeId: string; }
-interface PrestataireOption { id: string; nom: string; type: string; }
+interface PrestataireOption { id: string; nom: string; type: string; actif?: boolean; }
 
 interface CalculResult {
   bareme: string;
@@ -57,7 +57,12 @@ const JUSTIF_LABELS: Record<string, string> = { FACTURE: 'Facture', ORDONNANCE: 
 
 interface UploadedFile { file: File; type: string; id: string; }
 
-export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
+interface DossierFormProps {
+  onSuccess?: () => void;
+  defaultCategorie?: 'REMBOURSEMENT_ASSURE' | 'REGLEMENT_PRESTATAIRE';
+}
+
+export default function DossierForm({ onSuccess, defaultCategorie }: DossierFormProps) {
   const [societes, setSocietes] = useState<Societe[]>([]);
   const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
   const [loading, setLoading] = useState(false);
@@ -77,7 +82,7 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
   const [montantReclame, setMontantReclame] = useState('');
   const [moyenPaiement, setMoyenPaiement] = useState('');
   const [observations, setObservations] = useState('');
-  const [categorieDossier, setCategorieDossier] = useState('');
+  const [categorieDossier, setCategorieDossier] = useState(defaultCategorie || '');
   const [files, setFiles] = useState<UploadedFile[]>([]);
 
   // Ticket modérateur auto-calculation
@@ -246,7 +251,11 @@ export default function DossierForm({ onSuccess }: { onSuccess?: () => void }) {
       <form onSubmit={handleSubmit} className="space-y-6">
         <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
           <Plus className="size-5 text-emerald-600" />
-          Nouveau dossier de remboursement
+          {categorieDossier === 'REGLEMENT_PRESTATAIRE'
+            ? 'Nouveau dossier — Règlement Prestataire'
+            : categorieDossier === 'REMBOURSEMENT_ASSURE'
+              ? 'Nouveau dossier — Remboursement Assuré'
+              : 'Nouveau dossier'}
         </h3>
 
         {/* Section 1: Bénéficiaire */}

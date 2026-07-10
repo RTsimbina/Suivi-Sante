@@ -5,7 +5,8 @@ import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, Clock, H
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import DossierForm from './dossier-form';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface Anomalie { ligne: number; type: 'erreur' | 'avertissement'; champ: string; message: string; }
@@ -122,7 +123,11 @@ function ResultBanner({ result }: { result: ImportResult }) {
 // ─── Vue principale ─────────────────────────────────────────────
 export default function ImportView() {
   const [historique, setHistorique] = useState<HistoriqueItem[]>([]);
-  const [showNewDossier, setShowNewDossier] = useState(false);
+  // États séparés pour chaque dialogue de saisie manuelle
+  const [showManualRemboursement, setShowManualRemboursement] = useState(false);
+  const [showManualReglement, setShowManualReglement] = useState(false);
+  const [formKeyRemb, setFormKeyRemb] = useState(0);
+  const [formKeyRegl, setFormKeyRegl] = useState(0);
 
   async function loadHistorique() {
     try {
@@ -136,6 +141,18 @@ export default function ImportView() {
 
   // Colonnes Excel communes pour les deux flux
   const colonnesCommunes = "NumeroDossier, Beneficiaire, Societe, TypeDossier, MontantReclame, DateReception, CategorieDossier";
+
+  function handleRemboursementCreated() {
+    setShowManualRemboursement(false);
+    setFormKeyRemb(k => k + 1);
+    loadHistorique();
+  }
+
+  function handleReglementCreated() {
+    setShowManualReglement(false);
+    setFormKeyRegl(k => k + 1);
+    loadHistorique();
+  }
 
   return (
     <div className="space-y-6">
@@ -175,27 +192,10 @@ export default function ImportView() {
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Remboursement</h4>
               <p className="text-xs text-muted-foreground mt-1">Enregistrer un dossier de remboursement assuré directement via le formulaire.</p>
             </div>
-            <Dialog open={showNewDossier} onOpenChange={setShowNewDossier}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
-                  <FilePlus className="size-4 mr-1.5" />
-                  Nouveau dossier remboursement
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Users className="size-5 text-blue-600" />
-                    Nouveau dossier — Remboursement Assuré
-                  </DialogTitle>
-                </DialogHeader>
-                <iframe
-                  src="/dossiers?new=1&categorie=REMBOURSEMENT_ASSURE"
-                  className="w-full h-[60vh] border-0 rounded-md"
-                  title="Formulaire dossier remboursement"
-                />
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => setShowManualRemboursement(true)}>
+              <FilePlus className="size-4 mr-1.5" />
+              Nouveau dossier remboursement
+            </Button>
           </Card>
         </div>
       </div>
@@ -223,27 +223,10 @@ export default function ImportView() {
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Règlement</h4>
               <p className="text-xs text-muted-foreground mt-1">Enregistrer une facture de prestataire pour règlement directement via le formulaire.</p>
             </div>
-            <Dialog open={showNewDossier} onOpenChange={setShowNewDossier}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50">
-                  <FilePlus className="size-4 mr-1.5" />
-                  Nouveau dossier règlement
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Building2 className="size-5 text-amber-600" />
-                    Nouveau dossier — Règlement Prestataire
-                  </DialogTitle>
-                </DialogHeader>
-                <iframe
-                  src="/dossiers?new=1&categorie=REGLEMENT_PRESTATAIRE"
-                  className="w-full h-[60vh] border-0 rounded-md"
-                  title="Formulaire dossier règlement"
-                />
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowManualReglement(true)}>
+              <FilePlus className="size-4 mr-1.5" />
+              Nouveau dossier règlement
+            </Button>
           </Card>
         </div>
       </div>
@@ -276,6 +259,32 @@ export default function ImportView() {
           />
         </div>
       </div>
+
+      {/* ── DIALOGUE : Saisie manuelle Remboursement Assuré ── */}
+      <Dialog open={showManualRemboursement} onOpenChange={setShowManualRemboursement}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="size-5 text-blue-600" />
+              Nouveau dossier — Remboursement Assuré
+            </DialogTitle>
+          </DialogHeader>
+          <DossierForm key={formKeyRemb} onSuccess={handleRemboursementCreated} defaultCategorie="REMBOURSEMENT_ASSURE" />
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DIALOGUE : Saisie manuelle Règlement Prestataire ── */}
+      <Dialog open={showManualReglement} onOpenChange={setShowManualReglement}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="size-5 text-amber-600" />
+              Nouveau dossier — Règlement Prestataire
+            </DialogTitle>
+          </DialogHeader>
+          <DossierForm key={formKeyRegl} onSuccess={handleReglementCreated} defaultCategorie="REGLEMENT_PRESTATAIRE" />
+        </DialogContent>
+      </Dialog>
 
       {/* ── HISTORIQUE DES IMPORTS ── */}
       <Card className="p-6">
