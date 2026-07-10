@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 
-// ─── GLM Public API (open.bigmodel.cn) — accessible depuis Vercel ────────────
+// ─── LLM API (OpenAI / Groq / compatible) — config via env vars ────────────
 const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1";
-const LLM_MODEL = process.env.LLM_MODEL || "llama-3.3-70b-versatile";
+const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
+const LLM_MODEL = process.env.LLM_MODEL || "gpt-4o-mini";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -154,7 +154,7 @@ Tu aides les gestionnaires et directeurs à comprendre les performances de leur 
 
 ${context}`;
 
-    // 4. Call GLM API (OpenAI-compatible format)
+    // 4. Call LLM API (OpenAI-compatible format)
     const url = `${LLM_BASE_URL}/chat/completions`;
     const completion = await fetch(url, {
       method: "POST",

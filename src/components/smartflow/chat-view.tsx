@@ -402,13 +402,18 @@ function ChatTab() {
         content: data.reponse ?? data.response ?? data.message ?? data.content ?? 'Réponse reçue.',
       };
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[CHAT UI]', msg);
+      let userFriendlyMsg = 'Désolé, une erreur est survenue lors du traitement de votre question. Veuillez réessayer.';
+      if (msg.includes('401')) {
+        userFriendlyMsg = "La clé API IA n'est pas configurée correctement (erreur 401). Veuillez contacter l'administrateur.";
+      } else if (msg.includes('502') || msg.includes('503')) {
+        userFriendlyMsg = 'Le service IA est temporairement indisponible. Veuillez réessayer dans quelques instants.';
+      }
       setMessages((prev) => [
         ...prev,
-        {
-          role: 'assistant',
-          content: 'Désolé, une erreur est survenue lors du traitement de votre question. Veuillez réessayer.',
-        },
+        { role: 'assistant', content: userFriendlyMsg },
       ]);
     } finally {
       setLoading(false);
@@ -441,9 +446,16 @@ function ChatTab() {
       })
       .catch((err) => {
         console.error('[CHAT UI]', err);
+        const msg = err.message || 'Erreur inconnue';
+        let userFriendlyMsg = 'Désolé, une erreur est survenue. Veuillez réessayer.';
+        if (msg.includes('401')) {
+          userFriendlyMsg = "La clé API IA n'est pas configurée correctement (erreur 401). Veuillez contacter l'administrateur.";
+        } else if (msg.includes('502') || msg.includes('503')) {
+          userFriendlyMsg = 'Le service IA est temporairement indisponible. Veuillez réessayer dans quelques instants.';
+        }
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: `Désolé, une erreur est survenue : ${err.message}` },
+          { role: 'assistant', content: userFriendlyMsg },
         ]);
       })
       .finally(() => {
