@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 
-// ─── Direct fetch to ZAI API (bypasses SDK filesystem dependency) ──────────
-const ZAI_BASE_URL = process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1";
-const ZAI_API_KEY = process.env.ZAI_API_KEY;
-const ZAI_TOKEN = process.env.ZAI_TOKEN;
+// ─── GLM Public API (open.bigmodel.cn) — accessible depuis Vercel ────────────
+const LLM_API_KEY = process.env.LLM_API_KEY;
+const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
+const LLM_MODEL = process.env.LLM_MODEL || "glm-4-flash";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -135,9 +135,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Check API configuration
-    if (!ZAI_API_KEY || !ZAI_TOKEN) {
-      console.error("[CHAT] ZAI_API_KEY ou ZAI_TOKEN non configurés");
+    // 1. Check API key
+    if (!LLM_API_KEY) {
+      console.error("[CHAT] LLM_API_KEY non configurée");
       return NextResponse.json(
         { error: "Service IA non configuré. Contactez l'administrateur." },
         { status: 503 }
@@ -154,22 +154,20 @@ Tu aides les gestionnaires et directeurs à comprendre les performances de leur 
 
 ${context}`;
 
-    // 4. Call LLM API directly via fetch (bypasses SDK filesystem dependency)
-    const url = `${ZAI_BASE_URL}/chat/completions`;
+    // 4. Call GLM API (OpenAI-compatible format)
+    const url = `${LLM_BASE_URL}/chat/completions`;
     const completion = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${ZAI_API_KEY}`,
-        "X-Token": ZAI_TOKEN,
-        "X-Z-AI-From": "Z",
+        "Authorization": `Bearer ${LLM_API_KEY}`,
       },
       body: JSON.stringify({
+        model: LLM_MODEL,
         messages: [
-          { role: "assistant", content: systemPrompt },
+          { role: "system", content: systemPrompt },
           { role: "user", content: question },
         ],
-        thinking: { type: "disabled" },
       }),
     });
 
@@ -177,7 +175,7 @@ ${context}`;
       const errorText = await completion.text();
       console.error("[CHAT] API error:", completion.status, errorText);
       return NextResponse.json(
-        { error: "Erreur lors de l'appel au service IA", detail: `HTTP ${completion.status}` },
+        { error: "Erreur lors de l'appel au service IA", detail: `HTTP ${completion.status}: ${errorText}` },
         { status: 502 }
       );
     }

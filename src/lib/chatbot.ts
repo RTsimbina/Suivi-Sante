@@ -11,9 +11,9 @@
 
 import { db } from '@/lib/db';
 
-const ZAI_BASE_URL = process.env.ZAI_BASE_URL || 'https://internal-api.z.ai/v1';
-const ZAI_API_KEY = process.env.ZAI_API_KEY;
-const ZAI_TOKEN = process.env.ZAI_TOKEN;
+const LLM_API_KEY = process.env.LLM_API_KEY;
+const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
+const LLM_MODEL = process.env.LLM_MODEL || 'glm-4-flash';
 
 /**
  * Système prompt pour le chatbot multicanal.
@@ -106,24 +106,22 @@ export async function generateChatbotResponse(
 
     const systemPrompt = `${CHATBOT_SYSTEM_PROMPT}${contextEnrichment}\n\nCanal de communication : ${channel}. Adapte brièvement ton style (plus concis pour WhatsApp, plus détaillé pour Messenger).`;
 
-    if (!ZAI_API_KEY || !ZAI_TOKEN) {
+    if (!LLM_API_KEY) {
       return 'Le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
     }
 
-    const completion = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
+    const completion = await fetch(`${LLM_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ZAI_API_KEY}`,
-        'X-Token': ZAI_TOKEN,
-        'X-Z-AI-From': 'Z',
+        'Authorization': `Bearer ${LLM_API_KEY}`,
       },
       body: JSON.stringify({
+        model: LLM_MODEL,
         messages: [
-          { role: 'assistant', content: systemPrompt },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        thinking: { type: 'disabled' },
       }),
     });
 
