@@ -4,8 +4,8 @@ import { checkAuth } from "@/lib/authorize";
 
 // ─── GLM Public API (open.bigmodel.cn) — accessible depuis Vercel ────────────
 const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
-const LLM_MODEL = process.env.LLM_MODEL || "glm-4-flash";
+const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1";
+const LLM_MODEL = process.env.LLM_MODEL || "llama-3.3-70b-versatile";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());

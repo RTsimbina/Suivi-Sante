@@ -12,8 +12,8 @@
 import { db } from '@/lib/db';
 
 const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
-const LLM_MODEL = process.env.LLM_MODEL || 'glm-4-flash';
+const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.groq.com/openai/v1';
+const LLM_MODEL = process.env.LLM_MODEL || 'llama-3.3-70b-versatile';
 
 /**
  * Système prompt pour le chatbot multicanal.
