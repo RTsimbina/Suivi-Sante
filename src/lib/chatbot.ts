@@ -9,23 +9,8 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import SDK from 'z-ai-web-dev-sdk';
+import ZAI from 'z-ai-web-dev-sdk';
 import { db } from '@/lib/db';
-import fs from 'fs';
-
-// Charger la configuration Z.ai
-let sdkInstance: SDK | null = null;
-try {
-  const configPath = '/etc/.z-ai-config';
-  if (fs.existsSync(configPath)) {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    sdkInstance = new SDK(config);
-  } else if (process.env.ZAI_API_KEY) {
-    sdkInstance = new SDK({ apiKey: process.env.ZAI_API_KEY });
-  }
-} catch {
-  console.warn('[CHATBOT] Impossible d\'initialiser le SDK Z.ai');
-}
 
 /**
  * Système prompt pour le chatbot multicanal.
@@ -104,10 +89,6 @@ export async function generateChatbotResponse(
   userMessage: string,
   channel: 'whatsapp' | 'telegram' | 'messenger'
 ): Promise<string> {
-  if (!sdkInstance) {
-    return 'Désolé, le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
-  }
-
   try {
     // Détecter un numéro de dossier dans le message
     const dossierMatch = userMessage.match(/DOS-2026-\d{6}/i);
@@ -122,15 +103,16 @@ export async function generateChatbotResponse(
 
     const systemPrompt = `${CHATBOT_SYSTEM_PROMPT}${contextEnrichment}\n\nCanal de communication : ${channel}. Adapte brièvement ton style (plus concis pour WhatsApp, plus détaillé pour Messenger).`;
 
-    const result = await sdkInstance.createChatCompletion({
-      model: 'glm-4-flash',
+    const zai = await ZAI.create();
+    const completion = await zai.chat.completions.create({
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'assistant', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
+      thinking: { type: 'disabled' },
     });
 
-    const response = result?.choices?.[0]?.message?.content || result?.output?.text || 'Désolé, je n\'ai pas pu générer de réponse.';
+    const response = completion?.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu générer de réponse.';
 
     // Limiter la longueur pour les canaux SMS/messagerie
     if (channel === 'whatsapp' && response.length > 1600) {

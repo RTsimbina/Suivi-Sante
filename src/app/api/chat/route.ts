@@ -1,26 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import SDK from "z-ai-web-dev-sdk";
-import fs from "fs";
-
-let _sdk: InstanceType<typeof SDK> | null = null;
-function getLLM(): InstanceType<typeof SDK> | null {
-  if (!_sdk) {
-    try {
-      const configPath = '/etc/.z-ai-config';
-      if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        _sdk = new SDK(config);
-      } else if (process.env.ZAI_API_KEY) {
-        _sdk = new SDK({ apiKey: process.env.ZAI_API_KEY });
-      }
-    } catch (e) {
-      console.error('[CHAT] Erreur chargement SDK:', e);
-    }
-  }
-  return _sdk;
-}
+import ZAI from "z-ai-web-dev-sdk";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -87,7 +68,7 @@ async function buildKpiContext(): Promise<string> {
     .sort((a, b) => b.count - a.count)
     .map(
       (s) =>
-        `  - ${s.nom}: ${s.count} dossiers, ${round2(s.montantReclame)} DA réclamés, ${round2(s.montantPaye)} DA payés`
+        `  - ${s.nom}: ${s.count} dossiers, ${round2(s.montantReclame).toLocaleString("fr-FR")} Ar réclamés, ${round2(s.montantPaye).toLocaleString("fr-FR")} Ar payés`
     )
     .join("\n");
 
@@ -122,8 +103,8 @@ RÉSUMÉ GLOBAL:
 - Rejetés: ${totalRejetes}
 - Taux de rejet: ${tauxRejet}%
 - Délai moyen global (réception → paiement): ${delaiMoyen} jours
-- Montant total réclamé: ${montantTotalReclame} DA
-- Montant total payé: ${montantTotalPaye} DA
+- Montant total réclamé: ${montantTotalReclame.toLocaleString("fr-FR")} Ar
+- Montant total payé: ${montantTotalPaye.toLocaleString("fr-FR")} Ar
 
 PAR SOCIÉTÉ:
 ${societeLines}
@@ -154,35 +135,29 @@ export async function POST(request: NextRequest) {
     const context = await buildKpiContext();
 
     // 2. Build system prompt with context
-    const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour Suivi Santé, une plateforme de traitement des dossiers de soins de santé en Algérie.
+    const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour Suivi Santé, une plateforme de traitement des dossiers de soins de santé à Madagascar.
 
-Tu aides les gestionnaires et directeurs à comprendre les performances de leur service de traitement des dossiers médicaux. Tu as accès aux données en temps réel du système.
+Tu aides les gestionnaires et directeurs à comprendre les performances de leur service de traitement des dossiers médicaux. Tu as accès aux données en temps réel du système. Les montants sont en Ariary (Ar).
 
 ${context}`;
 
-    // 3. Call LLM
-    const llm = getLLM();
-    if (!llm) {
-      return NextResponse.json(
-        { error: "Service IA temporairement indisponible" },
-        { status: 503 }
-      );
-    }
-    const result = await llm.createChatCompletion({
-      model: "glm-4-flash",
+    // 3. Call LLM via z-ai-web-dev-sdk
+    const zai = await ZAI.create();
+    const completion = await zai.chat.completions.create({
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "assistant", content: systemPrompt },
         { role: "user", content: question },
       ],
+      thinking: { type: "disabled" },
     });
 
     // 4. Return response
-    const content = result?.choices?.[0]?.message?.content || result?.output?.text || "Désolé, je n'ai pas pu générer de réponse.";
+    const content = completion?.choices?.[0]?.message?.content || "Désolé, je n'ai pas pu générer de réponse.";
     return NextResponse.json({
       reponse: content,
     });
   } catch (error) {
-    console.error("Error in chat endpoint:", error);
+    console.error("[CHAT] Error:", error);
     return NextResponse.json(
       { error: "Erreur lors du traitement de la question" },
       { status: 500 }
