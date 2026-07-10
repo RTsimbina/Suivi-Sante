@@ -1,9 +1,9 @@
 import { db } from './db';
 
-// ─── Configuration LLM (Groq API — OpenAI-compatible) ──────────────────────
+// ─── Configuration LLM (OpenAI / Groq / compatible) ──────────────────────
 const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.groq.com/openai/v1';
-const LLM_MODEL = process.env.LLM_MODEL || 'llama-3.3-70b-versatile';
+const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.openai.com/v1';
+const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
 
 async function callLLM(systemPrompt: string, userMessage: string): Promise<string | null> {
   if (!LLM_API_KEY) return null;
