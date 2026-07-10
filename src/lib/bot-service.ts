@@ -1,18 +1,39 @@
 import { db } from './db';
-import SDK from 'z-ai-web-dev-sdk';
-import fs from 'fs';
 
-// ─── Configuration LLM ──────────────────────────────────────────────────────
-let _sdk: InstanceType<typeof SDK> | null = null;
-function getLLM(): InstanceType<typeof SDK> {
-  if (!_sdk) {
-    const configPath = '/etc/.z-ai-config';
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      _sdk = new SDK(config);
+// ─── Configuration LLM (direct fetch, no SDK dependency) ─────────────────────
+const ZAI_BASE_URL = process.env.ZAI_BASE_URL || 'https://internal-api.z.ai/v1';
+const ZAI_API_KEY = process.env.ZAI_API_KEY;
+const ZAI_TOKEN = process.env.ZAI_TOKEN;
+
+async function callLLM(systemPrompt: string, userMessage: string): Promise<string | null> {
+  if (!ZAI_API_KEY || !ZAI_TOKEN) return null;
+  try {
+    const res = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ZAI_API_KEY}`,
+        'X-Token': ZAI_TOKEN,
+        'X-Z-AI-From': 'Z',
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'assistant', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        thinking: { type: 'disabled' },
+      }),
+    });
+    if (!res.ok) {
+      console.error('[LLM] API error:', res.status, await res.text());
+      return null;
     }
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || null;
+  } catch (e) {
+    console.error('[LLM] Fetch error:', e);
+    return null;
   }
-  return _sdk;
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -258,11 +279,6 @@ async function calculerTicket(societeNom: string, prestation: string, montant: n
 
 // ─── Réponse IA générique (fallback) ────────────────────────────────────────
 async function reponseIA(question: string): Promise<string> {
-  const llm = getLLM();
-  if (!llm) {
-    return 'Le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
-  }
-
   try {
     // Contexte simplifié pour les bots
     const stats = await db.dossier.groupBy({
@@ -279,23 +295,17 @@ async function reponseIA(question: string): Promise<string> {
       contexte += '\n';
     }
 
-    const result = await llm.createChatCompletion({
-      model: 'glm-4-flash',
-      messages: [
-        {
-          role: 'system',
-          content: `Tu es l'assistant bot Suivi Santé. Tu réponds aux questions des assurés et prestataires médicalux concernant leurs dossiers de remboursement de soins de santé à Madagascar.
+    const systemPrompt = `Tu es l'assistant bot Suivi Santé. Tu réponds aux questions des assurés et prestataires médicaux concernant leurs dossiers de remboursement de soins de santé à Madagascar.
 Tu réponds en français, de manière concise et courtoise. Utilise les données fournies pour répondre.
 Si on te demande le solde, le remboursement, ou le statut d'un dossier précis, invite l'utilisateur à fournir le numéro de dossier.
 Commandes disponibles: /assure [nom], /prestataire [nom], /dossier [numéro], /calcul [société] [prestation] [montant], /aide
 
-${contexte}`,
-        },
-        { role: 'user', content: question },
-      ],
-    });
+${contexte}`;
 
-    return result?.choices?.[0]?.message?.content || result?.output?.text || 'Je n\'ai pas pu générer de réponse.';
+    const result = await callLLM(systemPrompt, question);
+    if (result) return result;
+
+    return 'Le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
   } catch (e) {
     console.error('[BOT] Erreur LLM:', e);
     return 'Désolé, une erreur est survenue lors du traitement. Veuillez réessayer.';

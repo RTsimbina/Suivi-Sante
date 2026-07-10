@@ -9,8 +9,11 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import ZAI from 'z-ai-web-dev-sdk';
 import { db } from '@/lib/db';
+
+const ZAI_BASE_URL = process.env.ZAI_BASE_URL || 'https://internal-api.z.ai/v1';
+const ZAI_API_KEY = process.env.ZAI_API_KEY;
+const ZAI_TOKEN = process.env.ZAI_TOKEN;
 
 /**
  * Système prompt pour le chatbot multicanal.
@@ -103,16 +106,35 @@ export async function generateChatbotResponse(
 
     const systemPrompt = `${CHATBOT_SYSTEM_PROMPT}${contextEnrichment}\n\nCanal de communication : ${channel}. Adapte brièvement ton style (plus concis pour WhatsApp, plus détaillé pour Messenger).`;
 
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
-      messages: [
-        { role: 'assistant', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      thinking: { type: 'disabled' },
+    if (!ZAI_API_KEY || !ZAI_TOKEN) {
+      return 'Le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
+    }
+
+    const completion = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ZAI_API_KEY}`,
+        'X-Token': ZAI_TOKEN,
+        'X-Z-AI-From': 'Z',
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'assistant', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        thinking: { type: 'disabled' },
+      }),
     });
 
-    const response = completion?.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu générer de réponse.';
+    if (!completion.ok) {
+      const errText = await completion.text();
+      console.error(`[CHATBOT:${channel}] API error:`, completion.status, errText);
+      return 'Désolé, une erreur est survenue lors du traitement de votre demande. Veuillez réessayer.';
+    }
+
+    const data = await completion.json();
+    const response = data?.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu générer de réponse.';
 
     // Limiter la longueur pour les canaux SMS/messagerie
     if (channel === 'whatsapp' && response.length > 1600) {
