@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react';
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, Clock, History, FileUp, FilePlus, ArrowRightLeft, Users, Building2, ClipboardList, Plus } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, Clock, History, FilePlus, Users, Building2, ClipboardList, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -228,35 +228,6 @@ export default function ImportView() {
               Nouveau dossier règlement
             </Button>
           </Card>
-        </div>
-      </div>
-
-      {/* ── MISE À JOUR TECHNIQUE : ISA et SAGE ── */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <ArrowRightLeft className="size-4 text-slate-500" />
-          <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide">Mise à jour technique</h3>
-          <Badge variant="secondary" className="text-[10px]">ISA et SAGE</Badge>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ImportZone
-            source="ISA"
-            categorie=""
-            label="Import ISA — Validation technique"
-            description="Met à jour les montants validés et l'avancement technique des dossiers en cours d'analyse."
-            columns="NumeroDossier, MontantValide, StatutTechnique, DateTraitement"
-            icon={FileUp}
-            accentColor="text-slate-600"
-          />
-          <ImportZone
-            source="SAGE"
-            categorie=""
-            label="Import SAGE — Paiement"
-            description="Met à jour les paiements effectués et les références de règlement en comptabilité."
-            columns="NumeroDossier, MontantPaye, DatePaiement, ReferencePaiement"
-            icon={FileUp}
-            accentColor="text-slate-600"
-          />
         </div>
       </div>
 
