@@ -1,38 +1,5 @@
 import { db } from './db';
-
-// ─── Configuration LLM (OpenAI / Groq / compatible) ──────────────────────
-const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://api.openai.com/v1';
-const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
-
-async function callLLM(systemPrompt: string, userMessage: string): Promise<string | null> {
-  if (!LLM_API_KEY) return null;
-  try {
-    const res = await fetch(`${LLM_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLM_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      console.error('[LLM] API error:', res.status, await res.text());
-      return null;
-    }
-    const data = await res.json();
-    return data?.choices?.[0]?.message?.content || null;
-  } catch (e) {
-    console.error('[LLM] Fetch error:', e);
-    return null;
-  }
-}
+import { callLLM } from './llm';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type CanalBot = 'WHATSAPP' | 'TELEGRAM' | 'MESSENGER';

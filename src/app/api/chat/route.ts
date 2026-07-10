@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-
-// ─── LLM API (OpenAI / Groq / compatible) — config via env vars ────────────
-const LLM_API_KEY = process.env.LLM_API_KEY;
-const LLM_BASE_URL = process.env.LLM_BASE_URL || "https://api.openai.com/v1";
-const LLM_MODEL = process.env.LLM_MODEL || "gpt-4o-mini";
+import { callLLM } from "@/lib/llm";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -135,55 +131,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Check API key
-    if (!LLM_API_KEY) {
-      console.error("[CHAT] LLM_API_KEY non configurée");
-      return NextResponse.json(
-        { error: "Service IA non configuré. Contactez l'administrateur." },
-        { status: 503 }
-      );
-    }
-
-    // 2. Fetch KPI data and build context
+    // 1. Fetch KPI data and build context
     const context = await buildKpiContext();
 
-    // 3. Build system prompt with context
+    // 2. Build system prompt with context
     const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour Suivi Santé, une plateforme de traitement des dossiers de soins de santé à Madagascar.
 
 Tu aides les gestionnaires et directeurs à comprendre les performances de leur service de traitement des dossiers médicaux. Tu as accès aux données en temps réel du système. Les montants sont en Ariary (Ar).
 
 ${context}`;
 
-    // 4. Call LLM API (OpenAI-compatible format)
-    const url = `${LLM_BASE_URL}/chat/completions`;
-    const completion = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${LLM_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: question },
-        ],
-      }),
-    });
+    // 3. Call LLM via the unified module (SDK z-ai or fallback)
+    const content = await callLLM(systemPrompt, question);
 
-    if (!completion.ok) {
-      const errorText = await completion.text();
-      console.error("[CHAT] API error:", completion.status, errorText);
+    if (!content) {
       return NextResponse.json(
-        { error: "Erreur lors de l'appel au service IA", detail: `HTTP ${completion.status}: ${errorText}` },
-        { status: 502 }
+        { error: "Service IA temporairement indisponible. Veuillez réessayer." },
+        { status: 503 }
       );
     }
 
-    const data = await completion.json();
-
-    // 5. Return response
-    const content = data?.choices?.[0]?.message?.content || "Désolé, je n'ai pas pu générer de réponse.";
+    // 4. Return response
     return NextResponse.json({
       reponse: content,
     });
