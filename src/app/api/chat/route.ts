@@ -12,6 +12,8 @@ function getLLM(): InstanceType<typeof SDK> | null {
       if (fs.existsSync(configPath)) {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
         _sdk = new SDK(config);
+      } else if (process.env.ZAI_API_KEY) {
+        _sdk = new SDK({ apiKey: process.env.ZAI_API_KEY });
       }
     } catch (e) {
       console.error('[CHAT] Erreur chargement SDK:', e);

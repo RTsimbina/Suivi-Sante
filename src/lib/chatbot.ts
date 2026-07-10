@@ -16,8 +16,13 @@ import fs from 'fs';
 // Charger la configuration Z.ai
 let sdkInstance: SDK | null = null;
 try {
-  const config = JSON.parse(fs.readFileSync('/etc/.z-ai-config', 'utf-8'));
-  sdkInstance = new SDK(config);
+  const configPath = '/etc/.z-ai-config';
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    sdkInstance = new SDK(config);
+  } else if (process.env.ZAI_API_KEY) {
+    sdkInstance = new SDK({ apiKey: process.env.ZAI_API_KEY });
+  }
 } catch {
   console.warn('[CHATBOT] Impossible d\'initialiser le SDK Z.ai');
 }
