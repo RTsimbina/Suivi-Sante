@@ -97,10 +97,7 @@ export default function Home() {
     async function fetchKpis() {
       try {
         const res = await fetch('/api/kpis');
-        if (res.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
+        if (!res.ok) return; // Le proxy gère déjà la redirection 401
         const data = await res.json();
         setKpis(data);
       } catch {
