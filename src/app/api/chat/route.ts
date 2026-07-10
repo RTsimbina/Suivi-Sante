@@ -157,9 +157,10 @@ ${context}`;
       reponse: content,
     });
   } catch (error) {
-    console.error("[CHAT] Error:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[CHAT] Error:", msg, error);
     return NextResponse.json(
-      { error: "Erreur lors du traitement de la question" },
+      { error: "Erreur lors du traitement de la question", detail: msg },
       { status: 500 }
     );
   }

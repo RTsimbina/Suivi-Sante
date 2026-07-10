@@ -428,7 +428,10 @@ function ChatTab() {
       body: JSON.stringify({ question }),
     })
       .then(async (res) => {
-        if (!res.ok) throw new Error(`Erreur ${res.status}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || errData.error || `Erreur ${res.status}`);
+        }
         const data = await res.json();
         const assistantMessage: Message = {
           role: 'assistant',
@@ -436,10 +439,11 @@ function ChatTab() {
         };
         setMessages((prev) => [...prev, assistantMessage]);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[CHAT UI]', err);
         setMessages((prev) => [
           ...prev,
-          { role: 'assistant', content: 'Désolé, une erreur est survenue. Veuillez réessayer.' },
+          { role: 'assistant', content: `Désolé, une erreur est survenue : ${err.message}` },
         ]);
       })
       .finally(() => {
