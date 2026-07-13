@@ -424,6 +424,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                           )}
                         </div>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
