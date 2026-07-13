@@ -361,13 +361,37 @@ export async function GET(request: Request) {
     }
     log.push('Tables créées/vérifiées');
 
-    // ── Étape 2 : Vérifier si le seed est déjà fait ──
+    // ── Étape 2 : Créer/mettre à jour les utilisateurs ──
+    // Migrate old @smartflow.mg emails to @suivisante.mg
+    const oldDomain = 'smartflow.mg';
+    const newDomain = 'suivisante.mg';
+    const oldUsers = await db.utilisateur.findMany({
+      where: { email: { endsWith: oldDomain } },
+    });
+    for (const u of oldUsers) {
+      const newEmail = u.email.replace(oldDomain, newDomain);
+      await db.utilisateur.update({ where: { id: u.id }, data: { email: newEmail } });
+      log.push(`Email migré: ${u.email} → ${newEmail}`);
+    }
+
     const existingUsers = await db.utilisateur.count();
     if (existingUsers > 0) {
+      // Update passwords to SuiviSante@2026 for all demo users
+      const passwordHash = await hash('SuiviSante@2026', 10);
+      const demoEmails = [
+        `admin@${newDomain}`, `accueil@${newDomain}`, `technique@${newDomain}`,
+        `compta@${newDomain}`, `utilisateur@${newDomain}`,
+      ];
+      for (const email of demoEmails) {
+        await db.utilisateur.updateMany({ where: { email }, data: { password: passwordHash } });
+      }
+      log.push(`${demoEmails.length} mots de passe mis à jour`);
+
       return NextResponse.json({
         success: true,
-        message: 'Base de données déjà initialisée',
+        message: 'Base de données mise à jour',
         users: existingUsers,
+        migrated: oldUsers.length,
         details: log,
       });
     }
