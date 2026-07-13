@@ -53,7 +53,8 @@ const TYPE_LABELS: Record<string, string> = {
   AUTRE: 'Autre',
 };
 
-export default function AssuresView() {
+export default function AssuresView({ userRole }: { userRole: string }) {
+  const canEdit = userRole === 'TECHNIQUE';
   const [assures, setAssures] = useState<Assure[]>([]);
   const [societes, setSocietes] = useState<Societe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,13 +263,14 @@ export default function AssuresView() {
             ))}
           </select>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nouvel assuré
-            </Button>
-          </DialogTrigger>
+          {canEdit && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvel assuré
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingAssure ? "Modifier l'assuré" : 'Nouvel assuré'}</DialogTitle>
@@ -337,8 +339,9 @@ export default function AssuresView() {
                 </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+          )}
       </div>
 
       {/* Table */}
@@ -364,7 +367,7 @@ export default function AssuresView() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase hidden lg:table-cell">Téléphone</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase hidden lg:table-cell">Dossiers</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase">Statut</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase">Actions</th>
+                    {canEdit && <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -399,6 +402,7 @@ export default function AssuresView() {
                           {a.actif ? 'Actif' : 'Inactif'}
                         </Badge>
                       </td>
+                      {canEdit && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(a)}>

@@ -51,7 +51,8 @@ interface Prestataire {
   updatedAt: string;
 }
 
-export default function PrestatairesView() {
+export default function PrestatairesView({ userRole }: { userRole: string }) {
+  const canEdit = userRole === 'TECHNIQUE';
   const [prestataires, setPrestataires] = useState<Prestataire[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -261,6 +262,7 @@ export default function PrestatairesView() {
             ))}
           </select>
         </div>
+        {canEdit && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreate}>
@@ -329,6 +331,7 @@ export default function PrestatairesView() {
             </div>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Table */}
@@ -353,7 +356,7 @@ export default function PrestatairesView() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase hidden lg:table-cell">Téléphone</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase hidden lg:table-cell">Dossiers</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground text-xs uppercase">Statut</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase">Actions</th>
+                    {canEdit && <th className="text-right px-4 py-3 font-medium text-muted-foreground text-xs uppercase">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -387,6 +390,7 @@ export default function PrestatairesView() {
                           {p.actif ? 'Actif' : 'Inactif'}
                         </Badge>
                       </td>
+                      {canEdit && (
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}>
@@ -408,6 +412,7 @@ export default function PrestatairesView() {
                           )}
                         </div>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
