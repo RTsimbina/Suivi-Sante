@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { traiterMessageBot, sauvegarderMessage, envoyerWhatsApp } from "@/lib/bot-service";
 
-const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "smartflow_verify_token";
+const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "suivisante_verify_token";
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
 
 // GET: Vérification du webhook (configuration Meta)

@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { statutLabel, statutColor } from '@/components/smartflow/format';
+import { statutLabel, statutColor } from '@/components/suivisante/format';
 
 interface IaData {
   retards: {

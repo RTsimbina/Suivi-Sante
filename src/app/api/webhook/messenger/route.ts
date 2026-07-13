@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { traiterMessageBot, sauvegarderMessage, envoyerMessenger } from "@/lib/bot-service";
 
-const MESSENGER_VERIFY_TOKEN = process.env.MESSENGER_VERIFY_TOKEN || "smartflow_verify_token";
+const MESSENGER_VERIFY_TOKEN = process.env.MESSENGER_VERIFY_TOKEN || "suivisante_verify_token";
 
 // GET: Vérification du webhook (configuration Meta)
 export async function GET(request: NextRequest) {

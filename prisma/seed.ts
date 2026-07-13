@@ -76,13 +76,13 @@ async function main() {
   console.log('🌱 Début du seeding Suivi Santé...');
 
   // ── 1. Utilisateurs démo ──
-  const passwordHash = await hash('SmartFlow@2026', 10);
+  const passwordHash = await hash('SuiviSante@2026', 10);
   const utilisateursData = [
-    { email: 'admin@smartflow.mg', nom: 'Administrateur Système', password: passwordHash, role: 'ADMINISTRATEUR' },
-    { email: 'accueil@smartflow.mg', nom: 'Ravao Andrianjaka', password: passwordHash, role: 'ACCUEIL' },
-    { email: 'technique@smartflow.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
-    { email: 'compta@smartflow.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
-    { email: 'utilisateur@smartflow.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
+    { email: 'admin@suivisante.mg', nom: 'Administrateur Système', password: passwordHash, role: 'ADMINISTRATEUR' },
+    { email: 'accueil@suivisante.mg', nom: 'Ravao Andrianjaka', password: passwordHash, role: 'ACCUEIL' },
+    { email: 'technique@suivisante.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
+    { email: 'compta@suivisante.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
+    { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
   ];
 
   for (const u of utilisateursData) {
