@@ -175,7 +175,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const fetchSocietes = useCallback(async () => {
     setSocietesLoading(true);
     try {
-      const res = await fetch('/api/technique/societes?withBaremes=true');
+      const res = await fetch('/api/technique/societes');
       if (!res.ok) throw new Error('Erreur de chargement');
       const data = await res.json();
       setSocietes(Array.isArray(data) ? data : data.societes ?? []);
@@ -236,26 +236,13 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
     setDialogOpen(true);
   };
 
-  const openEditDialog = async (societe: Societe) => {
+  const openEditDialog = (societe: Societe) => {
     setEditingSociete(societe);
     setSocieteNom(societe.nom);
-    // Toujours recharger les barèmes depuis l'API pour avoir les valeurs à jour
-    let baremes = societe.baremes;
-    if (!baremes || baremes.length === 0) {
-      try {
-        const res = await fetch(`/api/technique/societes/${societe.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          baremes = data.societe?.baremes || [];
-        }
-      } catch { /* silent */ }
-    }
     setBaremesForm(
       PRESTATIONS.map((p) => {
-        const existing = baremes?.find((b) => b.prestation === p);
-        return existing
-          ? { prestation: p, tauxCouverture: existing.tauxCouverture, plafond: existing.plafond, description: existing.description || '' }
-          : { prestation: p, tauxCouverture: 0, plafond: 0, description: '' };
+        const existing = societe.baremes?.find((b) => b.prestation === p);
+        return existing ?? { prestation: p, tauxCouverture: 0, plafond: 0, description: '' };
       })
     );
     setDialogOpen(true);
@@ -349,14 +336,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
         throw new Error(err.error || 'Erreur de calcul');
       }
       const data = await res.json();
-      // Le backend retourne { calcul: {...}, bareme: {...}, explication } → aplatir pour le frontend
-      setCalcResult({
-        bareme: data.bareme,
-        montantCouvert: data.calcul.montantCouvert,
-        montantRembourse: data.calcul.montantRembourse,
-        ticketModerateur: data.calcul.ticketModerateur,
-        explication: data.explication,
-      });
+      setCalcResult(data);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Erreur lors du calcul');
     } finally {
