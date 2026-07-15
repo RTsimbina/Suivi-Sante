@@ -149,8 +149,8 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ─── State: Calcul Ticket Modérateur ───
-  const [calcSocieteId, setCalcSocieteId] = useState('');
-  const [calcPrestation, setCalcPrestation] = useState('');
+  const [calcSocieteId, setCalcSocieteId] = useState<string | undefined>(undefined);
+  const [calcPrestation, setCalcPrestation] = useState<string | undefined>(undefined);
   const [calcMontant, setCalcMontant] = useState('');
   const [calculating, setCalculating] = useState(false);
   const [calcResult, setCalcResult] = useState<CalculResult | null>(null);
@@ -323,7 +323,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
 
   // ─── Handlers: Calcul ───
   const handleCalculer = async () => {
-    if (!calcSocieteId || !calcPrestation || !calcMontant) {
+    if (!calcSocieteId || !calcPrestation || !calcMontant || calcMontant === '0') {
       toast.error('Veuillez remplir tous les champs');
       return;
     }
@@ -344,17 +344,23 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
           montantReclame: montant,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Erreur de calcul');
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data || data.erreur) {
+        throw new Error(data?.erreur || `Erreur serveur (${res.status})`);
       }
-      const data = await res.json();
-      // Le backend retourne { calcul: {...}, bareme: {...}, explication } → aplatir pour le frontend
+
+      // Le backend retourne { calcul: {...}, bareme: {...}, explication }
+      const c = data.calcul;
+      if (!c) {
+        throw new Error('Réponse inattendue du serveur (pas de calcul)');
+      }
+
       setCalcResult({
         bareme: data.bareme,
-        montantCouvert: data.calcul.montantCouvert,
-        montantRembourse: data.calcul.montantRembourse,
-        ticketModerateur: data.calcul.ticketModerateur,
+        montantCouvert: c.montantCouvert,
+        montantRembourse: c.montantRembourse,
+        ticketModerateur: c.ticketModerateur,
         explication: data.explication,
       });
     } catch (err: unknown) {
