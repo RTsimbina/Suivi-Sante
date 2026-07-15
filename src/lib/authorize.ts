@@ -94,9 +94,15 @@ export const API_PERMISSIONS: Record<
   '/api/assures': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
     methods: {
-      POST: ['ADMINISTRATEUR'],
-      PUT: ['ADMINISTRATEUR'],
-      DELETE: ['ADMINISTRATEUR'],
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
+      PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
+      DELETE: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    },
+  },
+  '/api/assures/import': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
     },
   },
   '/api/prestataires': {
