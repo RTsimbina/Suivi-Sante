@@ -78,8 +78,8 @@ export const API_PERMISSIONS: Record<
   '/api/technique/societes': {
     roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
     methods: {
-      POST: ['ADMINISTRATEUR'],
-      PUT: ['ADMINISTRATEUR'],
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
+      PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
       DELETE: ['ADMINISTRATEUR'],
     },
   },
