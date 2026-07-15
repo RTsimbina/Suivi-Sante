@@ -153,17 +153,35 @@ export async function PUT(
       }));
     }
 
-    // Mettre à jour la société
-    // Stratégie : supprimer les anciens barèmes et recréer les nouveaux
-    // (upsert massif avec transaction pour la cohérence)
+    // Mettre à jour la société et ses barèmes (upsert par prestation)
     const updatedSociete = await db.$transaction(async (tx) => {
-      // Si des barèmes sont fournis, les remplacer
+      // Si des barèmes sont fournis, les mettre à jour via upsert
       if (baremes && baremesOperations) {
-        await tx.bareme.deleteMany({ where: { societeId: id } });
+        // D'abord supprimer les barèmes existants qui ne sont plus dans la liste
+        const prestationsEnvoyees = baremes.map((b) => b.prestation);
+        await tx.bareme.deleteMany({
+          where: {
+            societeId: id,
+            prestation: { notIn: prestationsEnvoyees },
+          },
+        });
 
+        // Puis upsert chaque barème
         for (const b of baremesOperations) {
-          await tx.bareme.create({
-            data: {
+          await tx.bareme.upsert({
+            where: {
+              societeId_prestation: {
+                societeId: id,
+                prestation: b.prestation,
+              },
+            },
+            update: {
+              tauxCouverture: b.tauxCouverture,
+              plafond: b.plafond,
+              description: b.description ?? null,
+              active: b.active ?? true,
+            },
+            create: {
               societeId: id,
               prestation: b.prestation,
               tauxCouverture: b.tauxCouverture,

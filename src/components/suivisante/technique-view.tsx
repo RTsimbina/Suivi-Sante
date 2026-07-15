@@ -267,7 +267,12 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
     }
     setSavingSociete(true);
     try {
-      const body = { nom: societeNom.trim(), baremes: baremesForm };
+      // Filtrer les barèmes : ne pas envoyer ceux avec taux=0 ET plafond=0 si création
+      const baremesToSend = editingSociete
+        ? baremesForm // En modification, envoyer tout (remplacement total)
+        : baremesForm.filter((b) => b.tauxCouverture > 0 || b.plafond > 0);
+
+      const body = { nom: societeNom.trim(), baremes: baremesToSend };
       let res: Response;
       if (editingSociete) {
         res = await fetch(`/api/technique/societes/${editingSociete.id}`, {
@@ -282,13 +287,13 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
           body: JSON.stringify(body),
         });
       }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Erreur lors de la sauvegarde');
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.erreur) {
+        throw new Error(data?.erreur || `Erreur serveur (${res.status})`);
       }
-      toast.success(editingSociete ? 'Société mise à jour' : 'Société créée avec succès');
+      toast.success(editingSociete ? 'Société et barèmes mis à jour' : 'Société créée avec succès');
       setDialogOpen(false);
-      fetchSocietes();
+      await fetchSocietes();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
     } finally {
