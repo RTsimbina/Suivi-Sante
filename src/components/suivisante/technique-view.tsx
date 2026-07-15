@@ -152,7 +152,6 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const [calcSocieteId, setCalcSocieteId] = useState<string | undefined>(undefined);
   const [calcPrestation, setCalcPrestation] = useState<string | undefined>(undefined);
   const [calcMontant, setCalcMontant] = useState('');
-  const [calculating, setCalculating] = useState(false);
   const [calcResult, setCalcResult] = useState<CalculResult | null>(null);
 
   // ─── State: Import ISA ───
@@ -321,8 +320,8 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
     );
   };
 
-  // ─── Handlers: Calcul ───
-  const handleCalculer = async () => {
+  // ─── Handlers: Calcul (100% frontend, pas d'appel API) ───
+  const handleCalculer = () => {
     if (!calcSocieteId || !calcPrestation || !calcMontant || calcMontant === '0') {
       toast.error('Veuillez remplir tous les champs');
       return;
@@ -332,42 +331,37 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
       toast.error('Le montant doit être un nombre positif');
       return;
     }
-    setCalculating(true);
-    setCalcResult(null);
-    try {
-      const res = await fetch('/api/technique/baremes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          societeId: calcSocieteId,
-          prestation: calcPrestation,
-          montantReclame: montant,
-        }),
-      });
-      const data = await res.json().catch(() => null);
 
-      if (!res.ok || !data || data.erreur) {
-        throw new Error(data?.erreur || `Erreur serveur (${res.status})`);
-      }
-
-      // Le backend retourne { calcul: {...}, bareme: {...}, explication }
-      const c = data.calcul;
-      if (!c) {
-        throw new Error('Réponse inattendue du serveur (pas de calcul)');
-      }
-
-      setCalcResult({
-        bareme: data.bareme,
-        montantCouvert: c.montantCouvert,
-        montantRembourse: c.montantRembourse,
-        ticketModerateur: c.ticketModerateur,
-        explication: data.explication,
-      });
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Erreur lors du calcul');
-    } finally {
-      setCalculating(false);
+    // Trouver la société et son barème directement dans le state
+    const societe = societes.find((s) => s.id === calcSocieteId);
+    if (!societe) {
+      toast.error('Société introuvable');
+      return;
     }
+
+    const bareme = societe.baremes?.find((b) => b.prestation === calcPrestation);
+    if (!bareme || (!bareme.tauxCouverture && !bareme.plafond)) {
+      toast.error(`Aucun barème configuré pour "${PRESTATION_LABELS[calcPrestation as PrestationType] || calcPrestation}" dans "${societe.nom}". Modifiez d'abord les barèmes de cette société.`);
+      return;
+    }
+
+    // Calcul
+    const montantCouvert = Math.min(montant, bareme.plafond);
+    const montantRembourse = Math.round(montantCouvert * (bareme.tauxCouverture / 100) * 100) / 100;
+    const ticketModerateur = Math.round((montant - montantRembourse) * 100) / 100;
+    const plafondAtteint = montant > bareme.plafond;
+
+    const explication = plafondAtteint
+      ? `Le montant réclamé (${montant.toLocaleString('fr-FR')} Ar) dépasse le plafond de ${bareme.plafond.toLocaleString('fr-FR')} Ar. Le montant couvert est plafonné à ${montantCouvert.toLocaleString('fr-FR')} Ar. Avec un taux de ${bareme.tauxCouverture}%, le montant remboursé est de ${montantRembourse.toLocaleString('fr-FR')} Ar. Le ticket modérateur est de ${ticketModerateur.toLocaleString('fr-FR')} Ar.`
+      : `Le montant réclamé (${montant.toLocaleString('fr-FR')} Ar) est dans la limite du plafond (${bareme.plafond.toLocaleString('fr-FR')} Ar). Avec un taux de ${bareme.tauxCouverture}%, le montant remboursé est de ${montantRembourse.toLocaleString('fr-FR')} Ar. Le ticket modérateur est de ${ticketModerateur.toLocaleString('fr-FR')} Ar.`;
+
+    setCalcResult({
+      bareme: { tauxCouverture: bareme.tauxCouverture, plafond: bareme.plafond },
+      montantCouvert,
+      montantRembourse,
+      ticketModerateur,
+      explication,
+    });
   };
 
   // ─── Handlers: Import ISA ───
@@ -814,15 +808,11 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
 
                 <Button
                   onClick={handleCalculer}
-                  disabled={calculating || !calcSocieteId || !calcPrestation || !calcMontant}
+                  disabled={!calcSocieteId || !calcPrestation || !calcMontant}
                   className="w-full gap-2"
                 >
-                  {calculating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Calculator className="h-4 w-4" />
-                  )}
-                  {calculating ? 'Calcul en cours...' : 'Calculer'}
+                  <Calculator className="h-4 w-4" />
+                  Calculer
                 </Button>
               </CardContent>
             </Card>
@@ -870,7 +860,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
               </Card>
             )}
 
-            {!calcResult && !calculating && (
+            {!calcResult && (
               <Card className="flex items-center justify-center min-h-[200px]">
                 <div className="text-center text-muted-foreground">
                   <Calculator className="h-12 w-12 mx-auto mb-3 opacity-20" />
