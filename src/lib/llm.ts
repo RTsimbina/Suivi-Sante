@@ -1,60 +1,46 @@
 /**
  * ─── Module LLM unifié ────────────────────────────────────────────────────────
  *
- * Utilise le z-ai-web-dev-sdk avec 3 niveaux de fallback :
- *   1. ZAI.create() — lit .z-ai-config (dev local)
- *   2. new ZAI({ baseUrl, apiKey }) depuis env vars (Vercel / production)
- *   3. fetch direct OpenAI-compatible (dernier recours)
+ * Supporte plusieurs fournisseurs LLM via fetch direct :
+ *   - OpenAI-compatible (OpenAI, Groq, Together, etc.)
+ *   - Eden AI (api.edenai.run)
  *
- * Configuration requise sur Vercel (.env) :
- *   LLM_BASE_URL = https://internal-api.z.ai/v1
- *   LLM_API_KEY  = votre clé API
- *   LLM_MODEL    = modèle (optionnel, défaut : glm-4-flash)
+ * Le z-ai-web-dev-sdk est utilisé uniquement en dev local (.z-ai-config).
+ *
+ * Configuration sur Vercel (.env) :
+ *   LLM_BASE_URL  = URL de base de l'API
+ *   LLM_API_KEY   = votre clé API
+ *   LLM_MODEL     = modèle (optionnel)
+ *   LLM_PROVIDER  = "openai" (défaut) ou "edenai"
  */
 
-// ─── Cache de l'instance SDK (singleton) ──────────────────────────────────────
+// ─── Cache SDK (dev local uniquement) ─────────────────────────────────────────
 let sdkInstance: InstanceType<typeof import('z-ai-web-dev-sdk').default> | null = null;
 let sdkInitFailed = false;
 
-async function getSDK() {
+async function getLocalSDK() {
   if (sdkInstance) return sdkInstance;
   if (sdkInitFailed) return null;
 
   try {
     const ZAI = (await import('z-ai-web-dev-sdk')).default;
-
-    // Stratégie 1 : create() lit .z-ai-config (fonctionne en dev local)
-    try {
-      sdkInstance = await ZAI.create();
-      return sdkInstance;
-    } catch {
-      // .z-ai-config introuvable → essayer les env vars
-    }
-
-    // Stratégie 2 : construire directement depuis les variables d'environnement
-    const baseUrl = process.env.LLM_BASE_URL;
-    const apiKey = process.env.LLM_API_KEY;
-    if (baseUrl && apiKey) {
-      sdkInstance = new ZAI({ baseUrl, apiKey } as ConstructorParameters<typeof ZAI>[0]);
-      console.log('[LLM] SDK initialisé depuis les variables d\'environnement');
-      return sdkInstance;
-    }
-
-    // Aucune config disponible
+    sdkInstance = await ZAI.create();
+    return sdkInstance;
+  } catch {
     sdkInitFailed = true;
-    console.warn('[LLM] z-ai-web-dev-sdk non configuré. Ajoutez LLM_BASE_URL et LLM_API_KEY dans .env');
-    return null;
-  } catch (err) {
-    sdkInitFailed = true;
-    console.error('[LLM] Erreur initialisation SDK:', err instanceof Error ? err.message : err);
     return null;
   }
 }
 
-// ─── Configuration fetch fallback (dernier recours) ──────────────────────────
-const FALLBACK_API_KEY = process.env.LLM_API_KEY;
-const FALLBACK_BASE_URL = process.env.LLM_BASE_URL;
-const FALLBACK_MODEL = process.env.LLM_MODEL;
+// ─── Configuration ────────────────────────────────────────────────────────────
+function getConfig() {
+  return {
+    baseUrl: process.env.LLM_BASE_URL || '',
+    apiKey: process.env.LLM_API_KEY || '',
+    model: process.env.LLM_MODEL || '',
+    provider: (process.env.LLM_PROVIDER || 'openai').toLowerCase(),
+  };
+}
 
 // ─── Fonction principale ─────────────────────────────────────────────────────
 
@@ -65,23 +51,21 @@ export interface LLMMessage {
 
 /**
  * Appelle le LLM et retourne le texte de la réponse.
- * Utilise le SDK z-ai-web-dev-sdk si disponible, sinon fetch direct.
- *
- * Note : le SDK utilise le rôle "assistant" pour les system prompts.
  */
 export async function callLLM(
   systemPrompt: string,
   userMessage: string,
   options?: { model?: string }
 ): Promise<string | null> {
-  const model = options?.model || FALLBACK_MODEL;
+  const { baseUrl, apiKey, model: envModel, provider } = getConfig();
+  const model = options?.model || envModel;
 
-  // 1. Essayer le SDK z-ai-web-dev-sdk
-  const sdk = await getSDK();
+  // 0. Essayer le SDK local (z-ai-web-dev-sdk avec .z-ai-config)
+  const sdk = await getLocalSDK();
   if (sdk) {
     try {
       const result = await sdk.chat.completions.create({
-        model,
+        model: model || 'glm-4-flash',
         messages: [
           { role: 'assistant', content: systemPrompt },
           { role: 'user', content: userMessage },
@@ -91,27 +75,46 @@ export async function callLLM(
       const content = result?.choices?.[0]?.message?.content;
       if (content) return content;
     } catch (err) {
-      console.error('[LLM] Erreur SDK:', err instanceof Error ? err.message : err);
-      // Ne pas bloquer, essayer le fallback
+      console.error('[LLM] Erreur SDK local:', err instanceof Error ? err.message : err);
     }
   }
 
-  // 2. Fallback : fetch direct vers l'API (OpenAI-compatible)
-  if (!FALLBACK_API_KEY || !FALLBACK_BASE_URL) {
-    console.error('[LLM] Aucune configuration LLM disponible. Ajoutez LLM_BASE_URL et LLM_API_KEY dans .env');
+  // Vérifier la configuration fetch
+  if (!baseUrl || !apiKey) {
+    console.error('[LLM] Aucune configuration LLM. Ajoutez LLM_BASE_URL et LLM_API_KEY dans .env');
     return null;
   }
 
+  // 1. Eden AI
+  if (provider === 'edenai') {
+    return callEdenAI(baseUrl, apiKey, model || 'openai/gpt-4o-mini', systemPrompt, userMessage);
+  }
+
+  // 2. OpenAI-compatible (défaut)
+  return callOpenAICompatible(baseUrl, apiKey, model || 'gpt-4o-mini', systemPrompt, userMessage);
+}
+
+// ─── OpenAI-compatible fetch ─────────────────────────────────────────────────
+async function callOpenAICompatible(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<string | null> {
+  // Si l'URL se termine par /v1, on construit /chat/completions
+  // Sinon on utilise l'URL telle quelle
+  const url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+
   try {
-    const url = `${FALLBACK_BASE_URL}/chat/completions`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${FALLBACK_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'glm-4-flash',
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
@@ -121,31 +124,90 @@ export async function callLLM(
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error('[LLM] Erreur API fallback:', res.status, errText);
+      console.error('[LLM] Erreur API OpenAI-compatible:', res.status, errText);
       return null;
     }
 
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || null;
   } catch (err) {
-    console.error('[LLM] Erreur fetch fallback:', err instanceof Error ? err.message : err);
+    console.error('[LLM] Erreur fetch OpenAI-compatible:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// ─── Eden AI fetch ───────────────────────────────────────────────────────────
+async function callEdenAI(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+): Promise<string | null> {
+  // model format: "provider/model" (ex: "openai/gpt-4o-mini")
+  const [provider, ...modelParts] = model.split('/');
+  const modelName = modelParts.join('/') || 'gpt-4o-mini';
+
+  const url = baseUrl.replace(/\/+$/, '') + '/v2/ai/text/chat';
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        response_as_dict: true,
+        attributes_as_list: false,
+        show_original_response: false,
+        providers: provider,
+        text: userMessage,
+        chatbot_global_action: systemPrompt,
+        model: modelName,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[LLM] Erreur API Eden AI:', res.status, errText);
+      return null;
+    }
+
+    const data = await res.json();
+
+    // Réponse Eden AI : { "openai": { "status": "success", "generated_text": "..." } }
+    const providerResult = data?.[provider];
+    if (providerResult?.status === 'success' && providerResult?.generated_text) {
+      return providerResult.generated_text;
+    }
+
+    console.error('[LLM] Réponse Eden AI inattendue:', JSON.stringify(data).slice(0, 300));
+    return null;
+  } catch (err) {
+    console.error('[LLM] Erreur fetch Eden AI:', err instanceof Error ? err.message : err);
     return null;
   }
 }
 
 /**
- * Vérifie si le LLM est configuré et fonctionnel.
+ * Vérifie si le LLM est configuré.
  */
 export async function verifierLLM(): Promise<{ ok: boolean; erreur?: string }> {
-  const sdk = await getSDK();
+  // Dev local : essayer le SDK
+  const sdk = await getLocalSDK();
   if (sdk) return { ok: true };
 
-  if (!process.env.LLM_BASE_URL || !process.env.LLM_API_KEY) {
+  // Production : vérifier les env vars
+  const { baseUrl, apiKey } = getConfig();
+  if (!baseUrl || !apiKey) {
     return {
       ok: false,
       erreur: 'LLM non configuré. Ajoutez LLM_BASE_URL et LLM_API_KEY dans les variables d\'environnement (.env).',
     };
   }
 
-  return { ok: false, erreur: 'Erreur d\'initialisation du SDK LLM.' };
+  return { ok: true };
 }
