@@ -440,9 +440,13 @@ function ChatTab() {
         body: JSON.stringify({ question: trimmed }),
       });
 
-      if (!res.ok) throw new Error(`Erreur ${res.status}: ${res.statusText}`);
+      const data = await res.json().catch(() => ({}));
 
-      const data = await res.json();
+      if (!res.ok) {
+        const errMsg = data.erreur || data.error || data.detail || `Erreur ${res.status}`;
+        throw new Error(`${res.status}:${errMsg}`);
+      }
+
       const assistantMessage: Message = {
         role: 'assistant',
         content: data.reponse ?? data.response ?? data.message ?? data.content ?? 'Réponse reçue.',
@@ -451,9 +455,11 @@ function ChatTab() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[CHAT UI]', msg);
-      let userFriendlyMsg = 'Désolé, une erreur est survenue lors du traitement de votre question. Veuillez réessayer.';
+      let userFriendlyMsg = 'Désolé, une erreur est survenue. Veuillez réessayer.';
       if (msg.includes('401')) {
         userFriendlyMsg = "La clé API IA n'est pas configurée correctement (erreur 401). Veuillez contacter l'administrateur.";
+      } else if (msg.includes('503') && msg.includes('non configuré')) {
+        userFriendlyMsg = 'Le service IA n\'est pas encore configuré. L\'administrateur doit ajouter les variables LLM_BASE_URL et LLM_API_KEY dans les paramètres du serveur.';
       } else if (msg.includes('502') || msg.includes('503')) {
         userFriendlyMsg = 'Le service IA est temporairement indisponible. Veuillez réessayer dans quelques instants.';
       }
@@ -479,11 +485,10 @@ function ChatTab() {
       body: JSON.stringify({ question }),
     })
       .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || errData.error || `Erreur ${res.status}`);
+          throw new Error(`${res.status}:${data.erreur || data.error || data.detail || 'Erreur serveur'}`);
         }
-        const data = await res.json();
         const assistantMessage: Message = {
           role: 'assistant',
           content: data.reponse ?? data.response ?? data.message ?? data.content ?? 'Réponse reçue.',
@@ -496,6 +501,8 @@ function ChatTab() {
         let userFriendlyMsg = 'Désolé, une erreur est survenue. Veuillez réessayer.';
         if (msg.includes('401')) {
           userFriendlyMsg = "La clé API IA n'est pas configurée correctement (erreur 401). Veuillez contacter l'administrateur.";
+        } else if (msg.includes('503') && msg.includes('non configuré')) {
+          userFriendlyMsg = 'Le service IA n\'est pas encore configuré. L\'administrateur doit ajouter les variables LLM_BASE_URL et LLM_API_KEY dans les paramètres du serveur.';
         } else if (msg.includes('502') || msg.includes('503')) {
           userFriendlyMsg = 'Le service IA est temporairement indisponible. Veuillez réessayer dans quelques instants.';
         }

@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (!question || typeof question !== "string") {
       return NextResponse.json(
-        { error: "Le champ 'question' est requis" },
+        { erreur: "Le champ 'question' est requis" },
         { status: 400 }
       );
     }
@@ -146,7 +146,7 @@ ${context}`;
 
     if (!content) {
       return NextResponse.json(
-        { error: "Service IA temporairement indisponible. Veuillez réessayer." },
+        { erreur: "Service IA non configuré. Ajoutez LLM_BASE_URL et LLM_API_KEY dans les variables d'environnement." },
         { status: 503 }
       );
     }
@@ -159,7 +159,7 @@ ${context}`;
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[CHAT] Error:", msg, error);
     return NextResponse.json(
-      { error: "Erreur lors du traitement de la question", detail: msg },
+      { erreur: "Erreur lors du traitement de la question", detail: msg },
       { status: 500 }
     );
   }

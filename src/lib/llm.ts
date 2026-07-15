@@ -1,14 +1,15 @@
 /**
  * ─── Module LLM unifié ────────────────────────────────────────────────────────
  *
- * Utilise le z-ai-web-dev-sdk (disponible dans l'environnement de développement)
- * avec un fallback fetch direct vers l'API interne Z.ai.
+ * Utilise le z-ai-web-dev-sdk avec 3 niveaux de fallback :
+ *   1. ZAI.create() — lit .z-ai-config (dev local)
+ *   2. new ZAI({ baseUrl, apiKey }) depuis env vars (Vercel / production)
+ *   3. fetch direct OpenAI-compatible (dernier recours)
  *
- * Le SDK lit le fichier .z-ai-config pour obtenir baseUrl + apiKey.
- * Si le fichier n'existe pas (ex: Vercel), il faut configurer :
- *   LLM_API_KEY  = la clé API
- *   LLM_BASE_URL = l'URL de base de l'API (ex: https://internal-api.z.ai/v1)
- *   LLM_MODEL    = le modèle (optionnel, défaut: glm-4-flash)
+ * Configuration requise sur Vercel (.env) :
+ *   LLM_BASE_URL = https://internal-api.z.ai/v1
+ *   LLM_API_KEY  = votre clé API
+ *   LLM_MODEL    = modèle (optionnel, défaut : glm-4-flash)
  */
 
 // ─── Cache de l'instance SDK (singleton) ──────────────────────────────────────
@@ -18,18 +19,39 @@ let sdkInitFailed = false;
 async function getSDK() {
   if (sdkInstance) return sdkInstance;
   if (sdkInitFailed) return null;
+
   try {
     const ZAI = (await import('z-ai-web-dev-sdk')).default;
-    sdkInstance = await ZAI.create();
-    return sdkInstance;
-  } catch {
+
+    // Stratégie 1 : create() lit .z-ai-config (fonctionne en dev local)
+    try {
+      sdkInstance = await ZAI.create();
+      return sdkInstance;
+    } catch {
+      // .z-ai-config introuvable → essayer les env vars
+    }
+
+    // Stratégie 2 : construire directement depuis les variables d'environnement
+    const baseUrl = process.env.LLM_BASE_URL;
+    const apiKey = process.env.LLM_API_KEY;
+    if (baseUrl && apiKey) {
+      sdkInstance = new ZAI({ baseUrl, apiKey } as ConstructorParameters<typeof ZAI>[0]);
+      console.log('[LLM] SDK initialisé depuis les variables d\'environnement');
+      return sdkInstance;
+    }
+
+    // Aucune config disponible
     sdkInitFailed = true;
-    console.warn('[LLM] z-ai-web-dev-sdk non disponible (fichier .z-ai-config manquant). Fallback sur env vars.');
+    console.warn('[LLM] z-ai-web-dev-sdk non configuré. Ajoutez LLM_BASE_URL et LLM_API_KEY dans .env');
+    return null;
+  } catch (err) {
+    sdkInitFailed = true;
+    console.error('[LLM] Erreur initialisation SDK:', err instanceof Error ? err.message : err);
     return null;
   }
 }
 
-// ─── Configuration fallback (env vars) ────────────────────────────────────────
+// ─── Configuration fetch fallback (dernier recours) ──────────────────────────
 const FALLBACK_API_KEY = process.env.LLM_API_KEY;
 const FALLBACK_BASE_URL = process.env.LLM_BASE_URL;
 const FALLBACK_MODEL = process.env.LLM_MODEL;
@@ -76,7 +98,7 @@ export async function callLLM(
 
   // 2. Fallback : fetch direct vers l'API (OpenAI-compatible)
   if (!FALLBACK_API_KEY || !FALLBACK_BASE_URL) {
-    console.error('[LLM] Aucune configuration LLM disponible. SDK indisponible et env vars (LLM_API_KEY / LLM_BASE_URL) non configurées.');
+    console.error('[LLM] Aucune configuration LLM disponible. Ajoutez LLM_BASE_URL et LLM_API_KEY dans .env');
     return null;
   }
 
@@ -109,4 +131,21 @@ export async function callLLM(
     console.error('[LLM] Erreur fetch fallback:', err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+/**
+ * Vérifie si le LLM est configuré et fonctionnel.
+ */
+export async function verifierLLM(): Promise<{ ok: boolean; erreur?: string }> {
+  const sdk = await getSDK();
+  if (sdk) return { ok: true };
+
+  if (!process.env.LLM_BASE_URL || !process.env.LLM_API_KEY) {
+    return {
+      ok: false,
+      erreur: 'LLM non configuré. Ajoutez LLM_BASE_URL et LLM_API_KEY dans les variables d\'environnement (.env).',
+    };
+  }
+
+  return { ok: false, erreur: 'Erreur d\'initialisation du SDK LLM.' };
 }
