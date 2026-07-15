@@ -1,6 +1,6 @@
 ---
 name: Prototype Skill
-description: Design HTML-based product prototypes, app flows, web app mockups, dashboards, and interactive product concepts. By default produces TWO separate files: a working interactive prototype (clickable, states complete) AND a standalone interaction flow diagram (core task wiring, key screens, main transitions).
+description: Design HTML-based product prototypes, product/feature demos (any "做一个 XX 的 demo" / interactive demo request), app flows, web app mockups, dashboards, and interactive product concepts. By default produces TWO separate files: a working interactive prototype (clickable, states complete) AND a standalone interaction flow diagram (core task wiring, key screens, main transitions).
 mode: prototype
 platform: responsive-web
 scenario: product
@@ -17,6 +17,16 @@ default_for:
   - web app
   - mobile app
   - clickable demo
+  - demo
+  - product demo
+  - feature demo
+  - interactive demo
+  - 产品 demo
+  - 功能 demo
+  - 做一个 demo
+  - 演示
+  - 功能演示
+  - 可交互演示
   - UX proposal
   - product design proposal
   - interaction design

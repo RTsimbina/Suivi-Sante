@@ -187,6 +187,10 @@ done
 - 仅改样式、文案、布局等 → 只改代码文件，不动 `assets/`（除非用户明确要求替换资源）
 - `git add .` 会自动将未改动的 `assets/` 文件纳入新版本快照（Git 自动复用未变文件，不重复存储），无需手动处理
 
+#### 小样文件保留规则
+
+若正式构建前存在小样阶段（模型先生成一个包含多个编号设计方向的 HTML 供用户选择），小样 HTML 必须移入 `我的项目/{项目名}/` 下保存，命名为 `style-samples.html`；用户不满意要求重新出方向时，后续轮次递增命名为 `style-samples-2.html`、`style-samples-3.html`，禁止覆盖已有小样文件。所有小样文件禁止命名为 `index.html` 或其他入口文件名。小样通过 `send_file` 吐出供用户预览和选择。`style-samples*.html` 已在 `.gitignore` 中通配排除，不进 Git 版本历史、不计入项目版本号。禁止在小样文件落盘到项目目录之前删除小样源文件/源文件夹。
+
 ### 1.4 创建流程
 
 首次为用户产出入口文件时（**第 1–3 步必须发生在写出任何代码文件之前**，见顶部「⚠️ 路径硬规则」）：
@@ -200,7 +204,7 @@ done
 ```bash
 cd 我的项目/{项目名}
 git init
-echo "meta.json" > .gitignore
+echo -e "meta.json\nstyle-samples*.html" > .gitignore
 git add .
 git commit -m "V1: {一句话摘要}"
 git tag v1
@@ -218,8 +222,9 @@ upload/                  ← 用户上传落点（不进项目 Git）
 我的项目/
 └── {项目名}/
     ├── .git/
-    ├── .gitignore       ← 仅排除 meta.json
+    ├── .gitignore       ← 排除 meta.json 和 style-samples*.html
     ├── meta.json        ← 版本元数据（不进 Git）
+    ├── style-samples*.html ← 设计方向小样，含多个编号方向供用户选择（不进 Git，可选，可多轮）
     ├── index.html       ← 主入口（进 Git，路径因项目而异）
     ├── ...              ← 其他代码文件（进 Git）
     ├── assets/          ← 资源文件（进 Git，随版本快照一起追踪）
@@ -301,6 +306,7 @@ upload/                  ← 用户上传落点（不进项目 Git）
 | 用户仅上传资源、无代码变更 | ❌ | 只写 `assets/`，不 commit |
 | 用户上传资源且 Agent 更新了代码引用 | ✅ | 须 commit + `send_file` |
 | 在同项目下新增入口文件（如新增 `light.html`） | ✅ | 新文件与现有文件一起提交为新版本 |
+| 小样阶段产出 `style-samples*.html` | ❌ | 不进 Git、不计版本号，仅 `send_file` 吐出供用户选择 |
 
 ### 3.3 创建版本的 Git 指令
 
@@ -564,6 +570,7 @@ git tag $NEXT_TAG
 | 「帮我写一份方案」 | 不触发版本管理 |
 | 指代不明 | 扫描 `我的项目/` → 追问 |
 | 小红书卡片 / 封面图 | 生成 HTML → 保存到项目 → export 到 `export/` → 同 commit → HTML `send_file` + export `send_file` |
+| 小样阶段（「先出几个方向」） | 生成 `style-samples.html` → 保存到 `我的项目/{项目名}/` → `send_file` 吐出 → 等用户选方向 → 不 commit、不计版本号 |
 
 ---
 
@@ -571,5 +578,5 @@ git tag $NEXT_TAG
 
 - **工作区内：** HTML 使用 `assets/xxx.png` 等相对路径；多文件项目内 `link` / `script` 使用相对路径引用同目录或子目录代码文件
 - **用户预览时：** 后端在云机解析绝对路径并替换为 OSS 链接；Agent **不要**在源码中写 OSS URL
-- **Git 追踪范围：** 代码文件 + `assets/` 资源 + `export/` 产物均进 Git；仅 `meta.json` 被 `.gitignore` 排除
+- **Git 追踪范围：** 代码文件 + `assets/` 资源 + `export/` 产物均进 Git；`meta.json` 和 `style-samples*.html` 被 `.gitignore` 排除
 - **已知限制：** 多文件项目的 JS/CSS 预览、历史版本预览与最新不一致——见 §0.1，本期不修复

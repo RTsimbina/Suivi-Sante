@@ -444,30 +444,51 @@ Templates are starting points. This skill decides whether the card needs editori
 
 ## HTML-To-Image Implementation Contract
 
-When producing the artifact:
+File structure is decided by `card_count`:
 
-- Build a fixed-canvas HTML file.
-- Keep each card as a separately exportable node.
+- `single` → one **self-contained** HTML file. Inline all styles. No shared assets.
+- multi-card carousel, cover-plus-pages, or WeChat cover pair → **one HTML file per card**, plus a shared design-token stylesheet and a preview page.
+
+### Per-card file rules (multi-card sets)
+
+- Each card is its own HTML file. The `<body>` **is** the canvas: set explicit `width`/`height` from `canvas-and-device.md`, no outer wrapper page, no scrolling.
+- All cards in one package link the same `shared/tokens.css`. It is the single source of truth for colors, fonts, spacing scale, and the canvas reset (margin resets for `body`, `figure`, `h1`, `p`, `ul`, etc.).
+- Card files may add card-private layout CSS, but must not override global tokens locally. Hardcoded colors/fonts that duplicate or contradict tokens are a defect.
+- Mixed canvas sizes in one task (e.g. WeChat 21:9 + 1:1 pair) are handled naturally: each file declares its own body dimensions; never share one body size across different presets.
+- Generate `preview.html` that embeds every card via `<iframe>` in reading order, scaled to fit. It exists for sequence-rhythm review only and is not a deliverable.
+- Editing or regenerating one card must touch only that card's file (and never `shared/tokens.css` unless the change is intentionally package-wide).
+
+### Shared rules (all cases)
+
 - Use explicit canvas dimensions from `canvas-and-device.md`.
-- Avoid browser default spacing surprises: reset margins for `body`, `figure`, `h1`, `p`, `ul`, etc.
 - Keep safe areas and platform UI overlays in mind.
 - Make text selectable in source HTML but visually composed as an image.
-- Export images in stable order and with stable names.
+- Export = set viewport to the card's canvas dimensions and take a full-page screenshot of `body`. Do not use element/node clipping; it is fragile with transforms, shadows, and devicePixelRatio.
+- Export images in stable order and with stable names, matching their source files.
 
-Suggested naming:
+Suggested structure and naming:
 
 ```text
-output/social-01-cover.png
-output/social-02-<topic>.png
-output/social-03-<topic>.png
+output/
+  shared/tokens.css
+  card-01-cover.html
+  card-02-<topic>.html
+  preview.html
+  social-01-cover.png
+  social-02-<topic>.png
 ```
 
 For WeChat cover pairs:
 
 ```text
-output/wechat-21x9-cover.png
-output/wechat-1x1-cover.png
-output/wechat-cover-pair-preview.png
+output/
+  shared/tokens.css
+  wechat-21x9-cover.html
+  wechat-1x1-cover.html
+  preview.html
+  wechat-21x9-cover.png
+  wechat-1x1-cover.png
+  wechat-cover-pair-preview.png
 ```
 
 ## Handoff
@@ -476,11 +497,11 @@ Social cards are authored as HTML but normally delivered as images.
 
 Default handoff:
 
-- Save the editable HTML source as the source of truth.
+- Save the editable HTML source as the source of truth: one self-contained file for single cards; per-card files plus `shared/tokens.css` for sets.
 - Export the final card or card sequence as PNG unless the user asks for JPG/PDF/ZIP.
 - Preserve the selected canvas preset from `canvas-and-device.md`.
-- Keep each card as an individually exportable fixed-canvas node.
-- For multi-card sequences, export one image per card and keep ordering stable.
+- For multi-card sequences, export one image per card file and keep ordering stable; card files and exported images can be generated and exported in parallel.
+- If the user later asks to revise one card, regenerate only that card's HTML file and re-export only that image.
 - For WeChat cover pairs, deliver both the main wide cover and the square cover.
 - Do not deliver only a scrollable webpage when the user asked for a social card, cover, poster, carousel, or long image.
 - If image export is not available in the current step, still structure the HTML so it can be captured cleanly later and state that export remains pending.
@@ -505,6 +526,8 @@ Run `quality-gate.md` as the shared blocking check first. On top of it, this ski
 - card set does not repeat the same layout page after page;
 - 3:4 portrait cards do not have unjustified empty lower space;
 - style mode stays consistent across a package;
+- in multi-card sets, every card file links the same `shared/tokens.css`, with no local hardcoded colors/fonts that duplicate or contradict tokens;
+- every card file's body dimensions match its declared canvas preset;
 - no random decorative blobs, stickers, gradients, or emoji icons unless required by the chosen visual language.
 
 ## Common Failure Cases
@@ -521,7 +544,9 @@ Avoid:
 - mixing editorial serif paper style with Swiss KPI grid without intent;
 - making every social image look like a Xiaohongshu template when the platform is WeChat, Douyin, or generic;
 - copying `pattern.html` instead of adapting the pattern;
-- adding visual noise to solve empty composition.
+- adding visual noise to solve empty composition;
+- letting per-card files drift stylistically because tokens were redefined locally instead of read from `shared/tokens.css`;
+- rebuilding the entire card set when the user asked to change one card.
 
 ## Scope Pushback
 

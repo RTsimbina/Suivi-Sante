@@ -1,6 +1,6 @@
 ---
 name: quality-gate
-description: Final blocking delivery gate for generated or major-edited design artifacts. Verifies brief fit, carrier logic, template adaptation, design-system consistency, horizontal craft application, interaction states, visualization integrity, accessibility, truthfulness of data/links/proof, and anti-AI-slop. Run as a blocking checklist, not a passive reference. Triggers on "质量检查", "交付检查", "delivery check", "design QA", "compliance check", or whenever an artifact is about to be handed off.
+description: Final blocking delivery gate for generated or major-edited design artifacts. A short blocking core (must-pass every time) plus on-demand detail checks (only the relevant ones) and non-blocking polish. Run as a checklist, not a passive reference. Triggers on "质量检查", "交付检查", "delivery check", "design QA", "compliance check", or whenever an artifact is about to be handed off.
 mode: quality-gate
 platform: any
 scenario: delivery-quality
@@ -18,347 +18,165 @@ fidelity: system
 
 # Quality Gate
 
-Run this gate **after** an artifact is generated or substantially edited, **before** delivery.
-
-This file is a verification layer. It does not contain design rules — those live in artifact skills and `horizontal-craft/*.md`. The gate only confirms that the right rules were actually applied and visible in the output.
+Run **after** an artifact is generated or substantially edited, **before** delivery. This file only verifies that the right rules were actually applied and visible in the output — the rules themselves live in the artifact skills and `horizontal-craft/*.md`.
 
 ```text
 Brief → Artifact Skill → Template / Design System / Craft → Artifact → [Quality Gate] → Delivery
 ```
 
-If a check fails, fix the smallest failing issue. Do not redesign the whole artifact unless the user asked for one.
+If a check fails, fix the **smallest** failing issue. Do not redesign the whole artifact unless the user asked for one.
+
+This gate has three tiers — run them in order:
+
+1. **Blocking core** — a short must-pass list. Run **every** time, every delivery, every turn. If you do nothing else, do this.
+2. **On-demand checks** — detailed checks that apply **only when the artifact has the relevant thing** (forms, charts, templates, motion…). Skip the ones that don't apply.
+3. **Non-blocking polish** — note in the summary; never block on these.
 
 ---
 
-## Required inputs
+## TIER 1 — Blocking core (must pass, every time)
 
-Before running any check, restate the following back to the user in 5–8 short lines. If anything is unknown, ask once rather than guessing — wrong assumptions here invalidate every check below.
-
-```yaml
-quality_gate_inputs:
-  user_request:              # what the user actually asked for, one sentence
-  primary_artifact_skill:    # landing-page / portfolio / prototype / content-page / info-interactive / web-tool / social-card / deck / ...
-  output_target:             # web / mobile web / fixed canvas / PDF / image / slide ...
-  design_system_or_reference: none | name
-  template_or_seed:          none | name
-  relevant_horizontal_craft: # only the ones that actually apply, not the full list
-    - ...
-  generated_artifact:        # path or identifier
-```
-
-The `relevant_horizontal_craft` list drives §5. Choose from:
-
-- `anti-ai-slop` — required for every final review
-- `chinese-typography` — substantial Chinese text exists
-- `visual-explanation` — charts, diagrams, timelines, maps, explorable models
-- `icon-system` — UI icons or pictograms
-- `accessibility` — HTML or any interactive surface
-- `state-coverage` — interactive / data / form / tool / prototype surface
-- `form-validation` — forms, inputs, validation
-- `data-integrity` — data, charts, tables, metrics, claims
-- `link-and-proof` — links, CTAs, proof claims
-- `color` — no design system, or color direction is unclear
-- `animation-discipline` — motion exists
-- `laws-of-ux` — pricing, onboarding, dashboards, H5 tools, conversion or interaction-heavy flows
-- `technique-library` — advanced motion, 3D, shaders, data-viz, or effects beyond plain CSS/SVG
-
----
-
-## Gate sequence
-
-| # | Check | Guards which stage of the pipeline |
-|---|---|---|
-| 1 | Brief Fit | Brief → Artifact |
-| 2 | Carrier / Artifact Structure | Artifact Skill → Artifact |
-| 3 | Template Adaptation | Template → Artifact |
-| 4 | Design System / Visual Consistency | Design System → Artifact |
-| 5 | Horizontal Craft Trigger | Craft → Artifact |
-| 6 | Interaction and State | Artifact (interactive surfaces) |
-| 7 | Visual Explanation | Artifact (charts / diagrams) |
-| 8 | Accessibility | Artifact (HTML / interactive) |
-| 9 | Truthfulness | Artifact → Delivery (links + data) |
-| 10 | Anti-AI Slop | Artifact → Delivery (final review) |
-| 11 | Editability & Compliance Markers | Artifact → Delivery (handoff metadata) |
-
----
-
-## 1. Brief Fit
+These are交付事故级 failures: the artifact reaches the user broken, off-target, dishonest, or visibly cheap. Check all of them on every delivery — this list is short on purpose so it actually gets run.
 
 ```text
-[ ] artifact type matches the user request
-[ ] audience and use case are visible in the design
-[ ] language matches request or dominant context
-[ ] output surface matches requested platform / device / canvas
-[ ] major constraints are not ignored
-[ ] inferred assumptions are safe and not over-specific
+[ ] 1. Right artifact type / carrier — matches what the user asked for
+       (a poster delivered as a scrollable page, or a product brief treated as a landing page, fails). [§A]
+[ ] 2. Relevant to the brief — visibly solves the actual request, not a polished wrong answer. [§A]
+[ ] 3. No dead links / no fake JS in a publish-ready artifact —
+       no href="#" / javascript:void(0) unless visibly marked placeholder; no alert('todo'),
+       TODO handler, or console-only "interaction"; every CTA has a real destination or visible pending state. [§B]
+[ ] 4. Content truthfulness AND completeness —
+       content comes from a real read of the source: it neither fabricates what isn't there
+       (fake data, fake works/projects, fake logos/testimonials/awards/metrics/press),
+       NOR omits or waters down what IS there (for source-grounded tasks, each real project/section's
+       substance is actually extracted and shown — not left as vague filler or a thin placeholder).
+       Depth over bulk: the test is "did it faithfully represent the source", not "is there more text". [§B]
+[ ] 5. Chinese fonts actually load — for Chinese content, every named font is really loaded
+       (<link> or @font-face) and font-family contains a CJK font; it must NOT fall straight through to system-ui. [§C]
+[ ] 6. Interactive artifacts have real behavior — controls are clickable and do something real;
+       relevant states (loading / empty / error / success / populated) exist; no placeholder-only interaction. [§D]
+[ ] 7. Anti-AI-slop (whole section, blocking — this is what most affects visual quality) —
+       no decorative emoji as icons/bullets; no default blue-purple gradient as the visual system;
+       no fake proof (logos/testimonials/awards/rankings/press/metrics presented as real);
+       no feature-card filler grid (vague 3-up/4-up); no generic "hero + three cards + CTA" with no
+       content-specific idea; no stock-photo / floating-device / fake-mockup evidence; no Chinese AI-cliché
+       copy; no decorative blobs/orbs to fill space; consistent icon family (no emoji/icon mix);
+       no visualization or interaction added only to look advanced. [§E]
+[ ] 8. Editability markers — sections / slides / screens / components / states are individually
+       identifiable; stable structural anchors exist (semantic HTML, named sections, or selected-region
+       comments); no opaque generated blobs that block local edits; placeholder content is labeled. [§F]
 ```
 
-Fail if the artifact is polished but solves the wrong problem.
+If any blocking item fails, fix it before delivery. Fix the specific failure — do not redesign by default.
 
 ---
 
-## 2. Carrier / Artifact Structure
+## TIER 2 — On-demand checks (only when relevant)
 
-The artifact must behave like its intended carrier, not just look like it.
+Run a check below **only if the artifact actually contains that thing**. Don't run a forms check on a page with no forms. These deepen the blocking core; they are where you confirm craft was really applied.
 
-```text
-landing-page      → single-subject conversion page, value clarity, one primary action
-portfolio         → work/identity hierarchy, project structure, contact path
-prototype         → reachable screens/states, real interaction, prototype.html + flow.html when required
-content-page      → linear reading rhythm, section hierarchy, long-form readability
-info-interactive  → explorable fixed information body, not a product demo
-web-tool          → working input → logic → result path, real validation
-social-card       → fixed canvas / HTML-to-image, mobile/export readability, one role per card
-deck              → slide rhythm, one idea per slide, presentation canvas
-```
+### On-demand: which horizontal-craft to verify
 
-Fail if the visual style is right but the carrier logic is wrong — e.g. a social-card delivered as a scrollable webpage, or a product-brief image treated as a landing page.
+For the craft that actually applies, open that file and confirm its rules are visibly applied. Don't load files that don't apply.
 
----
-
-## 3. Template Adaptation
-
-Skip this check if no template or seed was used.
-
-```text
-[ ] SKILL.md / markdown instructions were treated as primary over pattern.html
-[ ] pattern.html was not copied wholesale
-[ ] placeholder copy and fake assets are replaced or labeled
-[ ] unused sections are removed rather than filled with fake content
-[ ] template structure serves the current artifact skill and user goal
-[ ] visual style was adapted through user request / design system / visual intent
-```
-
-Fail if the output is a shallow copy with only text/color changes.
-
----
-
-## 4. Design System / Visual Consistency
-
-```text
-[ ] typography, color, spacing, radius, shadows, and components share one visual language
-[ ] tokens or repeated values are used intentionally
-[ ] accent color has a role and is not overused
-[ ] no unrelated style systems are mixed accidentally
-[ ] design-system constraints do not override usability or carrier fit
-```
-
-Fail if the artifact looks like a random template collection.
-
----
-
-## 5. Horizontal Craft Trigger
-
-For each item in `relevant_horizontal_craft` from the inputs, open that craft file and confirm its rules are visibly applied. Do not load craft files that were not listed.
-
-| Condition | Required craft file |
+| Only if the artifact has… | Verify against |
 |---|---|
-| Final review (always) | `horizontal-craft/anti-ai-slop.md` |
-| Substantial Chinese text, including typography-led titles/covers/reports | `horizontal-craft/chinese-typography.md` (+ `horizontal-craft/reference/fonts.md` when font choice materially affects visual direction) |
+| **(always, final pass)** the anti-slop core above | `horizontal-craft/anti-ai-slop.md` (full file, for the blocking §E check) |
+| Substantial Chinese text / typography-led titles/covers | `horizontal-craft/chinese-typography.md` (+ `reference/fonts.md` when font choice matters) |
 | Charts, diagrams, timelines, maps, explorable models | `horizontal-craft/visual-explanation.md` |
 | UI icons / pictograms / icon buttons | `horizontal-craft/icon-system.md` |
-| HTML / interactive / publish-ready surface | `horizontal-craft/accessibility.md` |
 | Forms / inputs / validation | `horizontal-craft/form-validation.md` |
 | Interactive states / dashboards / tools / prototypes | `horizontal-craft/state-coverage.md` |
 | Metrics / charts / tables / demo data / claims | `horizontal-craft/data-integrity.md` |
-| CTAs / links / proof claims / citations / logos | `horizontal-craft/link-and-proof.md` |
+| CTAs / links / proof / citations / logos | `horizontal-craft/link-and-proof.md` |
 | Unclear color direction / no design system | `horizontal-craft/color.md` |
 | Motion / transitions / animated charts | `horizontal-craft/animation-discipline.md` |
-| Pricing / onboarding / dashboards / H5 tools / conversion or interaction-heavy flows | `horizontal-craft/laws-of-ux.md` |
-| Advanced implementation beyond plain CSS/SVG | `horizontal-craft/technique-library.md` |
+| Pricing / onboarding / dashboards / H5 / conversion flows | `horizontal-craft/laws-of-ux.md` |
+| Advanced effects beyond plain CSS/SVG | `horizontal-craft/technique-library.md` |
 
-Fail if a needed craft rule was skipped and the artifact visibly suffers.
-
----
-
-## 6. Interaction and State
-
-Required for any interactive artifact (prototype, web-tool, dashboard, form).
+### On-demand: Template adaptation — only if a template/seed was used
 
 ```text
-[ ] controls are clickable and have real behavior
-[ ] no placeholder JS, TODO handler, alert('todo'), or console-only interaction remains
-[ ] loading / empty / error / success / populated / edge states exist when relevant
+[ ] markdown / SKILL.md instructions were treated as primary over pattern.html
+[ ] pattern.html was not copied wholesale; output isn't a shallow text/color reskin
+[ ] placeholder copy / fake assets are replaced or labeled; unused sections removed, not filled with fake content
+[ ] template structure serves the current artifact skill and the user's goal
+```
+
+### On-demand: Design-system / visual consistency — only if a system/reference applies or visual coherence is at risk
+
+```text
+[ ] typography, color, spacing, radius, shadows, components share one visual language
+[ ] accent color has a role and isn't overused; no unrelated style systems mixed by accident
+[ ] system constraints don't override usability or carrier fit
+```
+
+### On-demand: Interaction & state detail — only for interactive artifacts (beyond blocking #6)
+
+```text
 [ ] form validation preserves input and explains recovery
-[ ] dangerous actions have confirm, undo, or clear prevention
+[ ] dangerous actions have confirm / undo / clear prevention
 [ ] keyboard and focus behavior are usable
 ```
-
 Reference: `horizontal-craft/state-coverage.md`, `horizontal-craft/form-validation.md`.
 
----
-
-## 7. Visual Explanation
-
-Required when the artifact contains charts, diagrams, timelines, maps, comparison visuals, flowcharts, explorable models, or interactive explanations.
+### On-demand: Visual explanation — only if charts / diagrams / timelines / maps / explorable models exist
 
 ```text
-[ ] representation matches the information shape
-[ ] chart/diagram/map/timeline has a clear comprehension goal
-[ ] interaction changes what the user can understand, compare, filter, decide, or do
-[ ] no decorative-only controls, fake filters, or motion-only widgets
-[ ] charts have readable labels, units, scales, and conclusions where relevant
-[ ] diagrams have legible nodes, clear arrows, and labeled branches/conditions
-[ ] visual explanation feels native to the carrier
-[ ] labels remain readable at target viewport / export scale
+[ ] representation matches the information shape; has a clear comprehension goal
+[ ] interaction changes what the user can understand/compare/filter/decide (no decorative-only controls or fake filters)
+[ ] charts have readable labels, units, scales, conclusions; diagrams have legible nodes, clear arrows, labeled branches
+[ ] labels stay readable at target viewport / export scale
+[ ] it explains MORE than a clear paragraph or table would (if not, simplify)
 ```
-
 Reference: `horizontal-craft/visual-explanation.md`.
 
-Fail if the visualization looks impressive but explains less than a clear paragraph or table would.
+### On-demand: Accessibility — verify when it matters; NOT blocking for marketing/display artifacts
 
----
-
-## 8. Accessibility
-
-Required for HTML and interactive artifacts.
+Design artifacts are mostly marketing/display, so accessibility is **not** a blocking gate here. Apply it when the artifact is a real interactive tool, a form, or when the user/brand requires compliance. Even then, only two items rise toward "really should fix": **severe contrast that hurts readability**, and **icon-only controls with no accessible name** (these affect actual usability). The rest below are good practice, noted not blocked.
 
 ```text
-[ ] text contrast is sufficient
-[ ] non-text UI contrast is sufficient
-[ ] focus-visible exists
-[ ] interactive elements are keyboard reachable
-[ ] buttons and links use correct semantics
-[ ] inputs have labels
-[ ] icon-only controls have accessible names
-[ ] decorative icons are aria-hidden
-[ ] chart/diagram information is not conveyed by color alone
-[ ] reduced-motion fallback exists when motion exists
+[ ] text + non-text contrast sufficient
+[ ] focus-visible exists; interactive elements keyboard reachable
+[ ] buttons/links use correct semantics; inputs have labels; icon-only controls have accessible names
+[ ] decorative icons aria-hidden; chart info not conveyed by color alone
+[ ] reduced-motion fallback when motion exists
 ```
-
 Reference: `horizontal-craft/accessibility.md`.
 
 ---
 
-## 9. Truthfulness
+## TIER 3 — Non-blocking polish
 
-Hard checks on links, data, and demo markers. This section covers *verifiable* failures. Stylistic/cliché failures (fake logos, invented testimonials) live in §10.
-
-```text
-[ ] no href="#" or javascript:void(0) unless visibly marked placeholder
-[ ] every CTA has a real destination, action, or visible pending state
-[ ] demo/sample data is visibly labeled as such
-[ ] charts and tables show units and source (or are labeled demo)
-[ ] numbers in copy are either sourced or softened
-[ ] no broken anchors or dead internal navigation
-```
-
-Reference: `horizontal-craft/data-integrity.md`, `horizontal-craft/link-and-proof.md`.
-
----
-
-## 10. Anti-AI Slop
-
-Always run as the final review. Covers unearned defaults and fabricated proof.
-
-```text
-[ ] no decorative emoji used as icons / bullets / labels
-[ ] no generic blue-purple gradient as default visual system
-[ ] no fake logos, testimonials, awards, rankings, press claims, customer quotes
-[ ] no invented metrics presented as real
-[ ] no feature-card filler grid (3-up / 4-up with vague benefits)
-[ ] no generic "hero + three cards + CTA" with no content-specific idea
-[ ] no stock-photo / floating-device / fake-mockup evidence
-[ ] no Chinese AI cliché copy that weakens credibility
-[ ] no decorative blobs / orbs / background patterns used to fill space
-[ ] consistent icon family (no emoji/icon mix)
-[ ] no visualization or interaction added only to look advanced
-```
-
-Reference: `horizontal-craft/anti-ai-slop.md`.
-
-Fix the specific failure. Do not redesign by default.
-
----
-
-## 11. Editability & Compliance Markers
-
-Required for every HTML artifact. Enforced by `SKILL.md` Before-delivery checklist and consumed by `export.md`, `deck.md`, `portfolio.md`, and version-management handoff. Not optional.
-
-### 11a. Editability data markers
-
-```text
-[ ] page sections, slides, screens, components, and interaction states are individually identifiable
-[ ] stable structural anchors exist (semantic HTML, named sections, or selected-region comments)
-[ ] no opaque generated blobs that block selected-region edits
-[ ] placeholder content is labeled as placeholder
-```
-
-These let the user re-select and locally edit. Without them, follow-up iteration breaks.
-
-### 11b. Design Compliance block
-
-Insert this non-visible HTML comment near the end of the artifact. It must match the actual code — do not paste a generic version.
-
-```html
-<!--
-Design Compliance:
-- brief-fit: pass
-- artifact-skill: [name]
-- output-target: [name]
-- template-or-seed: none / [name]
-- design-system: none / [name]
-- horizontal-craft:
-  - anti-ai-slop: pass
-  - chinese-typography: pass / not relevant
-  - visual-explanation: pass / not relevant
-  - icon-system: pass / not relevant
-  - accessibility: pass / not relevant
-  - state-coverage: pass / not relevant
-  - form-validation: pass / not relevant
-  - data-integrity: pass / not relevant
-  - link-and-proof: pass / not relevant
-  - color: pass / not relevant
-  - animation-discipline: pass / not relevant
-  - laws-of-ux: pass / not relevant
-- interaction-states: pass / not relevant
-- truthfulness: pass
-- anti-ai-slop: pass
-- editability-markers: pass
--->
-```
-
-For non-HTML deliverables (PDF, image, deck export), record the same fields in the delivery note instead.
-
----
-
-## Blocking failures
-
-These must be fixed before delivery. Each maps to the section that owns it.
-
-```text
-[ ] wrong artifact type or carrier                                  → §2
-[ ] no visible relation to the brief                                → §1
-[ ] interactive artifact with no meaningful state handling          → §6
-[ ] visualization that does not aid understanding                   → §7
-[ ] inaccessible icon-only controls                                 → §8
-[ ] form inputs without labels                                      → §8
-[ ] href="#" / fake JS handler in publish-ready artifact            → §9
-[ ] fake proof / invented metrics / fake logos                      → §10
-[ ] decorative emoji used as icons by default                       → §10
-[ ] Chinese output with obvious typography failure                  → §5 (chinese-typography)
-[ ] missing editability data markers (selected-region / stable structure) → §11a
-[ ] missing or mismatched Design Compliance block in HTML artifact   → §11b
-```
-
----
-
-## Non-blocking improvement suggestions
-
-Note these in the delivery summary; do not block on them unless severe.
+Note in the delivery summary; do not block unless severe. Do not over-polish by adding decoration — fix structure, hierarchy, content, proof, interaction, and representation first.
 
 ```text
 [ ] visual rhythm could be more distinctive
 [ ] one section feels generic
 [ ] motion could be more purposeful
-[ ] chart could be simplified further
-[ ] design system could be made more explicit
+[ ] a chart could be simplified further
+[ ] the design system could be made more explicit
 ```
-
-Do not over-polish by adding decoration. Fix structure, hierarchy, content, proof, interaction, and representation first.
 
 ---
 
-## Delivery summary
+## Section references (for the blocking core)
 
-After running the gate, report results to the user as a short table — one row per section, `pass / fail (fixed) / not relevant`, plus any non-blocking notes. Keep it under 15 lines.
+The blocking items above point to these short clarifications:
+
+- **§A Brief & carrier** — artifact type matches request; audience/use case visible; language matches; output surface matches platform; major constraints respected; the carrier behaves like its kind (landing = single-subject conversion; portfolio = work/identity hierarchy + project detail; prototype = reachable states + real interaction; content-page = linear reading; info-interactive = explorable info, not a product demo; web-tool = input→logic→result; social-card = fixed canvas, one role; deck = one idea per slide).
+- **§B Truthfulness & completeness** — verifiable honesty (links, data, demo labels) AND faithful, complete representation of real source content. Don't invent; don't omit. Demo/sample data labeled; numbers sourced or softened.
+- **§C Chinese typography** — named fonts really loaded; CJK font in the stack; never fall through to an uncontrolled fallback. (Full rules: `chinese-typography.md`.)
+- **§D Interaction** — real behavior, no placeholder JS, relevant states present. (Full rules: `state-coverage.md`.)
+- **§E Anti-AI-slop** — the whole anti-slop list is blocking because it is what most affects visual quality. (Full rules: `anti-ai-slop.md`.)
+- **§F Editability** — identifiable sections/components, stable anchors, no opaque blobs, labeled placeholders — so the user can locally edit and iterate.
+
+---
+
+## 交付（门禁内部跑，不向用户念清单）
+
+质量门禁是**内部动作**——跑它，但**不要把检查清单逐条汇报给用户**（不要输出 pass/fail 表、不要列「①产物类型 pass ②相关 pass…」）。这和输出纪律一致：用户要的是做好的产物，不是质检过程。
+
+- 默认：检查通过就**直接交付产物**，不附任何门禁清单 / 汇总表。
+- 仅当确实**修复了**某个问题、或有**用户该知道的非阻塞提示**（如「项目图用了占位，建议你发真实图替换」）时，用**一句自然的话**说明，而不是念清单。
+- 绝不在产物里嵌入 compliance 注释块。

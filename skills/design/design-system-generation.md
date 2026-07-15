@@ -1,632 +1,99 @@
 ---
 name: Design System Generation Skill
 description: Import, extract, normalize, or persist a reusable DESIGN.md from an existing design system, HTML artifact, screenshot, template, style reference, or generated interface.
-mode: system-generation
-platform: any
-scenario: design-system-generation
-preview:
-  type: markdown
-default_for:
-  - DESIGN.md
-  - design system generation
-  - design system extraction
-  - design system import
-  - design system persistence
-  - design rules
-  - design tokens
-fidelity: system
 ---
 
 # Design System Generation Skill
 
-Use this skill to turn visual rules into a reusable `DESIGN.md`.
+把视觉规则变成一份可复用的 `DESIGN.md`。普通首版页面生成**不需要**这个 skill；仅当用户要导入、提取、规范化、持久化或复用一套设计语言时用。核心理念（借鉴 DESIGN.md 方法）：用自然语言描述视觉系统、有精确值就保留、并解释每个设计选择**为什么**存在而不只是长什么样。产出经 `skills/design/design-system-reference.md` 供未来生成复用。
 
-This skill is not required for ordinary first-draft page generation. It should be used when the user wants to import, extract, normalize, persist, or reuse a design language.
+## 三种模式
 
-This skill is inspired by the DESIGN.md approach: describe the visual system in natural language, preserve precise values when available, and explain not only what the design looks like, but why each design choice exists.
+- **Import（导入）**：用户给了现成 `DESIGN.md`/设计规范，要变成可复用参考。行为：读取、保留用户自有规则、检查缺失段、仅在有用时规范化结构、**不要按模型自己的品味重写**、保留精确值、必要时标出歧义。（如"这是我的 DESIGN.md 后面按这个来"、"检查这份有没有缺失"）
+- **Extraction（提取）**：从 HTML/截图/模板/页面/CSS/style skill/品牌参考提取设计规则。行为：检视来源、提取可见值与模式、区分精确值与推断值、**既描述表面风格也描述底层意图**、不机械照抄每条 CSS、不臆造没有的细节、分离可复用规则与一次性细节。（如"从这个 HTML 提炼 DESIGN.md"、"把截图总结成设计系统"）
+- **Persistence（持久化）**：把当前已认可的产物风格沉淀成未来可复用的系统。行为：检视当前产物、从已认可设计提取稳定规则、识别哪些该重复哪些是一次性、**别把页面特有细节变成通用规则**。（如"把当前页面风格沉淀成 DESIGN.md"、"后面页面都沿用这版"）
 
----
+多模式同时适用时，以用户明确请求为准。
 
-## Core Purpose
+## 不要用这个 skill 当
 
-This skill handles three modes:
-
-1. **Import Mode** — user provides an existing `DESIGN.md` or design guideline.
-2. **Extraction Mode** — user provides an existing visual artifact such as HTML, screenshot, template, or page.
-3. **Persistence Mode** — user wants to preserve the current generated interface as a reusable design system.
-
-The output should become a reusable reference for future design generation through:
-
-`skills/design/design-system-reference.md`
-
----
-
-## Trigger
-
-Use this skill when the user asks to import, extract, generate, normalize, or persist a reusable `DESIGN.md`.
-
----
-
-### 1. Import Mode
-
-Use when the user provides an existing `DESIGN.md`, design guideline, brand guideline, or partial design system and wants it to become the reusable design reference.
-
-Examples:
-
-```text
-这是我的 DESIGN.md，后面按这个来
-帮我整理一下这份 design.md
-检查这个 DESIGN.md 有没有缺失
-把这份规范转成你能使用的格式
-把这个设计规范标准化一下
-```
-
-Primary behavior:
-
-- read the provided `DESIGN.md` or guideline
-- preserve user-owned rules
-- check for missing sections
-- normalize structure only when useful
-- do not rewrite the system into the model’s own taste
-- keep exact values when provided
-- flag ambiguities or missing information when relevant
-
----
-
-### 2. Extraction Mode
-
-Use when the user provides an existing visual artifact and wants design rules extracted from it.
-
-Sources may include:
-
-- HTML file
-- generated HTML artifact
-- screenshot
-- preset HTML template
-- existing page
-- CSS / theme file
-- style skill
-- brand inspiration reference
-- codebase styles
-- Figma / MCP reference, if available in the future
-
-Examples:
-
-```text
-从这个 HTML 里提炼 DESIGN.md
-把这个截图总结成设计系统
-分析这个模板的设计规则
-从这个页面提取颜色、字体、布局规则
-把这个已有界面变成可复用设计规范
-```
-
-Primary behavior:
-
-- inspect the source artifact
-- extract visible values and patterns
-- distinguish exact values from inferred values
-- describe both surface style and underlying intent
-- do not mechanically copy every CSS property
-- do not invent unavailable details
-- separate reusable rules from one-off details
-
----
-
-### 3. Persistence Mode
-
-Use when the user wants to preserve the current generated artifact’s visual language for future pages.
-
-Examples:
-
-```text
-把当前页面风格沉淀成 DESIGN.md
-后面的页面都沿用这一版风格
-把这个作品集提炼成可复用设计规范
-把这个方向固化下来
-把当前界面的设计语言保存下来
-```
-
-Primary behavior:
-
-- inspect the current artifact state
-- extract stable rules from the approved design
-- identify which decisions should repeat
-- identify which decisions are one-off
-- create a reusable `DESIGN.md` for future artifacts
-- avoid turning page-specific details into universal rules
-
----
-
-## Do Not Use This Skill When
-
-Do not use this skill when:
-
-- the user only asks to generate a single first-draft page
-- the user only asks to use an existing design system without changing it
-- the user only asks for a local edit
-- the user only changes deterministic parameters such as color, spacing, radius, or density
-- the user asks for a normal design reference lookup, which should use `design-system-reference.md`
-
-For using an existing design system, use:
-
-`skills/design/design-system-reference.md`
-
----
-
-## Goal
-
-The goal is to produce a reusable, readable `DESIGN.md` that can guide future generation.
-
-The output should help future agents or users understand:
-
-- visual atmosphere
-- color roles
-- typography rules
-- spacing and layout principles
-- component styling
-- interaction and motion style
-- responsive behavior
-- do’s and don’ts
-- how to prompt future artifacts in the same style
-
-The goal is not to over-engineer a full enterprise design system.
-
-For first-stage usage, prefer a lightweight but useful `DESIGN.md`.
+只生成单个首版页面、只用现有设计系统而不改它、只做局部编辑、只改确定性参数（色/间距/圆角/密度）、或普通的设计参考查找（那用 `design-system-reference.md`）。
 
 ---
 
 ## Workflow
 
-### 1. Determine Mode
+### 1. 判断模式
+分类为 Import / Extraction / Persistence；多个适用时以用户明确请求为准。
 
-Classify the task as one of:
+---
 
-- Import Mode
-- Extraction Mode
-- Persistence Mode
+### 2. 提取设计意图（不只描述外观）
 
-If multiple modes apply, prefer the user’s explicit request.
+解释设计为什么用每个模式，而不只是它长什么样。
 
-Examples:
+弱：`蓝色按钮、圆角卡片。`
+好：`蓝色专用于主操作与进度状态，给界面一条清晰路径；圆角软化了原本偏技术感的布局，让密集信息更易接近。`
 
+应说清：每个视觉选择传达什么、哪些是结构性哪些是装饰性、如何扩展到未来页面、哪些元素是风格的核心、哪些不该被滥用。
+
+### 3. 分离稳定规则与一次性选择
+
+好的设计系统不盲目保留每个细节。把决策分为：**核心规则**（未来都重复）、**可选母题**（有用但非处处必需）、**一次性细节**（只属于当前产物）、**应避免**（不该重复）。
+
+例：
 ```text
-User uploads DESIGN.md
-→ Import Mode
-
-User uploads HTML and asks to generate DESIGN.md
-→ Extraction Mode
-
-User likes the current page and wants future pages to match it
-→ Persistence Mode
+核心规则：项目年份/角色/状态用紧凑等宽元数据标签。
+可选母题：项目多时，列表用 hover 预览图。
+一次性细节：超大动画项目编号只属于首页 hero。
+应避免：别给无关内容页加随机系统标签。
 ```
+
+### 4. 产出或更新 DESIGN.md
+
+用户给了现成 `DESIGN.md` → 更新/规范化而非整体替换；从产物提取 → 产出新的；持久化当前设计 → 产出供 `design-system-reference.md` 复用的。简洁但足以指导未来生成，别搞庞大的 design bible。
 
 ---
 
-### 2. Collect Source
+# DESIGN.md 结构
 
-For Import Mode:
+默认用下面 9 段结构。每段写**实用规则 + 为什么**（不只是值），有精确值就保留、推断的标注清楚。
 
-- read the provided `DESIGN.md`
-- preserve user-owned rules
-- check for missing sections
-- normalize structure only when useful
-- avoid unnecessary rewriting
+**1. Visual Theme & Atmosphere** — 整体气质：情绪、精致度、密度、视觉温度、个性、受众、头 2 秒的感受。**用一个具体参照物锚定主题，而非一串形容词**——"现代/干净/高级/可信"什么都没指定，模型只会做出落在这些词中心的平庸结果；形容词描述一个「区域」，一个具体参照（某类实物/场景/年代，如"1970 年代某老牌大学的研究生讲义"）描述一个「点」，一句话带出配色/字体/留白/有无装饰，还自带「它不是什么」。若一定要用形容词，定义它在本系统里的具体含义。
 
-For Extraction Mode:
-
-- inspect the provided artifact
-- extract visible values and patterns
-- distinguish exact values from inferred values
-- identify layout, typography, color, component, motion, and responsive rules
-- do not invent unavailable details
-
-For Persistence Mode:
-
-- inspect the current artifact state
-- extract stable rules from the approved design
-- separate reusable rules from one-off page details
-- preserve the design direction that the user accepted
-
----
-
-### 3. Extract Design Intent
-
-Do not only describe surface appearance.
-
-Explain why the design uses each pattern.
-
-Weak:
-
-```text
-Uses blue buttons and rounded cards.
-```
-
-Better:
-
-```text
-Blue is reserved for primary actions and progress states, creating a clear path through the interface. Rounded cards soften the otherwise technical layout and make dense information feel approachable.
-```
-
-The system should explain:
-
-- what visual choices communicate
-- which choices are structural vs decorative
-- how the design should scale to future pages
-- which elements are essential to the style
-- which elements should not be overused
-
----
-
-### 4. Separate Stable Rules from One-Off Choices
-
-A good design system should not blindly preserve every detail.
-
-Classify decisions as:
-
-- **Core rule** — should repeat across future artifacts.
-- **Optional motif** — useful but not required everywhere.
-- **One-off detail** — belongs only to the current artifact.
-- **Avoid** — should not be repeated.
-
-Example:
-
-```text
-Core rule:
-Use compact monospace metadata labels for project year, role, and status.
-
-Optional motif:
-Use hover-preview imagery for project lists when the portfolio has many projects.
-
-One-off detail:
-The oversized animated project number belongs only to the homepage hero.
-
-Avoid:
-Do not add random system labels to unrelated content pages.
-```
-
----
-
-### 5. Produce or Update DESIGN.md
-
-Output a reusable `DESIGN.md`.
-
-If the user provided an existing `DESIGN.md`, update or normalize it instead of replacing it wholesale.
-
-If extracting from an artifact, produce a new `DESIGN.md`.
-
-If persisting current design, produce a `DESIGN.md` that future artifacts can use through `design-system-reference.md`.
-
----
-
-## Output Format
-
-Unless the user asks for another format, output one markdown document named:
-
-```text
-DESIGN.md
-```
-
-The output should be concise but complete enough to guide future generation.
-
-Avoid huge design bibles. Prefer practical rules.
-
----
-
-# DESIGN.md Structure
-
-Use this structure by default.
-
-```md
-# DESIGN.md
-
-## 1. Visual Theme & Atmosphere
-
-## 2. Color Palette & Roles
-
-## 3. Typography Rules
-
-## 4. Layout Principles
-
-## 5. Component Styling
-
-## 6. Interaction & Motion
-
-## 7. Responsive Behavior
-
-## 8. Do's and Don'ts
-
-## 9. Agent Prompt Guide
-```
-
-Add `Lightweight Tokens` when useful and values are available or responsibly inferred.
-
----
-
-## 1. Visual Theme & Atmosphere
-
-Describe the overall feeling of the system.
-
-Include:
-
-- mood
-- level of polish
-- density
-- visual temperature
-- personality
-- intended audience
-- what the design should feel like in the first 2 seconds
-
-Example:
-
-```text
-The system feels editorial, confident, and quietly technical. It uses generous whitespace, sharp type hierarchy, and compact metadata to make personal work feel curated rather than marketed.
-```
-
-Avoid vague words without explanation:
-
-```text
-modern
-clean
-beautiful
-premium
-```
-
-If used, define what they mean in this system.
-
----
-
-## 2. Color Palette & Roles
-
-Document colors by role, not just by list.
-
-Include when available:
-
-- background
-- surface
-- primary text
-- secondary text
-- muted text
-- border
-- primary accent
-- secondary accent
-- success / warning / error
-- overlay / shadow
-
-Example:
-
+**2. Color Palette & Roles** — 按**角色**而非清单记录颜色，说明每个用在哪、哪些不该滥用，强调克制 accent，没可见值不臆造、推断的标注：
 ```md
 ### Core Palette
-
-- Background: `#F7F3EA` — warm editorial base, used for page background.
-- Text Primary: `#171717` — high-contrast body and headings.
-- Text Muted: `#73706A` — metadata, captions, secondary details.
-- Accent: `#D94F30` — used only for primary CTA, active state, and one highlight per section.
-- Border: `rgba(23, 23, 23, 0.14)` — subtle structure without heavy boxes.
+- Background `#F7F3EA` — 暖调编辑感底色，页面背景。
+- Text Primary `#171717` — 高对比正文与标题。
+- Text Muted `#73706A` — 元数据、说明、次要细节。
+- Accent `#D94F30` — 仅用于主 CTA、激活态、每区块一处高亮。
+- Border `rgba(23,23,23,0.14)` — 不靠重盒子的细微结构。
 ```
 
-Rules:
+**3. Typography Rules** — 字族 + **语义层级体系**（多数系统 9–15 级，用 headline/display/body/label/caption 等语义命名，每类可再分 small/medium/large），各级字号/字重/行高、层级跨度（克制：标题约 1.9× 正文而非 5×）、中-拉-数字混排。
 
-- Explain where each color should be used.
-- Avoid too many accent colors.
-- Do not invent precise values if none are visible; mark inferred values.
-- Note colors that should not be overused.
+**4. Layout & Elevation（布局与层级）** — 网格/版心、间距节奏、留白策略、内容区结构、对齐逻辑（结构而非装饰）。**并说清"层级/深度怎么表达"**：用阴影就定义阴影规则；扁平设计要说清替代方案（边框 / 色彩对比 / 色调分层，如背景用浅色、主内容用纯白卡）——层级如何传达是核心决策，不能漏。
 
----
+**5. Component & Shape（组件与形状）** — **形状语言**：整体的形状性格（锐利 / 柔和）与统一的圆角策略（如所有交互元素统一 4px，"克制的现代感"）。**组件形态**：关键组件（卡片/按钮/标签/输入框等）的圆角、边框、阴影、内距规则，**尤其覆盖状态变体**（primary/secondary、hover/pressed/active、空/错误/禁用）——状态覆盖是设计系统的关键，不只画默认态。
 
-## 3. Typography Rules
+**6. Interaction & Motion** — 动效性格、入场/hover/过渡惯例、始终带 reduced-motion，区分核心交互与一次性效果。
 
-Document the type system.
+**7. Responsive Behavior** — 断点、移动端如何重排、触控友好、各视口可读性。
 
-Include:
+**8. Do's and Don'ts** — 写具体规则。**注意：又长又啰嗦的 Don'ts 往往说明主题描述太模糊（足够具体的参照会自带大部分负向约束）；一个具体参照 + 一份刻意的 Do/Don't 才是最佳组合。**
+```text
+Do：作品为主要佐证；保持强层级；元数据标签克制一致；限制 accent 数量；用一个难忘的结构/交互主意；有精确值就复用。
+Don't：假评价/假指标/假 logo；通用区块填空；照抄品牌素材/专有 UI；无目的的装饰渐变/emoji；每个区块一样响；可发布产物里有死链/失效点击；把一次性 hero 效果当通用规则。
+```
 
-- font family or font category
-- headline style
-- body style
-- label / metadata style
-- scale
-- weight
-- line height
-- letter spacing
-- casing rules
-- language-specific rules if relevant
-
-Example:
-
+**9. Agent Prompt Guide** — 写给未来 agent 的、直接可操作的生成指令：
 ```md
-### Type Roles
-
-- Display: large, high-contrast serif or expressive sans for identity and project titles.
-- Body: neutral sans, 16px–18px, 1.5 line height for readability.
-- Metadata: monospace, 11px–12px, uppercase, increased letter spacing, used for year, role, status, and project tags.
+在本系统里生成新页面时：从作品优先结构开始；角色/年份/类别用紧凑元数据标签；accent 保留给主操作与激活态；尽早展示真实作品、别先放长 bio；用一个大胆结构动作、其余区块安静；除非用户要简单版避免通用卡片网格；保留响应式与触控友好。
 ```
 
-Rules:
-
-- Do not default to serif + monospace unless it fits the artifact.
-- Use 2 type voices at most unless the style explicitly demands more.
-- Typography should create structure, not decoration.
-- For mobile, body text should remain readable.
-
 ---
 
-## 4. Layout Principles
-
-Describe how pages are structured.
-
-Include:
-
-- grid or layout model
-- spacing rhythm
-- section structure
-- density
-- alignment
-- scroll behavior
-- use of asymmetry
-- hierarchy rules
-- how pages should start and end
-
-Example:
-
-```md
-### Layout System
-
-Use a fixed identity column with a scrollable work area for portfolio pages. The identity column anchors the person, while the work area carries proof. Section spacing follows an 8px base scale with large rhythm breaks between major work groups.
-```
-
-Rules:
-
-- Document the structural paradigm.
-- Avoid generic repeating vertical blocks unless the content demands it.
-- Define how hierarchy is created.
-- Define how empty space should be used.
-
----
-
-## 5. Component Styling
-
-Document reusable components and patterns.
-
-Include:
-
-- buttons
-- cards
-- project items
-- navigation
-- metadata blocks
-- forms
-- modals / overlays
-- detail views
-- empty states
-- status elements
-
-Example:
-
-```md
-### Project Card
-
-Project cards should prioritize the work image and title. Metadata appears as compact labels. Cards may use subtle hover movement or image reveal, but should not use heavy shadows or generic SaaS-card styling.
-```
-
-For each important component, include:
-
-- purpose
-- visual treatment
-- variants
-- states
-- usage notes
-- what to avoid
-
-Do not over-document components that do not exist.
-
----
-
-## 6. Interaction & Motion
-
-Document how the system should move and respond.
-
-Include:
-
-- hover behavior
-- active states
-- focus states
-- loading behavior
-- page transitions
-- scroll behavior
-- motion intensity
-- reduced motion expectations
-
-Example:
-
-```md
-Motion should be sparse and intentional. Use hover previews on project lists and one subtle entrance reveal for the first screen. Avoid animating every section. Motion should make the site feel responsive, not decorative.
-```
-
-Rules:
-
-- Every interactive element needs feedback.
-- Motion should reinforce the visual world.
-- Avoid decorative animation with no function.
-- Respect reduced motion when relevant.
-
----
-
-## 7. Responsive Behavior
-
-Document how the system adapts.
-
-Include:
-
-- desktop behavior
-- tablet behavior
-- mobile behavior
-- navigation changes
-- layout stacking
-- touch behavior
-- image cropping
-- interaction fallbacks
-
-Example:
-
-```md
-On desktop, portfolio work can use a fixed identity panel and scrollable work area. On mobile, the identity panel becomes a compact header, and project previews stack vertically. Hover previews must become tap-to-open or inline previews.
-```
-
-Rules:
-
-- Do not simply shrink desktop layout.
-- Replace hover-only interactions on touch devices.
-- Preserve content hierarchy on small screens.
-
----
-
-## 8. Do's and Don'ts
-
-Write practical rules.
-
-### Do
-
-- Use work as the primary proof.
-- Preserve strong hierarchy.
-- Use metadata labels sparingly and consistently.
-- Keep the number of accent colors limited.
-- Use one memorable structural or interaction idea.
-- Reuse exact values when they are available.
-
-### Don't
-
-- Add fake testimonials, fake metrics, or fake logos.
-- Fill space with generic sections.
-- Copy brand assets or proprietary UI.
-- Add decorative gradients or emoji without purpose.
-- Make every section equally loud.
-- Use dead links or inactive clickable elements in publish-ready artifacts.
-- Treat a one-off hero effect as a universal rule.
-
----
-
-## 9. Agent Prompt Guide
-
-Write instructions that future agents can follow.
-
-This section should be direct and operational.
-
-Example:
-
-```md
-When generating new pages in this system:
-
-- Start from a work-first structure.
-- Use compact metadata labels for role, year, and category.
-- Keep the accent color reserved for primary action and active states.
-- Show actual work early; do not lead with a long bio.
-- Use one bold structural move, then keep secondary sections quiet.
-- Avoid generic portfolio card grids unless the user asks for a simple version.
-- Preserve responsive behavior and touch-friendly interactions.
-```
-
-The Agent Prompt Guide should make future generation more consistent.
-
----
 
 ## Lightweight Tokens
 
@@ -667,137 +134,29 @@ Do not include fake precision. If values are inferred, state that they are infer
 
 ---
 
-## Import Mode Rules
+## 各模式补充（避免项）
 
-When the user uploads an existing `DESIGN.md`:
-
-- preserve the user’s system
-- do not rewrite it into a different style
-- normalize headings only when useful
-- fill obvious missing sections carefully
-- keep original exact values
-- mark any inferred additions
-- do not remove user rules unless they conflict or are duplicated
-
-Output options:
-
-- updated `DESIGN.md`
-- normalized `DESIGN.md`
-- gap analysis plus suggested edits
-- short compatibility note for future generation
-
----
-
-## Extraction Mode Rules
-
-When extracting from HTML, screenshot, template, or existing page:
-
-- inspect visible design patterns
-- preserve exact values when available
-- infer cautiously when values are not available
-- do not copy irrelevant implementation details
-- describe design intent, not only CSS
-- separate reusable rules from page-specific choices
-- include tokens only when useful
-
-Avoid:
-
-- dumping raw CSS into DESIGN.md
-- inventing unavailable values
-- treating every one-off detail as a design system rule
-- missing responsive or interaction behavior
-
----
-
-## Persistence Mode Rules
-
-When persisting a generated artifact:
-
-- extract from the current approved artifact state
-- focus on stable rules that should guide future pages
-- preserve the strongest design decisions
-- classify one-off details as optional or page-specific
-- make future use operational through Agent Prompt Guide
-
-Avoid:
-
-- overfitting to the current page
-- preserving placeholder content as design rules
-- turning a temporary experiment into a permanent system
-- ignoring user-approved style decisions
-
----
+三模式的核心行为已在前面「三种模式」给出。各自要避免：
+- **Extraction**：别把原始 CSS 倒进 DESIGN.md、别臆造没有的值、别把一次性细节当系统规则、别漏掉响应式/交互。
+- **Persistence**：别过拟合当前页、别把占位内容当设计规则、别把临时实验固化成永久系统、别忽略用户已认可的风格决定。
+- **Import**：输出可以是更新版/规范化版/缺口分析+建议/兼容性说明；不删用户规则除非冲突或重复。
 
 ## Quality Rules
 
-A generated `DESIGN.md` should be:
-
-- reusable
-- specific
-- grounded in source material
-- concise enough to be useful
-- clear about what is essential vs optional
-- safe around brand and IP boundaries
-- useful for future page generation
-
-Avoid:
-
-- generic design advice
-- vague premium/modern/clean language
-- long theory with no operational rules
-- copying proprietary brand systems
-- turning one artifact detail into a universal rule
-- inventing tokens not supported by the source
-
----
+一份好的 `DESIGN.md`：可复用、具体、扎根源材料、简洁够用、分清核心vs可选、IP安全、对未来生成有用。**避免**：通用设计套话、空泛的 premium/modern/clean 措辞、有理论无可操作规则、照抄专有品牌系统、把单个产物细节当通用规则、臆造源材料不支持的 token。
 
 ## IP and Brand Safety
 
-If the source is public brand inspiration:
-
-- do not present the output as an official design system
-- do not copy logos, assets, exact page structures, or proprietary UI
-- describe only high-level visual qualities
-- create reusable rules that lead to original designs
-
-If the source is user-owned:
-
-- treat it as authoritative when clearly provided by the user
-- preserve exact values when available
-- note assumptions when incomplete
-
----
-
-
+源是公开品牌灵感时：不把输出当官方系统、不照抄 logo/素材/精确页面结构/专有 UI、只描述高层视觉特质、产出导向原创的可复用规则。源是用户自有时：明确提供则视为权威、保留精确值、不完整处标注假设。
 
 ## Chinese Typography Reference
 
-Use `horizontal-craft/chinese-typography.md` when the artifact contains substantial Chinese / Chinese / CJK text, Chinese editorial layout, public-account formatting, Xiaohongshu content, Chinese deck typography, Chinese UI labels, or print-design-inspired HTML.
-
-Translate print-design methods into HTML structure: 版心, 网格, 留白, 标题组, 图版, 边注, 章节 rhythm, and proper punctuation.
-
+产物含大量中文/CJK、中文编辑排版、公众号、小红书、中文 deck、中文 UI 标签或印刷风 HTML 时，用 `horizontal-craft/chinese-typography.md`；把印刷方法转为 HTML 结构：版心、网格、留白、标题组、图版、边注、章节节奏与标点。
 
 ## Quality Gate
 
-Before delivering this scenario, apply `quality-gate.md`.
-
-This scenario may add stricter checks, but it must not weaken the shared gate.
+交付前应用 `quality-gate.md`；本场景可加更严的检查，但不得削弱共享门禁。
 
 ## Handoff
 
-After generating, importing, normalizing, or updating `DESIGN.md`, future design tasks can use it through:
-
-`skills/design/design-system-reference.md`
-
-The generated `DESIGN.md` should become a reusable reference, not a one-time summary.
-
-When useful, also note:
-
-- source artifact
-- source template
-- source screenshot
-- selected style skill
-- selected brand inspiration
-- date/version
-- assumptions
-- missing information
+生成/导入/规范化/更新后的 `DESIGN.md` 经 `skills/design/design-system-reference.md` 供未来设计复用，应是可复用参考而非一次性总结。有用时记下：源产物/模板/截图、所选 style skill/品牌灵感、日期版本、假设、缺失信息。
