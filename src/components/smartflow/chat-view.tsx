@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, type FormEvent } from 'react';
 import {
   Send, Bot, User, Loader2, Search, CheckCircle2, Clock, AlertTriangle,
   XCircle, ChevronRight, Circle, FileText, CreditCard, ArrowRight,
+  ClipboardCheck, Eye, Ban, Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -320,23 +321,68 @@ function SuiviTab() {
             <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
               Suivez en temps réel l&apos;avancement du traitement de chaque dossier de santé et l&apos;état des remboursements ou règlements de factures.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg w-full text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-2xl w-full text-sm">
               <div className="rounded-lg border p-3 space-y-1">
                 <p className="font-medium text-foreground flex items-center gap-2">
-                  <ArrowRight className="size-3.5 text-emerald-600" />
+                  <ClipboardCheck className="size-3.5 text-slate-500" />
+                  Reçu
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Le dossier a été reçu et est en attente de prise en charge par le service concerné.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 space-y-1">
+                <p className="font-medium text-foreground flex items-center gap-2">
+                  <Eye className="size-3.5 text-amber-600" />
+                  En analyse
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Le dossier est en cours d&apos;examen par le service médical ou technique.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 space-y-1">
+                <p className="font-medium text-foreground flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-600" />
+                  Validé
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Le dossier a été approuvé et transmis à la comptabilité pour règlement.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 space-y-1">
+                <p className="font-medium text-foreground flex items-center gap-2">
+                  <CreditCard className="size-3.5 text-orange-600" />
+                  En comptabilité
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Le dossier est en cours de vérification comptable avant le paiement.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 space-y-1">
+                <p className="font-medium text-foreground flex items-center gap-2">
+                  <Wallet className="size-3.5 text-sky-600" />
+                  En paiement
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Le remboursement ou le règlement est en cours de traitement bancaire.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 space-y-1">
+                <p className="font-medium text-foreground flex items-center gap-2">
+                  <ArrowRight className="size-3.5 text-teal-600" />
                   Dossier payé
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Le remboursement client ou le règlement du prestataire médical a été effectué.
                 </p>
               </div>
-              <div className="rounded-lg border p-3 space-y-1">
+              <div className="rounded-lg border p-3 space-y-1 sm:col-span-2 lg:col-span-3">
                 <p className="font-medium text-foreground flex items-center gap-2">
-                  <Clock className="size-3.5 text-sky-600" />
-                  En cours de traitement
+                  <Ban className="size-3.5 text-red-500" />
+                  Rejeté
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Le dossier est au service médical, technique ou en cours de paiement comptable.
+                  Le dossier a été refusé. Un motif de rejet est communiqué pour correction ou recours.
                 </p>
               </div>
             </div>
