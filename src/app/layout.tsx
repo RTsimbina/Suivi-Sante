@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "SUIVI SANTE — Gestion des Dossiers de Santé",
   description: "Plateforme intelligente de suivi des dossiers de santé. Centralisation Excel, ISA et SAGE avec analyses IA en temps réel.",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.svg",
   },
 };
 
