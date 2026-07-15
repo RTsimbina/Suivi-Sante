@@ -51,6 +51,7 @@ export default function ConfigurationView() {
   const [filterCanal, setFilterCanal] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [botStatus, setBotStatus] = useState<Record<string, { actif: boolean; details?: string }>>({});
+  const smtpConfigured = smtpStatus !== null && smtpStatus.ok;
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -180,19 +181,34 @@ export default function ConfigurationView() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Statut SMTP */}
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${smtpStatus !== null && !smtpStatus.ok ? 'bg-amber-50 border border-amber-200' : 'bg-muted/30'}`}>
             {smtpStatus === null ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : smtpStatus.ok ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-500" />
+              <XCircle className="h-4 w-4 text-amber-600" />
             )}
             <span className="text-sm">
               {smtpStatus === null ? 'Vérification SMTP...' :
-                smtpStatus.ok ? 'Connexion SMTP établie' : `SMTP non configuré : ${smtpStatus.erreur}`}
+                smtpStatus.ok ? 'Connexion SMTP établie' : 'Service email non configuré'}
             </span>
           </div>
+
+          {smtpStatus !== null && !smtpStatus.ok && (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="font-medium mb-1">Configuration requise</p>
+              <p className="text-amber-600">Ajoutez les variables suivantes dans votre fichier <code className="bg-amber-100 px-1 rounded text-xs">.env</code> :</p>
+              <code className="block mt-2 text-xs bg-amber-100/60 px-3 py-2 rounded font-mono">
+                SMTP_HOST=smtp.votre-serveur.com<br />
+                SMTP_PORT=587<br />
+                SMTP_USER=votre@email.com<br />
+                SMTP_PASS=votre-mot-de-passe<br />
+                SMTP_FROM=noreply@votre-domaine.com<br />
+                EMAIL_RAPPORT_DESTINATAIRE=rapport@votre-domaine.com
+              </code>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Test email */}
@@ -204,12 +220,14 @@ export default function ConfigurationView() {
                   placeholder="destinataire@email.com"
                   value={testEmail}
                   onChange={e => setTestEmail(e.target.value)}
+                  disabled={!smtpConfigured}
                 />
                 <Button
                   variant="outline"
                   onClick={handleTestEmail}
-                  disabled={sendingTest || !testEmail}
+                  disabled={sendingTest || !testEmail || !smtpConfigured}
                   className="shrink-0"
+                  title={!smtpConfigured ? 'Configurez SMTP d\'abord' : undefined}
                 >
                   {sendingTest && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                   Tester
@@ -227,8 +245,9 @@ export default function ConfigurationView() {
                 </div>
                 <Button
                   onClick={handleSendRapport}
-                  disabled={sendingRapport}
+                  disabled={sendingRapport || !smtpConfigured}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+                  title={!smtpConfigured ? 'Configurez SMTP d\'abord' : undefined}
                 >
                   {sendingRapport && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                   Envoyer maintenant
