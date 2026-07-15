@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Heart, Plus, Pencil, Trash2, Search, Loader2, X, Building2, FileText,
+  Upload, FileSpreadsheet, AlertTriangle, CheckCircle, XCircle as XCircleIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 interface Societe {
   id: string;
@@ -33,6 +35,14 @@ interface Assure {
   _count: { dossiers: number };
   createdAt: string;
   updatedAt: string;
+}
+
+interface ImportResult {
+  nbLignes: number;
+  nbSucces: number;
+  nbErreurs: number;
+  tauxSucces: number;
+  erreurs: { ligne: number; message: string }[];
 }
 
 function formatDate(d: string | null): string {
@@ -64,6 +74,14 @@ export default function AssuresView({ userRole }: { userRole: string }) {
   const [editingAssure, setEditingAssure] = useState<Assure | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // ─── State: Import ───
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form
   const [formSocieteId, setFormSocieteId] = useState('');
@@ -159,16 +177,16 @@ export default function AssuresView({ userRole }: { userRole: string }) {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.erreur || 'Erreur');
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.erreur) {
+        toast.error(data?.erreur || 'Erreur');
         return;
       }
 
       setDialogOpen(false);
       fetchAssures();
     } catch {
-      alert('Erreur réseau');
+      toast.error('Erreur réseau');
     } finally {
       setSaving(false);
     }
@@ -178,19 +196,83 @@ export default function AssuresView({ userRole }: { userRole: string }) {
     setSaving(true);
     try {
       const res = await fetch(`/api/assures?id=${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const err = await res.json();
-        alert(err.erreur || 'Erreur');
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.erreur) {
+        toast.error(data?.erreur || 'Erreur');
         return;
       }
       setDeleteConfirm(null);
       fetchAssures();
     } catch {
-      alert('Erreur réseau');
+      toast.error('Erreur réseau');
     } finally {
       setSaving(false);
     }
   }
+
+  // ─── Handlers: Import ───
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+      setImportFile(file);
+      setImportResult(null);
+    } else {
+      toast.error('Veuillez déposer un fichier .xlsx');
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImportFile(file);
+      setImportResult(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast.error('Veuillez sélectionner un fichier');
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const res = await fetch('/api/assures/import', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.erreur) {
+        throw new Error(data?.erreur || "Erreur lors de l'import");
+      }
+      setImportResult(data);
+      if (data.nbErreurs === 0) {
+        toast.success(`Import réussi : ${data.nbSucces} assurés importés`);
+      } else {
+        toast.warning(`Import partiel : ${data.nbSucces} succès, ${data.nbErreurs} erreurs`);
+      }
+      fetchAssures();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'import");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const totalAssures = assures.length;
   const activeAssures = assures.filter(a => a.actif).length;
@@ -263,85 +345,225 @@ export default function AssuresView({ userRole }: { userRole: string }) {
             ))}
           </select>
         </div>
-          {canEdit && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nouvel assuré
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingAssure ? "Modifier l'assuré" : 'Nouvel assuré'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 pt-2">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="a-nom">Nom *</Label>
-                  <Input id="a-nom" value={formNom} onChange={(e) => setFormNom(e.target.value)} placeholder="Rakoto" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="a-prenom">Prénom</Label>
-                  <Input id="a-prenom" value={formPrenom} onChange={(e) => setFormPrenom(e.target.value)} placeholder="Jean" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="a-societe">Société *</Label>
-                <select id="a-societe" value={formSocieteId} onChange={(e) => setFormSocieteId(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" required>
-                  <option value="">-- Sélectionner --</option>
-                  {societes.map((s) => (
-                    <option key={s.id} value={s.id}>{s.nom}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="a-nss">N° Sécurité Sociale</Label>
-                  <Input id="a-nss" value={formNSS} onChange={(e) => setFormNSS(e.target.value)} placeholder="SS-123456" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="a-datenaiss">Date de naissance</Label>
-                  <Input id="a-datenaiss" type="date" value={formDateNaissance} onChange={(e) => setFormDateNaissance(e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="a-sexe">Sexe</Label>
-                  <select id="a-sexe" value={formSexe} onChange={(e) => setFormSexe(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="">--</option>
-                    <option value="M">Masculin</option>
-                    <option value="F">Féminin</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="a-tel">Téléphone</Label>
-                  <Input id="a-tel" value={formTelephone} onChange={(e) => setFormTelephone(e.target.value)} placeholder="+261 34 00 000 00" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="a-email">E-mail</Label>
-                <Input id="a-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="assure@email.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="a-adresse">Adresse</Label>
-                <Input id="a-adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} placeholder="Antananarivo, Madagascar" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="a-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
-                <Label htmlFor="a-actif">Assuré actif</Label>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSave} disabled={saving || !formNom || !formSocieteId}>
-                  {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {editingAssure ? 'Enregistrer' : 'Créer'}
+        {canEdit && (
+          <div className="flex gap-2">
+            {/* Bouton Import */}
+            <Dialog open={importDialogOpen} onOpenChange={(open) => {
+              setImportDialogOpen(open);
+              if (!open) { setImportFile(null); setImportResult(null); }
+            }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Importer
                 </Button>
-              </div>
-            </div>
-            </DialogContent>
-          </Dialog>
-          )}
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                    Importer des assurés
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <p className="font-medium mb-1">Colonnes attendues dans le fichier Excel (.xlsx) :</p>
+                    <p className="text-xs text-amber-700">
+                      <strong>Nom *</strong>, Prénom, <strong>Société *</strong> (nom exact), NSS, DateNaissance, Sexe (M/F), Téléphone, Email, Adresse
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">* = obligatoire. Les accents sont ignorés pour la recherche de société.</p>
+                  </div>
+
+                  {/* Drop zone */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`
+                      relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8
+                      cursor-pointer transition-colors
+                      ${isDragging
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : importFile
+                          ? 'border-emerald-300 bg-emerald-50/50'
+                          : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'
+                      }
+                    `}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    {importFile ? (
+                      <>
+                        <FileSpreadsheet className="h-10 w-10 text-emerald-600 mb-2" />
+                        <p className="text-sm font-medium">{importFile.name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {(importFile.size / 1024).toFixed(1)} Ko — Cliquez ou déposez pour changer
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-10 w-10 text-muted-foreground/40 mb-2" />
+                        <p className="text-sm font-medium">
+                          Glissez-déposez votre fichier <span className="text-emerald-600 font-semibold">.xlsx</span> ici
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">ou cliquez pour sélectionner</p>
+                      </>
+                    )}
+                  </div>
+
+                  <Button
+                    onClick={handleImport}
+                    disabled={importing || !importFile}
+                    className="w-full gap-2"
+                  >
+                    {importing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {importing ? 'Import en cours...' : 'Importer le fichier'}
+                  </Button>
+
+                  {/* Results */}
+                  {importResult && (
+                    <div className="space-y-4 mt-2">
+                      <div className="grid grid-cols-3 gap-3">
+                        <Card className="p-3 text-center">
+                          <p className="text-xs text-muted-foreground">Lignes</p>
+                          <p className="text-xl font-bold">{importResult.nbLignes}</p>
+                        </Card>
+                        <Card className="p-3 text-center">
+                          <p className="text-xs text-emerald-600">Succès</p>
+                          <p className="text-xl font-bold text-emerald-700">{importResult.nbSucces}</p>
+                        </Card>
+                        <Card className="p-3 text-center">
+                          <p className="text-xs text-red-500">Erreurs</p>
+                          <p className="text-xl font-bold text-red-600">{importResult.nbErreurs}</p>
+                        </Card>
+                      </div>
+
+                      {importResult.erreurs && importResult.erreurs.length > 0 && (
+                        <div className="max-h-48 overflow-y-auto space-y-1.5">
+                          {importResult.erreurs.map((err, i) => (
+                            <div
+                              key={i}
+                              className="flex items-start gap-2 text-sm rounded-md border border-red-100 bg-red-50 p-2"
+                            >
+                              <XCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                              <div>
+                                <span className="font-medium text-red-700">Ligne {err.ligne} :</span>{' '}
+                                <span className="text-red-600">{err.message}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {importResult.nbErreurs === 0 && (
+                        <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                          <CheckCircle className="h-5 w-5 text-emerald-600" />
+                          <p className="text-sm text-emerald-700 font-medium">
+                            Tous les assurés ont été importés avec succès !
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Fermer</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Bouton Nouvel assuré */}
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreate}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouvel assuré
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingAssure ? "Modifier l'assuré" : 'Nouvel assuré'}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="a-nom">Nom *</Label>
+                      <Input id="a-nom" value={formNom} onChange={(e) => setFormNom(e.target.value)} placeholder="Rakoto" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="a-prenom">Prénom</Label>
+                      <Input id="a-prenom" value={formPrenom} onChange={(e) => setFormPrenom(e.target.value)} placeholder="Jean" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="a-societe">Société *</Label>
+                    <select id="a-societe" value={formSocieteId} onChange={(e) => setFormSocieteId(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm" required>
+                      <option value="">-- Sélectionner --</option>
+                      {societes.map((s) => (
+                        <option key={s.id} value={s.id}>{s.nom}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="a-nss">N° Sécurité Sociale</Label>
+                      <Input id="a-nss" value={formNSS} onChange={(e) => setFormNSS(e.target.value)} placeholder="SS-123456" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="a-datenaiss">Date de naissance</Label>
+                      <Input id="a-datenaiss" type="date" value={formDateNaissance} onChange={(e) => setFormDateNaissance(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="a-sexe">Sexe</Label>
+                      <select id="a-sexe" value={formSexe} onChange={(e) => setFormSexe(e.target.value)} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                        <option value="">--</option>
+                        <option value="M">Masculin</option>
+                        <option value="F">Féminin</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="a-tel">Téléphone</Label>
+                      <Input id="a-tel" value={formTelephone} onChange={(e) => setFormTelephone(e.target.value)} placeholder="+261 34 00 000 00" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="a-email">E-mail</Label>
+                    <Input id="a-email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="assure@email.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="a-adresse">Adresse</Label>
+                    <Input id="a-adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} placeholder="Antananarivo, Madagascar" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="a-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                    <Label htmlFor="a-actif">Assuré actif</Label>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Annuler</Button>
+                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSave} disabled={saving || !formNom || !formSocieteId}>
+                      {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      {editingAssure ? 'Enregistrer' : 'Créer'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
       </div>
 
       {/* Table */}
