@@ -127,12 +127,12 @@ const emptyBaremes = (): BaremeRow[] =>
   }));
 
 const kpiDefs = [
-  { key: 'totalAnalyses', label: 'Dossiers analysés', icon: ClipboardCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { key: 'totalValides', label: 'Validés', icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50' },
-  { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
-  { key: 'enCours', label: 'En cours', icon: Loader2, color: 'text-amber-600', bg: 'bg-amber-50' },
-  { key: 'delaiMoyenAnalyse', label: 'Délai moyen (j)', icon: Clock, color: 'text-sky-600', bg: 'bg-sky-50' },
-  { key: 'montantTotalValide', label: 'Montant validé', icon: Currency, color: 'text-emerald-600', bg: 'bg-emerald-50', format: true },
+  { key: 'totalAnalyses', label: 'Dossiers analysés', icon: ClipboardCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+  { key: 'totalValides', label: 'Validés', icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/40' },
+  { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/40' },
+  { key: 'enCours', label: 'En cours', icon: Loader2, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+  { key: 'delaiMoyenAnalyse', label: 'Délai moyen (j)', icon: Clock, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40' },
+  { key: 'montantTotalValide', label: 'Montant validé', icon: Currency, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40', format: true },
 ];
 
 const PIE_COLORS = ['#f59e0b', '#10b981', '#ef4444'];
@@ -841,14 +841,14 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                    <p className="text-xs text-emerald-700 mb-1 font-medium">Montant remboursé</p>
-                    <p className="text-3xl font-bold text-emerald-700">
+                  <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-1 font-medium">Montant remboursé</p>
+                    <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
                       {formatMontant(calcResult.montantRembourse)}
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/40 p-4">
                     <p className="text-xs text-orange-700 mb-1 font-medium">Ticket modérateur</p>
                     <p className="text-3xl font-bold text-orange-700">
                       {formatMontant(calcResult.ticketModerateur)}
@@ -899,9 +899,9 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                   relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8
                   cursor-pointer transition-colors
                   ${isDragging
-                    ? 'border-emerald-500 bg-emerald-50'
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
                     : importFile
-                      ? 'border-emerald-300 bg-emerald-50/50'
+                      ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40/50'
                       : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'
                   }
                 `}
@@ -955,7 +955,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                     </Card>
                     <Card className="p-4">
                       <p className="text-xs text-emerald-600">Succès</p>
-                      <p className="text-2xl font-bold text-emerald-700">{importResult.nbSucces}</p>
+                      <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{importResult.nbSucces}</p>
                     </Card>
                     <Card className="p-4">
                       <p className="text-xs text-red-500">Erreurs</p>
@@ -977,11 +977,11 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                         {importResult.erreurs.map((err, i) => (
                           <div
                             key={i}
-                            className="flex items-start gap-2 text-sm rounded-md border border-red-100 bg-red-50 p-2"
+                            className="flex items-start gap-2 text-sm rounded-md border border-red-100 bg-red-50 dark:bg-red-950/40 p-2"
                           >
                             <XCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                             <div>
-                              <span className="font-medium text-red-700">Ligne {err.ligne} :</span>{' '}
+                              <span className="font-medium text-red-700 dark:text-red-300">Ligne {err.ligne} :</span>{' '}
                               <span className="text-red-600">{err.message}</span>
                             </div>
                           </div>
@@ -991,9 +991,9 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                   )}
 
                   {importResult.nbErreurs === 0 && (
-                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
                       <CheckCircle className="h-5 w-5 text-emerald-600" />
-                      <p className="text-sm text-emerald-700 font-medium">
+                      <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
                         Toutes les lignes ont été importées avec succès !
                       </p>
                     </div>
@@ -1056,21 +1056,21 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                   <div className="space-y-4">
                     {/* KPI exclusions */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-center">
                         <p className="text-[10px] text-amber-600 uppercase tracking-wide font-medium">Dépassements</p>
-                        <p className="text-xl font-bold text-amber-700">{totalDepassement}</p>
+                        <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{totalDepassement}</p>
                       </div>
-                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center">
+                      <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-center">
                         <p className="text-[10px] text-red-600 uppercase tracking-wide font-medium">Exclusions totales</p>
-                        <p className="text-xl font-bold text-red-700">{totalExclusion}</p>
+                        <p className="text-xl font-bold text-red-700 dark:text-red-300">{totalExclusion}</p>
                       </div>
-                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-center">
-                        <p className="text-[10px] text-gray-600 uppercase tracking-wide font-medium">Rejetés</p>
-                        <p className="text-xl font-bold text-gray-700">{totalRejete}</p>
+                      <div className="rounded-lg border border-border bg-muted p-3 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Rejetés</p>
+                        <p className="text-xl font-bold">{totalRejete}</p>
                       </div>
-                      <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-center">
+                      <div className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 p-3 text-center">
                         <p className="text-[10px] text-violet-600 uppercase tracking-wide font-medium">Montant non couvert</p>
-                        <p className="text-xl font-bold text-violet-700">{formatMontantCourt(montantPerdu)}</p>
+                        <p className="text-xl font-bold text-violet-700 dark:text-violet-300">{formatMontantCourt(montantPerdu)}</p>
                       </div>
                     </div>
 
@@ -1101,7 +1101,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                             const isExclusion = d.montantValide === 0 && d.montantReclame > 0;
                             const isRejete = d.statut === 'REJETE';
                             return (
-                              <TableRow key={d.id} className={isExclusion ? 'bg-red-50/50' : isRejete ? 'bg-gray-50/50' : 'bg-amber-50/50'}>
+                              <TableRow key={d.id} className={isExclusion ? 'bg-red-50 dark:bg-red-950/400/10' : isRejete ? 'bg-muted/50' : 'bg-amber-50 dark:bg-amber-950/400/10'}>
                                 <TableCell className="font-mono text-xs">{d.numeroDossier}</TableCell>
                                 <TableCell className="text-xs">{d.beneficiaire}</TableCell>
                                 <TableCell className="text-xs">{d.societeNom}</TableCell>
@@ -1113,15 +1113,15 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                 </TableCell>
                                 <TableCell>
                                   {isRejete ? (
-                                    <Badge variant="outline" className="text-[10px] border-red-200 text-red-600 bg-red-50">
+                                    <Badge variant="outline" className="text-[10px] border-red-200 dark:border-red-800 text-red-600 bg-red-50 dark:bg-red-950/40">
                                       Rejeté
                                     </Badge>
                                   ) : isExclusion ? (
-                                    <Badge variant="outline" className="text-[10px] border-red-200 text-red-600 bg-red-50">
+                                    <Badge variant="outline" className="text-[10px] border-red-200 dark:border-red-800 text-red-600 bg-red-50 dark:bg-red-950/40">
                                       Exclusion
                                     </Badge>
                                   ) : (
-                                    <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-600 bg-amber-50">
+                                    <Badge variant="outline" className="text-[10px] border-amber-200 dark:border-amber-800 text-amber-600 bg-amber-50 dark:bg-amber-950/40">
                                       Dépassement
                                     </Badge>
                                   )}

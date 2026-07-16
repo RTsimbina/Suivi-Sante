@@ -74,7 +74,7 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50 px-4 py-12">
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
         <div className="w-full max-w-md text-center">
           <div className="flex flex-col items-center mb-8">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
@@ -104,7 +104,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50/50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
@@ -128,7 +128,7 @@ function ResetPasswordForm() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Error */}
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300 flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -168,23 +168,23 @@ function ResetPasswordForm() {
               <div className="space-y-1.5 text-xs">
                 <p className="font-medium text-muted-foreground mb-2">Critères de sécurité :</p>
                 <div className={`flex items-center gap-2 ${hasMinLength ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasMinLength ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasMinLength ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
                   Au moins 8 caractères
                 </div>
                 <div className={`flex items-center gap-2 ${hasLetter ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasLetter ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasLetter ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
                   Au moins une lettre
                 </div>
                 <div className={`flex items-center gap-2 ${hasNumber ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasNumber ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasNumber ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
                   Au moins un chiffre
                 </div>
                 <div className={`flex items-center gap-2 ${hasSpecial ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasSpecial ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasSpecial ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
                   Un caractère spécial (recommandé)
                 </div>
                 <div className={`flex items-center gap-2 ${passwordsMatch ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${passwordsMatch ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                  <span className={`h-1.5 w-1.5 rounded-full ${passwordsMatch ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
                   Les mots de passe correspondent
                 </div>
               </div>
@@ -231,7 +231,7 @@ function ResetPasswordForm() {
         <div className="text-center mt-4">
           <button
             onClick={() => router.push('/login')}
-            className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline"
+            className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline"
           >
             Retour à la page de connexion
           </button>
@@ -245,7 +245,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+        <div className="min-h-screen flex items-center justify-center bg-muted/30">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
         </div>
       }

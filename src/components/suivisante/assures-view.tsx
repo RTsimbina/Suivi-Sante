@@ -288,7 +288,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Total assurés</p>
                 <p className="text-2xl font-bold">{totalAssures}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Heart className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -301,7 +301,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Actifs</p>
                 <p className="text-2xl font-bold text-emerald-600">{activeAssures}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Heart className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -314,7 +314,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Sociétés couvertes</p>
                 <p className="text-2xl font-bold">{new Set(assures.map(a => a.societe.id)).size}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
                 <Building2 className="h-5 w-5 text-blue-600" />
               </div>
             </div>
@@ -367,9 +367,9 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                 </DialogHeader>
 
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-800">
                     <p className="font-medium mb-1">Colonnes attendues dans le fichier Excel (.xlsx) :</p>
-                    <p className="text-xs text-amber-700">
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
                       <strong>Nom *</strong>, Prénom, <strong>Société *</strong> (nom exact), NSS, DateNaissance, Sexe (M/F), Téléphone, Email, Adresse
                     </p>
                     <p className="text-xs text-amber-600 mt-1">* = obligatoire. Les accents sont ignorés pour la recherche de société.</p>
@@ -385,9 +385,9 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                       relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8
                       cursor-pointer transition-colors
                       ${isDragging
-                        ? 'border-emerald-500 bg-emerald-50'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
                         : importFile
-                          ? 'border-emerald-300 bg-emerald-50/50'
+                          ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40/50'
                           : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'
                       }
                     `}
@@ -441,7 +441,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                         </Card>
                         <Card className="p-3 text-center">
                           <p className="text-xs text-emerald-600">Succès</p>
-                          <p className="text-xl font-bold text-emerald-700">{importResult.nbSucces}</p>
+                          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{importResult.nbSucces}</p>
                         </Card>
                         <Card className="p-3 text-center">
                           <p className="text-xs text-red-500">Erreurs</p>
@@ -454,11 +454,11 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                           {importResult.erreurs.map((err, i) => (
                             <div
                               key={i}
-                              className="flex items-start gap-2 text-sm rounded-md border border-red-100 bg-red-50 p-2"
+                              className="flex items-start gap-2 text-sm rounded-md border border-red-100 bg-red-50 dark:bg-red-950/40 p-2"
                             >
                               <XCircleIcon className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                               <div>
-                                <span className="font-medium text-red-700">Ligne {err.ligne} :</span>{' '}
+                                <span className="font-medium text-red-700 dark:text-red-300">Ligne {err.ligne} :</span>{' '}
                                 <span className="text-red-600">{err.message}</span>
                               </div>
                             </div>
@@ -467,9 +467,9 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                       )}
 
                       {importResult.nbErreurs === 0 && (
-                        <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                        <div className="flex items-center gap-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
                           <CheckCircle className="h-5 w-5 text-emerald-600" />
-                          <p className="text-sm text-emerald-700 font-medium">
+                          <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
                             Tous les assurés ont été importés avec succès !
                           </p>
                         </div>
@@ -549,7 +549,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                     <Input id="a-adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} placeholder="Antananarivo, Madagascar" />
                   </div>
                   <div className="flex items-center gap-2">
-                    <input type="checkbox" id="a-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                    <input type="checkbox" id="a-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-border" />
                     <Label htmlFor="a-actif">Assuré actif</Label>
                   </div>
                   <div className="flex gap-2 pt-2">
@@ -597,7 +597,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                     <tr key={a.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                             {a.nom[0]}{a.prenom ? a.prenom[0] : ''}
                           </div>
                           <div className="min-w-0">
@@ -607,7 +607,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge variant="outline" className="text-[11px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
                           {a.societe.nom}
                         </Badge>
                       </td>
@@ -640,7 +640,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                               </Button>
                             </div>
                           ) : (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteConfirm(a.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => setDeleteConfirm(a.id)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}

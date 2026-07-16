@@ -70,7 +70,7 @@ function SortableCard({ dossier }: { dossier: Dossier }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="border rounded-lg p-3 hover:shadow-md transition bg-white cursor-grab active:cursor-grabbing"
+      className="border rounded-lg p-3 hover:shadow-md transition bg-card cursor-grab active:cursor-grabbing"
     >
       <div className="flex items-start justify-between gap-1.5 mb-1.5">
         <span className="font-mono text-xs font-medium truncate">
@@ -86,7 +86,7 @@ function SortableCard({ dossier }: { dossier: Dossier }) {
         <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal">
           {typeDossierLabel(dossier.typeDossier)}
         </Badge>
-        <span className="text-xs font-semibold text-emerald-700">
+        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
           {formatMontant(dossier.montantReclame)}
         </span>
       </div>
@@ -101,7 +101,7 @@ function SortableCard({ dossier }: { dossier: Dossier }) {
 
 function DragOverlayCard({ dossier }: { dossier: Dossier }) {
   return (
-    <div className="border rounded-lg p-3 bg-white shadow-lg rotate-2 w-72">
+    <div className="border rounded-lg p-3 bg-card shadow-lg rotate-2 w-72">
       <p className="font-mono text-xs font-medium">{dossier.numeroDossier}</p>
       <p className="text-sm font-medium mt-1">{dossier.beneficiaire}</p>
       <p className="text-xs text-muted-foreground">{dossier.societe?.nom}</p>

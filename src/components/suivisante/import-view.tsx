@@ -109,7 +109,7 @@ function ImportZone({ source, categorie, label, description, columns, icon: Icon
 // ─── Composant résultat import ──────────────────────────────────
 function ResultBanner({ result }: { result: ImportResult }) {
   return (
-    <div className="p-4 rounded-lg border bg-emerald-50/50 border-emerald-200 flex items-center gap-3">
+    <div className="p-4 rounded-lg border bg-emerald-50 dark:bg-emerald-950/40/50 border-emerald-200 dark:border-emerald-800 flex items-center gap-3">
       <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
       <div className="flex-1 text-sm">
         <span className="font-semibold">{result.nbSucces}/{result.nbLignes}</span> lignes importées
@@ -173,8 +173,8 @@ export default function ImportView() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Users className="size-4 text-blue-600" />
-          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Flux 1 — Remboursement Assuré</h3>
-          <Badge className="bg-blue-100 text-blue-700 text-[10px] border-0">Dossiers venant des assurés des entreprises clientes</Badge>
+          <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Flux 1 — Remboursement Assuré</h3>
+          <Badge className="bg-blue-100 text-blue-700 dark:text-blue-300 text-[10px] border-0">Dossiers venant des assurés des entreprises clientes</Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ImportZone
@@ -186,13 +186,13 @@ export default function ImportView() {
             icon={FileSpreadsheet}
             accentColor="text-blue-600"
           />
-          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-blue-200 bg-blue-50/30">
+          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40/30">
             <Plus className="size-8 text-blue-400" />
             <div>
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Remboursement</h4>
               <p className="text-xs text-muted-foreground mt-1">Enregistrer un dossier de remboursement assuré directement via le formulaire.</p>
             </div>
-            <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => setShowManualRemboursement(true)}>
+            <Button variant="outline" className="border-blue-300 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:bg-blue-950/40" onClick={() => setShowManualRemboursement(true)}>
               <FilePlus className="size-4 mr-1.5" />
               Nouveau dossier remboursement
             </Button>
@@ -204,8 +204,8 @@ export default function ImportView() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Building2 className="size-4 text-amber-600" />
-          <h3 className="text-sm font-semibold text-amber-700 uppercase tracking-wide">Flux 2 — Règlement Prestataire</h3>
-          <Badge className="bg-amber-100 text-amber-700 text-[10px] border-0">Factures venant des prestataires de santé</Badge>
+          <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wide">Flux 2 — Règlement Prestataire</h3>
+          <Badge className="bg-amber-100 text-amber-700 dark:text-amber-300 text-[10px] border-0">Factures venant des prestataires de santé</Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ImportZone
@@ -217,13 +217,13 @@ export default function ImportView() {
             icon={FileSpreadsheet}
             accentColor="text-amber-600"
           />
-          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-amber-200 bg-amber-50/30">
+          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40/30">
             <Plus className="size-8 text-amber-400" />
             <div>
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Règlement</h4>
               <p className="text-xs text-muted-foreground mt-1">Enregistrer une facture de prestataire pour règlement directement via le formulaire.</p>
             </div>
-            <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowManualReglement(true)}>
+            <Button variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:bg-amber-950/40" onClick={() => setShowManualReglement(true)}>
               <FilePlus className="size-4 mr-1.5" />
               Nouveau dossier règlement
             </Button>

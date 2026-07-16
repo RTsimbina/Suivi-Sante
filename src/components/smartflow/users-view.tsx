@@ -38,11 +38,11 @@ const ROLE_ICONS: Record<string, typeof Shield> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  ADMINISTRATEUR: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  ACCUEIL: 'bg-blue-100 text-blue-700 border-blue-200',
-  TECHNIQUE: 'bg-amber-100 text-amber-700 border-amber-200',
-  COMPTABILITE: 'bg-purple-100 text-purple-700 border-purple-200',
-  UTILISATEUR: 'bg-gray-100 text-gray-700 border-gray-200',
+  ADMINISTRATEUR: 'bg-emerald-100 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  ACCUEIL: 'bg-blue-100 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+  TECHNIQUE: 'bg-amber-100 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  COMPTABILITE: 'bg-purple-100 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+  UTILISATEUR: 'bg-muted text-muted-foreground border-border',
 };
 
 function getInitials(nom: string): string {
@@ -192,7 +192,7 @@ export default function UsersView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Total</p>
                 <p className="text-2xl font-bold">{totalUsers}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Users className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -205,7 +205,7 @@ export default function UsersView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Actifs</p>
                 <p className="text-2xl font-bold text-emerald-600">{activeUsers}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <UserCheck className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -218,7 +218,7 @@ export default function UsersView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Inactifs</p>
                 <p className="text-2xl font-bold text-red-500">{totalUsers - activeUsers}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-red-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center">
                 <UserCog className="h-5 w-5 text-red-500" />
               </div>
             </div>
@@ -231,7 +231,7 @@ export default function UsersView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Rôles</p>
                 <p className="text-2xl font-bold">{rolesCount.size}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
                 <Shield className="h-5 w-5 text-blue-600" />
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function UsersView() {
                   id="u-actif"
                   checked={formActif}
                   onChange={e => setFormActif(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-border"
                 />
                 <Label htmlFor="u-actif">Compte actif</Label>
               </div>
@@ -356,7 +356,7 @@ export default function UsersView() {
                       <tr key={user.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                            <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                               {getInitials(user.nom)}
                             </div>
                             <div className="min-w-0">
@@ -397,7 +397,7 @@ export default function UsersView() {
                                 </Button>
                               </div>
                             ) : (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteConfirm(user.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => setDeleteConfirm(user.id)}>
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             )}

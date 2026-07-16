@@ -27,12 +27,12 @@ interface AppelFonds {
 }
 
 const STATUT_BADGE: Record<string, string> = {
-  ACTIF: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  EXPIRE: 'bg-red-50 text-red-700 border-red-200',
-  SUSPENDU: 'bg-amber-50 text-amber-700 border-amber-200',
-  EN_ATTENTE: 'bg-amber-50 text-amber-700 border-amber-200',
-  REGLE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  PARTIELLEMENT_REGLE: 'bg-sky-50 text-sky-700 border-sky-200',
+  ACTIF: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  EXPIRE: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+  SUSPENDU: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  EN_ATTENTE: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  REGLE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  PARTIELLEMENT_REGLE: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
 };
 
 const STATUT_LABEL: Record<string, string> = {
@@ -132,7 +132,7 @@ export default function ReportingView() {
       {/* Tabs */}
       <div className="flex gap-1 border-b">
         {([['contrats', 'Suivi des Contrats', Building2], ['appels', 'Appels de Fonds', DollarSign], ['rapport', 'Rapport Mensuel', FileBarChart]] as const).map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === key ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+          <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === key ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             <Icon className="size-4" />{label}
           </button>
         ))}
@@ -250,7 +250,7 @@ export default function ReportingView() {
                       <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE[a.statut] || ''}>{STATUT_LABEL[a.statut] || a.statut}</Badge></td>
                       <td className="px-4 py-2.5 text-right">
                         {a.statut === 'EN_ATTENTE' && (
-                          <Button size="sm" variant="outline" onClick={() => marquerRegle(a.id)} className="text-xs h-7 text-emerald-600 border-emerald-200">
+                          <Button size="sm" variant="outline" onClick={() => marquerRegle(a.id)} className="text-xs h-7 text-emerald-600 border-emerald-200 dark:border-emerald-800">
                             <CheckCircle2 className="size-3 mr-1" />Marquer réglé
                           </Button>
                         )}

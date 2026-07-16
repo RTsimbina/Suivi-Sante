@@ -73,10 +73,10 @@ function StatusPipeline({ statut }: { statut: string }) {
               <div className={cn(
                 'h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium border-2',
                 i === 0
-                  ? 'bg-emerald-100 border-emerald-300 text-emerald-700'
+                  ? 'bg-emerald-100 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
                   : i === 1
-                    ? 'bg-red-100 border-red-300 text-red-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-400'
+                    ? 'bg-red-100 border-red-300 text-red-700 dark:text-red-300'
+                    : 'bg-muted border-border text-muted-foreground'
               )}>
                 {i === 0 ? <CheckCheck className="h-3.5 w-3.5" /> : i === 1 ? '✕' : i + 1}
               </div>
@@ -87,7 +87,7 @@ function StatusPipeline({ statut }: { statut: string }) {
             {i < PIPELINE_STEPS.length - 1 && (
               <div className={cn(
                 'h-0.5 w-6 mb-4',
-                i === 0 ? 'bg-emerald-300' : 'bg-gray-200'
+                i === 0 ? 'bg-emerald-400' : 'bg-muted-foreground/30'
               )} />
             )}
           </div>
@@ -104,16 +104,16 @@ function StatusPipeline({ statut }: { statut: string }) {
             <div className={cn(
               'h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-all',
               i < currentIdx
-                ? 'bg-emerald-500 border-emerald-500 text-white'
+                ? 'bg-emerald-50 dark:bg-emerald-950/400 border-emerald-500 text-white'
                 : i === currentIdx
-                  ? 'bg-emerald-100 border-emerald-400 text-emerald-700 ring-2 ring-emerald-200'
-                  : 'bg-gray-50 border-gray-200 text-gray-400'
+                  ? 'bg-emerald-100 border-emerald-400 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-200'
+                  : 'bg-muted border-border text-muted-foreground'
             )}>
               {i < currentIdx ? <CheckCheck className="h-3.5 w-3.5" /> : i + 1}
             </div>
             <span className={cn(
               'text-[10px] w-16 text-center leading-tight',
-              i <= currentIdx ? 'text-emerald-700 font-medium' : 'text-muted-foreground'
+              i <= currentIdx ? 'text-emerald-700 dark:text-emerald-300 font-medium' : 'text-muted-foreground'
             )}>
               {step.label}
             </span>
@@ -121,7 +121,7 @@ function StatusPipeline({ statut }: { statut: string }) {
           {i < PIPELINE_STEPS.length - 1 && (
             <div className={cn(
               'h-0.5 w-6 mb-4 transition-all',
-              i < currentIdx ? 'bg-emerald-500' : 'bg-gray-200'
+              i < currentIdx ? 'bg-emerald-50 dark:bg-emerald-950/400' : 'bg-muted-foreground/30'
             )} />
           )}
         </div>
@@ -150,7 +150,7 @@ function DossierClientCard({ dossier }: { dossier: PortailDossier }) {
   })();
 
   return (
-    <Card className="border-emerald-100 overflow-hidden">
+    <Card className="border-emerald-100 dark:border-emerald-800 overflow-hidden">
       <CardContent className="p-4 space-y-3">
         {/* En-tête */}
         <div className="flex items-start justify-between gap-2">
@@ -180,9 +180,9 @@ function DossierClientCard({ dossier }: { dossier: PortailDossier }) {
             <p className="text-base font-bold text-foreground mt-0.5">{formatMontant(dossier.montantReclame)}</p>
           </div>
           {isPaye && dossier.montantPaye !== undefined && (
-            <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3">
+            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 p-3">
               <p className="text-[10px] text-emerald-600 uppercase tracking-wide font-medium">Montant payé</p>
-              <p className="text-base font-bold text-emerald-700 mt-0.5">{formatMontant(dossier.montantPaye)}</p>
+              <p className="text-base font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">{formatMontant(dossier.montantPaye)}</p>
             </div>
           )}
         </div>
@@ -190,10 +190,10 @@ function DossierClientCard({ dossier }: { dossier: PortailDossier }) {
         {/* Message contextuel */}
         <div className={cn(
           'rounded-lg p-3 text-sm',
-          isPaye && 'bg-emerald-50 border border-emerald-100 text-emerald-800',
-          isRejete && 'bg-red-50 border border-red-100 text-red-800',
-          isEnCours && 'bg-amber-50 border border-amber-100 text-amber-800',
-          !isPaye && !isRejete && !isEnCours && 'bg-gray-50 border border-gray-100 text-gray-700'
+          isPaye && 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300',
+          isRejete && 'bg-red-50 dark:bg-red-950/40 border border-red-100 text-red-800',
+          isEnCours && 'bg-amber-50 dark:bg-amber-950/40 border border-amber-100 text-amber-800',
+          !isPaye && !isRejete && !isEnCours && 'bg-muted border border-border text-foreground'
         )}>
           {isPaye && dossier.montantPaye && dossier.datePaiement && (
             <p>
@@ -266,7 +266,7 @@ function PortailClientTab() {
   return (
     <div className="space-y-4">
       {/* Formulaire de recherche */}
-      <Card className="border-emerald-100">
+      <Card className="border-emerald-100 dark:border-emerald-800">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -299,7 +299,7 @@ function PortailClientTab() {
       {loading && (
         <div className="space-y-3">
           {[1, 2].map((i) => (
-            <Card key={i} className="border-emerald-100">
+            <Card key={i} className="border-emerald-100 dark:border-emerald-800">
               <CardContent className="p-4 space-y-3">
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-3 w-32" />
@@ -316,15 +316,15 @@ function PortailClientTab() {
       )}
 
       {error && (
-        <Card className="border-red-100 bg-red-50/50">
+        <Card className="border-red-100 bg-red-50 dark:bg-red-950/40/50">
           <CardContent className="p-4">
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </CardContent>
         </Card>
       )}
 
       {!loading && !error && searched && results.length === 0 && (
-        <Card className="border-gray-100">
+        <Card className="border-border">
           <CardContent className="p-6 text-center">
             <Search className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
             <p className="text-sm text-muted-foreground">
@@ -346,7 +346,7 @@ function PortailClientTab() {
       )}
 
       {!searched && !loading && (
-        <Card className="border-dashed border-gray-200">
+        <Card className="border-dashed border-border">
           <CardContent className="p-8 text-center">
             <FileText className="h-10 w-10 mx-auto text-emerald-400 mb-3" />
             <p className="text-sm font-medium text-foreground">Recherchez votre dossier</p>
@@ -571,7 +571,7 @@ function ChatbotTab() {
                     className="flex-1 flex flex-col items-center gap-1 bg-white rounded-lg px-2 py-2.5 shadow-sm hover:shadow transition-shadow active:scale-95"
                   >
                     <Icon className="h-4 w-4 text-emerald-600" />
-                    <span className="text-[10px] font-medium text-gray-700 text-center leading-tight">{action.label}</span>
+                    <span className="text-[10px] font-medium text-foreground text-center leading-tight">{action.label}</span>
                   </button>
                 );
               })}
@@ -585,7 +585,7 @@ function ChatbotTab() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
               placeholder="Saisissez votre message..."
-              className="flex-1 h-9 bg-white border-gray-200 rounded-full text-[13px] px-4 focus-visible:ring-emerald-400"
+              className="flex-1 h-9 bg-white border-border rounded-full text-[13px] px-4 focus-visible:ring-emerald-400"
               disabled={isLoading}
             />
             <Button
@@ -701,7 +701,7 @@ function PortailSecuriseTab() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-emerald-100">
+      <Card className="border-emerald-100 dark:border-emerald-800">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
             <div className="flex-1 w-full">
@@ -723,7 +723,7 @@ function PortailSecuriseTab() {
       </Card>
 
       {!selectedSociete && (
-        <Card className="border-dashed border-gray-200">
+        <Card className="border-dashed border-border">
           <CardContent className="p-8 text-center">
             <Building2 className="h-10 w-10 mx-auto text-emerald-400 mb-3" />
             <p className="text-sm font-medium text-foreground">Sélectionnez votre entreprise</p>
@@ -744,10 +744,10 @@ function PortailSecuriseTab() {
             </div>
           ) : kpis && (
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-              <Card className="border-emerald-100">
+              <Card className="border-emerald-100 dark:border-emerald-800">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-emerald-50"><FolderOpen className="h-4 w-4 text-emerald-600" /></div>
+                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40"><FolderOpen className="h-4 w-4 text-emerald-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Total dossiers</span>
                   </div>
                   <p className="text-2xl font-bold">{kpis.totalDossiers}</p>
@@ -756,7 +756,7 @@ function PortailSecuriseTab() {
               <Card className="border-sky-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-sky-50"><BarChart3 className="h-4 w-4 text-sky-600" /></div>
+                    <div className="p-2 rounded-lg bg-sky-50 dark:bg-sky-950/40"><BarChart3 className="h-4 w-4 text-sky-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Montant réclamé</span>
                   </div>
                   <p className="text-2xl font-bold">{formatMontant(kpis.totalReclame)}</p>
@@ -765,16 +765,16 @@ function PortailSecuriseTab() {
               <Card className="border-teal-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-teal-50"><TrendingUp className="h-4 w-4 text-teal-600" /></div>
+                    <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/40"><TrendingUp className="h-4 w-4 text-teal-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Montant payé</span>
                   </div>
-                  <p className="text-2xl font-bold text-teal-700">{formatMontant(kpis.totalPaye)}</p>
+                  <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{formatMontant(kpis.totalPaye)}</p>
                 </CardContent>
               </Card>
               <Card className="border-amber-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-amber-50"><CreditCard className="h-4 w-4 text-amber-600" /></div>
+                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40"><CreditCard className="h-4 w-4 text-amber-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">En cours</span>
                   </div>
                   <p className="text-2xl font-bold text-amber-600">{kpis.totalEnCours}</p>
@@ -783,7 +783,7 @@ function PortailSecuriseTab() {
               <Card className="border-red-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-red-50"><Receipt className="h-4 w-4 text-red-500" /></div>
+                    <div className="p-2 rounded-lg bg-red-50 dark:bg-red-950/40"><Receipt className="h-4 w-4 text-red-500" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Rejetés</span>
                   </div>
                   <p className="text-2xl font-bold text-red-600">{kpis.totalRejete}</p>
@@ -792,10 +792,10 @@ function PortailSecuriseTab() {
               <Card className="border-violet-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-violet-50"><Users className="h-4 w-4 text-violet-600" /></div>
+                    <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/40"><Users className="h-4 w-4 text-violet-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Taux paiement</span>
                   </div>
-                  <p className="text-2xl font-bold text-violet-700">
+                  <p className="text-2xl font-bold text-violet-700 dark:text-violet-300">
                     {kpis.totalDossiers > 0 ? ((kpis.totalPaye / kpis.totalReclame) * 100).toFixed(1) + '%' : '\u2014'}
                   </p>
                 </CardContent>
@@ -840,9 +840,9 @@ function PortailSecuriseTab() {
                             </td>
                             <td className="py-2 text-xs text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                                   <div
-                                    className={cn('h-full rounded-full', tauxUtil > 80 ? 'bg-red-500' : tauxUtil > 50 ? 'bg-amber-500' : 'bg-emerald-500')}
+                                    className={cn('h-full rounded-full', tauxUtil > 80 ? 'bg-red-50 dark:bg-red-950/400' : tauxUtil > 50 ? 'bg-amber-50 dark:bg-amber-950/400' : 'bg-emerald-50 dark:bg-emerald-950/400')}
                                     style={{width: `${Math.min(tauxUtil, 100)}%`}}
                                   />
                                 </div>
@@ -897,15 +897,15 @@ export default function PortailView() {
   return (
     <div className="space-y-4">
       {/* Bannière d'information */}
-      <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="flex items-start gap-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
         <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
           <Info className="h-4 w-4 text-emerald-600" />
         </div>
         <div>
-          <p className="text-sm font-medium text-emerald-800">
+          <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
             Aperçu du portail client
           </p>
-          <p className="text-xs text-emerald-700 mt-0.5 leading-relaxed">
+          <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5 leading-relaxed">
             En production, ce portail est accessible via{' '}
             <strong>WhatsApp</strong>, <strong>Telegram</strong> et <strong>Messenger</strong>.
             Les clients peuvent suivre leurs dossiers de remboursement en temps réel.
@@ -915,7 +915,7 @@ export default function PortailView() {
 
       {/* Onglets */}
       <Tabs defaultValue="portail" className="w-full">
-        <TabsList className="bg-emerald-50">
+        <TabsList className="bg-emerald-50 dark:bg-emerald-950/40">
           <TabsTrigger
             value="portail"
             className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white gap-2"

@@ -13,8 +13,13 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="h-8 w-8">
-        <Sun className="h-4 w-4" />
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5 text-xs font-medium"
+      >
+        <Sun className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Clair</span>
       </Button>
     );
   }
@@ -27,25 +32,26 @@ export function ThemeToggle() {
 
   const icon =
     theme === 'dark' ? (
-      <Moon className="h-4 w-4" />
+      <Moon className="h-3.5 w-3.5" />
     ) : theme === 'light' ? (
-      <Sun className="h-4 w-4" />
+      <Sun className="h-3.5 w-3.5" />
     ) : (
-      <Monitor className="h-4 w-4" />
+      <Monitor className="h-3.5 w-3.5" />
     );
 
   const label =
-    theme === 'dark' ? 'Mode sombre' : theme === 'light' ? 'Mode clair' : 'Système';
+    theme === 'dark' ? 'Sombre' : theme === 'light' ? 'Clair' : 'Auto';
 
   return (
     <Button
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+      variant="outline"
+      size="sm"
+      className="h-8 gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
       onClick={cycleTheme}
-      title={label}
+      title={theme === 'dark' ? 'Mode sombre' : theme === 'light' ? 'Mode clair' : 'Système'}
     >
       {icon}
+      <span className="hidden sm:inline">{label}</span>
     </Button>
   );
 }

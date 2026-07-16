@@ -65,9 +65,9 @@ const incoherenceLabel: Record<string, string> = {
 };
 
 function getRisqueColor(risque: number): string {
-  if (risque > 30) return 'bg-red-500';
-  if (risque > 15) return 'bg-amber-500';
-  return 'bg-emerald-500';
+  if (risque > 30) return 'bg-red-50 dark:bg-red-950/400';
+  if (risque > 15) return 'bg-amber-50 dark:bg-amber-950/400';
+  return 'bg-emerald-50 dark:bg-emerald-950/400';
 }
 
 function getRisqueTextColor(risque: number): string {
@@ -123,10 +123,10 @@ export default function IaView() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="border-red-200 bg-red-50 max-w-md">
+        <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 max-w-md">
           <CardContent className="pt-6 text-center">
             <AlertTriangle className="mx-auto mb-3 size-10 text-red-500" />
-            <p className="font-semibold text-red-700">Erreur de chargement</p>
+            <p className="font-semibold text-red-700 dark:text-red-300">Erreur de chargement</p>
             <p className="mt-1 text-sm text-red-600">{error}</p>
           </CardContent>
         </Card>
@@ -185,14 +185,14 @@ export default function IaView() {
       {/* Section 1 : 5 Cartes d'alerte */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Carte 1 : Dossiers en retard */}
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/30">
+        <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 dark:bg-red-950/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/50">
                 <AlertTriangle className="size-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                <p className="text-sm font-medium text-red-700 dark:text-red-300 dark:text-red-400">
                   Dossiers en retard
                 </p>
                 <p className="text-2xl font-bold text-red-800 dark:text-red-300">
@@ -207,14 +207,14 @@ export default function IaView() {
         </Card>
 
         {/* Carte 2 : Anomalies détectées */}
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/30">
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 dark:bg-amber-950/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
                 <ShieldAlert className="size-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-300 dark:text-amber-400">
                   Anomalies détectées
                 </p>
                 <p className="text-2xl font-bold text-amber-800 dark:text-amber-300">
@@ -229,7 +229,7 @@ export default function IaView() {
         </Card>
 
         {/* Carte 3 : Risque de retard */}
-        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
+        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/40 dark:bg-orange-950/30">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/50">
@@ -252,13 +252,13 @@ export default function IaView() {
 
         {/* Carte 4 : Pièces justificatives manquantes (orange/amber, cliquable) */}
         <Card
-          className="border-amber-300 bg-amber-50/80 dark:bg-amber-950/30 cursor-pointer hover:shadow-md transition-shadow"
+          className="border-amber-300 bg-amber-50 dark:bg-amber-950/40/80 dark:bg-amber-950/30 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => toggleCard('pieces')}
         >
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
-                <FileX className="size-5 text-amber-700" />
+                <FileX className="size-5 text-amber-700 dark:text-amber-300" />
               </div>
               <div>
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
@@ -270,7 +270,7 @@ export default function IaView() {
               </div>
               <ChevronDown className={`ml-auto size-4 text-amber-500 transition-transform ${expandedCards.has('pieces') ? 'rotate-180' : ''}`} />
             </div>
-            <p className="mt-2 text-xs text-amber-700/80 dark:text-amber-500/80">
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300/80 dark:text-amber-500/80">
               Dossiers sans justificatifs depuis &gt;3 jours
             </p>
           </CardContent>
@@ -278,13 +278,13 @@ export default function IaView() {
 
         {/* Carte 5 : Incohérences de traitement (red, cliquable) */}
         <Card
-          className="border-red-300 bg-red-50/80 dark:bg-red-950/30 cursor-pointer hover:shadow-md transition-shadow"
+          className="border-red-300 bg-red-50 dark:bg-red-950/40/80 dark:bg-red-950/30 cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => toggleCard('incoherences')}
         >
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/50">
-                <AlertOctagon className="size-5 text-red-700" />
+                <AlertOctagon className="size-5 text-red-700 dark:text-red-300" />
               </div>
               <div>
                 <p className="text-sm font-medium text-red-800 dark:text-red-400">
@@ -296,7 +296,7 @@ export default function IaView() {
               </div>
               <ChevronDown className={`ml-auto size-4 text-red-500 transition-transform ${expandedCards.has('incoherences') ? 'rotate-180' : ''}`} />
             </div>
-            <p className="mt-2 text-xs text-red-700/80 dark:text-red-500/80">
+            <p className="mt-2 text-xs text-red-700 dark:text-red-300/80 dark:text-red-500/80">
               Anomalies de traitement des dossiers
             </p>
           </CardContent>
@@ -375,7 +375,7 @@ export default function IaView() {
                 anomalies.map((a, idx) => (
                   <Card
                     key={`${a.numeroDossier}-${idx}`}
-                    className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 py-4 gap-3"
+                    className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40/50 dark:bg-amber-950/20 py-4 gap-3"
                   >
                     <CardContent className="px-4 pb-0 pt-0">
                       <div className="flex items-center justify-between gap-2">
@@ -433,7 +433,7 @@ export default function IaView() {
                         <TableCell className="text-sm">{p.beneficiaire}</TableCell>
                         <TableCell className="text-sm">{p.societeNom}</TableCell>
                         <TableCell className="text-right">
-                          <span className={p.joursEnAnalyse > 7 ? 'font-bold text-amber-700' : 'text-foreground'}>
+                          <span className={p.joursEnAnalyse > 7 ? 'font-bold text-amber-700 dark:text-amber-300' : 'text-foreground'}>
                             {p.joursEnAnalyse} j
                           </span>
                         </TableCell>
@@ -469,7 +469,7 @@ export default function IaView() {
                 incoherences.map((inc, idx) => (
                   <Card
                     key={`${inc.numeroDossier}-${idx}`}
-                    className="border-red-200 bg-red-50/50 dark:bg-red-950/20 py-4 gap-3"
+                    className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40/50 dark:bg-red-950/20 py-4 gap-3"
                   >
                     <CardContent className="px-4 pb-0 pt-0">
                       <div className="flex items-center justify-between gap-2">

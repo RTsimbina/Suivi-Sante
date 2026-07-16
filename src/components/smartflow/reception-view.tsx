@@ -80,14 +80,14 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  FACTURE_PRESTATAIRE: 'bg-orange-50 text-orange-700 border-orange-200',
-  DOSSIER_REMBOURSEMENT: 'bg-sky-50 text-sky-700 border-sky-200',
+  FACTURE_PRESTATAIRE: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 border-orange-200',
+  DOSSIER_REMBOURSEMENT: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
 };
 
 const COURRIEL_STATUT_COLORS: Record<string, string> = {
-  RECU: 'bg-amber-50 text-amber-700 border-amber-200',
-  TRAITE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  REJETE: 'bg-red-50 text-red-700 border-red-200',
+  RECU: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  TRAITE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  REJETE: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
 };
 
 const COURRIEL_STATUT_LABELS: Record<string, string> = {
@@ -97,10 +97,10 @@ const COURRIEL_STATUT_LABELS: Record<string, string> = {
 };
 
 const steps = [
-  { title: 'Réception', desc: 'Saisie dans Excel, création ID unique', icon: FileInput, color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-200' },
-  { title: 'Service Technique', desc: 'Traitement via ISA', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
-  { title: 'Comptabilité', desc: 'Décompte Excel + Paiement SAGE', icon: ArrowRight, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
-  { title: 'Paiement', desc: 'Virement effectué', icon: Timer, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  { title: 'Réception', desc: 'Saisie dans Excel, création ID unique', icon: FileInput, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40', border: 'border-sky-200 dark:border-sky-800' },
+  { title: 'Service Technique', desc: 'Traitement via ISA', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800' },
+  { title: 'Comptabilité', desc: 'Décompte Excel + Paiement SAGE', icon: ArrowRight, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800' },
+  { title: 'Paiement', desc: 'Virement effectué', icon: Timer, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -340,7 +340,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-sky-50"><FileInput className="h-6 w-6 text-sky-600" /></div>
+            <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-950/40"><FileInput className="h-6 w-6 text-sky-600" /></div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Total enregistrés</p>
               <p className="text-2xl font-bold">{kpis.reception.totalEnregistres}</p>
@@ -349,7 +349,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-amber-50"><Timer className="h-6 w-6 text-amber-600" /></div>
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40"><Timer className="h-6 w-6 text-amber-600" /></div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Temps moyen avant transfert</p>
               <p className="text-2xl font-bold">{kpis.reception.tempsMoyenAvantTransfert} <span className="text-sm font-normal text-muted-foreground">jours</span></p>
@@ -358,7 +358,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-amber-50"><AlertTriangle className="h-6 w-6 text-amber-600" /></div>
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40"><AlertTriangle className="h-6 w-6 text-amber-600" /></div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">En attente de transfert</p>
               <p className="text-2xl font-bold">{kpis.reception.enAttente}</p>
@@ -410,7 +410,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
               <Mail className="h-5 w-5 text-sky-600" />
               <CardTitle className="text-sm font-medium">Courriels</CardTitle>
               {pagination.total > 0 && (
-                <Badge variant="outline" className="text-[10px] border-sky-200 text-sky-600 bg-sky-50">
+                <Badge variant="outline" className="text-[10px] border-sky-200 dark:border-sky-800 text-sky-600 bg-sky-50 dark:bg-sky-950/40">
                   {pagination.total}
                 </Badge>
               )}
@@ -598,7 +598,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                 <div>
                   <p className="text-xs text-muted-foreground">{item.label}</p>
                   <p className="text-sm font-medium">{item.value}</p>
-                  {item.auto && <Badge variant="outline" className="mt-1 text-emerald-600 border-emerald-200 text-[10px]">Auto-généré par IA</Badge>}
+                  {item.auto && <Badge variant="outline" className="mt-1 text-emerald-600 border-emerald-200 dark:border-emerald-800 text-[10px]">Auto-généré par IA</Badge>}
                 </div>
               </div>
             ))}
@@ -783,7 +783,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                     {COURRIEL_STATUT_LABELS[selectedCourriel.statut] || selectedCourriel.statut}
                   </Badge>
                   {selectedCourriel.dossier && (
-                    <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200 text-[10px]">
+                    <Badge variant="outline" className="bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px]">
                       <FileText className="h-3 w-3 mr-1" />
                       {selectedCourriel.dossier.numeroDossier}
                     </Badge>
@@ -825,7 +825,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                   {selectedCourriel.montant !== null && selectedCourriel.montant > 0 && (
                     <div className="p-3 rounded-lg bg-muted/50">
                       <p className="text-[11px] text-muted-foreground">Montant</p>
-                      <p className="text-sm font-bold text-emerald-700">{formatMontantCourt(selectedCourriel.montant)}</p>
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatMontantCourt(selectedCourriel.montant)}</p>
                     </div>
                   )}
                   {selectedCourriel.dateSoins && (
@@ -859,7 +859,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                 {/* ─── Edit Section ─────────────────────────────────────── */}
                 {editMode ? (
                   <div className="space-y-4 pt-2 border-t">
-                    <p className="text-sm font-semibold text-amber-700">Mode édition</p>
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Mode édition</p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -909,7 +909,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-xs text-red-600 hover:text-red-700 dark:text-red-300 hover:bg-red-50 dark:bg-red-950/40"
                       onClick={() => setDeleteOpen(true)}
                     >
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" />

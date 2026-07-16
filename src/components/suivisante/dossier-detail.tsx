@@ -121,22 +121,22 @@ const JUSTIFICATIF_LABELS: Record<string, string> = {
 };
 
 const JUSTIFICATIF_COLORS: Record<string, string> = {
-  FACTURE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  ORDONNANCE: 'bg-sky-50 text-sky-700 border-sky-200',
-  RIB: 'bg-amber-50 text-amber-700 border-amber-200',
-  CARNET_SOINS: 'bg-purple-50 text-purple-700 border-purple-200',
-  DECOMPTE: 'bg-orange-50 text-orange-700 border-orange-200',
-  AUTRE: 'bg-gray-50 text-gray-600 border-gray-200',
+  FACTURE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  ORDONNANCE: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+  RIB: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  CARNET_SOINS: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+  DECOMPTE: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 border-orange-200',
+  AUTRE: 'bg-muted text-muted-foreground border-border',
 };
 
 const HISTORIQUE_STATUT_COLORS: Record<string, string> = {
   RECU: 'bg-slate-500',
-  EN_ANALYSE: 'bg-amber-500',
-  VALIDE: 'bg-emerald-500',
-  EN_COMPTABILITE: 'bg-sky-500',
+  EN_ANALYSE: 'bg-amber-50 dark:bg-amber-950/400',
+  VALIDE: 'bg-emerald-50 dark:bg-emerald-950/400',
+  EN_COMPTABILITE: 'bg-sky-50 dark:bg-sky-950/400',
   EN_PAIEMENT: 'bg-indigo-500',
-  PAYE: 'bg-teal-500',
-  REJETE: 'bg-red-500',
+  PAYE: 'bg-teal-50 dark:bg-teal-950/400',
+  REJETE: 'bg-red-50 dark:bg-red-950/400',
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors',
                     activeTab === tab.key
-                      ? 'border-emerald-600 text-emerald-700'
+                      ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   )}
                 >
@@ -390,25 +390,25 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                       <span>Analyse IA du dossier</span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-lg bg-white/70 border border-violet-100 p-3 text-center">
+                      <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Montant réclamé</p>
                         <p className="text-base font-bold text-foreground mt-0.5">{formatMontant(dossier.montantReclame)}</p>
                       </div>
-                      <div className="rounded-lg bg-white/70 border border-violet-100 p-3 text-center">
+                      <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Montant validé</p>
                         <p className="text-base font-bold mt-0.5" style={{color: dossier.montantValide && dossier.montantValide < dossier.montantReclame ? '#dc2626' : '#059669'}}>
                           {dossier.montantValide ? formatMontant(dossier.montantValide) : '—'}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white/70 border border-violet-100 p-3 text-center">
+                      <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Taux couverture</p>
-                        <p className="text-base font-bold text-violet-700 mt-0.5">
+                        <p className="text-base font-bold text-violet-700 dark:text-violet-300 mt-0.5">
                           {dossier.montantValide && dossier.montantReclame > 0
                             ? ((dossier.montantValide / dossier.montantReclame) * 100).toFixed(1) + '%'
                             : '—'}
                         </p>
                       </div>
-                      <div className="rounded-lg bg-white/70 border border-violet-100 p-3 text-center">
+                      <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Ticket mod.</p>
                         <p className="text-base font-bold text-amber-600 mt-0.5">
                           {dossier.ticketModerateur ? formatMontant(dossier.ticketModerateur) : '—'}
@@ -433,8 +433,8 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                         className={cn(
                           'flex items-start gap-3 rounded-lg border p-3',
                           alert.niveau === 'error'
-                            ? 'border-red-200 bg-red-50'
-                            : 'border-amber-200 bg-amber-50'
+                            ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40'
+                            : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40'
                         )}
                       >
                         {alert.niveau === 'error'
@@ -448,7 +448,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                           <p className="text-xs text-muted-foreground mt-0.5">{alert.message}</p>
                         </div>
                         {alert.niveau === 'error' && (
-                          <Badge variant="outline" className="text-[10px] border-red-200 text-red-600 bg-red-50 shrink-0">
+                          <Badge variant="outline" className="text-[10px] border-red-200 dark:border-red-800 text-red-600 bg-red-50 dark:bg-red-950/40 shrink-0">
                             Critique
                           </Badge>
                         )}
@@ -457,10 +457,10 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+                    <div className="h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-3">
                       <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                     </div>
-                    <p className="text-sm font-medium text-emerald-700">Aucune alerte détectée</p>
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Aucune alerte détectée</p>
                     <p className="text-xs text-muted-foreground mt-1">Ce dossier ne présente aucune anomalie identifiée par l&apos;IA.</p>
                   </div>
                 )}
@@ -585,12 +585,12 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                     <div key={i} className="flex gap-3 relative">
                       {/* Timeline line */}
                       {i < dossier.historiqueParsed.length - 1 && (
-                        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-gray-200" />
+                        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
                       )}
                       {/* Dot */}
                       <div className={cn(
                         'h-6 w-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 z-10',
-                        HISTORIQUE_STATUT_COLORS[entry.statut] || 'bg-gray-400',
+                        HISTORIQUE_STATUT_COLORS[entry.statut] || 'bg-muted-foreground',
                         'text-white'
                       )}>
                         {i === dossier.historiqueParsed.length - 1 ? (
@@ -627,7 +627,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
             {activeTab === 'commentaires' && (
               <div className="space-y-4">
                 {/* Add comment form */}
-                <Card className="border-emerald-100">
+                <Card className="border-emerald-100 dark:border-emerald-800">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2">
                       <Textarea
@@ -644,7 +644,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                         onClick={() => setCommentPrive(!commentPrive)}
                         className={cn(
                           'flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors',
-                          commentPrive ? 'bg-amber-50 text-amber-700' : 'text-muted-foreground hover:text-foreground'
+                          commentPrive ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' : 'text-muted-foreground hover:text-foreground'
                         )}
                       >
                         {commentPrive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -679,7 +679,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">{c.auteur?.nom || 'Utilisateur'}</span>
                             {c.prive && (
-                              <Badge variant="outline" className="text-[10px] border-amber-200 text-amber-600 bg-amber-50">
+                              <Badge variant="outline" className="text-[10px] border-amber-200 dark:border-amber-800 text-amber-600 bg-amber-50 dark:bg-amber-950/40">
                                 <EyeOff className="h-2.5 w-2.5 mr-0.5" />
                                 Interne
                               </Badge>
@@ -713,7 +713,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                       id="upload-justificatif"
                       accept=".pdf,.jpg,.jpeg,.png,.webp"
                       onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                      className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                      className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-emerald-50 dark:file:bg-emerald-950/40 file:text-emerald-700 dark:file:text-emerald-300 hover:file:bg-emerald-100 dark:hover:file:bg-emerald-900/50"
                     />
                   </div>
                   <Select value={uploadType} onValueChange={setUploadType}>
@@ -744,9 +744,9 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                   dossier.justificatifs.map((j) => (
                     <div
                       key={j.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
-                      <div className="h-10 w-10 rounded-md bg-emerald-50 flex items-center justify-center shrink-0">
+                      <div className="h-10 w-10 rounded-md bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center shrink-0">
                         <FileText className="h-5 w-5 text-emerald-600" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -771,7 +771,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                   ))
                 ) : (
                   <div className="text-center py-12">
-                    <Paperclip className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <Paperclip className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                     <p className="text-sm text-muted-foreground">
                       Aucun justificatif téléchargé pour ce dossier
                     </p>
@@ -813,7 +813,7 @@ function InfoRow({
       {Icon && <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={cn('text-sm', highlight ? 'font-semibold text-emerald-700' : 'font-medium')}>
+        <p className={cn('text-sm', highlight ? 'font-semibold text-emerald-700 dark:text-emerald-300' : 'font-medium')}>
           {value || <span className="text-muted-foreground font-normal">—</span>}
         </p>
       </div>

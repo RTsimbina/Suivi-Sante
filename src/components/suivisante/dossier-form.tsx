@@ -353,17 +353,17 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
         )}
 
         {!calculLoading && calculResult && (
-          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/60 overflow-hidden">
+          <Card className="border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50/80 to-teal-50/60 overflow-hidden">
             <div className="p-4 space-y-3">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <div className="flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
                   <Calculator className="size-4" />
                   <Sparkles className="size-3.5 text-amber-500" />
                   <span>Calcul automatique</span>
                 </div>
                 {calculResult.plafondAtteint && (
-                  <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 gap-1">
+                  <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 gap-1">
                     <AlertTriangle className="size-3" />
                     Plafond atteint
                   </Badge>
@@ -371,27 +371,27 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
               </div>
 
               {/* Barème info */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-emerald-700/80">
-                <span><span className="font-medium text-emerald-800">Barème :</span> {calculResult.bareme}</span>
-                <span><span className="font-medium text-emerald-800">Taux de couverture :</span> {calculResult.tauxCouverture}%</span>
-                <span><span className="font-medium text-emerald-800">Plafond :</span> {formatAr(calculResult.plafond)}</span>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-emerald-700 dark:text-emerald-300/80">
+                <span><span className="font-medium text-emerald-800 dark:text-emerald-300">Barème :</span> {calculResult.bareme}</span>
+                <span><span className="font-medium text-emerald-800 dark:text-emerald-300">Taux de couverture :</span> {calculResult.tauxCouverture}%</span>
+                <span><span className="font-medium text-emerald-800 dark:text-emerald-300">Plafond :</span> {formatAr(calculResult.plafond)}</span>
               </div>
 
               {/* Two columns: Montant remboursé / Ticket modérateur */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-emerald-100/70 border border-emerald-200/60 p-3 text-center">
-                  <p className="text-xs font-medium text-emerald-700 mb-1">Montant remboursé</p>
-                  <p className="text-lg font-bold text-emerald-700">{formatAr(calculResult.calcul.montantRembourse)}</p>
+                <div className="rounded-lg bg-emerald-100/70 border border-emerald-200 dark:border-emerald-800/60 p-3 text-center">
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-1">Montant remboursé</p>
+                  <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatAr(calculResult.calcul.montantRembourse)}</p>
                 </div>
-                <div className="rounded-lg bg-amber-50/70 border border-amber-200/60 p-3 text-center">
-                  <p className="text-xs font-medium text-amber-700 mb-1">Ticket modérateur</p>
-                  <p className="text-lg font-bold text-amber-700">{formatAr(calculResult.calcul.ticketModerateur)}</p>
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40/70 border border-amber-200 dark:border-amber-800/60 p-3 text-center">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Ticket modérateur</p>
+                  <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{formatAr(calculResult.calcul.ticketModerateur)}</p>
                 </div>
               </div>
 
               {/* Explanation */}
               {calculResult.explication && (
-                <p className="text-xs text-emerald-700/70 italic">{calculResult.explication}</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300/70 italic">{calculResult.explication}</p>
               )}
             </div>
           </Card>
@@ -428,7 +428,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
                     {JUSTIF_TYPES.map(t => <option key={t} value={t}>{JUSTIF_LABELS[t]}</option>)}
                   </select>
                   {uploadingFiles.includes(f.id) && <Loader2 className="size-3.5 animate-spin text-emerald-600" />}
-                  <button type="button" onClick={() => removeFile(f.id)} className="text-red-500 hover:text-red-700">
+                  <button type="button" onClick={() => removeFile(f.id)} className="text-red-500 hover:text-red-700 dark:text-red-300">
                     <X className="size-3.5" />
                   </button>
                 </div>

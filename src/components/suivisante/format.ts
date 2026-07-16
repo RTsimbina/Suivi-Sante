@@ -28,15 +28,15 @@ export function statutLabel(statut: string): string {
 
 export function statutColor(statut: string): string {
   const colors: Record<string, string> = {
-    RECU: 'bg-slate-100 text-slate-700 border-slate-200',
-    EN_ANALYSE: 'bg-amber-50 text-amber-700 border-amber-200',
-    VALIDE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    EN_COMPTABILITE: 'bg-orange-50 text-orange-700 border-orange-200',
-    REJETE: 'bg-red-50 text-red-700 border-red-200',
-    EN_PAIEMENT: 'bg-sky-50 text-sky-700 border-sky-200',
-    PAYE: 'bg-teal-50 text-teal-700 border-teal-200',
+    RECU: 'bg-muted text-muted-foreground border-border',
+    EN_ANALYSE: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    VALIDE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    EN_COMPTABILITE: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 border-orange-200',
+    REJETE: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+    EN_PAIEMENT: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+    PAYE: 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200',
   };
-  return colors[statut] || 'bg-gray-100 text-gray-700';
+  return colors[statut] || 'bg-muted text-muted-foreground';
 }
 
 export function typeDossierLabel(type: string): string {

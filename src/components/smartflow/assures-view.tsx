@@ -205,7 +205,7 @@ export default function AssuresView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Total assurés</p>
                 <p className="text-2xl font-bold">{totalAssures}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Heart className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -218,7 +218,7 @@ export default function AssuresView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Actifs</p>
                 <p className="text-2xl font-bold text-emerald-600">{activeAssures}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Heart className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -231,7 +231,7 @@ export default function AssuresView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Sociétés couvertes</p>
                 <p className="text-2xl font-bold">{new Set(assures.map(a => a.societe.id)).size}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
                 <Building2 className="h-5 w-5 text-blue-600" />
               </div>
             </div>
@@ -326,7 +326,7 @@ export default function AssuresView() {
                 <Input id="a-adresse" value={formAdresse} onChange={(e) => setFormAdresse(e.target.value)} placeholder="Antananarivo, Madagascar" />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="a-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                <input type="checkbox" id="a-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-border" />
                 <Label htmlFor="a-actif">Assuré actif</Label>
               </div>
               <div className="flex gap-2 pt-2">
@@ -372,7 +372,7 @@ export default function AssuresView() {
                     <tr key={a.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold flex-shrink-0">
                             {a.nom[0]}{a.prenom ? a.prenom[0] : ''}
                           </div>
                           <div className="min-w-0">
@@ -382,7 +382,7 @@ export default function AssuresView() {
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge variant="outline" className="text-[11px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
                           {a.societe.nom}
                         </Badge>
                       </td>
@@ -414,7 +414,7 @@ export default function AssuresView() {
                               </Button>
                             </div>
                           ) : (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteConfirm(a.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => setDeleteConfirm(a.id)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
