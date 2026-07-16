@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import UserMenu from '@/components/suivisante/user-menu';
+import { ThemeToggle } from '@/components/theme-toggle';
 import DirectionView from '@/components/suivisante/direction-view';
 import TechniqueView from '@/components/suivisante/technique-view';
 import ComptabiliteView from '@/components/suivisante/comptabilite-view';
@@ -132,7 +133,7 @@ export default function Home() {
   // Loading state
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
           <p className="text-sm text-muted-foreground">Chargement...</p>
@@ -142,7 +143,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-50/50">
+    <div className="min-h-screen flex bg-background">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -150,7 +151,7 @@ export default function Home() {
 
       {/* Sidebar */}
       <aside className={cn(
-        'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r flex flex-col transition-transform duration-200 lg:static lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r flex flex-col transition-transform duration-200 lg:static lg:translate-x-0 shadow-sm',
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         {/* Logo */}
@@ -186,14 +187,14 @@ export default function Home() {
                         className={cn(
                           'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                           active
-                            ? 'bg-emerald-50 text-emerald-700'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         )}
                       >
-                        <Icon className={cn('h-4 w-4', active && 'text-emerald-600')} />
+                        <Icon className={cn('h-4 w-4', active && 'text-emerald-600 dark:text-emerald-400')} />
                         <span className="flex-1 text-left">{item.label}</span>
                         {item.badge && (
-                          <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-emerald-200 text-emerald-600 bg-emerald-50">
+                          <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50">
                             {item.badge}
                           </Badge>
                         )}
@@ -234,7 +235,7 @@ export default function Home() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-14 border-b bg-white flex items-center px-4 gap-3 shrink-0">
+        <header className="h-14 border-b bg-card flex items-center px-4 gap-3 shrink-0">
           <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
           </Button>
@@ -243,10 +244,11 @@ export default function Home() {
             <h2 className="font-semibold text-sm">{navItems.find(n => n.key === view)?.label || 'Suivi Santé'}</h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] border-emerald-200 text-emerald-600">
+            <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
               <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
               En ligne
             </Badge>
+            <ThemeToggle />
             <UserMenu />
           </div>
         </header>
@@ -261,7 +263,7 @@ export default function Home() {
           {view === 'import' && <ImportView />}
           {view === 'reporting' && <ReportingView />}
           {view === 'ia' && <IaView />}
-          {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-white overflow-hidden"><ChatView /></div>}
+          {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><ChatView /></div>}
           {view === 'portail' && <PortailView />}
           {view === 'users' && <UsersView />}
           {view === 'assures' && <AssuresView userRole={role} />}
