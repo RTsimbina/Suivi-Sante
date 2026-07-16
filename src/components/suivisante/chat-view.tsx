@@ -72,15 +72,15 @@ function EtapePipeline({ etape, isLast }: { etape: Etape; isLast: boolean }) {
   const iconMap: Record<EtapeStatut, React.ReactNode> = {
     termine: <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />,
     en_cours: <Loader2 className="size-5 text-sky-600 animate-spin shrink-0" />,
-    en_attente: <Circle className="size-5 text-slate-300 shrink-0" />,
-    saute: <XCircle className="size-5 text-slate-300 shrink-0" />,
+    en_attente: <Circle className="size-5 text-muted-foreground/40 shrink-0" />,
+    saute: <XCircle className="size-5 text-muted-foreground/40 shrink-0" />,
   };
 
   const borderMap: Record<EtapeStatut, string> = {
-    termine: 'border-emerald-400 bg-emerald-50/50',
-    en_cours: 'border-sky-400 bg-sky-50/50 ring-1 ring-sky-200',
-    en_attente: 'border-slate-200 bg-slate-50/50',
-    saute: 'border-slate-200 bg-slate-50/50 opacity-50',
+    termine: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40/50',
+    en_cours: 'border-sky-400 bg-sky-50 dark:bg-sky-950/40/50 ring-1 ring-sky-200',
+    en_attente: 'border-border bg-muted/50',
+    saute: 'border-border bg-muted/50 opacity-50',
   };
 
   return (
@@ -90,7 +90,7 @@ function EtapePipeline({ etape, isLast }: { etape: Etape; isLast: boolean }) {
         {iconMap[etape.statut]}
         {!isLast && (
           <div className={`w-0.5 flex-1 min-h-[24px] ${
-            etape.statut === 'termine' ? 'bg-emerald-300' : 'bg-slate-200'
+            etape.statut === 'termine' ? 'bg-emerald-400 dark:bg-emerald-50 dark:bg-emerald-950/400' : 'bg-muted-foreground/30'
           }`} />
         )}
       </div>
@@ -120,10 +120,10 @@ function EtapePipeline({ etape, isLast }: { etape: Etape; isLast: boolean }) {
 
 function FichePaiement({ p, statut }: { p: PaiementInfo; statut: string }) {
   const paiementStatutLabel: Record<string, { label: string; class: string }> = {
-    PAYE: { label: 'Soldé', class: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-    EN_COURS: { label: 'En cours de règlement', class: 'bg-sky-100 text-sky-700 border-sky-200' },
-    EN_ATTENTE: { label: 'En attente', class: 'bg-amber-100 text-amber-700 border-amber-200' },
-    NON_APPLICABLE: { label: 'Non applicable', class: 'bg-slate-100 text-slate-500 border-slate-200' },
+    PAYE: { label: 'Soldé', class: 'bg-emerald-100 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
+    EN_COURS: { label: 'En cours de règlement', class: 'bg-sky-100 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800' },
+    EN_ATTENTE: { label: 'En attente', class: 'bg-amber-100 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+    NON_APPLICABLE: { label: 'Non applicable', class: 'bg-muted text-muted-foreground border-border' },
   };
 
   const ps = paiementStatutLabel[p.statutPaiement] || paiementStatutLabel.EN_ATTENTE;
@@ -206,9 +206,9 @@ function SuiviCard({ r }: { r: SuiviResult }) {
 
       {/* Alertes */}
       {r.alertes.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-1">
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40/50 p-3 space-y-1">
           {r.alertes.map((a, i) => (
-            <p key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
+            <p key={i} className="text-xs text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
               <AlertTriangle className="size-3.5 mt-0.5 shrink-0" />
               {a}
             </p>
@@ -324,7 +324,7 @@ function SuiviTab() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-2xl w-full text-sm">
               <div className="rounded-lg border p-3 space-y-1">
                 <p className="font-medium text-foreground flex items-center gap-2">
-                  <ClipboardCheck className="size-3.5 text-slate-500" />
+                  <ClipboardCheck className="size-3.5 text-muted-foreground" />
                   Reçu
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -630,7 +630,7 @@ export default function ChatView() {
           onClick={() => setActiveTab('suivi')}
           className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-t-lg ${
             activeTab === 'suivi'
-              ? 'text-emerald-700 bg-emerald-50/50'
+              ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40/50'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -644,7 +644,7 @@ export default function ChatView() {
           onClick={() => setActiveTab('chat')}
           className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-t-lg ${
             activeTab === 'chat'
-              ? 'text-emerald-700 bg-emerald-50/50'
+              ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40/50'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >

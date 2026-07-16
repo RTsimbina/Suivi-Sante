@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const DEMO_CREDENTIALS = [
-  { email: 'admin@suivisante.mg', role: 'Administrateur', color: 'bg-red-100 text-red-700 border-red-200' },
-  { email: 'accueil@suivisante.mg', role: 'Accueil', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { email: 'technique@suivisante.mg', role: 'Technique', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { email: 'compta@suivisante.mg', role: 'Comptabilité', color: 'bg-green-100 text-green-700 border-green-200' },
-  { email: 'utilisateur@suivisante.mg', role: 'Utilisateur', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  { email: 'admin@suivisante.mg', role: 'Administrateur', color: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800' },
+  { email: 'accueil@suivisante.mg', role: 'Accueil', color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { email: 'technique@suivisante.mg', role: 'Technique', color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800' },
+  { email: 'compta@suivisante.mg', role: 'Comptabilité', color: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800' },
+  { email: 'utilisateur@suivisante.mg', role: 'Utilisateur', color: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
 ];
 
 export default function LoginPage() {
@@ -61,7 +62,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50/50 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12 relative">
+      {/* Theme toggle in top-right */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
@@ -86,7 +91,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Error */}
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
                   {error}
                 </div>
               )}
@@ -160,7 +165,7 @@ export default function LoginPage() {
                       window.location.href = '/reset-password';
                     }
                   }}
-                  className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline"
+                  className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline"
                 >
                   Mot de passe oublié ?
                 </button>
@@ -189,7 +194,7 @@ export default function LoginPage() {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">ou</span>
+                  <span className="bg-background px-2 text-muted-foreground">ou</span>
                 </div>
               </div>
 
@@ -234,7 +239,7 @@ export default function LoginPage() {
                   <span className="font-mono text-xs font-medium">
                     {cred.email}
                   </span>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/60">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-background/60">
                     {cred.role}
                   </span>
                 </button>

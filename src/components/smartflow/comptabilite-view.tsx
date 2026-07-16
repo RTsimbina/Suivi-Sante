@@ -15,10 +15,10 @@ interface ComptabiliteViewProps {
 }
 
 const kpiDefs = [
-  { key: 'decomptesRecus', label: 'Décomptes reçus', icon: FileSpreadsheet, color: 'text-sky-600', bg: 'bg-sky-50' },
-  { key: 'paiementsEffectues', label: 'Paiements effectués', icon: BadgeCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { key: 'enCoursPaiement', label: 'En cours de paiement', icon: HourglassIcon, color: 'text-amber-600', bg: 'bg-amber-50' },
-  { key: 'montantTotalPaye', label: 'Montant total payé', icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50', format: true },
+  { key: 'decomptesRecus', label: 'Décomptes reçus', icon: FileSpreadsheet, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40' },
+  { key: 'paiementsEffectues', label: 'Paiements effectués', icon: BadgeCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+  { key: 'enCoursPaiement', label: 'En cours de paiement', icon: HourglassIcon, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+  { key: 'montantTotalPaye', label: 'Montant total payé', icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40', format: true },
 ];
 
 export default function ComptabiliteView({ kpis, loading }: ComptabiliteViewProps) {

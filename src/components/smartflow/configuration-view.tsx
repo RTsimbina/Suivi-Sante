@@ -120,13 +120,13 @@ export default function ConfigurationView() {
 
   const canalColors: Record<string, string> = {
     WHATSAPP: 'bg-green-100 text-green-700 border-green-200',
-    TELEGRAM: 'bg-blue-100 text-blue-700 border-blue-200',
+    TELEGRAM: 'bg-blue-100 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
     MESSENGER: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   };
 
   const bots: BotStatus[] = [
     { nom: 'WhatsApp Bot', canal: 'WHATSAPP', actif: botStatus?.whatsapp?.actif || false, messagesTotal: messages.filter(m => m.canal === 'WHATSAPP').length, icon: MessageSquare, couleur: 'text-green-600 bg-green-50' },
-    { nom: 'Telegram Bot', canal: 'TELEGRAM', actif: botStatus?.telegram?.actif || false, messagesTotal: messages.filter(m => m.canal === 'TELEGRAM').length, icon: Send, couleur: 'text-blue-600 bg-blue-50' },
+    { nom: 'Telegram Bot', canal: 'TELEGRAM', actif: botStatus?.telegram?.actif || false, messagesTotal: messages.filter(m => m.canal === 'TELEGRAM').length, icon: Send, couleur: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' },
     { nom: 'Messenger Bot', canal: 'MESSENGER', actif: botStatus?.messenger?.actif || false, messagesTotal: messages.filter(m => m.canal === 'MESSENGER').length, icon: Bot, couleur: 'text-indigo-600 bg-indigo-50' },
   ];
 
@@ -152,11 +152,11 @@ export default function ConfigurationView() {
                       <p className="font-medium text-sm">{bot.nom}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {bot.actif ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 text-[10px] border-emerald-200 hover:bg-emerald-100">
+                          <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100">
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Actif
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] text-gray-500" title={botStatus?.[bot.canal.toLowerCase()]?.details}>
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground" title={botStatus?.[bot.canal.toLowerCase()]?.details}>
                             <XCircle className="h-3 w-3 mr-1" /> {botStatus?.[bot.canal.toLowerCase()]?.details || 'Non configuré'}
                           </Badge>
                         )}
@@ -181,7 +181,7 @@ export default function ConfigurationView() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Statut SMTP */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${smtpStatus !== null && !smtpStatus.ok ? 'bg-amber-50 border border-amber-200' : 'bg-muted/30'}`}>
+          <div className={`flex items-center gap-3 p-3 rounded-lg ${smtpStatus !== null && !smtpStatus.ok ? 'bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800' : 'bg-muted/30'}`}>
             {smtpStatus === null ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : smtpStatus.ok ? (
@@ -196,7 +196,7 @@ export default function ConfigurationView() {
           </div>
 
           {smtpStatus !== null && !smtpStatus.ok && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
               <p className="font-medium mb-1">Configuration requise</p>
               <p className="text-amber-600">Ajoutez les variables suivantes dans votre fichier <code className="bg-amber-100 px-1 rounded text-xs">.env</code> :</p>
               <code className="block mt-2 text-xs bg-amber-100/60 px-3 py-2 rounded font-mono">
@@ -310,13 +310,13 @@ export default function ConfigurationView() {
                           </Badge>
                           <span className="text-[11px] text-muted-foreground">{formatDate(msg.createdAt)}</span>
                         </div>
-                        <div className="bg-emerald-50 rounded-lg p-2.5 mb-2 border border-emerald-100">
-                          <p className="text-xs font-medium text-emerald-700 mb-0.5">Question</p>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.message}</p>
+                        <div className="bg-emerald-50 dark:bg-emerald-950/40 rounded-lg p-2.5 mb-2 border border-emerald-100 dark:border-emerald-800">
+                          <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-0.5">Question</p>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">{msg.message}</p>
                         </div>
-                        <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
-                          <p className="text-xs font-medium text-blue-700 mb-0.5">Réponse Suivi Santé</p>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.reponse}</p>
+                        <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-2.5 border border-blue-100">
+                          <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">Réponse Suivi Santé</p>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">{msg.reponse}</p>
                         </div>
                       </div>
                       {deleteConfirm === msg.id ? (

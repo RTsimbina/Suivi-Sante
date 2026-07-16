@@ -164,7 +164,7 @@ export default function SocietesView() {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
               <Users className="h-4 w-4 text-blue-600" />
             </div>
             <div>
@@ -175,7 +175,7 @@ export default function SocietesView() {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center">
               <FileText className="h-4 w-4 text-amber-600" />
             </div>
             <div>
@@ -186,7 +186,7 @@ export default function SocietesView() {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center">
               <DollarSign className="h-4 w-4 text-purple-600" />
             </div>
             <div>
@@ -234,19 +234,19 @@ export default function SocietesView() {
                 <div className="flex items-center gap-3 p-3">
                   <div className={cn(
                     'h-10 w-10 rounded-lg flex items-center justify-center shrink-0',
-                    soc.actif ? 'bg-emerald-50' : 'bg-gray-100'
+                    soc.actif ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'bg-muted'
                   )}>
-                    <Building2 className={cn('h-5 w-5', soc.actif ? 'text-emerald-600' : 'text-gray-400')} />
+                    <Building2 className={cn('h-5 w-5', soc.actif ? 'text-emerald-600' : 'text-muted-foreground')} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-sm">{soc.nom}</p>
                       {soc.actif ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 text-[9px] border-emerald-200 hover:bg-emerald-100">
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[9px] border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100">
                           <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Active
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[9px] text-gray-500">Inactive</Badge>
+                        <Badge variant="outline" className="text-[9px] text-muted-foreground">Inactive</Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
@@ -317,7 +317,7 @@ export default function SocietesView() {
                                   <td className="py-1.5 pr-2 text-right text-amber-600">{c.budgetUtilise.toLocaleString('fr-FR')} Ar</td>
                                   <td className={`py-1.5 pr-2 text-right font-medium ${c.solde < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{c.solde.toLocaleString('fr-FR')} Ar</td>
                                   <td className="py-1.5 text-center">
-                                    <Badge variant="outline" className={`text-[9px] ${c.statut === 'ACTIF' ? 'border-emerald-200 text-emerald-700' : c.statut === 'EXPIRE' ? 'border-red-200 text-red-700' : 'border-amber-200 text-amber-700'}`}>{c.statut}</Badge>
+                                    <Badge variant="outline" className={`text-[9px] ${c.statut === 'ACTIF' ? 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : c.statut === 'EXPIRE' ? 'border-red-200 dark:border-red-800 text-red-700 dark:text-red-300' : 'border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'}`}>{c.statut}</Badge>
                                   </td>
                                 </tr>
                               ))}
@@ -331,9 +331,9 @@ export default function SocietesView() {
 
                 {/* Confirmation suppression */}
                 {deleteConfirm === soc.id && (
-                  <div className="px-3 pb-3 border-t bg-red-50/50">
+                  <div className="px-3 pb-3 border-t bg-red-50 dark:bg-red-950/40/50">
                     <div className="flex items-center justify-between pt-3">
-                      <p className="text-xs text-red-700">
+                      <p className="text-xs text-red-700 dark:text-red-300">
                         Supprimer {soc.nom} ? ({soc._count.dossiers} dossiers, {soc._count.assures} assurés seront affectés)
                       </p>
                       <div className="flex gap-2">

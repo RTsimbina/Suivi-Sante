@@ -22,20 +22,20 @@ interface DirectionViewProps {
 }
 
 const kpiDefs = [
-  { key: 'totalRecus', label: 'Dossiers reçus', icon: FileText, color: 'text-sky-600', bg: 'bg-sky-50' },
-  { key: 'totalTraites', label: 'Traités', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { key: 'totalPayes', label: 'Payés', icon: CreditCard, color: 'text-teal-600', bg: 'bg-teal-50' },
-  { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
-  { key: 'delaiMoyenGlobal', label: 'Délai moyen (j)', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-  { key: 'montantTotalReclame', label: 'Montant réclamé', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50', format: true },
-  { key: 'montantTotalPaye', label: 'Montant payé', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', format: true },
-  { key: 'tauxRejet', label: 'Taux de rejet', icon: Percent, color: 'text-red-600', bg: 'bg-red-50', isPercent: true },
+  { key: 'totalRecus', label: 'Dossiers reçus', icon: FileText, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-950/40' },
+  { key: 'totalTraites', label: 'Traités', icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+  { key: 'totalPayes', label: 'Payés', icon: CreditCard, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-950/40' },
+  { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/40' },
+  { key: 'delaiMoyenGlobal', label: 'Délai moyen (j)', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+  { key: 'montantTotalReclame', label: 'Montant réclamé', icon: DollarSign, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40', format: true },
+  { key: 'montantTotalPaye', label: 'Montant payé', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40', format: true },
+  { key: 'tauxRejet', label: 'Taux de rejet', icon: Percent, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/40', isPercent: true },
 ];
 
 const serviceColors: Record<string, string> = {
-  RECEPTION: 'bg-sky-100 text-sky-700',
-  TECHNIQUE: 'bg-amber-100 text-amber-700',
-  COMPTABILITE: 'bg-emerald-100 text-emerald-700',
+  RECEPTION: 'bg-sky-100 text-sky-700 dark:text-sky-300 dark:bg-sky-900/50 dark:text-sky-300',
+  TECHNIQUE: 'bg-amber-100 text-amber-700 dark:text-amber-300 dark:bg-amber-900/50 dark:text-amber-300',
+  COMPTABILITE: 'bg-emerald-100 text-emerald-700 dark:text-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300',
 };
 
 export default function DirectionView({ kpis, loading }: DirectionViewProps) {
@@ -91,7 +91,7 @@ export default function DirectionView({ kpis, loading }: DirectionViewProps) {
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={kpis.volumeMensuel}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
                 <XAxis dataKey="mois" tickFormatter={(v: string) => monthLabels[v.split('-')[1]] || v} fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip formatter={(v: number) => [v, 'Dossiers']} labelFormatter={(l: string) => monthLabels[l.split('-')[1]] || l} />
@@ -106,7 +106,7 @@ export default function DirectionView({ kpis, loading }: DirectionViewProps) {
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={sortedSocietes} layout="vertical" margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border, #e5e7eb)" />
                 <XAxis type="number" tickFormatter={(v: number) => formatMontantCourt(v)} fontSize={11} />
                 <YAxis type="category" dataKey="societeNom" width={100} fontSize={11} tickLine={false} />
                 <Tooltip formatter={(v: number, name: string) => [formatMontantCourt(v), name === 'montantReclame' ? 'Réclamé' : 'Payé']} />

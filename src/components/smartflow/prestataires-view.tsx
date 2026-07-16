@@ -25,14 +25,14 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  HOPITAL: 'bg-red-100 text-red-700 border-red-200',
-  CLINIQUE: 'bg-blue-100 text-blue-700 border-blue-200',
+  HOPITAL: 'bg-red-100 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+  CLINIQUE: 'bg-blue-100 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
   PHARMACIE: 'bg-green-100 text-green-700 border-green-200',
-  CABINET_MEDICAL: 'bg-purple-100 text-purple-700 border-purple-200',
-  LABORATOIRE: 'bg-amber-100 text-amber-700 border-amber-200',
+  CABINET_MEDICAL: 'bg-purple-100 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+  LABORATOIRE: 'bg-amber-100 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
   DENTAIRE: 'bg-pink-100 text-pink-700 border-pink-200',
   OPTICIEN: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  AUTRE: 'bg-gray-100 text-gray-700 border-gray-200',
+  AUTRE: 'bg-muted text-muted-foreground border-border',
 };
 
 interface Prestataire {
@@ -191,7 +191,7 @@ export default function PrestatairesView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Total</p>
                 <p className="text-2xl font-bold">{totalPrestataires}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Stethoscope className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -204,7 +204,7 @@ export default function PrestatairesView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Actifs</p>
                 <p className="text-2xl font-bold text-emerald-600">{activePrestataires}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Stethoscope className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function PrestatairesView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Types</p>
                 <p className="text-2xl font-bold">{new Set(prestataires.map(p => p.type)).size}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
                 <Building2 className="h-5 w-5 text-blue-600" />
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function PrestatairesView() {
                 <p className="text-[11px] text-muted-foreground uppercase font-medium">Dossiers liés</p>
                 <p className="text-2xl font-bold">{prestataires.reduce((s, p) => s + p._count.dossiers, 0)}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-purple-50 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-lg bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center">
                 <FileText className="h-5 w-5 text-purple-600" />
               </div>
             </div>
@@ -316,7 +316,7 @@ export default function PrestatairesView() {
                 <Input id="p-rib" value={formRib} onChange={(e) => setFormRib(e.target.value)} placeholder="MG0000000000000000000000" />
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="p-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+                <input type="checkbox" id="p-actif" checked={formActif} onChange={(e) => setFormActif(e.target.checked)} className="h-4 w-4 rounded border-border" />
                 <Label htmlFor="p-actif">Prestataire actif</Label>
               </div>
               <div className="flex gap-2 pt-2">
@@ -361,7 +361,7 @@ export default function PrestatairesView() {
                     <tr key={p.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                          <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 dark:text-emerald-300 flex items-center justify-center flex-shrink-0">
                             <Stethoscope className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
@@ -402,7 +402,7 @@ export default function PrestatairesView() {
                               </Button>
                             </div>
                           ) : (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteConfirm(p.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => setDeleteConfirm(p.id)}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
