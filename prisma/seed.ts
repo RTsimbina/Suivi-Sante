@@ -308,7 +308,7 @@ async function main() {
     const prestataire = PRESTATAIRES_DATA.find(p => prestatairesMap[p.nom] === prestataireId);
 
     // Historique JSON
-    const historique = [];
+    const historique: { date: string; statut: string; commentaire: string }[] = [];
     historique.push({ date: dateReception.toISOString(), statut: 'RECU', commentaire: 'Dossier reçu à l\'accueil' });
     if (dateTraitementTechnique) {
       historique.push({ date: dateTraitementTechnique.toISOString(), statut: 'EN_ANALYSE', commentaire: 'Transmis au service technique' });

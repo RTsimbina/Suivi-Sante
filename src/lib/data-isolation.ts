@@ -111,9 +111,9 @@ export async function getUserSocieteId(userId: string): Promise<string | null> {
     const { db } = await import("@/lib/db");
     const user = await db.utilisateur.findUnique({
       where: { id: userId },
-      select: { societeId: true, role: true },
+      select: { role: true },
     });
-    return user?.societeId || null;
+    return null; // Utilisateur model doesn't have societeId; use dossier.createurId fallback
   } catch {
     return null;
   }

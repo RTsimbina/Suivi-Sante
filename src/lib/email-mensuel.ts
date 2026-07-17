@@ -14,7 +14,7 @@ function genererHTMLRapportSociete(data: {
   delaiMoyen: number;
   topPrestations: { type: string; count: number; montant: number }[];
   parAssure: { nom: string; nbDossiers: number; montantReclame: number; montantPaye: number }[];
-  appelsFonds: { reference: string; montant: number; statut: string; datePaiement?: string | null }[];
+  appelsFonds: { reference: string | null; montant: number; statut: string; datePaiement?: string | null }[];
   fondsDisponibles: number;
   budgetUtilise: number;
   budgetTotal: number;

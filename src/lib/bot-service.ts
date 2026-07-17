@@ -254,7 +254,7 @@ async function reponseIA(question: string): Promise<string> {
 
     let contexte = 'Suivi Santé — Plateforme de gestion des dossiers de santé.\n\nStatistiques actuelles:\n';
     for (const s of stats) {
-      contexte += `- ${s.statut}: ${s._count.id} dossiers`;
+      contexte += `- ${s.statut}: ${s._count} dossiers`;
       if (s._sum.montantReclame) contexte += `, ${Math.round(s._sum.montantReclame).toLocaleString('fr-FR')} AR réclamés`;
       if (s._sum.montantPaye) contexte += `, ${Math.round(s._sum.montantPaye).toLocaleString('fr-FR')} AR payés`;
       contexte += '\n';

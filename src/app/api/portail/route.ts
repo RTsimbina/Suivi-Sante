@@ -99,9 +99,6 @@ export async function POST(request: NextRequest) {
         if (d.referencePaiement) base.referencePaiement = d.referencePaiement;
       }
 
-      // Prestataire — si disponible
-      if (d.prestataire) base.prestataire = d.prestataire;
-
       // Motif de rejet — si rejeté
       if (d.statut === "REJETE" && d.motifRejet) base.motifRejet = d.motifRejet;
 

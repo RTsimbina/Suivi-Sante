@@ -15,7 +15,8 @@
  */
 
 // ─── Cache SDK (dev local uniquement) ─────────────────────────────────────────
-let sdkInstance: InstanceType<typeof import('z-ai-web-dev-sdk').default> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let sdkInstance: any | null = null;
 let sdkInitFailed = false;
 
 async function getLocalSDK() {

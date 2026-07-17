@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const contrat = await db.contrat.findUnique({
       where: { id },
       include: {
-        societe: { select: { id: true, nom: true, email: true, telephone: true } },
+        societe: { select: { id: true, nom: true } },
         appelsDeFonds: { orderBy: { createdAt: 'desc' } },
         _count: { select: { appelsDeFonds: true } },
       },

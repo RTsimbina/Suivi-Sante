@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus, Users,
-  Heart, Stethoscope, Building2, Zap, HeartPulse,
+  Heart, Stethoscope, Building2, Zap, HeartPulse, Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,8 +31,9 @@ import PrestatairesView from '@/components/suivisante/prestataires-view';
 import ConfigurationView from '@/components/suivisante/configuration-view';
 import SocietesView from '@/components/suivisante/societes-view';
 import SanteView from '@/components/suivisante/sante-view';
+import ReceptionView from '@/components/suivisante/reception-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -46,6 +47,7 @@ interface Kpis {
 const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; badge?: string; section?: string; roles: string[] }[] = [
   { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard, section: 'PILOTAGE', roles: ['ADMINISTRATEUR'] },
   { key: 'import', label: 'Accueil', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
+  { key: 'reception', label: 'Réception Courriels', icon: Mail, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'] },
   { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'TECHNIQUE'] },
@@ -94,7 +96,7 @@ export default function Home() {
   }, [role, navItems, view]);
 
   // Vérifier si l'utilisateur peut créer des dossiers
-  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE';
+  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE' || role === 'SANTE';
 
   useEffect(() => {
     async function fetchKpis() {
@@ -263,13 +265,14 @@ export default function Home() {
           {view === 'technique' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
           {view === 'comptabilite' && <ComptabiliteView kpis={kpis} loading={loadingKpis} />}
           {view === 'import' && <ImportView />}
+          {view === 'reception' && <ReceptionView kpis={kpis as Record<string, unknown> | null} loading={loadingKpis} />}
           {view === 'reporting' && <ReportingView />}
           {view === 'ia' && <IaView />}
           {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><ChatView /></div>}
           {view === 'portail' && <PortailView />}
           {view === 'users' && <UsersView />}
-          {view === 'assures' && <AssuresView userRole={role} />}
-          {view === 'prestataires' && <PrestatairesView userRole={role} />}
+          {view === 'assures' && <AssuresView userRole={role || ''} />}
+          {view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
           {view === 'societes' && <SocietesView />}
           {view === 'configuration' && <ConfigurationView />}
           {view === 'sante' && <SanteView />}

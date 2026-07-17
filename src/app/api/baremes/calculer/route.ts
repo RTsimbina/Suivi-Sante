@@ -37,9 +37,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Le montant doit être positif" }, { status: 400 });
     }
 
-    // Récupérer le barème
+    // Récupérer le barème avec le nom de la société
     const bareme = await db.bareme.findUnique({
       where: { societeId_prestation: { societeId, prestation } },
+      include: { societe: { select: { nom: true } } },
     });
 
     if (!bareme || !bareme.active) {
