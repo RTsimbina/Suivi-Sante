@@ -15,6 +15,7 @@ const DEMO_CREDENTIALS = [
   { email: 'technique@suivisante.mg', role: 'Technique', color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800' },
   { email: 'compta@suivisante.mg', role: 'Comptabilité', color: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800' },
   { email: 'utilisateur@suivisante.mg', role: 'Utilisateur', color: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
+  { email: 'sante@suivisante.mg', role: 'Contrôle Santé', color: 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800' },
 ];
 
 export default function LoginPage() {

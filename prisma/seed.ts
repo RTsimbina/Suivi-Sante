@@ -83,6 +83,7 @@ async function main() {
     { email: 'technique@suivisante.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
     { email: 'compta@suivisante.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
     { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
+    { email: 'sante@suivisante.mg', nom: 'Dr. Nahitra Raza', password: passwordHash, role: 'SANTE' },
   ];
 
   for (const u of utilisateursData) {

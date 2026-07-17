@@ -35,6 +35,8 @@ function getRoleBadgeVariant(
       return 'secondary';
     case 'COMPTABILITE':
       return 'outline';
+    case 'SANTE':
+      return 'secondary';
     default:
       return 'outline';
   }
@@ -50,6 +52,8 @@ function getRoleBadgeClass(role: string): string {
       return 'bg-amber-100 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800';
     case 'COMPTABILITE':
       return 'bg-purple-100 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800';
+    case 'SANTE':
+      return 'bg-teal-100 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800';
     default:
       return 'bg-muted text-muted-foreground border-border';
   }

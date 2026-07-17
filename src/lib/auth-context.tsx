@@ -8,6 +8,7 @@ export type RoleType =
   | 'ACCUEIL'
   | 'TECHNIQUE'
   | 'COMPTABILITE'
+  | 'SANTE'
   | 'UTILISATEUR';
 
 export const ROLE_LABELS: Record<RoleType, string> = {
@@ -15,6 +16,7 @@ export const ROLE_LABELS: Record<RoleType, string> = {
   ACCUEIL: 'Accueil',
   TECHNIQUE: 'Service Technique',
   COMPTABILITE: 'Comptabilité',
+  SANTE: 'Contrôle Santé',
   UTILISATEUR: 'Utilisateur',
 };
 
