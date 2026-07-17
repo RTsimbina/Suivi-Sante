@@ -159,9 +159,9 @@ function DossierClientCard({ dossier }: { dossier: PortailDossier }) {
             <p className="text-xs text-muted-foreground mt-0.5">
               {typeDossierLabel(dossier.typeDossier)} — Reçu le {formatDate(dossier.dateReception)}
             </p>
-            {dossier.prestataireLegacy && (
+            {dossier.prestataire && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                Prestataire : {dossier.prestataireLegacy}
+                Prestataire : {dossier.prestataire}
               </p>
             )}
           </div>

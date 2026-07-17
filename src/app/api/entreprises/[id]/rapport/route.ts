@@ -70,7 +70,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const pdfBuffer = await genererRapportMensuel(data);
     const filename = `rapport-${societe.nom.replace(/\s+/g, "_")}-${annee}-${String(mois).padStart(2, "0")}.pdf`;
-    return new NextResponse(pdfBuffer, { headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${filename}"` } });
+    return new NextResponse(new Uint8Array(pdfBuffer), { headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${filename}"` } });
   } catch (error) {
     console.error("[RAPPORT ENTREPRISE] Erreur:", error);
     return NextResponse.json({ error: "Erreur" }, { status: 500 });

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const societes = await db.societe.findMany({
       orderBy: { nom: "asc" },
       include: {
-        _count: { select: { dossiers: true, contrats: true, baremes: true, utilisateurs: true } },
+        _count: { select: { dossiers: true, contrats: true, baremes: true } },
       },
     });
     return NextResponse.json({ societes });

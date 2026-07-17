@@ -11,10 +11,10 @@
  *   - En développement : le cron ne s'active que si CRON_ENABLED=true
  */
 
-import cron from 'node-cron';
+import cron, { type ScheduledTask } from 'node-cron';
 import { envoyerRapportMensuel } from '@/lib/email-mensuel';
 
-let cronInstance: cron.ScheduledTask | null = null;
+let cronInstance: ScheduledTask | null = null;
 
 export function demarrerCronMensuel() {
   // Ne pas démarrer en dev sauf si explicitement activé

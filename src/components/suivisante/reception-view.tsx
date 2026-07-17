@@ -28,14 +28,13 @@ import {
   FileText, Receipt, ClipboardList, Filter,
 } from 'lucide-react';
 import { formatMontantCourt, formatDate, statutLabel, statutColor } from './format';
+/* statutLabel & statutColor used in code but not directly in JSX — kept for extensibility */
 import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ReceptionViewProps {
-  kpis: {
-    reception: { totalEnregistres: number; tempsMoyenAvantTransfert: number; enAttente: number };
-  } | null;
+  kpis: Record<string, unknown> | null;
   loading: boolean;
 }
 
@@ -320,6 +319,9 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
   // ─── Counts for tabs ────────────────────────────────────────────────────
   const totalReçus = courriels.length > 0 || loadingCourriels ? null : 0;
 
+  // Extract reception KPIs safely
+  const receptionKpis = kpis?.reception as { totalEnregistres?: number; tempsMoyenAvantTransfert?: number; enAttente?: number } | undefined;
+
   // ─── Render: loading state ───────────────────────────────────────────────
   if (loading || !kpis) {
     return (
@@ -343,7 +345,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
             <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-950/40"><FileInput className="h-6 w-6 text-sky-600" /></div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Total enregistrés</p>
-              <p className="text-2xl font-bold">{kpis.reception.totalEnregistres}</p>
+              <p className="text-2xl font-bold">{receptionKpis?.totalEnregistres ?? '—'}</p>
             </div>
           </CardContent>
         </Card>
@@ -352,7 +354,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
             <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40"><Timer className="h-6 w-6 text-amber-600" /></div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Temps moyen avant transfert</p>
-              <p className="text-2xl font-bold">{kpis.reception.tempsMoyenAvantTransfert} <span className="text-sm font-normal text-muted-foreground">jours</span></p>
+              <p className="text-2xl font-bold">{receptionKpis?.tempsMoyenAvantTransfert ?? '—'} <span className="text-sm font-normal text-muted-foreground">jours</span></p>
             </div>
           </CardContent>
         </Card>
@@ -361,7 +363,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
             <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40"><AlertTriangle className="h-6 w-6 text-amber-600" /></div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">En attente de transfert</p>
-              <p className="text-2xl font-bold">{kpis.reception.enAttente}</p>
+              <p className="text-2xl font-bold">{receptionKpis?.enAttente ?? '—'}</p>
             </div>
           </CardContent>
         </Card>

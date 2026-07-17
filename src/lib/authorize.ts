@@ -1,4 +1,4 @@
-import { getToken } from 'next-auth/jwt';
+import { getToken, type JWT } from 'next-auth/jwt';
 import { NextRequest } from 'next/server';
 import type { RoleType } from './auth-context';
 
@@ -163,7 +163,7 @@ export const API_PERMISSIONS: Record<
 
 interface AuthResult {
   authorized: boolean;
-  token: ReturnType<typeof getToken> | null;
+  token: JWT | null;
   error: string;
   status: number;
 }

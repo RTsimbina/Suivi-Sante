@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
     }
 
     const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
@@ -189,7 +189,7 @@ export async function GET(request: NextRequest) {
     const pdfBuffer = await genererRapportMensuel(data);
 
     const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
