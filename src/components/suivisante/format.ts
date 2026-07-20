@@ -1,12 +1,14 @@
-export function formatMontant(montant: number): string {
-  return new Intl.NumberFormat('fr-FR').format(montant) + ' Ar';
+export function formatMontant(montant: number | undefined | null): string {
+  const n = typeof montant === 'number' && isFinite(montant) ? montant : 0;
+  return new Intl.NumberFormat('fr-FR').format(n) + ' Ar';
 }
 
-export function formatMontantCourt(montant: number): string {
-  if (montant >= 1_000_000_000) return (montant / 1_000_000_000).toFixed(1) + ' Mds Ar';
-  if (montant >= 1_000_000) return (montant / 1_000_000).toFixed(1) + ' M Ar';
-  if (montant >= 1_000) return (montant / 1_000).toFixed(0) + ' K Ar';
-  return new Intl.NumberFormat('fr-FR').format(montant) + ' Ar';
+export function formatMontantCourt(montant: number | undefined | null): string {
+  const n = typeof montant === 'number' && isFinite(montant) ? montant : 0;
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + ' Mds Ar';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' M Ar';
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + ' K Ar';
+  return new Intl.NumberFormat('fr-FR').format(n) + ' Ar';
 }
 
 export function formatDate(date: string | Date): string {
