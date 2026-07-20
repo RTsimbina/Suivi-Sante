@@ -162,22 +162,26 @@ export default function ReportingView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {contrats.map(c => (
+                  {contrats.map(c => {
+                    const taux = c.tauxUtilisation ?? (c.budgetAnnuel > 0 ? Math.round((c.budgetUtilise / c.budgetAnnuel) * 100) : 0);
+                    const solde = c.soldeDisponible ?? (c.budgetAnnuel - c.budgetUtilise);
+                    return (
                     <tr key={c.id} className="border-t hover:bg-muted/30">
                       <td className="px-4 py-2.5 font-medium">{c.societe.nom}</td>
                       <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{c.reference}</td>
                       <td className="px-4 py-2.5 text-right">{formatMontant(c.budgetAnnuel)}</td>
                       <td className="px-4 py-2.5 w-40">
                         <div className="flex items-center gap-2">
-                          <Progress value={c.tauxUtilisation} className="h-2 flex-1" />
-                          <span className="text-xs text-muted-foreground w-10 text-right">{c.tauxUtilisation}%</span>
+                          <Progress value={taux} className="h-2 flex-1" />
+                          <span className="text-xs text-muted-foreground w-10 text-right">{taux}%</span>
                         </div>
                       </td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${c.soldeDisponible < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatMontant(c.soldeDisponible)}</td>
+                      <td className={`px-4 py-2.5 text-right font-medium ${solde < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatMontant(solde)}</td>
                       <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE[c.statut] || ''}>{STATUT_LABEL[c.statut] || c.statut}</Badge></td>
                       <td className="px-4 py-2.5 text-muted-foreground">{formatDate(c.dateFin)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
