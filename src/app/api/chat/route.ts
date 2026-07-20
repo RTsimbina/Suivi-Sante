@@ -1,110 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { callLLM } from "@/lib/llm";
+import {
+  getStatutCounts, getTotalSums, getSocieteBreakdown, getAvgDelaiPaiement, round2,
+} from "@/lib/kpi-queries";
+import { db } from "@/lib/db";
 
-function diffDays(a: Date, b: Date): number {
-  const ms = Math.abs(a.getTime() - b.getTime());
-  return Math.round(ms / (1000 * 60 * 60 * 24));
-}
-
-function round2(n: number | null | undefined): number {
-  if (n === null || n === undefined || isNaN(n)) return 0;
-  return Math.round(n * 100) / 100;
-}
+const MS_DAY = 86_400_000;
 
 async function buildKpiContext(): Promise<string> {
-  const allDossiers = await db.dossier.findMany({
-    include: {
-      societe: true,
-      gestionnaireAccueil: true,
-      gestionnaireTechnique: true,
-      gestionnaireCompta: true,
-    },
-  });
+  const [statuts, sums, societeBreakdown, delaiMoyen] = await Promise.all([
+    getStatutCounts(),
+    getTotalSums(),
+    getSocieteBreakdown(),
+    getAvgDelaiPaiement(),
+  ]);
 
-  const total = allDossiers.length;
-  const totalRecus = allDossiers.filter((d) => d.statut === "RECU").length;
-  const totalPayes = allDossiers.filter((d) => d.statut === "PAYE").length;
-  const totalRejetes = allDossiers.filter((d) => d.statut === "REJETE").length;
-  const enAnalyse = allDossiers.filter((d) => d.statut === "EN_ANALYSE").length;
-  const valides = allDossiers.filter((d) => d.statut === "VALIDE").length;
-  const enPaiement = allDossiers.filter((d) => d.statut === "EN_PAIEMENT").length;
+  const c = (s: string) => statuts[s] || 0;
+  const total = sums.total;
+  const totalRecus = c("RECU");
+  const totalPayes = c("PAYE");
+  const totalRejetes = c("REJETE");
+  const tauxRejet = total > 0 ? round2((totalRejetes / total) * 100) : 0;
 
-  const payeDossiers = allDossiers.filter(
-    (d) => d.statut === "PAYE" && d.datePaiement && d.dateReception
-  );
-  const delaiMoyen =
-    payeDossiers.length > 0
-      ? round2(
-          payeDossiers.reduce(
-            (sum, d) => sum + diffDays(d.datePaiement!, d.dateReception),
-            0
-          ) / payeDossiers.length
-        )
-      : 0;
-
-  const montantTotalReclame = round2(
-    allDossiers.reduce((s, d) => s + d.montantReclame, 0)
-  );
-  const montantTotalPaye = round2(
-    allDossiers.reduce((s, d) => s + (d.montantPaye || 0), 0)
-  );
-  const tauxRejet =
-    total > 0 ? round2((totalRejetes / total) * 100) : 0;
-
-  // Per-societe breakdown
-  const societeMap = new Map<string, { nom: string; count: number; montantReclame: number; montantPaye: number }>();
-  for (const d of allDossiers) {
-    if (!societeMap.has(d.societeId)) {
-      societeMap.set(d.societeId, { nom: d.societe.nom, count: 0, montantReclame: 0, montantPaye: 0 });
-    }
-    const s = societeMap.get(d.societeId)!;
-    s.count++;
-    s.montantReclame += d.montantReclame;
-    s.montantPaye += d.montantPaye || 0;
-  }
-  const societeLines = Array.from(societeMap.values())
-    .sort((a, b) => b.count - a.count)
+  const societeLines = societeBreakdown
     .map(
       (s) =>
-        `  - ${s.nom}: ${s.count} dossiers, ${round2(s.montantReclame).toLocaleString("fr-FR")} Ar réclamés, ${round2(s.montantPaye).toLocaleString("fr-FR")} Ar payés`
+        `  - ${s.societeNom}: ${s.nbDossiers} dossiers, ${s.montantReclame.toLocaleString("fr-FR")} Ar réclamés, ${s.montantPaye.toLocaleString("fr-FR")} Ar payés`
     )
     .join("\n");
 
-  // Retard info
+  // Retards — 3 targeted count queries
   const NOW = new Date();
-  const retardsReception = allDossiers.filter(
-    (d) => d.statut === "RECU" && diffDays(NOW, d.dateReception) > 5
-  ).length;
-  const retardsTechnique = allDossiers.filter(
-    (d) =>
-      (d.statut === "EN_ANALYSE" || d.statut === "VALIDE") &&
-      d.dateTraitementTechnique &&
-      diffDays(NOW, d.dateTraitementTechnique) > 5
-  ).length;
-  const retardsCompta = allDossiers.filter(
-    (d) =>
-      d.statut === "EN_PAIEMENT" &&
-      d.dateReceptionDecompte &&
-      diffDays(NOW, d.dateReceptionDecompte) > 5
-  ).length;
+  const [retardsReception, retardsTechnique, retardsCompta] = await Promise.all([
+    db.dossier.count({ where: { statut: "RECU", dateReception: { lt: new Date(NOW.getTime() - 5 * MS_DAY) } } }),
+    db.dossier.count({ where: { statut: { in: ["EN_ANALYSE", "VALIDE"] }, dateTraitementTechnique: { lt: new Date(NOW.getTime() - 5 * MS_DAY) } } }),
+    db.dossier.count({ where: { statut: "EN_PAIEMENT", dateReceptionDecompte: { lt: new Date(NOW.getTime() - 5 * MS_DAY) } } }),
+  ]);
 
-  const aujourd = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const aujourd = new Date().toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   return `Données Suivi Santé — Tableau de bord (au ${aujourd}):
 
 RÉSUMÉ GLOBAL:
 - Total dossiers: ${total}
 - En attente (RECU): ${totalRecus}
-- En analyse: ${enAnalyse}
-- Validés: ${valides}
-- En paiement: ${enPaiement}
+- En analyse: ${c("EN_ANALYSE")}
+- Validés: ${c("VALIDE")}
+- En paiement: ${c("EN_PAIEMENT")}
 - Payés: ${totalPayes}
 - Rejetés: ${totalRejetes}
 - Taux de rejet: ${tauxRejet}%
 - Délai moyen global (réception → paiement): ${delaiMoyen} jours
-- Montant total réclamé: ${montantTotalReclame.toLocaleString("fr-FR")} Ar
-- Montant total payé: ${montantTotalPaye.toLocaleString("fr-FR")} Ar
+- Montant total réclamé: ${sums.montantReclame.toLocaleString("fr-FR")} Ar
+- Montant total payé: ${sums.montantPaye.toLocaleString("fr-FR")} Ar
 
 PAR SOCIÉTÉ:
 ${societeLines}
@@ -131,17 +84,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Fetch KPI data and build context
     const context = await buildKpiContext();
 
-    // 2. Build system prompt with context
     const systemPrompt = `Tu es un assistant IA spécialisé dans l'analyse des dossiers de gestion pour Suivi Santé, une plateforme de traitement des dossiers de soins de santé à Madagascar.
 
 Tu aides les gestionnaires et directeurs à comprendre les performances de leur service de traitement des dossiers médicaux. Tu as accès aux données en temps réel du système. Les montants sont en Ariary (Ar).
 
 ${context}`;
 
-    // 3. Call LLM via the unified module (SDK z-ai or fallback)
     const content = await callLLM(systemPrompt, question);
 
     if (!content) {
@@ -151,10 +101,7 @@ ${context}`;
       );
     }
 
-    // 4. Return response
-    return NextResponse.json({
-      reponse: content,
-    });
+    return NextResponse.json({ reponse: content });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[CHAT] Error:", msg, error);
