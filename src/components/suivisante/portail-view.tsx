@@ -683,15 +683,15 @@ function PortailSecuriseTab() {
         delaiMoyen: 0,
       });
 
-      const societeContrats = (contratsData.contrats || []).filter((c: {societeId?: string}) => c.societeId === selectedSociete);
-      setContrats(societeContrats.map((c: {id: string; societe?: {nom: string}; typeContrat?: string; budgetAnnuel?: number; appelsFonds?: Array<{montant: number}>; _count?: {dossiers: number}}) => ({
+      const contratsArray = Array.isArray(contratsData) ? contratsData : contratsData.contrats || [];
+      const societeContrats = contratsArray.filter((c: {societeId?: string}) => c.societeId === selectedSociete);
+      setContrats(societeContrats.map((c: {id: string; societe?: {nom: string}; budgetAnnuel?: number; budgetUtilise?: number; soldeDisponible?: number; tauxUtilisation?: number; _count?: {appelsDeFonds: number}}) => ({
         id: c.id,
         societeNom: c.societe?.nom || '',
-        typeContrat: c.typeContrat || 'Standard',
         budget: c.budgetAnnuel || 0,
-        utilise: (c.appelsFonds || []).reduce((s: number, a: {montant: number}) => s + a.montant, 0),
-        solde: (c.budgetAnnuel || 0) - (c.appelsFonds || []).reduce((s: number, a: {montant: number}) => s + a.montant, 0),
-        nbDossiers: c._count?.dossiers || 0,
+        utilise: c.budgetUtilise || 0,
+        solde: c.soldeDisponible ?? (c.budgetAnnuel || 0) - (c.budgetUtilise || 0),
+        nbDossiers: c._count?.appelsDeFonds || 0,
       })));
     }).catch(() => {}).finally(() => {
       setLoading(false);

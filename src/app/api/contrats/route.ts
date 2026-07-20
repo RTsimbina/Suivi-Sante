@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       tauxUtilisation: c.budgetAnnuel > 0 ? Math.round((c.budgetUtilise / c.budgetAnnuel) * 100) : 0,
     }));
 
-    return NextResponse.json(contrats);
+    return NextResponse.json(enriched);
   } catch {
     return NextResponse.json({ error: 'Erreur' }, { status: 500 });
   }
