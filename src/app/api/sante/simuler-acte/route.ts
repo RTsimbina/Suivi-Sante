@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-
-const db = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   const authError = await checkAuth(request);

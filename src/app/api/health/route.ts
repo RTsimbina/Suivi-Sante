@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 
 export async function GET() {
   const checks: { name: string; ok: boolean; detail?: string }[] = [];
@@ -29,15 +30,10 @@ export async function GET() {
   // 2. Test de connexion BDD
   if (hasDbUrl) {
     try {
-      const { PrismaClient } = await import('@prisma/client');
-      const db = new PrismaClient();
       await db.$queryRaw`SELECT 1 as ok`;
-      await db.$disconnect();
 
       // Vérifier si les tables ont des données
-      const db2 = new PrismaClient();
-      const userCount = await db2.utilisateur.count();
-      await db2.$disconnect();
+      const userCount = await db.utilisateur.count();
 
       checks.push({
         name: 'Connexion PostgreSQL',
@@ -51,11 +47,12 @@ export async function GET() {
           ? `${userCount} utilisateur(s) trouvé(s)`
           : 'Table VIDE — appelez /api/setup?token=VOTRE_TOKEN',
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erreur inconnue';
       checks.push({
         name: 'Connexion PostgreSQL',
         ok: false,
-        detail: e.message?.slice(0, 200) || 'Erreur inconnue',
+        detail: msg.slice(0, 200),
       });
     }
   } else {

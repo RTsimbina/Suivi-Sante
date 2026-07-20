@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db } from '@/lib/db';
 import { hash } from 'bcryptjs';
 
 // Ce endpoint initialise la base de données PostgreSQL sur Vercel
@@ -341,7 +341,6 @@ export async function GET(request: Request) {
   }
 
   const log: string[] = [];
-  const db = new PrismaClient();
 
   try {
     // ── Étape 1 : Créer les tables si elles n'existent pas ──
@@ -698,14 +697,13 @@ export async function GET(request: Request) {
       message: 'Base de données initialisée avec succès',
       details: log,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erreur lors de l\'initialisation';
     console.error('[SETUP] Erreur:', error);
     return NextResponse.json({
       success: false,
-      error: error.message || 'Erreur lors de l\'initialisation',
+      error: msg,
       details: log,
     }, { status: 500 });
-  } finally {
-    await db.$disconnect();
   }
 }
