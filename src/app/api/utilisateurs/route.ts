@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { hash } from "bcryptjs";
 import { checkAuth } from "@/lib/authorize";
 
-const VALID_ROLES = ["ADMINISTRATEUR", "ACCUEIL", "TECHNIQUE", "COMPTABILITE", "UTILISATEUR"];
+const VALID_ROLES = ["ADMINISTRATEUR", "ACCUEIL", "TECHNIQUE", "COMPTABILITE", "SANTE", "UTILISATEUR"];
 
 // GET /api/utilisateurs — Lister tous les utilisateurs (admin only)
 export async function GET(request: NextRequest) {
