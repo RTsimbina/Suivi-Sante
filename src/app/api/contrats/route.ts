@@ -12,19 +12,31 @@ export async function GET(request: NextRequest) {
     const contrats = await db.contrat.findMany({
       include: {
         societe: { select: { id: true, nom: true } },
-        _count: { select: { appelsDeFonds: true } },
+        appelsDeFonds: { select: { montant: true, statut: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     const enriched = contrats.map((c) => {
-      const utilise = c.budgetUtilise ?? 0;
-      const budget = c.budgetAnnuel ?? 0;
+      const budget = Number(c.budgetAnnuel) || 0;
+      const utilise = c.appelsDeFonds.reduce((sum: number, a) => sum + (Number(a.montant) || 0), 0);
+      const solde = budget - utilise;
+      const taux = budget > 0 ? Math.round((utilise / budget) * 100) : 0;
       return {
-        ...c,
+        id: c.id,
+        societeId: c.societeId,
+        societe: c.societe,
+        reference: c.reference,
+        budgetAnnuel: budget,
         budgetUtilise: utilise,
-        soldeDisponible: budget - utilise,
-        tauxUtilisation: budget > 0 ? Math.round((utilise / budget) * 100) : 0,
+        soldeDisponible: solde,
+        tauxUtilisation: taux,
+        dateDebut: c.dateDebut.toISOString(),
+        dateFin: c.dateFin.toISOString(),
+        statut: c.statut,
+        _count: { appelsDeFonds: c.appelsDeFonds.length },
+        createdAt: c.createdAt.toISOString(),
+        updatedAt: c.updatedAt.toISOString(),
       };
     });
 
