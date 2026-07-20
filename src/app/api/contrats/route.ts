@@ -17,11 +17,16 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const enriched = contrats.map((c) => ({
-      ...c,
-      soldeDisponible: c.budgetAnnuel - c.budgetUtilise,
-      tauxUtilisation: c.budgetAnnuel > 0 ? Math.round((c.budgetUtilise / c.budgetAnnuel) * 100) : 0,
-    }));
+    const enriched = contrats.map((c) => {
+      const utilise = c.budgetUtilise ?? 0;
+      const budget = c.budgetAnnuel ?? 0;
+      return {
+        ...c,
+        budgetUtilise: utilise,
+        soldeDisponible: budget - utilise,
+        tauxUtilisation: budget > 0 ? Math.round((utilise / budget) * 100) : 0,
+      };
+    });
 
     return NextResponse.json(enriched);
   } catch {

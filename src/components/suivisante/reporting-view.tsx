@@ -121,8 +121,8 @@ export default function ReportingView() {
     } catch { toast.error('Erreur'); }
   }
 
-  const totalBudget = contrats.reduce((s, c) => s + c.budgetAnnuel, 0);
-  const totalUtilise = contrats.reduce((s, c) => s + c.budgetUtilise, 0);
+  const totalBudget = contrats.reduce((s, c) => s + (c.budgetAnnuel || 0), 0);
+  const totalUtilise = contrats.reduce((s, c) => s + (c.budgetUtilise || 0), 0);
   const totalAppels = appels.reduce((s, a) => s + a.montant, 0);
   const appelsEnAttente = appels.filter(a => a.statut === 'EN_ATTENTE');
   const filteredAppels = filterStatut === 'TOUS' ? appels : appels.filter(a => a.statut === filterStatut);
@@ -163,8 +163,10 @@ export default function ReportingView() {
                 </thead>
                 <tbody>
                   {contrats.map(c => {
-                    const taux = c.tauxUtilisation ?? (c.budgetAnnuel > 0 ? Math.round((c.budgetUtilise / c.budgetAnnuel) * 100) : 0);
-                    const solde = c.soldeDisponible ?? (c.budgetAnnuel - c.budgetUtilise);
+                    const utilise = c.budgetUtilise || 0;
+                    const budget = c.budgetAnnuel || 0;
+                    const taux = c.tauxUtilisation || (budget > 0 ? Math.round((utilise / budget) * 100) : 0);
+                    const solde = c.soldeDisponible || (budget - utilise);
                     return (
                     <tr key={c.id} className="border-t hover:bg-muted/30">
                       <td className="px-4 py-2.5 font-medium">{c.societe.nom}</td>
