@@ -6,6 +6,10 @@ import {
   getStatutCounts,
 } from "@/lib/kpi-queries";
 
+async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch (err) { console.error(`[IA] ${label} failed:`, err); return fallback; }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
@@ -13,17 +17,16 @@ export async function GET(request: NextRequest) {
 
     const [retards, anomalies, doublons, incoherences, piecesManquantes, monthlyVolume, chargeParGestionnaire, statuts] =
       await Promise.all([
-        findRetards(),
-        findAnomalies(),
-        detectDoublons(),
-        findIncoherences(),
-        findPiecesManquantes(),
-        getMonthlyVolume(2026),
-        getGestionnaireCharge(),
-        getStatutCounts(),
+        safe("findRetards", () => findRetards(), []),
+        safe("findAnomalies", () => findAnomalies(), []),
+        safe("detectDoublons", () => detectDoublons(), []),
+        safe("findIncoherences", () => findIncoherences(), []),
+        safe("findPiecesManquantes", () => findPiecesManquantes(), []),
+        safe("getMonthlyVolume", () => getMonthlyVolume(2026), []),
+        safe("getGestionnaireCharge", () => getGestionnaireCharge(), []),
+        safe("getStatutCounts", () => getStatutCounts(), {}),
       ]);
 
-    // Volume moyen mensuel (months 1-6)
     const firstHalf = monthlyVolume.filter((m) => {
       const monthNum = parseInt(m.mois.split("-")[1], 10);
       return monthNum >= 1 && monthNum <= 6;
@@ -32,7 +35,6 @@ export async function GET(request: NextRequest) {
     const totalSoFar = firstHalf.reduce((s, m) => s + m.nbDossiers, 0);
     const volumeMoyenMensuel = monthsWithData.length > 0 ? Math.round(totalSoFar / monthsWithData.length) : 0;
 
-    // Risque retard
     const totalNonTerminal = Object.entries(statuts)
       .filter(([s]) => s !== "PAYE" && s !== "REJETE")
       .reduce((sum, [, v]) => sum + v, 0);

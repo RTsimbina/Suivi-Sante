@@ -2,16 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/authorize";
 import { findRetards, findAnomalies, detectDoublons, findIncoherences } from "@/lib/kpi-queries";
 
+async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch (err) { console.error(`[ALERTES] ${label} failed:`, err); return fallback; }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
     const [retards, anomalies, doublons, incoherences] = await Promise.all([
-      findRetards(),
-      findAnomalies(),
-      detectDoublons(),
-      findIncoherences(),
+      safe("findRetards", () => findRetards(), []),
+      safe("findAnomalies", () => findAnomalies(), []),
+      safe("detectDoublons", () => detectDoublons(), []),
+      safe("findIncoherences", () => findIncoherences(), []),
     ]);
 
     return NextResponse.json({
