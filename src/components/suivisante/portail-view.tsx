@@ -642,14 +642,19 @@ function PortailSecuriseTab() {
 
   useEffect(() => {
     if (!selectedSociete) return;
-    setLoading(true);
-    setKpiLoading(true);
 
-    Promise.all([
-      fetch(`/api/dossiers?societeId=${selectedSociete}&limit=200`).then(r => r.json()),
-      fetch(`/api/contrats`).then(r => r.json()),
-    ]).then(([dossData, contratsData]) => {
-      const dossiersList = dossData.dossiers || [];
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const [dossRes, contratsRes] = await Promise.all([
+          fetch(`/api/dossiers?societeId=${selectedSociete}&limit=200`, { signal: controller.signal }),
+          fetch('/api/contrats', { signal: controller.signal }),
+        ]);
+        const dossData = await dossRes.json();
+        const contratsData = await contratsRes.json();
+
+        const dossiersList = dossData.dossiers || [];
       setDossiers(dossiersList.map((d: {numeroDossier: string; statut: string; typeDossier: string; dateReception: string; montantReclame: number; montantPaye?: number; datePaiement?: string; referencePaiement?: string; prestataire?: string; motifRejet?: string}) => ({
         numeroDossier: d.numeroDossier,
         statut: d.statut,
@@ -688,10 +693,13 @@ function PortailSecuriseTab() {
         solde: c.soldeDisponible ?? (c.budgetAnnuel || 0) - (c.budgetUtilise || 0),
         nbDossiers: c._count?.appelsDeFonds || 0,
       })));
-    }).catch(() => {}).finally(() => {
-      setLoading(false);
-      setKpiLoading(false);
-    });
+      } catch { /* aborted or network error */ } finally {
+        setLoading(false);
+        setKpiLoading(false);
+      }
+    })();
+
+    return () => controller.abort();
   }, [selectedSociete]);
 
   return (

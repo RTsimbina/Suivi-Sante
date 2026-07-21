@@ -60,7 +60,7 @@ server.log
 /download/
 /examples/
 
-# Skills directory
-/skills/tool-results/
+# Skills directory (non applicatif)
+/skills/
 uploads/
 tool-results/

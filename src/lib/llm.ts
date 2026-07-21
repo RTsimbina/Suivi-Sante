@@ -15,7 +15,7 @@
  */
 
 // ─── Cache SDK (dev local uniquement) ─────────────────────────────────────────
-let sdkInstance: unknown = null;
+let sdkInstance: any = null;
 let sdkInitFailed = false;
 
 async function getLocalSDK() {

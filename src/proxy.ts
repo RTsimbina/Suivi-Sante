@@ -34,6 +34,32 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ─── En-têtes de sécurité (appliqués à TOUTES les réponses) ──────────────
+  const securityHeaders = new Headers();
+  securityHeaders.set('X-Frame-Options', 'DENY');
+  securityHeaders.set('X-Content-Type-Options', 'nosniff');
+  securityHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  securityHeaders.set('X-XSS-Protection', '1; mode=block');
+  securityHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  securityHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // CSP restrictive : autorise uniquement les sources nécessaires
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // unsafe-inline/eval requis par Next.js runtime
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+  securityHeaders.set('Content-Security-Policy', csp);
+
+  const response = NextResponse.next({
+    headers: securityHeaders,
+  });
+
   // 2. Autoriser les pages publiques
   if (PUBLIC_PAGES.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
     // Si déjà connecté et sur /login, rediriger vers l'accueil
@@ -43,12 +69,12 @@ export default async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/', request.url));
       }
     }
-    return NextResponse.next();
+    return response;
   }
 
   // 3. Autoriser les API publiques (auth, webhooks, etc.)
   if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return NextResponse.next();
+    return response;
   }
 
   // ─── À partir d'ici, tout nécessite une authentification ────────────────
@@ -68,7 +94,12 @@ export default async function middleware(request: NextRequest) {
     }
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
+    const loginResponse = NextResponse.redirect(loginUrl);
+    // Propager les security headers sur la redirect aussi
+    for (const [k, v] of securityHeaders.entries()) {
+      loginResponse.headers.set(k, v);
+    }
+    return loginResponse;
   }
 
   const userRole = (token.role as string) || '';
@@ -93,14 +124,18 @@ export default async function middleware(request: NextRequest) {
     requestHeaders.set('x-user-email', userEmail);
     requestHeaders.set('x-user-nom', userNom);
 
-    return NextResponse.next({
+    const apiResponse = NextResponse.next({
       request: { headers: requestHeaders },
     });
+    for (const [k, v] of securityHeaders.entries()) {
+      apiResponse.headers.set(k, v);
+    }
+    return apiResponse;
   }
 
   // 6. Pages protégées : le token existe, on laisse passer
   //    (le filtrage par rôle est géré côté client dans la navigation)
-  return NextResponse.next();
+  return response;
 }
 
 // ─── Logique de correspondance des permissions ─────────────────────────────
