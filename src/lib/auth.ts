@@ -14,84 +14,100 @@ const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;   // 10 minutes
 
 /**
  * Vérifie si un email est verrouillé (lecture DB).
- * Réinitialise les tentatives expirées pour éviter l'accumulation.
+ * Résilient : si les colonnes lockout n'existent pas encore (migration
+ * non appliquée), on considère le compte comme non verrouillé.
  */
 async function isLockedOut(email: string): Promise<{ locked: boolean; remainingMs: number }> {
-  const user = await db.utilisateur.findUnique({
-    where: { email },
-    select: { failedAttempts: true, lockoutUntil: true },
-  });
+  try {
+    const user = await db.utilisateur.findUnique({
+      where: { email },
+      select: { failedAttempts: true, lockoutUntil: true },
+    });
 
-  if (!user || !user.lockoutUntil) {
+    if (!user || !user.lockoutUntil) {
+      return { locked: false, remainingMs: 0 };
+    }
+
+    const now = Date.now();
+    if (now < user.lockoutUntil.getTime()) {
+      return { locked: true, remainingMs: user.lockoutUntil.getTime() - now };
+    }
+
+    // Le verrouillage a expiré — réinitialiser les compteurs
+    await db.utilisateur.update({
+      where: { email },
+      data: { failedAttempts: 0, lockoutUntil: null },
+    });
+
+    return { locked: false, remainingMs: 0 };
+  } catch {
+    // Colonnes manquantes (migration pas encore appliquée) → pas de lockout
     return { locked: false, remainingMs: 0 };
   }
-
-  const now = Date.now();
-  if (now < user.lockoutUntil.getTime()) {
-    return { locked: true, remainingMs: user.lockoutUntil.getTime() - now };
-  }
-
-  // Le verrouillage a expiré — réinitialiser les compteurs
-  await db.utilisateur.update({
-    where: { email },
-    data: { failedAttempts: 0, lockoutUntil: null },
-  });
-
-  return { locked: false, remainingMs: 0 };
 }
 
 /**
  * Enregistre une tentative échouée et verrouille si le seuil est atteint.
+ * Résilient : si les colonnes n'existent pas encore, l'enregistrement
+ * est silencieusement ignoré (pas de lockout mais le login reste fonctionnel).
  */
 async function recordFailedAttempt(email: string): Promise<{ locked: boolean; remainingMs: number }> {
-  const user = await db.utilisateur.findUnique({
-    where: { email },
-    select: { failedAttempts: true, lockoutUntil: true },
-  });
+  try {
+    const user = await db.utilisateur.findUnique({
+      where: { email },
+      select: { failedAttempts: true, lockoutUntil: true },
+    });
 
-  const now = new Date();
+    const now = new Date();
 
-  // Si l'utilisateur n'existe pas, on ne crée rien (pas d'énumération)
-  if (!user) {
-    return { locked: false, remainingMs: 0 };
-  }
+    // Si l'utilisateur n'existe pas, on ne crée rien (pas d'énumération)
+    if (!user) {
+      return { locked: false, remainingMs: 0 };
+    }
 
-  // Si un lockout est déjà actif, le renvoyer tel quel
-  if (user.lockoutUntil && now < user.lockoutUntil) {
-    return { locked: true, remainingMs: user.lockoutUntil.getTime() - now.getTime() };
-  }
+    // Si un lockout est déjà actif, le renvoyer tel quel
+    if (user.lockoutUntil && now < user.lockoutUntil) {
+      return { locked: true, remainingMs: user.lockoutUntil.getTime() - now.getTime() };
+    }
 
-  // Réinitialiser la fenêtre si le lockout a expiré ou si c'est le début
-  const lockoutExpired = user.lockoutUntil && now >= user.lockoutUntil;
-  const newCount = lockoutExpired ? 1 : user.failedAttempts + 1;
+    // Réinitialiser la fenêtre si le lockout a expiré ou si c'est le début
+    const lockoutExpired = user.lockoutUntil && now >= user.lockoutUntil;
+    const newCount = lockoutExpired ? 1 : user.failedAttempts + 1;
 
-  if (newCount >= MAX_ATTEMPTS) {
-    const lockedUntil = new Date(now.getTime() + LOCKOUT_DURATION_MS);
+    if (newCount >= MAX_ATTEMPTS) {
+      const lockedUntil = new Date(now.getTime() + LOCKOUT_DURATION_MS);
+      await db.utilisateur.update({
+        where: { email },
+        data: { failedAttempts: newCount, lockoutUntil: lockedUntil },
+      });
+      return { locked: true, remainingMs: LOCKOUT_DURATION_MS };
+    }
+
     await db.utilisateur.update({
       where: { email },
-      data: { failedAttempts: newCount, lockoutUntil: lockedUntil },
+      data: { failedAttempts: newCount },
     });
-    return { locked: true, remainingMs: LOCKOUT_DURATION_MS };
+
+    return { locked: false, remainingMs: 0 };
+  } catch {
+    // Colonnes manquantes (migration pas encore appliquée) → silencieux
+    return { locked: false, remainingMs: 0 };
   }
-
-  await db.utilisateur.update({
-    where: { email },
-    data: { failedAttempts: newCount },
-  });
-
-  return { locked: false, remainingMs: 0 };
 }
 
 /**
  * Réinitialise les tentatives après une connexion réussie.
+ * Silencieux si les colonnes n'existent pas encore.
  */
 async function resetAttempts(email: string) {
-  await db.utilisateur.update({
-    where: { email },
-    data: { failedAttempts: 0, lockoutUntil: null },
-  }).catch(() => {
-    // Silencieux : l'utilisateur a pu être supprimé entretemps
-  });
+  try {
+    await db.utilisateur.update({
+      where: { email },
+      data: { failedAttempts: 0, lockoutUntil: null },
+    });
+  } catch {
+    // Colonnes manquantes ou utilisateur supprimé → silencieux
+  }
 }
 
 export const authOptions: NextAuthOptions = {
