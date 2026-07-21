@@ -16,8 +16,10 @@ model Utilisateur {
   role          String    @default("UTILISATEUR")
   actif         Boolean   @default(true)
   avatar        String?
-  dernierLogin  DateTime?
-  createdAt     DateTime  @default(now())
+  dernierLogin    DateTime?
+  failedAttempts  Int       @default(0)
+  lockoutUntil    DateTime?
+  createdAt       DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   commentaires  Commentaire[]
   dossiersCrees Dossier[]  @relation("CreateurDossier")

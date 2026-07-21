@@ -380,6 +380,19 @@ export async function GET(request: Request) {
       console.warn(`[SETUP] Migration budgetUtilise (non bloquant): ${e.message?.slice(0, 120)}`);
     }
 
+    // ── Étape 1c : Migration lockout (colonnes DB anti brute-force) ──
+    try {
+      await db.$executeRaw`
+        ALTER TABLE "Utilisateur" ADD COLUMN IF NOT EXISTS "failedAttempts" INTEGER NOT NULL DEFAULT 0
+      `;
+      await db.$executeRaw`
+        ALTER TABLE "Utilisateur" ADD COLUMN IF NOT EXISTS "lockoutUntil" TIMESTAMP
+      `;
+      log.push('Migration lockout : colonnes anti brute-force ajoutées');
+    } catch (e: any) {
+      console.warn(`[SETUP] Migration lockout (non bloquant): ${e.message?.slice(0, 120)}`);
+    }
+
     // ── Étape 2 : Créer/mettre à jour les utilisateurs ──
     // Migrate old @smartflow.mg emails to @suivisante.mg
     const oldDomain = 'smartflow.mg';

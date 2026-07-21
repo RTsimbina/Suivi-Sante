@@ -4,47 +4,94 @@ import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
 
-// ─── Protection anti brute-force (en mémoire) ─────────────────────────────
-const loginAttempts = new Map<string, { count: number; lastAttempt: number; lockedUntil: number | null }>();
+// ─── Protection anti brute-force (persistée en base de données) ───────────
+// Remplace l'ancien Map local qui était vulnérable en environnement serverless :
+// chaque instance isolée avait sa propre mémoire, permettant de contourner le lockout.
+
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
-const ATTEMPT_WINDOW = 10 * 60 * 1000; // 10 minutes
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;   // 10 minutes
 
-function isLockedOut(email: string): { locked: boolean; remainingMs: number } {
-  const record = loginAttempts.get(email);
-  if (!record || !record.lockedUntil) return { locked: false, remainingMs: 0 };
+/**
+ * Vérifie si un email est verrouillé (lecture DB).
+ * Réinitialise les tentatives expirées pour éviter l'accumulation.
+ */
+async function isLockedOut(email: string): Promise<{ locked: boolean; remainingMs: number }> {
+  const user = await db.utilisateur.findUnique({
+    where: { email },
+    select: { failedAttempts: true, lockoutUntil: true },
+  });
+
+  if (!user || !user.lockoutUntil) {
+    return { locked: false, remainingMs: 0 };
+  }
+
   const now = Date.now();
-  if (now < record.lockedUntil) {
-    return { locked: true, remainingMs: record.lockedUntil - now };
-  }
-  // Lockout expired, reset
-  record.lockedUntil = null;
-  record.count = 0;
-  return { locked: false, remainingMs: 0 };
-}
-
-function recordFailedAttempt(email: string): { locked: boolean; remainingMs: number } {
-  const now = Date.now();
-  let record = loginAttempts.get(email);
-
-  if (!record || (now - record.lastAttempt > ATTEMPT_WINDOW)) {
-    record = { count: 0, lastAttempt: now, lockedUntil: null };
-    loginAttempts.set(email, record);
+  if (now < user.lockoutUntil.getTime()) {
+    return { locked: true, remainingMs: user.lockoutUntil.getTime() - now };
   }
 
-  record.count++;
-  record.lastAttempt = now;
-
-  if (record.count >= MAX_ATTEMPTS) {
-    record.lockedUntil = now + LOCKOUT_DURATION;
-    return { locked: true, remainingMs: LOCKOUT_DURATION };
-  }
+  // Le verrouillage a expiré — réinitialiser les compteurs
+  await db.utilisateur.update({
+    where: { email },
+    data: { failedAttempts: 0, lockoutUntil: null },
+  });
 
   return { locked: false, remainingMs: 0 };
 }
 
-function resetAttempts(email: string) {
-  loginAttempts.delete(email);
+/**
+ * Enregistre une tentative échouée et verrouille si le seuil est atteint.
+ */
+async function recordFailedAttempt(email: string): Promise<{ locked: boolean; remainingMs: number }> {
+  const user = await db.utilisateur.findUnique({
+    where: { email },
+    select: { failedAttempts: true, lockoutUntil: true },
+  });
+
+  const now = new Date();
+
+  // Si l'utilisateur n'existe pas, on ne crée rien (pas d'énumération)
+  if (!user) {
+    return { locked: false, remainingMs: 0 };
+  }
+
+  // Si un lockout est déjà actif, le renvoyer tel quel
+  if (user.lockoutUntil && now < user.lockoutUntil) {
+    return { locked: true, remainingMs: user.lockoutUntil.getTime() - now.getTime() };
+  }
+
+  // Réinitialiser la fenêtre si le lockout a expiré ou si c'est le début
+  const lockoutExpired = user.lockoutUntil && now >= user.lockoutUntil;
+  const newCount = lockoutExpired ? 1 : user.failedAttempts + 1;
+
+  if (newCount >= MAX_ATTEMPTS) {
+    const lockedUntil = new Date(now.getTime() + LOCKOUT_DURATION_MS);
+    await db.utilisateur.update({
+      where: { email },
+      data: { failedAttempts: newCount, lockoutUntil: lockedUntil },
+    });
+    return { locked: true, remainingMs: LOCKOUT_DURATION_MS };
+  }
+
+  await db.utilisateur.update({
+    where: { email },
+    data: { failedAttempts: newCount },
+  });
+
+  return { locked: false, remainingMs: 0 };
+}
+
+/**
+ * Réinitialise les tentatives après une connexion réussie.
+ */
+async function resetAttempts(email: string) {
+  await db.utilisateur.update({
+    where: { email },
+    data: { failedAttempts: 0, lockoutUntil: null },
+  }).catch(() => {
+    // Silencieux : l'utilisateur a pu être supprimé entretemps
+  });
 }
 
 export const authOptions: NextAuthOptions = {
@@ -66,8 +113,8 @@ export const authOptions: NextAuthOptions = {
 
         const email = credentials.email.toLowerCase().trim();
 
-        // Vérifier le verrouillage
-        const lockStatus = isLockedOut(email);
+        // Vérifier le verrouillage (DB)
+        const lockStatus = await isLockedOut(email);
         if (lockStatus.locked) {
           console.warn(`Compte verrouillé: ${email} (reste ${Math.ceil(lockStatus.remainingMs / 60000)} min)`);
           return null;
@@ -78,23 +125,23 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.actif) {
-          recordFailedAttempt(email);
+          await recordFailedAttempt(email);
           return null;
         }
 
         const isValid = await compare(credentials.password, user.password);
         if (!isValid) {
-          const attemptResult = recordFailedAttempt(email);
+          const attemptResult = await recordFailedAttempt(email);
           if (attemptResult.locked) {
-            console.warn(`Comte ${email} verrouillé après ${MAX_ATTEMPTS} tentatives échouées`);
+            console.warn(`Compte ${email} verrouillé après ${MAX_ATTEMPTS} tentatives échouées`);
           }
           return null;
         }
 
         // Réinitialiser les tentatives après succès
-        resetAttempts(email);
+        await resetAttempts(email);
 
-        // Update last login
+        // Mettre à jour la dernière connexion
         await db.utilisateur.update({
           where: { id: user.id },
           data: { dernierLogin: new Date() },
