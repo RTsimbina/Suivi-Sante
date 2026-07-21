@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Importer dynamiquement pour éviter les dépendances circulaires
     const { isLockedOut } = await import("@/lib/auth");
-    const status = isLockedOut(emailStr);
+    const status = await isLockedOut(emailStr);
 
     // Retourner le même format de réponse pour éviter les différences de timing
     return NextResponse.json(status, { status: 200 });

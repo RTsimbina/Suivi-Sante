@@ -41,7 +41,7 @@ export default function LoginPage() {
     if (result?.error) {
       // Vérifier si le compte est verrouillé
       const emailTrimmed = email.toLowerCase().trim();
-      const response = await fetch('/api/auth/check-lockout', {
+      const response = await fetch('/api/session/lockout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailTrimmed }),
