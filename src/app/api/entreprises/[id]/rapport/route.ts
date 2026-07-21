@@ -15,7 +15,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const mois = parseInt(searchParams.get("mois") || String(new Date().getMonth() + 1));
     const annee = parseInt(searchParams.get("annee") || String(new Date().getFullYear()));
 
-    const societe = await db.societe.findUnique({ where: { id }, include: { contrats: true } });
+    const societe = await db.societe.findUnique({
+      where: { id },
+      include: { contrats: { include: { appelsDeFonds: { select: { montant: true } } } } },
+    });
     if (!societe) return NextResponse.json({ error: "Société non trouvée" }, { status: 404 });
 
     const start = new Date(annee, mois - 1, 1);
@@ -60,13 +63,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       montant: r.montant,
     }));
 
-    const contratsData = societe.contrats.map((c) => ({
-      reference: c.reference,
-      budgetAnnuel: c.budgetAnnuel,
-      budgetUtilise: c.budgetUtilise,
-      solde: c.budgetAnnuel - c.budgetUtilise,
-      statut: c.statut,
-    }));
+    const contratsData = societe.contrats.map((c) => {
+      const utilise = c.appelsDeFonds.reduce((s: number, a) => s + (Number(a.montant) || 0), 0);
+      return {
+        reference: c.reference,
+        budgetAnnuel: c.budgetAnnuel,
+        budgetUtilise: utilise,
+        solde: c.budgetAnnuel - utilise,
+        statut: c.statut,
+      };
+    });
 
     const data: ReportData = {
       periode: `${MOIS_NOMS[mois - 1]} ${annee} — ${societe.nom}`,

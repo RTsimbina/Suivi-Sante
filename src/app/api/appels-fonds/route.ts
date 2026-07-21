@@ -57,6 +57,12 @@ export async function POST(request: NextRequest) {
       include: { contrat: { include: { societe: true } } },
     });
 
+    // Synchroniser le budgetUtilise du contrat (champ cache)
+    await db.contrat.update({
+      where: { id: contratId },
+      data: { budgetUtilise: { increment: parseFloat(montant) } },
+    });
+
     return NextResponse.json(appel, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Erreur" }, { status: 500 });

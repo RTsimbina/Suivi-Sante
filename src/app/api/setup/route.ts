@@ -360,6 +360,26 @@ export async function GET(request: Request) {
     }
     log.push('Tables créées/vérifiées');
 
+    // ── Étape 1b : Migration rattrapage budgetUtilise ──
+    try {
+      await db.$executeRaw`
+        UPDATE "Contrat" c
+        SET "budgetUtilise" = COALESCE(
+          (SELECT SUM(a."montant") FROM "AppelDeFonds" a WHERE a."contratId" = c.id),
+          0
+        )
+        WHERE c."budgetUtilise" IS NULL
+           OR c."budgetUtilise" != COALESCE(
+             (SELECT SUM(a."montant") FROM "AppelDeFonds" a WHERE a."contratId" = c.id),
+             0
+           )
+      `;
+      log.push('Migration budgetUtilise : valeurs recalculées depuis les appels de fonds');
+    } catch (e: any) {
+      // ALTER COLUMN peut échouer sur SQLite — ignorer silencieusement
+      console.warn(`[SETUP] Migration budgetUtilise (non bloquant): ${e.message?.slice(0, 120)}`);
+    }
+
     // ── Étape 2 : Créer/mettre à jour les utilisateurs ──
     // Migrate old @smartflow.mg emails to @suivisante.mg
     const oldDomain = 'smartflow.mg';
