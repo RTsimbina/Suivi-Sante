@@ -15,8 +15,7 @@
  */
 
 // ─── Cache SDK (dev local uniquement) ─────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sdkInstance: any | null = null;
+let sdkInstance: unknown = null;
 let sdkInitFailed = false;
 
 async function getLocalSDK() {

@@ -129,15 +129,18 @@ export default function ImportView() {
   const [formKeyRemb, setFormKeyRemb] = useState(0);
   const [formKeyRegl, setFormKeyRegl] = useState(0);
 
-  async function loadHistorique() {
+  const loadRef = useRef<() => Promise<void>>();
+  loadRef.current = async () => {
     try {
       const res = await fetch('/api/import');
       const data = await res.json();
       setHistorique(data.historiques || []);
     } catch { /* silent */ }
-  }
+  };
 
-  useEffect(() => { loadHistorique(); }, []);
+  const loadHistorique = () => loadRef.current!();
+
+  useEffect(() => { loadRef.current?.(); }, []);
 
   // Colonnes Excel communes pour les deux flux
   const colonnesCommunes = "NumeroDossier, Beneficiaire, Societe, TypeDossier, MontantReclame, DateReception, CategorieDossier";
