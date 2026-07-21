@@ -324,10 +324,12 @@ export async function envoyerRapportMensuel(): Promise<{
       // Appels de fonds regles et budget
       const tousContrats = await db.contrat.findMany({
         where: { societeId: societe.id },
-        include: { appelsDeFonds: true },
+        include: { appelsDeFonds: { select: { montant: true, reference: true, statut: true, datePaiement: true } } },
       });
       const budgetTotal = tousContrats.reduce((s, c) => s + c.budgetAnnuel, 0);
-      const budgetUtilise = tousContrats.reduce((s, c) => s + c.budgetUtilise, 0);
+      const budgetUtilise = tousContrats.reduce((s, c) => {
+        return s + c.appelsDeFonds.reduce((a: number, f) => a + (Number(f.montant) || 0), 0);
+      }, 0);
       const fondsDisponibles = budgetTotal - budgetUtilise;
       const appelsFonds = tousContrats.flatMap(c => c.appelsDeFonds).map(af => ({
         reference: af.reference,

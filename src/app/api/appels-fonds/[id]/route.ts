@@ -21,14 +21,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       include: { contrat: { include: { societe: true } } },
     });
 
-    // Mettre à jour le budget utilisé du contrat si réglé
-    if (statut === 'REGLE') {
-      await db.contrat.update({
-        where: { id: appel.contratId },
-        data: { budgetUtilise: { increment: appel.montant } },
-      });
-    }
-
     return NextResponse.json(appel);
   } catch {
     return NextResponse.json({ error: "Erreur" }, { status: 500 });

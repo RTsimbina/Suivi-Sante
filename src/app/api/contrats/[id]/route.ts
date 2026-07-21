@@ -14,8 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: { id },
       include: {
         societe: { select: { id: true, nom: true } },
-        appelsDeFonds: { orderBy: { createdAt: 'desc' } },
-        _count: { select: { appelsDeFonds: true } },
+        appelsDeFonds: { select: { montant: true, statut: true }, orderBy: { createdAt: 'desc' } },
       },
     });
 
@@ -23,10 +22,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ erreur: 'Contrat introuvable.' }, { status: 404 });
     }
 
+    const budget = Number(contrat.budgetAnnuel) || 0;
+    const utilise = contrat.appelsDeFonds.reduce((s: number, a) => s + (Number(a.montant) || 0), 0);
+
     return NextResponse.json({
-      ...contrat,
-      soldeDisponible: contrat.budgetAnnuel - contrat.budgetUtilise,
-      tauxUtilisation: contrat.budgetAnnuel > 0 ? Math.round((contrat.budgetUtilise / contrat.budgetAnnuel) * 100) : 0,
+      id: contrat.id,
+      societeId: contrat.societeId,
+      societe: contrat.societe,
+      reference: contrat.reference,
+      budgetAnnuel: budget,
+      budgetUtilise: utilise,
+      soldeDisponible: budget - utilise,
+      tauxUtilisation: budget > 0 ? Math.round((utilise / budget) * 100) : 0,
+      dateDebut: contrat.dateDebut.toISOString(),
+      dateFin: contrat.dateFin.toISOString(),
+      statut: contrat.statut,
+      appelsDeFonds: contrat.appelsDeFonds,
+      createdAt: contrat.createdAt.toISOString(),
+      updatedAt: contrat.updatedAt.toISOString(),
     });
   } catch {
     return NextResponse.json({ erreur: 'Erreur.' }, { status: 500 });
