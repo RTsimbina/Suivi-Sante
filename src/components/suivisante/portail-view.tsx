@@ -641,12 +641,7 @@ function PortailSecuriseTab() {
   }, []);
 
   useEffect(() => {
-    if (!selectedSociete) {
-      setKpis(null);
-      setContrats([]);
-      setDossiers([]);
-      return;
-    }
+    if (!selectedSociete) return;
     setLoading(true);
     setKpiLoading(true);
 
@@ -711,7 +706,14 @@ function PortailSecuriseTab() {
               </label>
               <select
                 value={selectedSociete}
-                onChange={(e) => setSelectedSociete(e.target.value)}
+                onChange={(e) => {
+                  setSelectedSociete(e.target.value);
+                  if (!e.target.value) {
+                    setKpis(null);
+                    setContrats([]);
+                    setDossiers([]);
+                  }
+                }}
                 className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
               >
                 <option value="">Choisir une entreprise...</option>
