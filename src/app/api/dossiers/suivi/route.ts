@@ -32,14 +32,50 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ societes, statuts, types });
     }
 
+    // --- Mode suggest : autocomplétion pour la multi-recherche ---
+    if (searchParams.get("mode") === "suggest") {
+      const term = (searchParams.get("term") || "").trim();
+      if (!term || term.length < 1) return NextResponse.json({ suggestions: [] });
+      const results = await db.dossier.findMany({
+        where: {
+          OR: [
+            { numeroDossier: { contains: term } },
+            { beneficiaire: { contains: term } },
+            { societe: { nom: { contains: term } } },
+          ],
+        },
+        select: {
+          id: true,
+          numeroDossier: true,
+          beneficiaire: true,
+          societe: { select: { nom: true } },
+          statut: true,
+        },
+        distinct: ["numeroDossier"],
+        orderBy: { createdAt: "desc" },
+        take: 12,
+      });
+      const suggestions = results.map((d) => ({
+        value: d.numeroDossier,
+        label: `${d.numeroDossier} — ${d.beneficiaire} (${d.societe.nom})`,
+        detail: d.beneficiaire,
+        societe: d.societe.nom,
+      }));
+      return NextResponse.json({ suggestions });
+    }
+
     // --- Mode recherche ---
-    const q = (searchParams.get("q") || "").trim();
+    // Supporte q unique ou q[] pour multi-recherche
+    const qSingle = (searchParams.get("q") || "").trim();
+    const qMulti = searchParams.getAll("q").map((v) => v.trim()).filter(Boolean);
+    // Si q[] existe, l'utiliser ; sinon fallback vers q unique
+    const queries = qMulti.length > 0 ? qMulti : (qSingle ? [qSingle] : []);
     const statut = searchParams.get("statut") || "";
     const type = searchParams.get("type") || "";
     const societeId = searchParams.get("societeId") || "";
 
     // Il faut au moins un critère
-    const hasFilter = q || statut || type || societeId;
+    const hasFilter = queries.length > 0 || statut || type || societeId;
     if (!hasFilter) {
       return NextResponse.json(
         { error: "Au moins un critère de recherche est requis" },
@@ -50,14 +86,26 @@ export async function GET(request: NextRequest) {
     // Construction dynamique du filtre Prisma
     const andConditions: Prisma.DossierWhereInput[] = [];
 
-    if (q) {
-      andConditions.push({
-        OR: [
-          { numeroDossier: { contains: q } },
-          { beneficiaire: { contains: q } },
-          { societe: { nom: { contains: q } } },
-        ],
-      });
+    if (queries.length > 0) {
+      if (queries.length === 1) {
+        // Recherche simple
+        andConditions.push({
+          OR: [
+            { numeroDossier: { contains: queries[0] } },
+            { beneficiaire: { contains: queries[0] } },
+            { societe: { nom: { contains: queries[0] } } },
+          ],
+        });
+      } else {
+        // Multi-recherche : chaque terme cherche dans les mêmes champs (OR entre termes)
+        andConditions.push({
+          OR: queries.flatMap((q) => [
+            { numeroDossier: { contains: q } },
+            { beneficiaire: { contains: q } },
+            { societe: { nom: { contains: q } } },
+          ]),
+        });
+      }
     }
 
     if (statut && VALID_STATUTS.includes(statut)) {
@@ -209,7 +257,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      query: q,
+      query: queries,
       filters: { statut: statut || null, type: type || null, societeId: societeId || null },
       results: enriched,
       total: enriched.length,
