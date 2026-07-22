@@ -145,6 +145,124 @@ async function suiviDossier(numero: string, expediteurId: string): Promise<strin
   return reponse;
 }
 
+// ─── Explication du calcul de remboursement/règlement d'un dossier ─────────
+async function expliquerCalcul(numero: string, expediteurId: string): Promise<string> {
+  const q = numero.trim().toUpperCase();
+
+  // L'expéditeur DOIT être identifié
+  const session = botSessions.get(expediteurId);
+  if (!session) {
+    return 'Vous devez d\'abord vous identifier pour consulter le détail d\'un dossier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
+  }
+
+  // Récupérer le dossier avec tous les champs financiers + barème
+  const dossier = await db.dossier.findFirst({
+    where: { assureId: session.assureId, numeroDossier: { contains: q } },
+    include: {
+      societe: {
+        select: {
+          id: true, nom: true,
+          baremes: {
+            where: { active: true },
+            },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+  });
+
+  if (!dossier) {
+    return `Aucun dossier "${numero}" ne vous est associé. Vous ne pouvez consulter que vos propres dossiers.`;
+  }
+
+  // Si le dossier est encore au début du processus
+  if (dossier.statut === 'RECU') {
+    return `Dossier ${dossier.numeroDossier}\nStatut : Reçu\n\nVotre dossier vient d'être enregistré. Le calcul de remboursement sera disponible une fois l'analyse technique effectuée.\n\nUtilisez /dossier ${dossier.numeroDossier} pour suivre l'avancement.`;
+  }
+
+  if (dossier.statut === 'EN_ANALYSE') {
+    return `Dossier ${dossier.numeroDossier}\nStatut : En analyse\n\nVotre dossier est en cours d'analyse technique. Le détail du calcul sera disponible après validation.`;
+  }
+
+  if (dossier.statut === 'REJETE') {
+    let reponse = `Dossier ${dossier.numeroDossier}\nStatut : Rejeté\n\nCe dossier a été rejeté.`;
+    if (dossier.motifRejet) reponse += `\nMotif : ${dossier.motifRejet}`;
+    reponse += '\n\nAucun calcul de remboursement n\'a été effectué pour ce dossier.';
+    return reponse;
+  }
+
+  // Construction de l'explication du calcul
+  const fmt = (n: number | null | undefined) =>
+    n != null ? `${n.toLocaleString('fr-FR')} Ar` : 'Non déterminé';
+
+  let reponse = `Dossier ${dossier.numeroDossier}\n`;
+  reponse += `Type : ${dossier.typeDossier}\n`;
+  reponse += `Statut : ${STATUT_LABELS[dossier.statut] || dossier.statut}\n`;
+  reponse += `Société : ${dossier.societe.nom}\n`;
+  reponse += '─────────────────────\n';
+
+  // 1. Montant réclamé (point de départ)
+  reponse += `\nMontant réclamé : ${fmt(dossier.montantReclame)}`;
+
+  // 2. Montant validé par l'analyse technique
+  if (dossier.montantValide != null) {
+    reponse += `\nMontant validé (après analyse) : ${fmt(dossier.montantValide)}`;
+    if (dossier.montantReclame > 0 && dossier.montantValide !== dossier.montantReclame) {
+      const diff = dossier.montantReclame - dossier.montantValide;
+      reponse += `  (soit ${diff.toLocaleString('fr-FR')} Ar de moins que le montant réclamé)`;
+    }
+  }
+
+  // 3. Recherche du barème applicable
+  const bareme = dossier.societe.baremes.find(b => b.prestation === dossier.typeDossier);
+  if (bareme) {
+    reponse += '\n─────────────────────';
+    reponse += `\nBarème applicable (${dossier.typeDossier}) :`;
+    reponse += `\n  Taux de couverture : ${bareme.tauxCouverture}%`;
+    reponse += `\n  Plafond : ${fmt(bareme.plafond)}`;
+
+    // 4. Explication du calcul étape par étape
+    const baseCalcul = dossier.montantValide ?? dossier.montantReclame;
+    const montantPlafonne = Math.min(baseCalcul, bareme.plafond);
+    const montantCouvert = montantPlafonne * (bareme.tauxCouverture / 100);
+    const ticketModCalcule = montantPlafonne - montantCouvert;
+
+    reponse += '\n─────────────────────';
+    reponse += '\nDétail du calcul :';
+    reponse += `\n  1. Base de calcul : ${fmt(baseCalcul)}`;
+    if (baseCalcul > bareme.plafond) {
+      reponse += `\n  2. Application du plafond (${fmt(bareme.plafond)}) : ${fmt(montantPlafonne)}`;
+    }
+    reponse += `\n  3. Taux couvert (${bareme.tauxCouverture}%) : ${fmt(montantCouvert)}`;
+    reponse += `\n  4. Ticket modérateur (part patient) : ${fmt(ticketModCalcule)}`;
+  }
+
+  // 5. Valeurs réelles enregistrées dans le dossier
+  reponse += '\n─────────────────────';
+  reponse += '\nMontants enregistrés dans le dossier :';
+  reponse += `\n  Ticket modérateur : ${fmt(dossier.ticketModerateur)}`;
+  reponse += `\n  Part patient : ${fmt(dossier.partPatient)}`;
+  reponse += `\n  Part entreprise : ${fmt(dossier.partEntreprise)}`;
+
+  // 6. Montant payé
+  if (dossier.montantPaye != null) {
+    reponse += '\n─────────────────────';
+    reponse += `\nMontant payé : ${fmt(dossier.montantPaye)}`;
+    if (dossier.datePaiement) {
+      reponse += `\nDate de paiement : ${dossier.datePaiement.toLocaleDateString('fr-FR')}`;
+    }
+    if (dossier.referencePaiement) {
+      reponse += `\nRéférence : ${dossier.referencePaiement}`;
+    }
+  } else if (dossier.statut === 'EN_COMPTABILITE' || dossier.statut === 'EN_PAIEMENT') {
+    reponse += '\n─────────────────────';
+    reponse += '\nLe paiement n\'a pas encore été effectué. Votre dossier est en cours de traitement.';
+  }
+
+  return reponse;
+}
+
 // ─── Réponse IA restrictive (uniquement consultation de statut) ─────────────
 async function reponseIA(question: string, expediteurId: string): Promise<string> {
   try {
@@ -155,16 +273,18 @@ async function reponseIA(question: string, expediteurId: string): Promise<string
 Règles strictes :
 - Tu ne peux PAS créer de dossier, ni initier de demande de remboursement ou de règlement.
 - Tu ne peux PAS rechercher un assuré ou un prestataire par nom.
-- Tu ne peux PAS calculer de montant de remboursement ou de ticket modérateur.
-- Tu peux uniquement indiquer comment consulter l'état d'un dossier existant.
+- Tu peux expliquer le calcul de remboursement d'un dossier existant (utilise /calcul [numéro]).
+- Tu peux indiquer comment consulter l'état d'un dossier existant.
 
 Si l'utilisateur n'est pas identifié, invite-le à envoyer : /verifier [numéro de sécurité sociale]
 Si l'utilisateur veut consulter ses dossiers, indique-lui les commandes :
 - /mesdossiers — Voir la situation de tous vos dossiers
 - /dossier [numéro] — Suivre un dossier précis
+- /calcul [numéro] — Détail du calcul de remboursement d'un dossier
 ${ident ? `\nL'utilisateur est identifié en tant que ${ident.assureNom}.` : '\nL\'utilisateur n\'est pas encore identifié.'}
 
-Si la question ne concerne pas le suivi d'un dossier existant, réponds poliment que vous ne pouvez que consulter l'état des dossiers de remboursement ou de règlement déjà enregistrés.`;
+Si la question porte sur le calcul, le montant du remboursement, le ticket modérateur ou la part patient d'un dossier spécifique, invite l'utilisateur à utiliser /calcul [numéro de dossier].
+Si la question ne concerne pas le suivi ou le calcul d'un dossier existant, réponds poliment que vous ne pouvez que consulter l'état et le calcul des dossiers déjà enregistrés.`;
 
     const result = await callLLM(systemPrompt, question);
     if (result) return result;
@@ -198,11 +318,13 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
       '/verifier [NSS] — Vous identifier avec votre numéro de sécurité sociale',
       '/mesdossiers — Voir la situation de tous vos dossiers',
       '/dossier [numéro] — Suivre un dossier précis',
+      '/calcul [numéro] — Détail du calcul de remboursement d\'un dossier',
       '/aide — Afficher ce message',
       '',
       'Exemple :',
       '/verifier 123456789',
       '/dossier DOS-2026-000001',
+      '/calcul DOS-2026-000001',
       '',
       'Vous pouvez aussi poser votre question en langage naturel.',
     ].join('\n');
@@ -227,9 +349,15 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
     return await suiviDossier(numero, msg.expeditieurId);
   }
 
+  // ─── Commande /calcul [numéro dossier] — explication du calcul ───────
+  if (lowerText.startsWith('/calcul ')) {
+    const numero = texte.slice('/calcul '.length);
+    return await expliquerCalcul(numero, msg.expeditieurId);
+  }
+
   // ─── Commandes supprimées : informer l'utilisateur ────────────────────
-  if (lowerText.startsWith('/assure ') || lowerText.startsWith('/prestataire ') || lowerText.startsWith('/calcul ')) {
-    return 'Cette commande n\'est plus disponible via ce bot. Ce canal permet uniquement de consulter la situation de vos dossiers de remboursement ou de règlement existants.\n\nUtilisez /mesdossiers ou /dossier [numéro] pour suivre vos demandes.';
+  if (lowerText.startsWith('/assure ') || lowerText.startsWith('/prestataire ')) {
+    return 'Cette commande n\'est plus disponible via ce bot. Ce canal permet uniquement de consulter la situation et le calcul de vos dossiers existants.\n\nUtilisez /mesdossiers, /dossier [numéro] ou /calcul [numéro] pour vos demandes.';
   }
 
   // ─── Détection intelligente : suivi de dossier ────────────────────────
@@ -251,16 +379,35 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
     return await mesDossiers(ident.assureId, ident.assureNom);
   }
 
+  // ─── Détection intelligente : explication du calcul d'un dossier ─────
+  if (
+    (lowerText.includes('calcul') || lowerText.includes('combien') || lowerText.includes('détail') ||
+     lowerText.includes('detail') || lowerText.includes('expliqu') || lowerText.includes('pourquoi') ||
+     lowerText.includes('comment')) &&
+    (lowerText.includes('remboursement') || lowerText.includes('règlement') || lowerText.includes('reglement') ||
+     lowerText.includes('paiement') || lowerText.includes('ticket') || lowerText.includes('montant'))
+  ) {
+    const match = texte.match(/DOS-\d{4}-\d{3,}/i) || texte.match(/\d{6,}/);
+    if (match) {
+      return await expliquerCalcul(match[0], msg.expeditieurId);
+    }
+    // Pas de numéro → proposer la commande
+    const ident = await identifierExpediteur(msg);
+    if (!ident) {
+      return 'Pour consulter le détail du calcul, vous devez d\'abord vous identifier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
+    }
+    return `Pour connaître le détail du calcul de remboursement d\'un dossier, utilisez :\n/calcul [numéro de dossier]\n\nExemple : /calcul DOS-2026-000001`;
+  }
+
   // ─── Détection : demande de création / recherche non autorisée ────────
   if (
     lowerText.includes('créer') || lowerText.includes('creer') || lowerText.includes('nouveau') ||
     lowerText.includes('nouvelle') || lowerText.includes('enregistrer') || lowerText.includes('déposer') ||
     lowerText.includes('deposer') || lowerText.includes('initier') || lowerText.includes('ajouter') ||
     lowerText.includes('chercher') || lowerText.includes('rechercher') || lowerText.includes('trouver') ||
-    lowerText.includes('calcul') || lowerText.includes('combien') || lowerText.includes('montant') ||
-    lowerText.includes('ticket') || lowerText.includes('simuler')
+    lowerText.includes('simuler')
   ) {
-    return 'Ce bot permet uniquement de consulter la situation de vos demandes de remboursement ou de règlement déjà enregistrées.\n\nIl n\'est pas possible de créer une nouvelle demande, de rechercher un assuré/prestataire ou de calculer un montant via ce canal.\n\nPour suivre vos dossiers :\n• /mesdossiers\n• /dossier [numéro]';
+    return 'Ce bot permet uniquement de consulter la situation et le calcul de vos demandes de remboursement ou de règlement déjà enregistrées.\n\nIl n\'est pas possible de créer une nouvelle demande ou de rechercher un assuré/prestataire via ce canal.\n\nPour suivre vos dossiers :\n• /mesdossiers\n• /dossier [numéro]\n• /calcul [numéro]';
   }
 
   // ─── Fallback IA restrictif ───────────────────────────────────────────
