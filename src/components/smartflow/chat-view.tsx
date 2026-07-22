@@ -68,7 +68,7 @@ const suggestedQuestions = [
 
 /* ─────────── Composant étape de traitement ─────────── */
 
-function EtapePipeline({ etape, isLast }: { etape: Etape; isLast: boolean }) {
+function EtapePipeline({ etape, isLast, nextStatut }: { etape: Etape; isLast: boolean; nextStatut?: EtapeStatut }) {
   const iconMap: Record<EtapeStatut, React.ReactNode> = {
     termine: <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />,
     en_cours: <Loader2 className="size-5 text-sky-600 animate-spin shrink-0" />,
@@ -76,29 +76,41 @@ function EtapePipeline({ etape, isLast }: { etape: Etape; isLast: boolean }) {
     saute: <XCircle className="size-5 text-muted-foreground/40 shrink-0" />,
   };
 
-  const borderMap: Record<EtapeStatut, string> = {
-    termine: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40/50',
-    en_cours: 'border-sky-400 bg-sky-50 dark:bg-sky-950/40/50 ring-1 ring-sky-200',
+  const cardMap: Record<EtapeStatut, string> = {
+    termine: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/50',
+    en_cours: 'border-sky-400 bg-sky-50 dark:bg-sky-950/50 ring-1 ring-sky-200',
     en_attente: 'border-border bg-muted/50',
-    saute: 'border-border bg-muted/50 opacity-50',
+    saute: 'border-dashed border-muted-foreground/30 bg-muted/30 opacity-60',
   };
+
+  // Couleur du trait vertical entre cette étape et la suivante
+  const connectorColor =
+    !isLast && nextStatut
+      ? etape.statut === 'termine' && nextStatut === 'termine'
+        ? 'bg-emerald-400 dark:bg-emerald-500'
+        : etape.statut === 'termine' && (nextStatut === 'en_cours' || nextStatut === 'en_attente')
+          ? 'bg-emerald-300 dark:bg-emerald-700'
+          : 'bg-muted-foreground/20'
+      : 'bg-muted-foreground/20';
+
+  const isSaute = etape.statut === 'saute';
 
   return (
     <div className="flex gap-3">
       {/* Colonne icônes + trait vertical */}
       <div className="flex flex-col items-center">
-        {iconMap[etape.statut]}
+        <div className="flex items-center justify-center size-7 shrink-0">
+          {iconMap[etape.statut]}
+        </div>
         {!isLast && (
-          <div className={`w-0.5 flex-1 min-h-[24px] ${
-            etape.statut === 'termine' ? 'bg-emerald-400 dark:bg-emerald-50 dark:bg-emerald-950/400' : 'bg-muted-foreground/30'
-          }`} />
+          <div className={`w-0.5 flex-1 min-h-[12px] my-0.5 rounded-full ${connectorColor}`} />
         )}
       </div>
 
       {/* Contenu de l'étape */}
-      <div className={`flex-1 rounded-lg border p-3 mb-2 ${borderMap[etape.statut]}`}>
+      <div className={`flex-1 rounded-lg border p-3 ${isSaute ? 'border-dashed' : ''} ${cardMap[etape.statut]}`}>
         <div className="flex items-center justify-between mb-1">
-          <span className="font-semibold text-sm text-foreground">{etape.nom}</span>
+          <span className={`font-semibold text-sm ${isSaute ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{etape.nom}</span>
           {etape.date && (
             <span className="text-xs text-muted-foreground">
               {formatDate(etape.date)}
@@ -106,7 +118,7 @@ function EtapePipeline({ etape, isLast }: { etape: Etape; isLast: boolean }) {
           )}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">{etape.details}</p>
-        {etape.gestionnaire && (
+        {etape.gestionnaire && !isSaute && (
           <p className="text-xs text-muted-foreground mt-1">
             Gestionnaire : <span className="font-medium text-foreground">{etape.gestionnaire}</span>
           </p>
@@ -228,6 +240,7 @@ function SuiviCard({ r }: { r: SuiviResult }) {
               key={idx}
               etape={etape}
               isLast={idx === r.etapes.length - 1}
+              nextStatut={idx < r.etapes.length - 1 ? r.etapes[idx + 1].statut : undefined}
             />
           ))}
         </div>
