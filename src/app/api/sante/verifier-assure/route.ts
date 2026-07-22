@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     const assure = await db.assure.findFirst({
       where: {
         OR: [
+          { id: { equals: query } },
           { nSS: { equals: query, mode: 'insensitive' } },
           { nom: { contains: query, mode: 'insensitive' } },
           { prenom: { contains: query, mode: 'insensitive' } },
@@ -210,6 +211,7 @@ export async function GET(request: NextRequest) {
     const resultats = await db.assure.findMany({
       where: {
         OR: [
+          { id: { contains: q } },
           { nSS: { contains: q, mode: 'insensitive' } },
           { nom: { contains: q, mode: 'insensitive' } },
           { prenom: { contains: q, mode: 'insensitive' } },
