@@ -39,6 +39,18 @@ export const API_PERMISSIONS: Record<
   '/api/import': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],
   },
+  '/api/comptabilite/import-suivi': {
+    roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'COMPTABILITE'],
+    },
+  },
+  '/api/comptabilite/import-sage': {
+    roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'COMPTABILITE'],
+    },
+  },
   '/api/technique/import-isa': {
     roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
   },
