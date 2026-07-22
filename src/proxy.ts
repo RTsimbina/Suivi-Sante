@@ -22,7 +22,7 @@ const PUBLIC_API_PREFIXES = [
 
 // ─── Middleware principal ───────────────────────────────────────────────────
 
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Autoriser les assets statiques et fichiers Next.js internes
