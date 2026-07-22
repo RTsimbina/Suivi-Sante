@@ -29,7 +29,7 @@ export async function sauvegarderMessage(msg: MessageBotIncoming, reponse: strin
   }
 }
 
-// ─── Identification et isolation des données bots ─────────────────────────
+// ─── Identification et sessions ─────────────────────────────────────────────
 
 // En mémoire : association ID expéditeur (téléphone/chatId) → assure vérifié
 const botSessions = new Map<string, { assureId: string; assureNom: string; societeId: string; verifieA: Date }>();
@@ -59,221 +59,120 @@ async function verifierNSS(nss: string, expediteurId: string): Promise<string> {
   });
   if (!assure) return 'Numero de securite sociale non reconnu. Verifiez et reessayez.';
   botSessions.set(expediteurId, { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId, verifieA: new Date() });
-  return `Identite confirmee. Bienvenue ${assure.prenom || ''} ${assure.nom} (${assure.societe.nom}).\nVous pouvez maintenant consulter vos dossiers avec /dossier ou /mesdossiers.`;
+  return `Identite confirmée. Bienvenue ${assure.prenom || ''} ${assure.nom} (${assure.societe.nom}).\n\nVous pouvez maintenant consulter la situation de vos dossiers avec :\n• /mesdossiers — Voir tous vos dossiers\n• /dossier [numéro] — Suivre un dossier précis`;
 }
+
+// ─── Consultation des dossiers d'un assuré (STATUT UNIQUEMENT) ───────────────
+
+const STATUT_LABELS: Record<string, string> = {
+  RECU: 'Reçu', EN_ANALYSE: 'En analyse', VALIDE: 'Validé',
+  EN_COMPTABILITE: 'En comptabilité', EN_PAIEMENT: 'En cours de paiement',
+  PAYE: 'Payé', REJETE: 'Rejeté',
+};
 
 async function mesDossiers(assureId: string, assureNom: string): Promise<string> {
-  const dossiers = await db.dossier.findMany({ where: { assureId }, include: { societe: { select: { nom: true } } }, orderBy: { createdAt: 'desc' }, take: 10 });
-  if (dossiers.length === 0) return `${assureNom}, vous n'avez aucun dossier enregistre.`;
-  const statutLabels: Record<string, string> = { RECU: 'Recu', EN_ANALYSE: 'En analyse', VALIDE: 'Valide', EN_COMPTABILITE: 'En comptabilite', EN_PAIEMENT: 'En paiement', PAYE: 'Paye', REJETE: 'Rejete' };
-  const lignes = dossiers.map(d => `- ${d.numeroDossier}: ${statutLabels[d.statut] || d.statut} — ${d.montantReclame.toLocaleString('fr-FR')} AR${d.montantPaye ? ` (Paye: ${d.montantPaye.toLocaleString('fr-FR')} AR)` : ''}`);
-  return `${assureNom}, voici vos ${dossiers.length} dernier(s) dossier(s):\n${lignes.join('\n')}`;
-}
-
-// ─── Recherche d'assuré par nom ou NSS ──────────────────────────────────────
-async function chercherAssure(query: string): Promise<string> {
-  const q = query.trim();
-  const assures = await db.assure.findMany({
-    where: {
-      OR: [
-        { nom: { contains: q } },
-        { prenom: { contains: q } },
-        { nSS: { contains: q } },
-        { telephone: { contains: q } },
-      ],
-      actif: true,
-    },
-    include: {
-      societe: { select: { nom: true } },
-      _count: { select: { dossiers: true } },
-    },
-    take: 5,
+  const dossiers = await db.dossier.findMany({
+    where: { assureId },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: { numeroDossier: true, statut: true, montantReclame: true, montantPaye: true, datePaiement: true, motifRejet: true },
   });
 
-  if (assures.length === 0) {
-    return 'Aucun assuré trouvé pour cette recherche. Vérifiez le nom ou le numéro de sécurité sociale.';
+  if (dossiers.length === 0) {
+    return `${assureNom}, vous n'avez aucun dossier enregistré dans notre système.`;
   }
 
-  const lignes = assures.map(a => {
-    const nomComplet = a.prenom ? `${a.prenom} ${a.nom}` : a.nom;
-    const nss = a.nSS ? ` | NSS: ${a.nSS}` : '';
-    return `- ${nomComplet} (${a.societe.nom})${nss} — ${a._count.dossiers} dossier(s)`;
-  });
-  return `Assurés trouvés (${assures.length}):\n${lignes.join('\n')}`;
-}
-
-// ─── Recherche de prestataire par nom ───────────────────────────────────────
-async function chercherPrestataire(query: string): Promise<string> {
-  const q = query.trim();
-  const prestas = await db.prestataire.findMany({
-    where: {
-      OR: [
-        { nom: { contains: q } },
-        { telephone: { contains: q } },
-      ],
-      actif: true,
-    },
-    take: 5,
+  const lignes = dossiers.map(d => {
+    let ligne = `- ${d.numeroDossier} : ${STATUT_LABELS[d.statut] || d.statut}`;
+    if (d.statut === 'PAYE' && d.montantPaye && d.datePaiement) {
+      ligne += ` — Payé ${d.montantPaye.toLocaleString('fr-FR')} Ar le ${d.datePaiement.toLocaleDateString('fr-FR')}`;
+    } else if (d.statut === 'REJETE' && d.motifRejet) {
+      ligne += ` — Motif : ${d.motifRejet}`;
+    } else if (d.statut === 'EN_PAIEMENT') {
+      ligne += ` — En attente de paiement`;
+    }
+    return ligne;
   });
 
-  if (prestas.length === 0) {
-    return 'Aucun prestataire trouvé pour cette recherche.';
-  }
-
-  const types: Record<string, string> = {
-    HOPITAL: 'Hôpital', CLINIQUE: 'Clinique', PHARMACIE: 'Pharmacie',
-    CABINET_MEDICAL: 'Cabinet médical', LABORATOIRE: 'Laboratoire',
-    DENTAIRE: 'Dentaire', OPTICIEN: 'Opticien', AUTRE: 'Autre',
-  };
-
-  const lignes = prestas.map(p =>
-    `- ${p.nom} (${types[p.type] || p.type})${p.telephone ? ` — Tél: ${p.telephone}` : ''}`
-  );
-  return `Prestataires trouvés (${prestas.length}):\n${lignes.join('\n')}`;
+  return `${assureNom}, voici la situation de vos ${dossiers.length} dernier(s) dossier(s) :\n\n${lignes.join('\n')}`;
 }
 
-// ─── Suivi d'un dossier par numéro ──────────────────────────────────────────
-async function suiviDossier(numero: string, expediteurId?: string): Promise<string> {
+// ─── Suivi d'un dossier par numéro (avec contrôle de propriété STRICT) ─────
+async function suiviDossier(numero: string, expediteurId: string): Promise<string> {
   const q = numero.trim().toUpperCase();
 
-  // Si l'expediteur est identifie, verifier que le dossier lui appartient
-  if (expediteurId) {
-    const session = botSessions.get(expediteurId);
-    if (session) {
-      const assureDossiers = await db.dossier.findMany({
-        where: { assureId: session.assureId, numeroDossier: { contains: q } },
-        select: { id: true }, take: 1,
-      });
-      if (assureDossiers.length === 0) {
-        return `Aucun dossier "${numero}" ne vous est associe. Vous ne pouvez consulter que vos propres dossiers.`;
-      }
-    }
+  // L'expéditeur DOIT être identifié pour consulter un dossier
+  const session = botSessions.get(expediteurId);
+  if (!session) {
+    return 'Vous devez d\'abord vous identifier pour consulter un dossier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
   }
 
+  // Vérifier que le dossier appartient à l'assuré identifié
   const dossier = await db.dossier.findFirst({
-    where: {
-      OR: [
-        { numeroDossier: { contains: q } },
-      ],
-    },
-    include: {
-      societe: { select: { nom: true } },
-    },
+    where: { assureId: session.assureId, numeroDossier: { contains: q } },
+    select: { numeroDossier: true, statut: true, montantPaye: true, datePaiement: true, referencePaiement: true, motifRejet: true },
     orderBy: { createdAt: 'desc' },
     take: 1,
   });
 
   if (!dossier) {
-    return `Aucun dossier trouvé pour "${numero}". Vérifiez le numéro de dossier (format: DOS-2026-XXXXXX).`;
+    return `Aucun dossier "${numero}" ne vous est associé. Vous ne pouvez consulter que vos propres dossiers.`;
   }
-
-  const statutLabels: Record<string, string> = {
-    RECU: 'Reçu', EN_ANALYSE: 'En analyse', VALIDE: 'Validé',
-    EN_COMPTABILITE: 'En comptabilité', EN_PAIEMENT: 'En paiement',
-    PAYE: 'Payé', REJETE: 'Rejeté',
-  };
 
   let reponse = `Dossier ${dossier.numeroDossier}\n`;
-  reponse += `Société: ${dossier.societe.nom}\n`;
-  reponse += `Statut: ${statutLabels[dossier.statut] || dossier.statut}\n`;
-  reponse += `Montant réclamé: ${dossier.montantReclame.toLocaleString('fr-FR')} AR\n`;
+  reponse += `Statut : ${STATUT_LABELS[dossier.statut] || dossier.statut}\n`;
 
-  if (dossier.montantValide) {
-    reponse += `Montant validé: ${dossier.montantValide.toLocaleString('fr-FR')} AR\n`;
-  }
-  if (dossier.ticketModerateur) {
-    reponse += `Ticket modérateur: ${dossier.ticketModerateur.toLocaleString('fr-FR')} AR\n`;
-  }
-  if (dossier.montantPaye) {
-    reponse += `Montant payé: ${dossier.montantPaye.toLocaleString('fr-FR')} AR\n`;
-  }
-  if (dossier.datePaiement) {
-    reponse += `Date de paiement: ${dossier.datePaiement.toLocaleDateString('fr-FR')}\n`;
-  }
-  if (dossier.motifRejet) {
-    reponse += `Motif de rejet: ${dossier.motifRejet}\n`;
-  }
-
-  return reponse;
-}
-
-// ─── Calcul ticket modérateur ────────────────────────────────────────────────
-async function calculerTicket(societeNom: string, prestation: string, montant: number): Promise<string> {
-  const societe = await db.societe.findFirst({
-    where: { nom: { contains: societeNom.trim(), mode: 'insensitive' } },
-  });
-
-  if (!societe) {
-    return `Société "${societeNom}" non trouvée. Vérifiez le nom.`;
-  }
-
-  const bareme = await db.bareme.findUnique({
-    where: {
-      societeId_prestation: {
-        societeId: societe.id,
-        prestation: prestation.trim().toUpperCase(),
-      },
-    },
-  });
-
-  if (!bareme || !bareme.active) {
-    return `Aucun barème actif trouvé pour la prestation "${prestation}" chez ${societe.nom}.`;
-  }
-
-  const montantCouvert = Math.min(montant, bareme.plafond);
-  const montantRembourse = montantCouvert * (bareme.tauxCouverture / 100);
-  const ticketModerateur = montant - montantRembourse;
-  const plafondAtteint = montant > bareme.plafond;
-
-  let reponse = `Calcul pour ${societe.nom} — ${prestation}:\n`;
-  reponse += `Montant réclamé: ${montant.toLocaleString('fr-FR')} AR\n`;
-  reponse += `Taux de couverture: ${bareme.tauxCouverture}%\n`;
-  reponse += `Plafond: ${bareme.plafond.toLocaleString('fr-FR')} AR\n`;
-  if (plafondAtteint) {
-    reponse += `Plafond atteint ! Montant couvert plafonné à ${montantCouvert.toLocaleString('fr-FR')} AR\n`;
-  }
-  reponse += `Montant remboursé: ${Math.round(montantRembourse).toLocaleString('fr-FR')} AR\n`;
-  reponse += `Ticket modérateur (à la charge du patient): ${Math.round(ticketModerateur).toLocaleString('fr-FR')} AR\n`;
-
-  if (plafondAtteint) {
-    reponse += `\nLe patient devra payer la différence de ${Math.round(montant - bareme.plafond).toLocaleString('fr-FR')} AR (dépassement du plafond) plus le ticket modérateur.`;
-  }
-
-  return reponse;
-}
-
-// ─── Réponse IA générique (fallback) ────────────────────────────────────────
-async function reponseIA(question: string): Promise<string> {
-  try {
-    // Contexte simplifié pour les bots
-    const stats = await db.dossier.groupBy({
-      by: ['statut'],
-      _count: true,
-      _sum: { montantReclame: true, montantPaye: true },
-    });
-
-    let contexte = 'Suivi Santé — Plateforme de gestion des dossiers de santé.\n\nStatistiques actuelles:\n';
-    for (const s of stats) {
-      contexte += `- ${s.statut}: ${s._count} dossiers`;
-      if (s._sum.montantReclame) contexte += `, ${Math.round(s._sum.montantReclame).toLocaleString('fr-FR')} AR réclamés`;
-      if (s._sum.montantPaye) contexte += `, ${Math.round(s._sum.montantPaye).toLocaleString('fr-FR')} AR payés`;
-      contexte += '\n';
+  if (dossier.statut === 'PAYE' && dossier.montantPaye) {
+    reponse += `Montant payé : ${dossier.montantPaye.toLocaleString('fr-FR')} Ar\n`;
+    if (dossier.datePaiement) {
+      reponse += `Date de paiement : ${dossier.datePaiement.toLocaleDateString('fr-FR')}\n`;
     }
+    if (dossier.referencePaiement) {
+      reponse += `Référence de paiement : ${dossier.referencePaiement}\n`;
+    }
+  } else if (dossier.statut === 'EN_PAIEMENT') {
+    reponse += `Votre dossier est en cours de traitement pour le paiement.\n`;
+  } else if (dossier.statut === 'EN_COMPTABILITE') {
+    reponse += `Votre dossier est en cours de vérification comptable.\n`;
+  } else if (dossier.statut === 'EN_ANALYSE') {
+    reponse += `Votre dossier est en cours d'analyse technique.\n`;
+  } else if (dossier.statut === 'VALIDE') {
+    reponse += `Votre dossier a été validé et sera transmis à la comptabilité.\n`;
+  } else if (dossier.statut === 'REJETE' && dossier.motifRejet) {
+    reponse += `Motif de rejet : ${dossier.motifRejet}\n`;
+  }
 
-    const systemPrompt = `Tu es l'assistant bot Suivi Santé. Tu réponds aux questions des assurés et prestataires médicaux concernant leurs dossiers de remboursement de soins de santé à Madagascar.
-Tu réponds en français, de manière concise et courtoise. Utilise les données fournies pour répondre.
-Si on te demande le solde, le remboursement, ou le statut d'un dossier précis, invite l'utilisateur à fournir le numéro de dossier.
-Commandes disponibles: /assure [nom], /prestataire [nom], /dossier [numéro], /calcul [société] [prestation] [montant], /aide
+  return reponse;
+}
 
-${contexte}`;
+// ─── Réponse IA restrictive (uniquement consultation de statut) ─────────────
+async function reponseIA(question: string, expediteurId: string): Promise<string> {
+  try {
+    const ident = await identifierExpediteur({ canal: 'WHATSAPP', expeditieurId: expediteurId, expeditieurNom: '', texte: '' });
+
+    const systemPrompt = `Tu es le bot Suivi Santé. Tu réponds UNIQUEMENT aux questions concernant le suivi de dossiers de remboursement ou de règlement.
+
+Règles strictes :
+- Tu ne peux PAS créer de dossier, ni initier de demande de remboursement ou de règlement.
+- Tu ne peux PAS rechercher un assuré ou un prestataire par nom.
+- Tu ne peux PAS calculer de montant de remboursement ou de ticket modérateur.
+- Tu peux uniquement indiquer comment consulter l'état d'un dossier existant.
+
+Si l'utilisateur n'est pas identifié, invite-le à envoyer : /verifier [numéro de sécurité sociale]
+Si l'utilisateur veut consulter ses dossiers, indique-lui les commandes :
+- /mesdossiers — Voir la situation de tous vos dossiers
+- /dossier [numéro] — Suivre un dossier précis
+${ident ? `\nL'utilisateur est identifié en tant que ${ident.assureNom}.` : '\nL\'utilisateur n\'est pas encore identifié.'}
+
+Si la question ne concerne pas le suivi d'un dossier existant, réponds poliment que vous ne pouvez que consulter l'état des dossiers de remboursement ou de règlement déjà enregistrés.`;
 
     const result = await callLLM(systemPrompt, question);
     if (result) return result;
 
-    return 'Le service IA est temporairement indisponible. Veuillez réessayer plus tard.';
+    return 'Le service est temporairement indisponible. Veuillez réessayer plus tard ou utilisez /mesdossiers pour consulter vos dossiers.';
   } catch (e) {
     console.error('[BOT] Erreur LLM:', e);
-    return 'Désolé, une erreur est survenue lors du traitement. Veuillez réessayer.';
+    return 'Désolé, une erreur est survenue. Veuillez réessayer plus tard.';
   }
 }
 
@@ -286,108 +185,86 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
     return 'Bonjour ! Je suis le bot Suivi Santé. Envoyez /aide pour voir les commandes disponibles.';
   }
 
-  // Commandes
   const lowerText = texte.toLowerCase();
 
+  // ─── Commande /aide ────────────────────────────────────────────────────
   if (lowerText === '/aide' || lowerText === '/help' || lowerText === 'aide' || lowerText === 'help') {
     return [
-      'Suivi Santé — Commandes disponibles:',
+      'Suivi Santé — Consultation de vos dossiers',
       '',
-      '/verifier [NSS] — Vous identifier (obligatoire pour acceder a vos donnees)',
-      '/mesdossiers — Voir vos dossiers (apres identification)',
-      '/assure [nom ou NSS] — Rechercher un assure',
-      '/prestataire [nom] — Rechercher un prestataire médical',
-      '/dossier [numéro] — Suivre l\'état d\'un dossier',
-      '/calcul [société] [prestation] [montant] — Calculer le remboursement',
+      'Ce bot vous permet UNIQUEMENT de consulter la situation de vos demandes de remboursement ou de règlement déjà enregistrées.',
+      '',
+      'Commandes disponibles :',
+      '/verifier [NSS] — Vous identifier avec votre numéro de sécurité sociale',
+      '/mesdossiers — Voir la situation de tous vos dossiers',
+      '/dossier [numéro] — Suivre un dossier précis',
       '/aide — Afficher ce message',
       '',
-      'Exemples:',
-      '/assure Rakoto',
-      '/prestataire Clinique Sainte Marie',
+      'Exemple :',
+      '/verifier 123456789',
       '/dossier DOS-2026-000001',
-      '/calcul TELMA consultation 40000',
       '',
-      'Vous pouvez aussi poser une question en langage naturel.',
+      'Vous pouvez aussi poser votre question en langage naturel.',
     ].join('\n');
   }
 
-  // Commande /verifier [NSS]
+  // ─── Commande /verifier [NSS] ─────────────────────────────────────────
   if (lowerText.startsWith('/verifier ')) {
     const nss = texte.slice('/verifier '.length).trim();
     return await verifierNSS(nss, msg.expeditieurId);
   }
 
-  // Commande /mesdossiers
+  // ─── Commande /mesdossiers ────────────────────────────────────────────
   if (lowerText === '/mesdossiers' || lowerText === '/mes dossiers') {
     const ident = await identifierExpediteur(msg);
-    if (!ident) return 'Vous devez d\'abord vous identifier. Envoyez /verifier [votre numero de securite sociale].';
+    if (!ident) return 'Vous devez d\'abord vous identifier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
     return await mesDossiers(ident.assureId, ident.assureNom);
   }
 
-  // Commande /assure
-  if (lowerText.startsWith('/assure ')) {
-    const query = texte.slice('/assure '.length);
-    return await chercherAssure(query);
-  }
-
-  // Commande /prestataire
-  if (lowerText.startsWith('/prestataire ')) {
-    const query = texte.slice('/prestataire '.length);
-    return await chercherPrestataire(query);
-  }
-
-  // Commande /dossier (avec controle d'acces)
+  // ─── Commande /dossier (avec contrôle de propriété STRICT) ────────────
   if (lowerText.startsWith('/dossier ')) {
     const numero = texte.slice('/dossier '.length);
     return await suiviDossier(numero, msg.expeditieurId);
   }
 
-  // Commande /calcul
-  if (lowerText.startsWith('/calcul ')) {
-    const parts = texte.slice('/calcul '.length).split(/\s+/);
-    if (parts.length < 3) {
-      return 'Format: /calcul [société] [prestation] [montant]\nExemple: /calcul TELMA consultation 40000';
-    }
-    const montant = parseFloat(parts[parts.length - 1]);
-    const prestation = parts[parts.length - 2];
-    const societeNom = parts.slice(0, parts.length - 2).join(' ');
-    if (isNaN(montant) || montant <= 0) {
-      return 'Le montant doit être un nombre positif. Exemple: /calcul TELMA consultation 40000';
-    }
-    return await calculerTicket(societeNom, prestation, montant);
+  // ─── Commandes supprimées : informer l'utilisateur ────────────────────
+  if (lowerText.startsWith('/assure ') || lowerText.startsWith('/prestataire ') || lowerText.startsWith('/calcul ')) {
+    return 'Cette commande n\'est plus disponible via ce bot. Ce canal permet uniquement de consulter la situation de vos dossiers de remboursement ou de règlement existants.\n\nUtilisez /mesdossiers ou /dossier [numéro] pour suivre vos demandes.';
   }
 
-  // Détection intelligente de l'intention
-  if (lowerText.includes('assuré') || lowerText.includes('assure') || lowerText.includes('chercher')) {
-    if (lowerText.includes('trouver') || lowerText.includes('chercher') || lowerText.includes('recherch')) {
-      const words = texte.split(/\s+/).filter(w => !['je', 'veux', 'trouver', 'chercher', 'rechercher', 'un', 'une', 'des', 'les', 'l\'assuré', 'l\'assure', 'assuré', 'assure', 's\'il', 'vous', 'plait'].includes(w.toLowerCase()));
-      if (words.length > 0) return await chercherAssure(words.join(' '));
-    }
-  }
-
-  if (lowerText.includes('dossier') && (lowerText.includes('statut') || lowerText.includes('suivi') || lowerText.includes('où') || lowerText.includes('etat') || lowerText.includes('avancement'))) {
+  // ─── Détection intelligente : suivi de dossier ────────────────────────
+  if (lowerText.includes('dossier') && (
+    lowerText.includes('statut') || lowerText.includes('suivi') || lowerText.includes('où') ||
+    lowerText.includes('etat') || lowerText.includes('avancement') || lowerText.includes('situation') ||
+    lowerText.includes('paiement') || lowerText.includes('remboursement') || lowerText.includes('règlement') ||
+    lowerText.includes('reglement')
+  )) {
     const match = texte.match(/DOS-\d{4}-\d{3,}/i) || texte.match(/\d{6,}/);
-    if (match) return await suiviDossier(match[0]);
-    return 'Veuillez fournir le numéro de dossier. Format: /dossier DOS-2026-000001';
-  }
-
-  if (lowerText.includes('calcul') || lowerText.includes('remboursement') || lowerText.includes('ticket')) {
-    const match = texte.match(/(\d[\d\s.]*)\s*ar?$/i);
     if (match) {
-      const montantStr = match[1].replace(/\s/g, '');
-      const montant = parseFloat(montantStr);
-      if (!isNaN(montant) && montant > 0) {
-        // Essayer d'extraire société et prestation
-        const words = texte.replace(/calcul|remboursement|ticket|modérateur|pour|de|est|c'est|\d[\d\s.]*ar?$/gi, '').trim().split(/\s+/);
-        if (words.length >= 2) {
-          return await calculerTicket(words[0], words[1], montant);
-        }
-      }
+      return await suiviDossier(match[0], msg.expeditieurId);
     }
+    // Pas de numéro de dossier fourni → proposer /mesdossiers
+    const ident = await identifierExpediteur(msg);
+    if (!ident) {
+      return 'Pour consulter la situation de vos dossiers, vous devez d\'abord vous identifier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
+    }
+    return await mesDossiers(ident.assureId, ident.assureNom);
   }
 
-  // Fallback IA
-  return await reponseIA(texte);
+  // ─── Détection : demande de création / recherche non autorisée ────────
+  if (
+    lowerText.includes('créer') || lowerText.includes('creer') || lowerText.includes('nouveau') ||
+    lowerText.includes('nouvelle') || lowerText.includes('enregistrer') || lowerText.includes('déposer') ||
+    lowerText.includes('deposer') || lowerText.includes('initier') || lowerText.includes('ajouter') ||
+    lowerText.includes('chercher') || lowerText.includes('rechercher') || lowerText.includes('trouver') ||
+    lowerText.includes('calcul') || lowerText.includes('combien') || lowerText.includes('montant') ||
+    lowerText.includes('ticket') || lowerText.includes('simuler')
+  ) {
+    return 'Ce bot permet uniquement de consulter la situation de vos demandes de remboursement ou de règlement déjà enregistrées.\n\nIl n\'est pas possible de créer une nouvelle demande, de rechercher un assuré/prestataire ou de calculer un montant via ce canal.\n\nPour suivre vos dossiers :\n• /mesdossiers\n• /dossier [numéro]';
+  }
+
+  // ─── Fallback IA restrictif ───────────────────────────────────────────
+  return await reponseIA(texte, msg.expeditieurId);
 }
 
 // ─── Envoi de réponse WhatsApp (Meta Cloud API) ─────────────────────────────
