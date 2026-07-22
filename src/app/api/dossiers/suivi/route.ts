@@ -13,28 +13,66 @@ function round2(n: number | null | undefined): number {
   return Math.round(n * 100) / 100;
 }
 
+const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "REJETE", "EN_PAIEMENT", "PAYE"];
+const VALID_TYPES = ["HOSPITALISATION", "CONSULTATION", "PHARMACIE", "MATERNITE", "CHIRURGIE", "EXAMEN", "SOINS DENTAIRES", "OPTIQUE"];
+
 export async function GET(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { searchParams } = new URL(request.url);
-    const q = (searchParams.get("q") || "").trim();
 
-    if (!q) {
+    // --- Mode options : retourne les listes pour les dropdowns ---
+    if (searchParams.get("mode") === "options") {
+      const [societes, statuts, types] = await Promise.all([
+        db.societe.findMany({ select: { id: true, nom: true }, orderBy: { nom: "asc" } }),
+        Promise.resolve(VALID_STATUTS),
+        Promise.resolve(VALID_TYPES),
+      ]);
+      return NextResponse.json({ societes, statuts, types });
+    }
+
+    // --- Mode recherche ---
+    const q = (searchParams.get("q") || "").trim();
+    const statut = searchParams.get("statut") || "";
+    const type = searchParams.get("type") || "";
+    const societeId = searchParams.get("societeId") || "";
+
+    // Il faut au moins un critère
+    const hasFilter = q || statut || type || societeId;
+    if (!hasFilter) {
       return NextResponse.json(
-        { error: "Le paramètre de recherche 'q' est requis" },
+        { error: "Au moins un critère de recherche est requis" },
         { status: 400 }
       );
     }
 
-    // Recherche par numéro de dossier exact ou partiel, bénéficiaire, ou société
-    const where: Prisma.DossierWhereInput = {
-      OR: [
-        { numeroDossier: { contains: q } },
-        { beneficiaire: { contains: q } },
-        { societe: { nom: { contains: q } } },
-      ],
-    };
+    // Construction dynamique du filtre Prisma
+    const andConditions: Prisma.DossierWhereInput[] = [];
+
+    if (q) {
+      andConditions.push({
+        OR: [
+          { numeroDossier: { contains: q } },
+          { beneficiaire: { contains: q } },
+          { societe: { nom: { contains: q } } },
+        ],
+      });
+    }
+
+    if (statut && VALID_STATUTS.includes(statut)) {
+      andConditions.push({ statut });
+    }
+
+    if (type && VALID_TYPES.includes(type)) {
+      andConditions.push({ typeDossier: type });
+    }
+
+    if (societeId) {
+      andConditions.push({ societeId });
+    }
+
+    const where: Prisma.DossierWhereInput = { AND: andConditions };
 
     const dossiers = await db.dossier.findMany({
       where,
@@ -45,7 +83,7 @@ export async function GET(request: NextRequest) {
         gestionnaireCompta: true,
       },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: 50,
     });
 
     const NOW = new Date();
@@ -172,6 +210,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       query: q,
+      filters: { statut: statut || null, type: type || null, societeId: societeId || null },
       results: enriched,
       total: enriched.length,
     });

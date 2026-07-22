@@ -4,13 +4,20 @@ import { useState, useRef, useEffect, type FormEvent } from 'react';
 import {
   Send, Bot, User, Loader2, Search, CheckCircle2, Clock, AlertTriangle,
   XCircle, ChevronRight, Circle, FileText, CreditCard, ArrowRight,
-  ClipboardCheck, Eye, Ban, Wallet,
+  ClipboardCheck, Eye, Ban, Wallet, Filter, X, ChevronsUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { statutLabel, statutColor, typeDossierLabel, formatDate, formatMontant } from './format';
 
 /* ─────────── Types ─────────── */
@@ -275,14 +282,45 @@ function SuiviTab() {
   const [searched, setSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function handleSearch(e: FormEvent) {
-    e.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed || loading) return;
+  // Filtres dropdown
+  const [filterStatut, setFilterStatut] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterSociete, setFilterSociete] = useState('');
+
+  // Options pour les dropdowns
+  const [options, setOptions] = useState<{ societes: { id: string; nom: string }[]; statuts: string[]; types: string[] }>({ societes: [], statuts: [], types: [] });
+
+  useEffect(() => {
+    fetch('/api/dossiers/suivi?mode=options')
+      .then((r) => r.json())
+      .then((data) => setOptions(data))
+      .catch(() => {});
+  }, []);
+
+  const hasAnyFilter = query.trim() || filterStatut || filterType || filterSociete;
+  const activeFilterCount = [!!query.trim(), !!filterStatut, !!filterType, !!filterSociete].filter(Boolean).length;
+
+  function clearFilters() {
+    setQuery('');
+    setFilterStatut('');
+    setFilterType('');
+    setFilterSociete('');
+    setSearched(false);
+    setResults([]);
+  }
+
+  async function handleSearch(e?: FormEvent) {
+    e?.preventDefault();
+    if (!hasAnyFilter || loading) return;
     setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(`/api/dossiers/suivi?q=${encodeURIComponent(trimmed)}`);
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('q', query.trim());
+      if (filterStatut) params.set('statut', filterStatut);
+      if (filterType) params.set('type', filterType);
+      if (filterSociete) params.set('societeId', filterSociete);
+      const res = await fetch(`/api/dossiers/suivi?${params.toString()}`);
       if (!res.ok) throw new Error(`Erreur ${res.status}`);
       const data = await res.json();
       setResults(data.results || []);
@@ -295,29 +333,83 @@ function SuiviTab() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Barre de recherche */}
-      <div className="p-4 border-b bg-background">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <form onSubmit={handleSearch} className="flex flex-1 gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="N° dossier, bénéficiaire ou société..."
-                disabled={loading}
-                className="pl-9"
-              />
-            </div>
-            <Button type="submit" disabled={!query.trim() || loading}>
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-              <span className="ml-2 hidden sm:inline">Rechercher</span>
+      {/* Barre de recherche multi-critères */}
+      <div className="p-4 border-b bg-background space-y-3">
+        {/* Ligne 1 : Recherche texte + Bouton */}
+        <form onSubmit={(e) => handleSearch(e)} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="N° dossier, bénéficiaire ou société..."
+              disabled={loading}
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit" disabled={!hasAnyFilter || loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+            <span className="ml-2 hidden sm:inline">Rechercher</span>
+          </Button>
+        </form>
+
+        {/* Ligne 2 : Filtres déroulants */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Filter className="size-3.5" />
+            <span>Filtres :</span>
+          </div>
+
+          <Select value={filterStatut} onValueChange={(v) => { setFilterStatut(v === '__all__' ? '' : v); }}>
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Statut du dossier" />
+            </SelectTrigger>
+            <SelectContent>
+              {options.statuts.map((s) => (
+                <SelectItem key={s} value={s} className="text-xs">
+                  {statutLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterType} onValueChange={(v) => { setFilterType(v === '__all__' ? '' : v); }}>
+            <SelectTrigger className="w-[170px] h-8 text-xs">
+              <SelectValue placeholder="Type de dossier" />
+            </SelectTrigger>
+            <SelectContent>
+              {options.types.map((t) => (
+                <SelectItem key={t} value={t} className="text-xs">
+                  {typeDossierLabel(t)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterSociete} onValueChange={(v) => { setFilterSociete(v === '__all__' ? '' : v); }}>
+            <SelectTrigger className="w-[180px] h-8 text-xs">
+              <SelectValue placeholder="Société" />
+            </SelectTrigger>
+            <SelectContent>
+              {options.societes.map((s) => (
+                <SelectItem key={s.id} value={s.id} className="text-xs">
+                  {s.nom}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {activeFilterCount > 0 && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground" onClick={clearFilters}>
+              <X className="size-3 mr-1" />
+              Réinitialiser ({activeFilterCount})
             </Button>
-          </form>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Recherchez par numéro de dossier (ex: DOS-2026-000001), nom du bénéficiaire ou nom de la société pour suivre le traitement et le paiement.
+
+        <p className="text-xs text-muted-foreground">
+          Combinez la recherche texte avec les filtres pour affiner les résultats. Au moins un critère est requis.
         </p>
       </div>
 
@@ -411,7 +503,7 @@ function SuiviTab() {
 
         {searched && !loading && results.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-sm text-muted-foreground">Aucun dossier trouvé pour cette recherche.</p>
+            <p className="text-sm text-muted-foreground">Aucun dossier trouvé pour ces critères.</p>
           </div>
         )}
 
@@ -422,6 +514,8 @@ function SuiviTab() {
     </div>
   );
 }
+
+/* ─────────── Onglet Chat Assistant IA ─────────── */
 
 /* ─────────── Onglet Chat Assistant IA ─────────── */
 
