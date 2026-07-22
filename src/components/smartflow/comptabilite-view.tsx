@@ -275,7 +275,7 @@ function ImportSection({ kpis, loading }: { kpis: ComptabiliteViewProps['kpis'];
             accentFrom="#059669"
             accentTo="#0891b2"
             icon={Database}
-            accept=".xlsx,.xls,.csv"
+            accept=".xlsx,.xls"
           />
         )}
       </CardContent>

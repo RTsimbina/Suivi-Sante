@@ -61,11 +61,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
     }
 
-    const allowedExts = [".xlsx", ".xls", ".csv"];
+    const allowedExts = [".xlsx", ".xls"];
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     if (!allowedExts.includes(ext)) {
       return NextResponse.json(
-        { error: "Format invalide. Utilisez .xlsx, .xls ou .csv" },
+        { error: "Format invalide. Utilisez .xlsx ou .xls" },
         { status: 400 }
       );
     }
