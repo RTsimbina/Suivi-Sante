@@ -19,7 +19,7 @@ export const API_PERMISSIONS: Record<
   }
 > = {
   '/api/dossiers': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
@@ -28,7 +28,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/kpis': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/ia': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
@@ -71,7 +71,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/portail': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
   },
   '/api/upload': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
@@ -85,10 +85,10 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/reporting': {
-    roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE'],
   },
   '/api/technique/societes': {
-    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
@@ -96,7 +96,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/technique/baremes': {
-    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
@@ -104,7 +104,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/assures': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
@@ -118,7 +118,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/prestataires': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
@@ -135,7 +135,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/alertes': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
   },
   '/api/entreprise-contacts': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
@@ -146,10 +146,10 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/societes': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
   },
   '/api/baremes': {
-    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
   },
   '/api/sante/verifier-assure': {
     roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE'],
