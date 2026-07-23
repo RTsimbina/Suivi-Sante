@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus, Users,
-  Heart, Stethoscope, Building2, Zap, HeartPulse, Mail,
+  Heart, Stethoscope, Building2, Zap, HeartPulse, Mail, Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,8 +32,9 @@ import ConfigurationView from '@/components/suivisante/configuration-view';
 import SocietesView from '@/components/suivisante/societes-view';
 import SanteView from '@/components/suivisante/sante-view';
 import ReceptionView from '@/components/suivisante/reception-view';
+import JournalView from '@/components/suivisante/journal-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante' | 'journal';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -59,6 +60,7 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
   { key: 'sante', label: 'Contrôle Santé', icon: HeartPulse, badge: 'Santé', section: 'SANTE', roles: ['ADMINISTRATEUR', 'SANTE'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
+  { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
@@ -275,6 +277,7 @@ export default function Home() {
           {view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
           {view === 'societes' && <SocietesView />}
           {view === 'configuration' && <ConfigurationView />}
+          {view === 'journal' && <JournalView />}
           {view === 'sante' && <SanteView />}
         </main>
       </div>

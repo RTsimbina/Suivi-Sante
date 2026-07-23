@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { logParametreChange, getUserIdFromRequest } from '@/lib/audit-log';
 
 // ─── GET : Un contrat par ID ───────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
+    const userId = getUserIdFromRequest(request);
 
     const body = await request.json();
     const { reference, budgetAnnuel, dateDebut, dateFin, statut } = body;
@@ -64,20 +66,60 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const validStatuts = ['ACTIF', 'EXPIRE', 'SUSPENDU'];
 
+    // Préparer les données de mise à jour et collecter les changements pour l'audit
+    const updateData: Record<string, unknown> = {};
+    const changes: { champ: string; ancienneValeur: unknown; nouvelleValeur: unknown }[] = [];
+
+    if (reference) {
+      const trimmed = reference.trim();
+      if (trimmed !== existing.reference) {
+        updateData.reference = trimmed;
+        changes.push({ champ: 'reference', ancienneValeur: existing.reference, nouvelleValeur: trimmed });
+      }
+    }
+    if (budgetAnnuel !== undefined) {
+      const numBudget = Number(budgetAnnuel);
+      if (String(numBudget) !== String(Number(existing.budgetAnnuel))) {
+        updateData.budgetAnnuel = numBudget;
+        changes.push({ champ: 'budgetAnnuel', ancienneValeur: existing.budgetAnnuel, nouvelleValeur: numBudget });
+      }
+    }
+    if (dateDebut) {
+      const d = new Date(dateDebut);
+      if (d.getTime() !== existing.dateDebut.getTime()) {
+        updateData.dateDebut = d;
+        changes.push({ champ: 'dateDebut', ancienneValeur: existing.dateDebut.toISOString(), nouvelleValeur: d.toISOString() });
+      }
+    }
+    if (dateFin) {
+      const d = new Date(dateFin);
+      if (d.getTime() !== existing.dateFin.getTime()) {
+        updateData.dateFin = d;
+        changes.push({ champ: 'dateFin', ancienneValeur: existing.dateFin.toISOString(), nouvelleValeur: d.toISOString() });
+      }
+    }
+    if (statut && validStatuts.includes(statut)) {
+      if (statut !== existing.statut) {
+        updateData.statut = statut;
+        changes.push({ champ: 'statut', ancienneValeur: existing.statut, nouvelleValeur: statut });
+      }
+    }
+
     const updated = await db.contrat.update({
       where: { id },
-      data: {
-        ...(reference ? { reference: reference.trim() } : {}),
-        ...(budgetAnnuel !== undefined ? { budgetAnnuel: Number(budgetAnnuel) } : {}),
-        ...(dateDebut ? { dateDebut: new Date(dateDebut) } : {}),
-        ...(dateFin ? { dateFin: new Date(dateFin) } : {}),
-        ...(statut && validStatuts.includes(statut) ? { statut } : {}),
-      },
+      data: updateData,
       include: {
         societe: { select: { id: true, nom: true } },
         _count: { select: { appelsDeFonds: true } },
       },
     });
+
+    // Audit log : enregistrer chaque champ modifié
+    for (const change of changes) {
+      await logParametreChange({
+        entite: 'Contrat', entiteId: id, ...change, modifiePar: userId,
+      });
+    }
 
     return NextResponse.json(updated);
   } catch (error: any) {
@@ -95,6 +137,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
+    const userId = getUserIdFromRequest(request);
 
     const existing = await db.contrat.findUnique({
       where: { id },
@@ -113,6 +156,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     await db.contrat.delete({ where: { id } });
+
+    // Audit log : suppression
+    await logParametreChange({
+      entite: 'Contrat', entiteId: id, champ: 'SUPPRESSION',
+      ancienneValeur: `Réf: ${existing.reference}, Budget: ${existing.budgetAnnuel}, Statut: ${existing.statut}`,
+      nouvelleValeur: null, modifiePar: userId,
+    });
 
     return NextResponse.json({ message: 'Contrat supprimé.' });
   } catch {

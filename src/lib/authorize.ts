@@ -157,6 +157,9 @@ export const API_PERMISSIONS: Record<
   '/api/sante/simuler-acte': {
     roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE'],
   },
+  '/api/historique-parametres': {
+    roles: ['ADMINISTRATEUR'],
+  },
   '/api/entreprises': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
   },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { logParametreChange, getUserIdFromRequest } from '@/lib/audit-log';
 import { Prisma } from '@prisma/client';
 
 // Types
@@ -70,6 +71,7 @@ export async function PUT(
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const userId = getUserIdFromRequest(request);
     const { id } = await params;
     const body = await request.json();
     const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = body as {
@@ -159,6 +161,10 @@ export async function PUT(
       if (baremes && baremesOperations) {
         // D'abord supprimer les barèmes existants qui ne sont plus dans la liste
         const prestationsEnvoyees = baremes.map((b) => b.prestation);
+        const removedBaremes = existing.baremes.filter(
+          (eb) => !prestationsEnvoyees.includes(eb.prestation)
+        );
+
         await tx.bareme.deleteMany({
           where: {
             societeId: id,
@@ -168,6 +174,10 @@ export async function PUT(
 
         // Puis upsert chaque barème
         for (const b of baremesOperations) {
+          const existingBareme = existing.baremes.find(
+            (eb) => eb.prestation === b.prestation
+          );
+
           await tx.bareme.upsert({
             where: {
               societeId_prestation: {
@@ -190,6 +200,31 @@ export async function PUT(
               active: b.active ?? true,
             },
           });
+
+          // Audit log pour chaque barème modifié/créé
+          if (existingBareme) {
+            if (String(existingBareme.tauxCouverture) !== String(b.tauxCouverture)) {
+              await logParametreChange({
+                entite: 'Bareme', entiteId: existingBareme.id, champ: 'tauxCouverture',
+                ancienneValeur: existingBareme.tauxCouverture, nouvelleValeur: b.tauxCouverture, modifiePar: userId,
+              });
+            }
+            if (String(existingBareme.plafond) !== String(b.plafond)) {
+              await logParametreChange({
+                entite: 'Bareme', entiteId: existingBareme.id, champ: 'plafond',
+                ancienneValeur: existingBareme.plafond, nouvelleValeur: b.plafond, modifiePar: userId,
+              });
+            }
+          }
+        }
+
+        // Audit log pour les barèmes supprimés
+        for (const rb of removedBaremes) {
+          await logParametreChange({
+            entite: 'Bareme', entiteId: rb.id, champ: 'SUPPRESSION',
+            ancienneValeur: `${rb.prestation} (taux: ${rb.tauxCouverture}%, plafond: ${rb.plafond})`,
+            nouvelleValeur: null, modifiePar: userId,
+          });
         }
       }
 
@@ -209,6 +244,14 @@ export async function PUT(
         },
       });
     });
+
+    // Audit log : modifications de la société elle-même
+    if (nom && nom.trim() !== existing.nom) {
+      await logParametreChange({
+        entite: 'Societe', entiteId: id, champ: 'nom',
+        ancienneValeur: existing.nom, nouvelleValeur: nom.trim(), modifiePar: userId,
+      });
+    }
 
     return NextResponse.json({
       message: 'Société mise à jour avec succès.',
@@ -246,12 +289,14 @@ export async function DELETE(
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const userId = getUserIdFromRequest(request);
     const { id } = await params;
 
     // Vérifier que la société existe
     const societe = await db.societe.findUnique({
       where: { id },
       include: {
+        baremes: true,
         _count: { select: { dossiers: true, contrats: true } },
       },
     });
@@ -272,6 +317,13 @@ export async function DELETE(
         { status: 409 }
       );
     }
+
+    // Audit log : suppression avec le détail des barèmes
+    await logParametreChange({
+      entite: 'Societe', entiteId: id, champ: 'SUPPRESSION',
+      ancienneValeur: `${societe.nom} (${societe.baremes.length} barème(s), ${societe._count.contrats} contrat(s))`,
+      nouvelleValeur: null, modifiePar: userId,
+    });
 
     // Supprimer la société (les barèmes et contrats seront supprimés en cascade par Prisma si configuré)
     // Pour SQLite, on supprime d'abord les barèmes et contrats manuellement

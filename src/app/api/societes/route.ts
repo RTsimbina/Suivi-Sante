@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { logParametreChange, getUserIdFromRequest } from "@/lib/audit-log";
 
 // GET — Lister toutes les sociétés
 export async function GET(request: NextRequest) {
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const userId = getUserIdFromRequest(request);
     const body = await request.json();
     const { nom } = body;
 
@@ -43,6 +45,12 @@ export async function POST(request: NextRequest) {
       data: { nom: nom.trim() },
     });
 
+    // Audit log : création
+    await logParametreChange({
+      entite: 'Societe', entiteId: societe.id, champ: 'CREATION',
+      ancienneValeur: null, nouvelleValeur: nom.trim(), modifiePar: userId,
+    });
+
     return NextResponse.json({ societe }, { status: 201 });
   } catch (error) {
     console.error("Erreur création société:", error);
@@ -56,6 +64,7 @@ export async function DELETE(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const userId = getUserIdFromRequest(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -72,12 +81,23 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Récupérer la société pour l'audit
+    const societe = await db.societe.findUnique({ where: { id } });
+
     // Supprimer les barèmes d'abord
     await db.bareme.deleteMany({ where: { societeId: id } });
     // Supprimer les contrats
     await db.contrat.deleteMany({ where: { societeId: id } });
 
     await db.societe.delete({ where: { id } });
+
+    // Audit log : suppression
+    if (societe) {
+      await logParametreChange({
+        entite: 'Societe', entiteId: id, champ: 'SUPPRESSION',
+        ancienneValeur: societe.nom, nouvelleValeur: null, modifiePar: userId,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

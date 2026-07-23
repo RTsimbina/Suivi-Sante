@@ -267,3 +267,16 @@ model EntrepriseContact {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 }
+model HistoriqueParametre {
+  id               String   @id @default(cuid())
+  entite           String
+  entiteId         String
+  champ            String
+  ancienneValeur   String?
+  nouvelleValeur   String?
+  modifiePar       String
+  dateModification DateTime @default(now())
+
+  @@index([entite, entiteId])
+  @@index([dateModification])
+}

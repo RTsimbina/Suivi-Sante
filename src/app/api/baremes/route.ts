@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { logParametreChange, getUserIdFromRequest } from "@/lib/audit-log";
 
 const PRESTATIONS_VALIDES = [
   "HOSPITALISATION", "CONSULTATION", "PHARMACIE", "MATERNITE",
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const userId = getUserIdFromRequest(request);
     const body = await request.json();
     const { societeId, prestation, tauxCouverture, plafond, description } = body;
 
@@ -51,6 +53,11 @@ export async function POST(request: NextRequest) {
     if (plafond === undefined || plafond <= 0) {
       return NextResponse.json({ error: "plafond doit être un montant positif" }, { status: 400 });
     }
+
+    // Récupérer l'ancien barème s'il existe (pour l'audit)
+    const existing = await db.bareme.findUnique({
+      where: { societeId_prestation: { societeId, prestation } },
+    });
 
     const bareme = await db.bareme.upsert({
       where: { societeId_prestation: { societeId, prestation } },
@@ -69,6 +76,35 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Audit log : logger les modifications sur un barème existant
+    if (existing) {
+      const logId = bareme.id;
+      if (String(existing.tauxCouverture) !== String(tauxCouverture)) {
+        await logParametreChange({
+          entite: 'Bareme', entiteId: logId, champ: 'tauxCouverture',
+          ancienneValeur: existing.tauxCouverture, nouvelleValeur: tauxCouverture, modifiePar: userId,
+        });
+      }
+      if (String(existing.plafond) !== String(plafond)) {
+        await logParametreChange({
+          entite: 'Bareme', entiteId: logId, champ: 'plafond',
+          ancienneValeur: existing.plafond, nouvelleValeur: plafond, modifiePar: userId,
+        });
+      }
+      if ((existing.description || '') !== (description || '')) {
+        await logParametreChange({
+          entite: 'Bareme', entiteId: logId, champ: 'description',
+          ancienneValeur: existing.description || '', nouvelleValeur: description || '', modifiePar: userId,
+        });
+      }
+      if (!existing.active) {
+        await logParametreChange({
+          entite: 'Bareme', entiteId: logId, champ: 'active',
+          ancienneValeur: false, nouvelleValeur: true, modifiePar: userId,
+        });
+      }
+    }
+
     return NextResponse.json({ bareme }, { status: 201 });
   } catch (error) {
     console.error("Erreur création barème:", error);
@@ -76,12 +112,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH — Désactiver un barème
+// PATCH — Désactiver/activer un barème
 export async function PATCH(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const userId = getUserIdFromRequest(request);
     const body = await request.json();
     const { id, active } = body;
 
@@ -89,10 +126,21 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "ID du barème requis" }, { status: 400 });
     }
 
+    // Récupérer l'ancien barème pour l'audit
+    const existing = await db.bareme.findUnique({ where: { id } });
+
     const bareme = await db.bareme.update({
       where: { id },
       data: { active: active !== undefined ? active : false },
     });
+
+    // Audit log
+    if (existing && existing.active !== bareme.active) {
+      await logParametreChange({
+        entite: 'Bareme', entiteId: id, champ: 'active',
+        ancienneValeur: existing.active, nouvelleValeur: bareme.active, modifiePar: userId,
+      });
+    }
 
     return NextResponse.json({ bareme });
   } catch (error) {
@@ -114,7 +162,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "ID du barème requis" }, { status: 400 });
     }
 
+    // Récupérer le barème avant suppression pour l'audit
+    const existing = await db.bareme.findUnique({ where: { id } });
+
     await db.bareme.delete({ where: { id } });
+
+    // Audit log : suppression = ancienneValeur complète, nouvelleValeur vide
+    if (existing) {
+      const userId = getUserIdFromRequest(request);
+      await logParametreChange({
+        entite: 'Bareme', entiteId: id, champ: 'SUPPRESSION',
+        ancienneValeur: `${existing.prestation} (taux: ${existing.tauxCouverture}%, plafond: ${existing.plafond})`,
+        nouvelleValeur: null, modifiePar: userId,
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Erreur suppression barème:", error);
