@@ -29,6 +29,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Utilisateur_email_key" ON "Utilisateur"("emai
 CREATE TABLE IF NOT EXISTS "Societe" (
     "id" TEXT NOT NULL,
     "nom" TEXT NOT NULL,
+    "adresse" TEXT,
+    "telephone" TEXT,
+    "email" TEXT,
+    "nif" TEXT,
+    "contactPrincipal" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Societe_pkey" PRIMARY KEY ("id")
 );
@@ -380,7 +385,19 @@ export async function GET(request: Request) {
       console.warn(`[SETUP] Migration budgetUtilise (non bloquant): ${e.message?.slice(0, 120)}`);
     }
 
-    // ── Étape 1c : Migration lockout (colonnes DB anti brute-force) ──
+    // ── Étape 1c : Migration colonnes Societe (adresse, telephone, email, nif, contactPrincipal) ──
+    try {
+      await db.$executeRawUnsafe(`ALTER TABLE "Societe" ADD COLUMN IF NOT EXISTS "adresse" TEXT`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Societe" ADD COLUMN IF NOT EXISTS "telephone" TEXT`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Societe" ADD COLUMN IF NOT EXISTS "email" TEXT`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Societe" ADD COLUMN IF NOT EXISTS "nif" TEXT`);
+      await db.$executeRawUnsafe(`ALTER TABLE "Societe" ADD COLUMN IF NOT EXISTS "contactPrincipal" TEXT`);
+      log.push('Migration Societe : colonnes adresse/telephone/email/nif/contactPrincipal ajoutées');
+    } catch (e: any) {
+      console.warn(`[SETUP] Migration Societe colonnes (non bloquant): ${e.message?.slice(0, 120)}`);
+    }
+
+    // ── Étape 1d : Migration lockout (colonnes DB anti brute-force) ──
     try {
       await db.$executeRaw`
         ALTER TABLE "Utilisateur" ADD COLUMN IF NOT EXISTS "failedAttempts" INTEGER NOT NULL DEFAULT 0

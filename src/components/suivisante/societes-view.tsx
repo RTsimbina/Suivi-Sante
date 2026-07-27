@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Societe {
   id: string;
@@ -121,16 +122,28 @@ export default function SocietesView() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (res.ok) { setFormOpen(false); fetchSocietes(); }
+        const data = await res.json().catch(() => null);
+        if (!res.ok || data?.erreur) {
+          throw new Error(data?.erreur || `Erreur serveur (${res.status})`);
+        }
+        toast.success('Société mise à jour avec succès');
+        setFormOpen(false); fetchSocietes();
       } else {
         const res = await fetch('/api/technique/societes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (res.ok) { setFormOpen(false); fetchSocietes(); }
+        const data = await res.json().catch(() => null);
+        if (!res.ok || data?.erreur) {
+          throw new Error(data?.erreur || `Erreur serveur (${res.status})`);
+        }
+        toast.success('Société créée avec succès');
+        setFormOpen(false); fetchSocietes();
       }
-    } catch { /* silent */ } finally {
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
       setSaving(false);
     }
   }
@@ -138,8 +151,15 @@ export default function SocietesView() {
   async function handleDelete(id: string) {
     try {
       const res = await fetch(`/api/technique/societes/${id}`, { method: 'DELETE' });
-      if (res.ok) { setDeleteConfirm(null); fetchSocietes(); }
-    } catch { /* silent */ }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.erreur) {
+        throw new Error(data?.erreur || 'Erreur lors de la suppression');
+      }
+      toast.success('Société supprimée avec succès');
+      setDeleteConfirm(null); fetchSocietes();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Impossible de supprimer la société');
+    }
   }
 
   const totalDossiers = societes.reduce((s, soc) => s + soc._count.dossiers, 0);
