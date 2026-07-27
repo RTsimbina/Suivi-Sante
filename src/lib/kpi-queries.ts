@@ -170,20 +170,23 @@ export async function getGestionnaireProductivite() {
              END
            ), 2)                                                                     AS temps_moyen
     FROM (
-      SELECT d."gestionnaireAccueilId" AS gid, g.nom, 'RECEPTION'     AS service,
+      SELECT COALESCE(d."gestionnaireAccueilId", 'none') AS gid,
+             COALESCE(g.nom, 'Non assigné') AS nom, 'RECEPTION'     AS service,
              d."montantValide", d."montantReclame",
              d."dateTraitementTechnique", d."dateReception", d."datePaiement"
-      FROM "Dossier" d JOIN "Gestionnaire" g ON d."gestionnaireAccueilId" = g.id
+      FROM "Dossier" d LEFT JOIN "Gestionnaire" g ON d."gestionnaireAccueilId" = g.id
       UNION ALL
-      SELECT d."gestionnaireTechniqueId" AS gid, g.nom, 'TECHNIQUE'    AS service,
+      SELECT COALESCE(d."gestionnaireTechniqueId", 'none') AS gid,
+             COALESCE(g.nom, 'Non assigné') AS nom, 'TECHNIQUE'    AS service,
              d."montantValide", d."montantReclame",
              d."dateTraitementTechnique", d."dateReception", d."datePaiement"
-      FROM "Dossier" d JOIN "Gestionnaire" g ON d."gestionnaireTechniqueId" = g.id
+      FROM "Dossier" d LEFT JOIN "Gestionnaire" g ON d."gestionnaireTechniqueId" = g.id
       UNION ALL
-      SELECT d."gestionnaireComptaId"    AS gid, g.nom, 'COMPTABILITE' AS service,
+      SELECT COALESCE(d."gestionnaireComptaId", 'none') AS gid,
+             COALESCE(g.nom, 'Non assigné') AS nom, 'COMPTABILITE' AS service,
              d."montantValide", d."montantReclame",
              d."dateTraitementTechnique", d."dateReception", d."datePaiement"
-      FROM "Dossier" d JOIN "Gestionnaire" g ON d."gestionnaireComptaId" = g.id
+      FROM "Dossier" d LEFT JOIN "Gestionnaire" g ON d."gestionnaireComptaId" = g.id
     ) sub
     GROUP BY sub.gid, sub.nom, sub.service
     ORDER BY sub.service, nb_dossiers DESC
