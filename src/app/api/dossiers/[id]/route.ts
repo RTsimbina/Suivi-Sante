@@ -45,18 +45,9 @@ export async function PATCH(
     if (authError) return authError;
     const { id } = await params;
 
-    // ─── Isolation : UTILISATEUR ne peut modifier que ses propres dossiers ───
+    // ─── Modification du dossier ───
     const userRole = request.headers.get('x-user-role');
     const userId = request.headers.get('x-user-id');
-    if (userRole === 'UTILISATEUR') {
-      const dossier = await db.dossier.findFirst({
-        where: { id, createurId: userId },
-        select: { id: true },
-      });
-      if (!dossier) {
-        return NextResponse.json({ error: 'Dossier introuvable' }, { status: 404 });
-      }
-    }
 
     const body = await request.json();
     const { statut } = body;

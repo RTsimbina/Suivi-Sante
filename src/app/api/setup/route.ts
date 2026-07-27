@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS "Utilisateur" (
     "email" TEXT NOT NULL,
     "nom" TEXT NOT NULL,
     "password" TEXT NOT NULL,
-    "role" TEXT NOT NULL DEFAULT 'UTILISATEUR',
+    "role" TEXT NOT NULL DEFAULT 'SANTE',
     "actif" BOOLEAN NOT NULL DEFAULT true,
     "avatar" TEXT,
     "dernierLogin" TIMESTAMP(3),
@@ -435,7 +435,7 @@ export async function GET(request: Request) {
       { email: 'accueil@suivisante.mg', nom: 'Ravao Andrianjaka', password: passwordHash, role: 'ACCUEIL' },
       { email: 'technique@suivisante.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
       { email: 'compta@suivisante.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
-      { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
+      { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'SANTE' },
     ];
 
     for (const u of utilisateursData) {
@@ -578,7 +578,7 @@ export async function GET(request: Request) {
     const comptaIds = Object.values(gestionnaires).filter(g => g.service === 'COMPTABILITE').map(g => g.id);
     const utilisateursList = await db.utilisateur.findMany();
     const accueilUser = utilisateursList.find(u => u.role === 'ACCUEIL')!;
-    const utilisateurDemo = utilisateursList.find(u => u.role === 'UTILISATEUR')!;
+    const utilisateurDemo = utilisateursList.find(u => u.role === 'SANTE')!;
     const prestataireIds = Object.values(prestatairesMap);
     const societeIds = Object.values(societes);
 

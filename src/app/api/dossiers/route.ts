@@ -23,10 +23,7 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.DossierWhereInput = {};
 
-    // ─── Isolation des données : UTILISATEUR ne voit que ses dossiers créés ───
-    if (userRole === 'UTILISATEUR') {
-      where.createurId = userId;
-    }
+    // ─── Isolation des données ───
 
     // Filter by statut
     if (statut) {

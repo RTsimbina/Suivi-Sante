@@ -1151,7 +1151,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                     </p>
                                   </div>
                                   <div className={`flex items-center justify-center h-9 w-9 rounded-lg bg-gradient-to-br ${kpi.gradient} shadow-sm`}> 
-                                    <Icon className="h-4.5 w-4.5 text-white" />
+                                    <Icon className="h-[18px] w-[18px] text-white" />
                                   </div>
                                 </div>
                                 <p className="text-[11px] text-muted-foreground mt-2">{kpi.sub}</p>
@@ -1212,7 +1212,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                     const pourcentageCouvert = d.montantReclame > 0 && d.montantValide !== null
                                       ? ((d.montantValide / d.montantReclame) * 100) 
                                       : 0;
-                                    const rowColor = isExclusion
+                                    const rowBorderColor = isExclusion
                                       ? 'border-l-red-500'
                                       : isRejete
                                         ? 'border-l-slate-400'
@@ -1226,7 +1226,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                     return (
                                       <tr
                                         key={d.id}
-                                        className={`border-l-[3px] ${rowColor} ${rowBg} transition-colors`}
+                                        className={`border-l-[3px] ${rowBorderColor} ${rowBg} transition-colors`}
                                       >
                                         <td className="py-3 px-4 font-mono text-xs font-medium">{d.numeroDossier}</td>
                                         <td className="py-3 px-4">
