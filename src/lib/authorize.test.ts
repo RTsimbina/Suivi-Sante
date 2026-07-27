@@ -71,14 +71,14 @@ describe('API_PERMISSIONS — /api/contrats', () => {
     expect(checkPermission('/api/contrats', 'GET', 'ACCUEIL').allowed).toBe(false);
   });
 
-  it('UTILISATEUR ne peut pas accéder aux contrats', () => {
-    expect(checkPermission('/api/contrats', 'GET', 'UTILISATEUR').allowed).toBe(false);
+  it('SANTE ne peut pas accéder aux contrats', () => {
+    expect(checkPermission('/api/contrats', 'GET', 'SANTE').allowed).toBe(false);
   });
 });
 
 describe('API_PERMISSIONS — /api/dossiers', () => {
   it('tous les rôles opérationnels peuvent lire les dossiers', () => {
-    for (const role of ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] as RoleType[]) {
+    for (const role of ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] as RoleType[]) {
       expect(checkPermission('/api/dossiers', 'GET', role).allowed).toBe(true);
     }
   });
@@ -89,8 +89,8 @@ describe('API_PERMISSIONS — /api/dossiers', () => {
     expect(checkPermission('/api/dossiers', 'DELETE', 'TECHNIQUE').allowed).toBe(false);
   });
 
-  it('UTILISATEUR ne peut pas créer de dossier', () => {
-    expect(checkPermission('/api/dossiers', 'POST', 'UTILISATEUR').allowed).toBe(false);
+  it('SANTE ne peut pas créer de dossier', () => {
+    expect(checkPermission('/api/dossiers', 'POST', 'SANTE').allowed).toBe(false);
   });
 });
 
@@ -129,7 +129,7 @@ describe('API_PERMISSIONS — /api/reporting (restreint)', () => {
     expect(checkPermission('/api/reporting/rapport', 'GET', 'ADMINISTRATEUR').allowed).toBe(true);
     expect(checkPermission('/api/reporting/rapport', 'GET', 'COMPTABILITE').allowed).toBe(true);
     expect(checkPermission('/api/reporting/rapport', 'GET', 'ACCUEIL').allowed).toBe(false);
-    expect(checkPermission('/api/reporting/rapport', 'GET', 'UTILISATEUR').allowed).toBe(false);
+    expect(checkPermission('/api/reporting/rapport', 'GET', 'SANTE').allowed).toBe(false);
   });
 });
 
