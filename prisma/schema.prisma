@@ -28,6 +28,11 @@ model Utilisateur {
 model Societe {
   id        String    @id @default(cuid())
   nom       String
+  adresse   String?
+  telephone  String?
+  email     String?
+  nif       String?
+  contactPrincipal String?
   baremes   Bareme[]
   dossiers  Dossier[]
   contrats  Contrat[]
