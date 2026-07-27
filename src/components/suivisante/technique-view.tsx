@@ -529,26 +529,34 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
             <CardTitle className="text-sm font-medium">Performance gestionnaires techniques</CardTitle>
           </CardHeader>
           <CardContent className="max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-background">
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 font-medium">Nom</th>
-                  <th className="pb-2 font-medium text-right">Dossiers</th>
-                  <th className="pb-2 font-medium text-right">Montant</th>
-                  <th className="pb-2 font-medium text-right">Tps moyen (j)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {techGestionnaires.map((p, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-2 font-medium">{p.gestionnaireNom}</td>
-                    <td className="py-2 text-right">{p.nbDossiers}</td>
-                    <td className="py-2 text-right">{formatMontantCourt(p.montantTraite)}</td>
-                    <td className="py-2 text-right">{p.tempsMoyenTraitement}</td>
+            {techGestionnaires.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                <p className="text-xs">Aucune donnée de performance disponible.</p>
+                <p className="text-[10px] mt-0.5">Les données apparaîtront une fois les dossiers traités.</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-background">
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-2 font-medium">Nom</th>
+                    <th className="pb-2 font-medium text-right">Dossiers</th>
+                    <th className="pb-2 font-medium text-right">Montant</th>
+                    <th className="pb-2 font-medium text-right">Tps moyen (j)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {techGestionnaires.map((p, i) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="py-2 font-medium">{p.gestionnaireNom}</td>
+                      <td className="py-2 text-right">{p.nbDossiers}</td>
+                      <td className="py-2 text-right">{formatMontantCourt(p.montantTraite)}</td>
+                      <td className="py-2 text-right">{p.tempsMoyenTraitement}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </CardContent>
         </Card>
       </div>
