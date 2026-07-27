@@ -14,27 +14,23 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || undefined;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(
-      1000,
+      100,
       Math.max(1, parseInt(searchParams.get("limit") || "20", 10))
     );
-    const typeDossier = searchParams.get("typeDossier") || undefined;
-    const societeId = searchParams.get("societeId") || undefined;
-    const dateDebut = searchParams.get("dateDebut") || undefined;
-    const dateFin = searchParams.get("dateFin") || undefined;
+
+    const userRole = request.headers.get('x-user-role') || '';
+    const userId = request.headers.get('x-user-id') || '';
 
     const where: Prisma.DossierWhereInput = {};
 
-    // ─── Isolation des données : tous les rôles internes voient tout ───
-    // Le proxy.ts vérifie déjà l'authentification et les permissions
+    // ─── Isolation des données : UTILISATEUR ne voit que ses dossiers créés ───
+    if (userRole === 'UTILISATEUR') {
+      where.createurId = userId;
+    }
 
-    // Filter by statut (supports comma-separated values: ?statut=VALIDE,REJETE)
+    // Filter by statut
     if (statut) {
-      const statuts = statut.split(',').map(s => s.trim()).filter(Boolean);
-      if (statuts.length === 1) {
-        where.statut = statuts[0];
-      } else if (statuts.length > 1) {
-        where.statut = { in: statuts };
-      }
+      where.statut = statut;
     }
 
     // Filter by service — maps to which gestionnaire relation to check
@@ -51,29 +47,6 @@ export async function GET(request: NextRequest) {
       where.societe = {
         nom: { contains: societe, mode: "insensitive" },
       };
-    }
-
-    // Filter by societeId (exact match for Kanban dropdown)
-    if (societeId) {
-      where.societeId = societeId;
-    }
-
-    // Filter by typeDossier
-    if (typeDossier) {
-      where.typeDossier = typeDossier;
-    }
-
-    // Filter by date range on dateReception
-    if (dateDebut || dateFin) {
-      where.dateReception = {};
-      if (dateDebut) {
-        (where.dateReception as Prisma.DateTimeNullableFilter)['gte'] = new Date(dateDebut);
-      }
-      if (dateFin) {
-        const endDate = new Date(dateFin);
-        endDate.setHours(23, 59, 59, 999);
-        (where.dateReception as Prisma.DateTimeNullableFilter)['lte'] = endDate;
-      }
     }
 
     // Search by beneficiaire or numeroDossier
