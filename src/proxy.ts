@@ -15,6 +15,7 @@ const PUBLIC_API_PREFIXES = [
   '/api/webhook/',        // WhatsApp, Telegram, Messenger
   '/api/bot-status',      // Statut des bots
   '/api/setup',           // Initialisation DB
+  '/api/migrate-societe', // Migration colonnes Societe
   '/api/health',          // Health check
   '/api/session/lockout', // Vérification verrouillage
   '/api/auth/check-lockout', // Vérification verrouillage (legacy)
