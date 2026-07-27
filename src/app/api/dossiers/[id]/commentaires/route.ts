@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // ─── Isolation : les commentaires privés ne sont visibles que par l'équipe interne ───
     const whereCommentaire: Record<string, unknown> = { dossierId: id };
-    if (!['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE'].includes(userRole)) {
+    if (userRole === 'UTILISATEUR') {
       whereCommentaire.prive = false;
     }
 
@@ -46,8 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Seuls les rôles internes peuvent créer des commentaires privés
     const userRole = request.headers.get('x-user-role') || '';
-    const INTERNAL = ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE'];
-    if (prive === true && !INTERNAL.includes(userRole)) {
+    if (prive === true && userRole === 'UTILISATEUR') {
       return NextResponse.json({ erreur: 'Les commentaires privés sont réservés à l\'équipe interne' }, { status: 403 });
     }
 

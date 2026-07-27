@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
-  FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
+  FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus, Users,
   Heart, Stethoscope, Building2, Zap, HeartPulse, Mail, Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import ImportView from '@/components/suivisante/import-view';
 import ReportingView from '@/components/suivisante/reporting-view';
 import PortailView from '@/components/suivisante/portail-view';
 import DossierForm from '@/components/suivisante/dossier-form';
+import UsersView from '@/components/suivisante/users-view';
 import AssuresView from '@/components/suivisante/assures-view';
 import PrestatairesView from '@/components/suivisante/prestataires-view';
 import ConfigurationView from '@/components/suivisante/configuration-view';
@@ -33,7 +34,7 @@ import SanteView from '@/components/suivisante/sante-view';
 import ReceptionView from '@/components/suivisante/reception-view';
 import JournalView from '@/components/suivisante/journal-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante' | 'journal';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'users' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante' | 'journal';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -48,20 +49,21 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'direction', label: 'Direction Générale', icon: LayoutDashboard, section: 'PILOTAGE', roles: ['ADMINISTRATEUR'] },
   { key: 'import', label: 'Accueil', icon: Inbox, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
   { key: 'reception', label: 'Réception Courriels', icon: Mail, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'ACCUEIL'] },
-  { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'] },
+  { key: 'dossiers', label: 'Table des Dossiers', icon: FileText, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
   { key: 'kanban', label: 'Vue Kanban', icon: Kanban, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'] },
   { key: 'technique', label: 'Service Technique', icon: Wrench, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'TECHNIQUE'] },
   { key: 'comptabilite', label: 'Comptabilité', icon: Calculator, section: 'TRAITEMENT', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
   { key: 'reporting', label: 'Reporting', icon: FileBarChart, section: 'FINANCE', roles: ['ADMINISTRATEUR', 'COMPTABILITE'] },
+  { key: 'users', label: 'Utilisateurs', icon: Users, section: 'FINANCE', roles: ['ADMINISTRATEUR'] },
   { key: 'assures', label: 'Assurés', icon: Heart, section: 'GESTION', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, section: 'GESTION', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
   { key: 'sante', label: 'Contrôle Santé', icon: HeartPulse, badge: 'Santé', section: 'SANTE', roles: ['ADMINISTRATEUR', 'SANTE'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
-  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'] },
-  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'] },
-  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'] },
+  { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
+  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
+  { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'] },
 ];
 
 export default function Home() {
@@ -270,6 +272,7 @@ export default function Home() {
           {view === 'ia' && <IaView />}
           {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><ChatView /></div>}
           {view === 'portail' && <PortailView />}
+          {view === 'users' && <UsersView />}
           {view === 'assures' && <AssuresView userRole={role || ''} />}
           {view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
           {view === 'societes' && <SocietesView />}

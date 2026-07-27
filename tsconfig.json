@@ -40,6 +40,7 @@
     "node_modules",
     "skills",
     "scripts",
-    "examples"
+    "examples",
+    "Suivi-Sante"
   ]
 }

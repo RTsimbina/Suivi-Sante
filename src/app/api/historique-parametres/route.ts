@@ -66,18 +66,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    // Table inexistante (P2021) -> retourner vide au lieu de crasher
-    if (
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      (error as { code: string }).code === 'P2021'
-    ) {
-      return NextResponse.json({
-        entries: [],
-        pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
-      });
-    }
     console.error('Erreur historique-parametres:', error);
     return NextResponse.json(
       { erreur: 'Erreur lors de la récupération du journal.' },
