@@ -27,9 +27,14 @@ export async function GET(request: NextRequest) {
     // ─── Isolation des données : tous les rôles internes voient tout ───
     // Le proxy.ts vérifie déjà l'authentification et les permissions
 
-    // Filter by statut
+    // Filter by statut (supports comma-separated values: ?statut=VALIDE,REJETE)
     if (statut) {
-      where.statut = statut;
+      const statuts = statut.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuts.length === 1) {
+        where.statut = statuts[0];
+      } else if (statuts.length > 1) {
+        where.statut = { in: statuts };
+      }
     }
 
     // Filter by service — maps to which gestionnaire relation to check
