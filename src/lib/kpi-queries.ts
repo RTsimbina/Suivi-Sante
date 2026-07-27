@@ -160,7 +160,7 @@ export async function getGestionnaireProductivite() {
   const rows: GestionnaireRow[] = await db.$queryRaw`
     SELECT sub.gid, sub.nom, sub.service,
            COUNT(*)::bigint                                                          AS nb_dossiers,
-           ROUND(SUM(COALESCE(sub."montantValide", sub."montantReclame")), 2)       AS montant_traite,
+           ROUND(SUM(COALESCE(sub."montantValide", sub."montantReclame"))::numeric, 2) AS montant_traite,
            ROUND(AVG(
              CASE
                WHEN sub.service IN ('RECEPTION','TECHNIQUE')
@@ -168,7 +168,7 @@ export async function getGestionnaireProductivite() {
                WHEN sub.service = 'COMPTABILITE'
                  THEN EXTRACT(EPOCH FROM (sub."datePaiement" - sub."dateReception")) / 86400
              END
-           ), 2)                                                                     AS temps_moyen
+           )::numeric, 2)                                                          AS temps_moyen
     FROM (
       SELECT d."gestionnaireAccueilId" AS gid, g.nom, 'RECEPTION'     AS service,
              d."montantValide", d."montantReclame",
