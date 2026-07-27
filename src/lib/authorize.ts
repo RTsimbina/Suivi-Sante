@@ -19,7 +19,7 @@ export const API_PERMISSIONS: Record<
   }
 > = {
   '/api/dossiers': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
@@ -31,10 +31,10 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/ia': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
   '/api/chat': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
   '/api/import': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],
@@ -71,18 +71,10 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/portail': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/upload': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
-  },
-  '/api/utilisateurs': {
-    roles: ['ADMINISTRATEUR'],
-    methods: {
-      POST: ['ADMINISTRATEUR'],
-      PUT: ['ADMINISTRATEUR'],
-      DELETE: ['ADMINISTRATEUR'],
-    },
   },
   '/api/reporting': {
     roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE'],
@@ -96,7 +88,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/technique/baremes': {
-    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
@@ -104,7 +96,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/assures': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
@@ -118,7 +110,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/prestataires': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
@@ -135,7 +127,7 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/alertes': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/entreprise-contacts': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
@@ -146,10 +138,10 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/societes': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/baremes': {
-    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE', 'SANTE'],
   },
   '/api/sante/verifier-assure': {
     roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE'],
@@ -161,7 +153,7 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR'],
   },
   '/api/entreprises': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'UTILISATEUR', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/reception/courriels': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],

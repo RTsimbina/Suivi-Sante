@@ -6,7 +6,7 @@
  * PostgreSQL. Chaque requête Prisma doit passer par ces filtres pour
  * garantir que :
  * 
- * 1. Un UTILISATEUR ne voit que les dossiers de sa société (societeId)
+ * 1. Les rôles internes voient toutes les données
  * 2. Les commentaires privés ne sont visibles que par l'équipe interne
  * 3. Les justificatifs suivent la même règle de société
  * 4. Les KPIs et analyses IA respectent le périmètre de l'utilisateur
@@ -25,8 +25,7 @@ const PRIVATE_COMMENT_ROLES = ["ADMINISTRATEUR", "TECHNIQUE", "COMPTABILITE"];
 
 /**
  * Retourne le filtre Prisma à appliquer sur les dossiers pour un rôle/utilisateur donné.
- * - ADMINISTRATEUR, ACCUEIL, TECHNIQUE, COMPTABILITE : pas de filtre (voient tout)
- * - UTILISATEUR : filtre par societeId lié au compte utilisateur
+ * - Tous les rôles internes : pas de filtre (voient tout)
  */
 export function getDossierIsolationFilter(
   userRole: string,
@@ -37,12 +36,7 @@ export function getDossierIsolationFilter(
     return {}; // Pas de restriction pour les rôles internes
   }
 
-  // UTILISATEUR : ne voit que les dossiers de sa société
-  if (userRole === "UTILISATEUR" && userSocieteId) {
-    return { societeId: userSocieteId };
-  }
-
-  // Fallback : UTILISATEUR sans société → uniquement ses dossiers créés
+  // Fallback : rôle non reconnu → uniquement ses dossiers créés
   return { createurId: userId };
 }
 
@@ -76,9 +70,6 @@ export function getJustificatifIsolationFilter(
 ): Prisma.JustificatifWhereInput {
   if (INTERNAL_ROLES.includes(userRole)) {
     return {};
-  }
-  if (userRole === "UTILISATEUR" && userSocieteId) {
-    return { dossier: { societeId: userSocieteId } };
   }
   return { uploadedBy: userId };
 }
