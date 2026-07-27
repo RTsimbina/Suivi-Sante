@@ -254,6 +254,20 @@ CREATE TABLE IF NOT EXISTS "EntrepriseContact" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "EntrepriseContact_pkey" PRIMARY KEY ("id")
 );
+
+CREATE TABLE IF NOT EXISTS "HistoriqueParametre" (
+    "id" TEXT NOT NULL,
+    "entite" TEXT NOT NULL,
+    "entiteId" TEXT NOT NULL,
+    "champ" TEXT NOT NULL,
+    "ancienneValeur" TEXT,
+    "nouvelleValeur" TEXT,
+    "modifiePar" TEXT NOT NULL,
+    "dateModification" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "HistoriqueParametre_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "HistoriqueParametre_entite_entiteId_idx" ON "HistoriqueParametre"("entite", "entiteId");
+CREATE INDEX IF NOT EXISTS "HistoriqueParametre_dateModification_idx" ON "HistoriqueParametre"("dateModification");
 `;
 
 const TYPES_DOSSIER = ['HOSPITALISATION', 'CONSULTATION', 'PHARMACIE', 'MATERNITE', 'CHIRURGIE', 'EXAMEN', 'SOINS DENTAIRES', 'OPTIQUE'];
@@ -397,7 +411,29 @@ export async function GET(request: Request) {
       console.warn(`[SETUP] Migration Societe colonnes (non bloquant): ${e.message?.slice(0, 120)}`);
     }
 
-    // ── Étape 1d : Migration lockout (colonnes DB anti brute-force) ──
+    // ── Étape 1d : Migration HistoriqueParametre (table journal de bord) ──
+    try {
+      await db.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "HistoriqueParametre" (
+            "id" TEXT NOT NULL,
+            "entite" TEXT NOT NULL,
+            "entiteId" TEXT NOT NULL,
+            "champ" TEXT NOT NULL,
+            "ancienneValeur" TEXT,
+            "nouvelleValeur" TEXT,
+            "modifiePar" TEXT NOT NULL,
+            "dateModification" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "HistoriqueParametre_pkey" PRIMARY KEY ("id")
+        )
+      `);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "HistoriqueParametre_entite_entiteId_idx" ON "HistoriqueParametre"("entite", "entiteId")`);
+      await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "HistoriqueParametre_dateModification_idx" ON "HistoriqueParametre"("dateModification")`);
+      log.push('Migration HistoriqueParametre : table et index créés');
+    } catch (e: any) {
+      console.warn(`[SETUP] Migration HistoriqueParametre (non bloquant): ${e.message?.slice(0, 120)}`);
+    }
+
+    // ── Étape 1e : Migration lockout (colonnes DB anti brute-force) ──
     try {
       await db.$executeRaw`
         ALTER TABLE "Utilisateur" ADD COLUMN IF NOT EXISTS "failedAttempts" INTEGER NOT NULL DEFAULT 0
