@@ -175,7 +175,10 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const [exclusions, setExclusions] = useState<Array<{
     id: string; numeroDossier: string; beneficiaire: string; societeNom: string;
     typeDossier: string; montantReclame: number; montantValide: number | null;
+    montantTheorique: number; plafondApplique: number | null; tauxCouverture: number | null;
     ticketModerateur: number | null; statut: string; motifRejet: string | null;
+    typeEcart: 'depassement' | 'exclusion' | 'rejete';
+    ecart: number; pourcentageCouvert: number;
   }>>([]);
   const [exclusionsLoading, setExclusionsLoading] = useState(false);
   const [exclusionFilter, setExclusionFilter] = useState<'all' | 'depassement' | 'exclusion' | 'rejete'>('all');
@@ -203,28 +206,10 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const fetchExclusions = useCallback(async () => {
     setExclusionsLoading(true);
     try {
-      const res = await fetch('/api/dossiers?limit=500&statut=VALIDE,REJETE');
+      const res = await fetch('/api/technique/exclusions');
       if (res.ok) {
         const data = await res.json();
-        const allDossiers = data.dossiers || [];
-        // Identifier les dépassements (montantValide < montantReclame) et exclusions (montantValide = 0)
-        const exclus = allDossiers.filter((d: { montantReclame: number; montantValide: number | null; statut: string }) =>
-          d.statut === 'REJETE' ||
-          (d.montantValide !== null && d.montantValide < d.montantReclame) ||
-          (d.montantValide === 0 && d.montantReclame > 0)
-        );
-        setExclusions(exclus.map((d: { id: string; numeroDossier: string; beneficiaire: string; societe: { nom: string } | null; typeDossier: string; montantReclame: number; montantValide: number | null; ticketModerateur: number | null; statut: string; motifRejet: string | null }) => ({
-          id: d.id,
-          numeroDossier: d.numeroDossier,
-          beneficiaire: d.beneficiaire,
-          societeNom: d.societe?.nom || '—',
-          typeDossier: d.typeDossier,
-          montantReclame: d.montantReclame,
-          montantValide: d.montantValide,
-          ticketModerateur: d.ticketModerateur,
-          statut: d.statut,
-          motifRejet: d.motifRejet,
-        })));
+        setExclusions(data.exclusions || []);
       }
     } catch {
       // silencieux
@@ -1078,19 +1063,16 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                   </div>
                 ) : (() => {
                   const filtered = exclusions.filter((d) => {
-                    if (exclusionFilter === 'depassement') return d.montantValide !== null && d.montantValide > 0 && d.montantValide < d.montantReclame;
-                    if (exclusionFilter === 'exclusion') return d.montantValide === 0 && d.montantReclame > 0;
-                    if (exclusionFilter === 'rejete') return d.statut === 'REJETE';
+                    if (exclusionFilter === 'depassement') return d.typeEcart === 'depassement';
+                    if (exclusionFilter === 'exclusion') return d.typeEcart === 'exclusion';
+                    if (exclusionFilter === 'rejete') return d.typeEcart === 'rejete';
                     return true;
                   });
 
-                  const totalDepassement = filtered.filter(d => d.montantValide !== null && d.montantValide > 0 && d.montantValide < d.montantReclame).length;
-                  const totalExclusion = filtered.filter(d => d.montantValide === 0 && d.montantReclame > 0).length;
-                  const totalRejete = filtered.filter(d => d.statut === 'REJETE').length;
-                  const montantPerdu = filtered.reduce((acc, d) => {
-                    if (d.montantValide !== null) return acc + (d.montantReclame - d.montantValide);
-                    return acc + d.montantReclame;
-                  }, 0);
+                  const totalDepassement = filtered.filter(d => d.typeEcart === 'depassement').length;
+                  const totalExclusion = filtered.filter(d => d.typeEcart === 'exclusion').length;
+                  const totalRejete = filtered.filter(d => d.typeEcart === 'rejete').length;
+                  const montantPerdu = filtered.reduce((acc, d) => acc + d.ecart, 0);
                   const montantTotalReclame = filtered.reduce((acc, d) => acc + d.montantReclame, 0);
                   const tauxPerte = montantTotalReclame > 0 ? (montantPerdu / montantTotalReclame) * 100 : 0;
 
@@ -1113,7 +1095,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                       bgLight: 'bg-red-50 dark:bg-red-950/30',
                       textColor: 'text-red-700 dark:text-red-300',
                       borderColor: 'border-red-200/60 dark:border-red-800/40',
-                      sub: 'Montant validé = 0',
+                      sub: 'Pas de barème défini',
                     },
                     {
                       label: 'Rejetés',
@@ -1207,19 +1189,16 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                     <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Société</th>
                                     <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</th>
                                     <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Réclamé</th>
-                                    <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Validé</th>
+                                    <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Théorique</th>
                                     <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Écart</th>
-                                    <th className="text-center py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Statut</th>
+                                    <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden xl:table-cell">Couverture</th>
+                                    <th className="text-center py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                   {filtered.slice(0, 100).map((d) => {
-                                    const ecart = d.montantValide !== null ? d.montantReclame - d.montantValide : d.montantReclame;
-                                    const isExclusion = d.montantValide === 0 && d.montantReclame > 0;
-                                    const isRejete = d.statut === 'REJETE';
-                                    const pourcentageCouvert = d.montantReclame > 0 && d.montantValide !== null
-                                      ? ((d.montantValide / d.montantReclame) * 100) 
-                                      : 0;
+                                    const isExclusion = d.typeEcart === 'exclusion';
+                                    const isRejete = d.typeEcart === 'rejete';
                                     const rowBorderColor = isExclusion
                                       ? 'border-l-red-500'
                                       : isRejete
@@ -1262,10 +1241,15 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                         <td className="py-3 px-4 text-right">
                                           <span className="text-xs font-medium">{formatMontant(d.montantReclame)}</span>
                                         </td>
-                                        <td className="py-3 px-4 text-right">
+                                        <td className="py-3 px-4 text-right hidden md:table-cell">
                                           <span className="text-xs text-muted-foreground">
-                                            {d.montantValide !== null ? formatMontant(d.montantValide) : '—'}
+                                            {d.montantTheorique > 0 ? formatMontant(d.montantTheorique) : '—'}
                                           </span>
+                                          {d.plafondApplique !== null && (
+                                            <span className="block text-[10px] text-muted-foreground">
+                                              Plafond: {formatMontantCourt(d.plafondApplique)}
+                                            </span>
+                                          )}
                                         </td>
                                         <td className="py-3 px-4 text-right">
                                           <div className="flex flex-col items-end gap-1">
@@ -1276,23 +1260,33 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                                                   : 'text-amber-600 dark:text-amber-400'
                                               }`}
                                             >
-                                              -{formatMontant(ecart)}
+                                              -{formatMontant(d.ecart)}
                                             </span>
-                                            {!isExclusion && d.montantReclame > 0 && (
+                                            {!isExclusion && !isRejete && d.montantReclame > 0 && (
                                               <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                                                 <div
                                                   className={`h-full rounded-full transition-all ${
-                                                    pourcentageCouvert > 70
+                                                    d.pourcentageCouvert > 70
                                                       ? 'bg-emerald-500'
-                                                      : pourcentageCouvert > 40
+                                                      : d.pourcentageCouvert > 40
                                                         ? 'bg-amber-500'
                                                         : 'bg-red-500'
                                                   }`}
-                                                  style={{ width: `${pourcentageCouvert}%` }}
+                                                  style={{ width: `${d.pourcentageCouvert}%` }}
                                                 />
                                               </div>
                                             )}
                                           </div>
+                                        </td>
+                                        <td className="py-3 px-4 text-right hidden xl:table-cell">
+                                          {d.tauxCouverture !== null ? (
+                                            <div className="flex flex-col items-end gap-0.5">
+                                              <span className="text-xs font-medium">{d.pourcentageCouvert}%</span>
+                                              <span className="text-[10px] text-muted-foreground">Taux: {d.tauxCouverture}%</span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-xs text-muted-foreground">—</span>
+                                          )}
                                         </td>
                                         <td className="py-3 px-4 text-center">
                                           {isRejete ? (

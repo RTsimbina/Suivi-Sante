@@ -79,6 +79,9 @@ export const API_PERMISSIONS: Record<
   '/api/reporting': {
     roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE'],
   },
+  '/api/technique/exclusions': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE', 'ACCUEIL', 'SANTE'],
+  },
   '/api/technique/societes': {
     roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'SANTE'],
     methods: {
