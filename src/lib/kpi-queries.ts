@@ -158,7 +158,7 @@ interface GestionnaireRow {
 
 export async function getGestionnaireProductivite() {
   const rows: GestionnaireRow[] = await db.$queryRaw`
-    SELECT sub.gid, sub.nom, sub.service,
+    SELECT sub.gid, COALESCE(sub.nom, 'Non assigné') AS nom, sub.service,
            COUNT(*)::bigint                                                          AS nb_dossiers,
            ROUND(SUM(COALESCE(sub."montantValide", sub."montantReclame")), 2)       AS montant_traite,
            ROUND(AVG(
