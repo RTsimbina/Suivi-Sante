@@ -18,6 +18,9 @@ export const API_PERMISSIONS: Record<
     methods?: Partial<Record<string, RoleType[]>>;
   }
 > = {
+  '/api/dossiers/assigner-bulk': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+  },
   '/api/dossiers': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {

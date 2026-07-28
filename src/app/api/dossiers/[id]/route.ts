@@ -22,7 +22,6 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   REJETE: [],
 };
 
-// Seuls certains rôles peuvent effectuer certaines transitions
 const ROLE_TRANSITIONS: Record<string, string[]> = {
   'RECU_EN_ANALYSE': ['ADMINISTRATEUR', 'ACCUEIL'],
   'RECU_REJETE': ['ADMINISTRATEUR', 'TECHNIQUE'],
@@ -45,19 +44,11 @@ export async function PATCH(
     if (authError) return authError;
     const { id } = await params;
 
-    // ─── Modification du dossier ───
     const userRole = request.headers.get('x-user-role');
     const userId = request.headers.get('x-user-id');
 
     const body = await request.json();
-    const { statut } = body;
-
-    if (!statut || !VALID_STATUTS.includes(statut)) {
-      return NextResponse.json(
-        { error: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    const { statut, gestionnaireAccueilId, gestionnaireTechniqueId, gestionnaireComptaId } = body;
 
     const existing = await db.dossier.findUnique({
       where: { id },
@@ -65,47 +56,76 @@ export async function PATCH(
     });
 
     if (!existing) {
-      return NextResponse.json(
-        { error: "Dossier introuvable" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    if (existing.statut === statut) {
+    // ─── Partie 1 : Changement de statut ───
+    if (statut) {
+      if (!VALID_STATUTS.includes(statut)) {
+        return NextResponse.json(
+          { error: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
+          { status: 400 }
+        );
+      }
+
+      if (existing.statut === statut) {
+        return NextResponse.json(
+          { error: `Le dossier est déjà dans le statut "${statut}"` },
+          { status: 400 }
+        );
+      }
+
+      const allowed = VALID_TRANSITIONS[existing.statut] || [];
+      if (!allowed.includes(statut)) {
+        return NextResponse.json(
+          { error: `Transition non autorisée de "${existing.statut}" vers "${statut}"` },
+          { status: 400 }
+        );
+      }
+
+      const transitionKey = `${existing.statut}_${statut}`;
+      const allowedRoles = ROLE_TRANSITIONS[transitionKey];
+
+      if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
+        return NextResponse.json(
+          { error: `Le rôle '${userRole}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // ─── Partie 2 : Assignation de gestionnaires ───
+    const assignData: Record<string, string | null> = {};
+    const assignComments: string[] = [];
+
+    if (gestionnaireAccueilId !== undefined) {
+      assignData.gestionnaireAccueilId = gestionnaireAccueilId || null;
+      if (gestionnaireAccueilId && !existing.gestionnaireAccueilId) {
+        assignComments.push('Assigné à un gestionnaire Accueil');
+      }
+    }
+    if (gestionnaireTechniqueId !== undefined) {
+      assignData.gestionnaireTechniqueId = gestionnaireTechniqueId || null;
+      if (gestionnaireTechniqueId && !existing.gestionnaireTechniqueId) {
+        assignComments.push('Assigné à un gestionnaire Technique');
+      }
+    }
+    if (gestionnaireComptaId !== undefined) {
+      assignData.gestionnaireComptaId = gestionnaireComptaId || null;
+      if (gestionnaireComptaId && !existing.gestionnaireComptaId) {
+        assignComments.push('Assigné à un gestionnaire Comptabilité');
+      }
+    }
+
+    // Si ni statut ni gestionnaire à modifier
+    if (!statut && Object.keys(assignData).length === 0) {
       return NextResponse.json(
-        { error: `Le dossier est déjà dans le statut "${statut}"` },
+        { error: "Aucune modification demandée" },
         { status: 400 }
       );
     }
 
-    const allowed = VALID_TRANSITIONS[existing.statut] || [];
-    if (!allowed.includes(statut)) {
-      return NextResponse.json(
-        { error: `Transition non autorisée de "${existing.statut}" vers "${statut}"` },
-        { status: 400 }
-      );
-    }
-
-    // Vérification du rôle pour cette transition
-    const roleTransition = request.headers.get('x-user-role');
-    const transitionKey = `${existing.statut}_${statut}`;
-    const allowedRoles = ROLE_TRANSITIONS[transitionKey];
-
-    if (allowedRoles && roleTransition && !allowedRoles.includes(roleTransition)) {
-      return NextResponse.json(
-        { error: `Le rôle '${roleTransition}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
-        { status: 403 }
-      );
-    }
-
-    const historiqueEntry = {
-      date: new Date().toISOString(),
-      statut: statut,
-      statutPrecedent: existing.statut,
-      commentaire: "Changement via Kanban",
-      ...(userId ? { userId } : {}),
-    };
-
+    // ─── Historique ───
     const currentHistorique: unknown[] = (() => {
       try {
         return JSON.parse(existing.historique || "[]");
@@ -114,12 +134,33 @@ export async function PATCH(
       }
     })();
 
-    const newHistorique = [...currentHistorique, historiqueEntry];
+    const newHistorique = [...currentHistorique];
 
+    if (statut) {
+      newHistorique.push({
+        date: new Date().toISOString(),
+        statut,
+        statutPrecedent: existing.statut,
+        commentaire: 'Changement via Kanban',
+        ...(userId ? { userId } : {}),
+      });
+    }
+
+    if (assignComments.length > 0) {
+      newHistorique.push({
+        date: new Date().toISOString(),
+        statut: existing.statut,
+        commentaire: assignComments.join('. '),
+        ...(userId ? { userId } : {}),
+      });
+    }
+
+    // ─── Mise à jour ───
     const updated = await db.dossier.update({
       where: { id },
       data: {
-        statut,
+        ...(statut ? { statut } : {}),
+        ...assignData,
         historique: JSON.stringify(newHistorique),
       },
       include: {
