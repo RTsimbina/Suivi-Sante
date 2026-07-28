@@ -144,61 +144,140 @@ export async function getAvgDelaiAnalyse(): Promise<number> {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   6. Gestionnaire productivité  (1 raw SQL – UNION ALL)
+   6. Gestionnaire productivité  (3 Prisma groupBy – no raw SQL)
    ────────────────────────────────────────────────────────────── */
 
-interface GestionnaireRow {
-  gid: string;
-  nom: string;
-  service: string;
-  nb_dossiers: bigint;
-  montant_traite: number;
-  temps_moyen: number | null;
+interface GroupedRow {
+  gestionnaireId: string | null;
+  _count: number;
+  _sum: { montantValide: number | null; montantReclame: number | null };
+}
+
+function buildProductiviteFromGroups(
+  rows: GroupedRow[],
+  service: string,
+  nomMap: Map<string, string>,
+): { gestionnaireNom: string; service: string; nbDossiers: number; montantTraite: number; tempsMoyenTraitement: number }[] {
+  return rows
+    .map((r) => ({
+      gestionnaireNom: r.gestionnaireId ? (nomMap.get(r.gestionnaireId) || 'Inconnu') : 'Non assigné',
+      service,
+      nbDossiers: r._count,
+      montantTraite: round2(r._sum.montantValide ?? r._sum.montantReclame ?? 0),
+      tempsMoyenTraitement: 0, // computed separately below
+    }))
+    .sort((a, b) => b.nbDossiers - a.nbDossiers);
 }
 
 export async function getGestionnaireProductivite() {
-  const rows: GestionnaireRow[] = await db.$queryRaw`
-    SELECT sub.gid, COALESCE(sub.nom, 'Non assigné') AS nom, sub.service,
-           COUNT(*)::bigint                                                          AS nb_dossiers,
-           ROUND(SUM(COALESCE(sub."montantValide", sub."montantReclame")), 2)       AS montant_traite,
-           ROUND(AVG(
-             CASE
-               WHEN sub.service IN ('RECEPTION','TECHNIQUE')
-                 THEN EXTRACT(EPOCH FROM (sub."dateTraitementTechnique" - sub."dateReception")) / 86400
-               WHEN sub.service = 'COMPTABILITE'
-                 THEN EXTRACT(EPOCH FROM (sub."datePaiement" - sub."dateReception")) / 86400
-             END
-           ), 2)                                                                     AS temps_moyen
-    FROM (
-      SELECT COALESCE(d."gestionnaireAccueilId", 'none') AS gid,
-             COALESCE(g.nom, 'Non assigné') AS nom, 'RECEPTION'     AS service,
-             d."montantValide", d."montantReclame",
-             d."dateTraitementTechnique", d."dateReception", d."datePaiement"
-      FROM "Dossier" d LEFT JOIN "Gestionnaire" g ON d."gestionnaireAccueilId" = g.id
-      UNION ALL
-      SELECT COALESCE(d."gestionnaireTechniqueId", 'none') AS gid,
-             COALESCE(g.nom, 'Non assigné') AS nom, 'TECHNIQUE'    AS service,
-             d."montantValide", d."montantReclame",
-             d."dateTraitementTechnique", d."dateReception", d."datePaiement"
-      FROM "Dossier" d LEFT JOIN "Gestionnaire" g ON d."gestionnaireTechniqueId" = g.id
-      UNION ALL
-      SELECT COALESCE(d."gestionnaireComptaId", 'none') AS gid,
-             COALESCE(g.nom, 'Non assigné') AS nom, 'COMPTABILITE' AS service,
-             d."montantValide", d."montantReclame",
-             d."dateTraitementTechnique", d."dateReception", d."datePaiement"
-      FROM "Dossier" d LEFT JOIN "Gestionnaire" g ON d."gestionnaireComptaId" = g.id
-    ) sub
-    GROUP BY sub.gid, sub.nom, sub.service
-    ORDER BY sub.service, nb_dossiers DESC
-  `;
+  // 1. Group dossiers by each gestionnaire field
+  const [accueilGroups, techniqueGroups, comptaGroups] = await Promise.all([
+    db.dossier.groupBy({
+      by: ['gestionnaireAccueilId'],
+      _count: true,
+      _sum: { montantValide: true, montantReclame: true },
+    }),
+    db.dossier.groupBy({
+      by: ['gestionnaireTechniqueId'],
+      _count: true,
+      _sum: { montantValide: true, montantReclame: true },
+    }),
+    db.dossier.groupBy({
+      by: ['gestionnaireComptaId'],
+      _count: true,
+      _sum: { montantValide: true, montantReclame: true },
+    }),
+  ]);
 
-  return rows.map((r) => ({
-    gestionnaireNom: r.nom,
-    service: r.service,
-    nbDossiers: Number(r.nb_dossiers),
-    montantTraite: round2(r.montant_traite),
-    tempsMoyenTraitement: r.temps_moyen ? round2(Number(r.temps_moyen)) : 0,
-  }));
+  // 2. Fetch all gestionnaire names in one query
+  const allIds = [
+    ...accueilGroups.map((r) => r.gestionnaireAccueilId),
+    ...techniqueGroups.map((r) => r.gestionnaireTechniqueId),
+    ...comptaGroups.map((r) => r.gestionnaireComptaId),
+  ].filter((id): id is string => id !== null);
+
+  const uniqueIds = [...new Set(allIds)];
+  const gestionnaires = uniqueIds.length > 0
+    ? await db.gestionnaire.findMany({ where: { id: { in: uniqueIds } }, select: { id: true, nom: true } })
+    : [];
+  const nomMap = new Map(gestionnaires.map((g) => [g.id, g.nom]));
+
+  // 3. Compute average treatment times per gestionnaire (single query)
+  const timedDossiers = await db.dossier.findMany({
+    where: { dateReception: { not: null as unknown as Date } },
+    select: {
+      gestionnaireAccueilId: true,
+      gestionnaireTechniqueId: true,
+      gestionnaireComptaId: true,
+      dateReception: true,
+      dateTraitementTechnique: true,
+      datePaiement: true,
+    },
+  });
+
+  const accTimeMap = new Map<string, { total: number; count: number }>();
+  const techTimeMap = new Map<string, { total: number; count: number }>();
+  const comptaTimeMap = new Map<string, { total: number; count: number }>();
+
+  for (const d of timedDossiers) {
+    // RECEPTION & TECHNIQUE: dateReception → dateTraitementTechnique
+    if (d.dateTraitementTechnique) {
+      const jours = (d.dateTraitementTechnique.getTime() - d.dateReception!.getTime()) / MS_DAY;
+      const accKey = d.gestionnaireAccueilId || '__none__';
+      const accEntry = accTimeMap.get(accKey) || { total: 0, count: 0 };
+      accEntry.total += jours;
+      accEntry.count++;
+      accTimeMap.set(accKey, accEntry);
+
+      const techKey = d.gestionnaireTechniqueId || '__none__';
+      const techEntry = techTimeMap.get(techKey) || { total: 0, count: 0 };
+      techEntry.total += jours;
+      techEntry.count++;
+      techTimeMap.set(techKey, techEntry);
+    }
+    // COMPTABILITE: dateReception → datePaiement
+    if (d.datePaiement) {
+      const jours = (d.datePaiement.getTime() - d.dateReception!.getTime()) / MS_DAY;
+      const comptaKey = d.gestionnaireComptaId || '__none__';
+      const comptaEntry = comptaTimeMap.get(comptaKey) || { total: 0, count: 0 };
+      comptaEntry.total += jours;
+      comptaEntry.count++;
+      comptaTimeMap.set(comptaKey, comptaEntry);
+    }
+  }
+
+  // 4. Build result arrays
+  const reception = buildProductiviteFromGroups(
+    accueilGroups.map((r) => ({ gestionnaireId: r.gestionnaireAccueilId, _count: r._count, _sum: r._sum })),
+    'RECEPTION', nomMap,
+  );
+  const technique = buildProductiviteFromGroups(
+    techniqueGroups.map((r) => ({ gestionnaireId: r.gestionnaireTechniqueId, _count: r._count, _sum: r._sum })),
+    'TECHNIQUE', nomMap,
+  );
+  const compta = buildProductiviteFromGroups(
+    comptaGroups.map((r) => ({ gestionnaireId: r.gestionnaireComptaId, _count: r._count, _sum: r._sum })),
+    'COMPTABILITE', nomMap,
+  );
+
+  // 5. Enrich with average times
+  function enrichTimes(
+    items: { gestionnaireNom: string; tempsMoyenTraitement: number }[],
+    ids: (string | null)[],
+    timeMap: Map<string, { total: number; count: number }>,
+  ) {
+    for (let i = 0; i < items.length; i++) {
+      const gid = ids[i] || '__none__';
+      const t = timeMap.get(gid);
+      items[i].tempsMoyenTraitement = t && t.count > 0 ? round2(t.total / t.count) : 0;
+    }
+  }
+
+  enrichTimes(reception, accueilGroups.map(r => r.gestionnaireAccueilId), accTimeMap);
+  enrichTimes(technique, techniqueGroups.map(r => r.gestionnaireTechniqueId), techTimeMap);
+  enrichTimes(compta, comptaGroups.map(r => r.gestionnaireComptaId), comptaTimeMap);
+
+  return [...reception, ...technique, ...compta];
 }
 
 /* ──────────────────────────────────────────────────────────────
