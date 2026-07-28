@@ -99,6 +99,10 @@ export default function Home() {
   // Vérifier si l'utilisateur peut créer des dossiers
   const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE' || role === 'SANTE';
 
+  // Défense en profondeur : s'assurer que la vue actuelle est autorisée pour le rôle
+  // (le rôle SANTE ne doit jamais voir les vues financières : reporting, comptabilite, direction)
+  const isViewAllowed = navItems.some(n => n.key === view);
+
   useEffect(() => {
     async function fetchKpis() {
       try {
@@ -258,25 +262,25 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Page content */}
+        {/* Page content — garde : ne rien rendre si la vue n'est pas autorisée */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {view === 'direction' && <DirectionView kpis={kpis} loading={loadingKpis} />}
-          {view === 'dossiers' && <DossiersView />}
-          {view === 'kanban' && <div className="h-[calc(100vh-8rem)]"><KanbanView /></div>}
-          {view === 'technique' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
-          {view === 'comptabilite' && <ComptabiliteView kpis={kpis} loading={loadingKpis} />}
-          {view === 'import' && <ImportView />}
-          {view === 'reception' && <ReceptionView kpis={kpis as Record<string, unknown> | null} loading={loadingKpis} />}
-          {view === 'reporting' && <ReportingView />}
-          {view === 'ia' && <IaView />}
-          {view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><ChatView /></div>}
-          {view === 'portail' && <PortailView />}
-          {view === 'assures' && <AssuresView userRole={role || ''} />}
-          {view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
-          {view === 'societes' && <SocietesView />}
-          {view === 'configuration' && <ConfigurationView />}
-          {view === 'journal' && <JournalView />}
-          {view === 'sante' && <SanteView />}
+          {isViewAllowed && view === 'direction' && <DirectionView kpis={kpis} loading={loadingKpis} />}
+          {isViewAllowed && view === 'dossiers' && <DossiersView />}
+          {isViewAllowed && view === 'kanban' && <div className="h-[calc(100vh-8rem)]"><KanbanView /></div>}
+          {isViewAllowed && view === 'technique' && <TechniqueView kpis={kpis} loading={loadingKpis} />}
+          {isViewAllowed && view === 'comptabilite' && <ComptabiliteView kpis={kpis} loading={loadingKpis} />}
+          {isViewAllowed && view === 'import' && <ImportView />}
+          {isViewAllowed && view === 'reception' && <ReceptionView kpis={kpis as Record<string, unknown> | null} loading={loadingKpis} />}
+          {isViewAllowed && view === 'reporting' && <ReportingView />}
+          {isViewAllowed && view === 'ia' && <IaView />}
+          {isViewAllowed && view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><ChatView /></div>}
+          {isViewAllowed && view === 'portail' && <PortailView />}
+          {isViewAllowed && view === 'assures' && <AssuresView userRole={role || ''} />}
+          {isViewAllowed && view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
+          {isViewAllowed && view === 'societes' && <SocietesView />}
+          {isViewAllowed && view === 'configuration' && <ConfigurationView />}
+          {isViewAllowed && view === 'journal' && <JournalView />}
+          {isViewAllowed && view === 'sante' && <SanteView />}
         </main>
       </div>
     </div>

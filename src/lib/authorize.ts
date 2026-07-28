@@ -10,6 +10,14 @@ import type { RoleType } from './auth-context';
  * La valeur est un objet avec :
  *   - roles: liste des rôles autorisés
  *   - methods: (optionnel) méthodes HTTP restrictives { method: [roles] }
+ *
+ * ⚠️ RÈGLE STRICTE : Le rôle SANTE ne doit JAMAIS avoir accès aux rapports financiers.
+ *    Routes financières (réservées ADMINISTRATEUR + COMPTABILITE uniquement) :
+ *    - /api/reporting (rapports PDF, suivi contrats, appels de fonds)
+ *    - /api/appels-fonds (CRUD appels de fonds)
+ *    - /api/comptabilite/* (imports comptables, suivi paiements)
+ *    - /api/kpis (indicateurs financiers : montants, paiements)
+ *    - /api/contrats (gestion contrats / budgets)
  */
 export const API_PERMISSIONS: Record<
   string,
@@ -22,7 +30,7 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
   '/api/dossiers': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
