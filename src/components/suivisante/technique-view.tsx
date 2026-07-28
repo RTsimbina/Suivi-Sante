@@ -531,9 +531,9 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
           <CardContent className="max-h-80 overflow-y-auto">
             {techGestionnaires.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                <p className="text-xs">Aucune donnée de performance disponible.</p>
-                <p className="text-[10px] mt-0.5">Les données apparaîtront une fois les dossiers traités.</p>
+                <ClipboardCheck className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Aucune donnée de performance disponible.</p>
+                <p className="text-xs mt-1">Les données apparaîtront une fois les dossiers traités par le service technique.</p>
               </div>
             ) : (
               <table className="w-full text-sm">
