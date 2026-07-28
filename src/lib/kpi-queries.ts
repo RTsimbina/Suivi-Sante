@@ -203,8 +203,8 @@ export async function getGestionnaireProductivite() {
   const nomMap = new Map(gestionnaires.map((g) => [g.id, g.nom]));
 
   // 3. Compute average treatment times per gestionnaire (single query)
+  // dateReception is required (non-null) in schema, no need to filter
   const timedDossiers = await db.dossier.findMany({
-    where: { dateReception: { not: null as unknown as Date } },
     select: {
       gestionnaireAccueilId: true,
       gestionnaireTechniqueId: true,
@@ -464,7 +464,7 @@ export async function findIncoherences() {
     db.dossier.findMany({ where: { statut: "EN_PAIEMENT", dateReceptionDecompte: null }, select: { numeroDossier: true } }),
     db.dossier.findMany({ where: { statut: "VALIDE", OR: [{ montantValide: null }, { montantValide: 0 }] }, select: { numeroDossier: true } }),
     db.dossier.findMany({ where: { statut: "REJETE", OR: [{ motifRejet: null }, { motifRejet: "" }] }, select: { numeroDossier: true } }),
-    db.dossier.findMany({ where: { datePaiement: { not: null as unknown as Date }, dateReception: { not: null as unknown as Date } }, select: { numeroDossier: true, datePaiement: true, dateReception: true } }),
+    db.dossier.findMany({ where: { datePaiement: { gte: new Date(0) }, dateReception: { gte: new Date(0) } }, select: { numeroDossier: true, datePaiement: true, dateReception: true } }),
   ]);
 
   for (const r of a) incoherences.push({ numeroDossier: r.numeroDossier, typeIncoherence: "PAYE_SANS_MONTANT", description: "Pay\u00e9 sans montant" });
