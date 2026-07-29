@@ -15,7 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { PRESTATION_COLORS } from '@/lib/prestations';
+import { PRESTATION_COLORS, getPrestationLabel } from '@/lib/prestations';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -725,7 +725,7 @@ function BaremesTab({ baremes, search, onSearchChange, totalCount }: {
                 <tr key={b.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="py-2.5 px-3">
                     <Badge className={cn('text-[11px]', PRESTATION_COLORS[b.prestation] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300')}>
-                      {b.prestation}
+                      {getPrestationLabel(b.prestation)}
                     </Badge>
                   </td>
                   <td className="py-2.5 px-3 text-center font-mono font-semibold text-emerald-600 dark:text-emerald-400">{b.tauxCouverture}%</td>
