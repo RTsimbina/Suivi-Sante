@@ -251,7 +251,14 @@ CREATE TABLE IF NOT EXISTS "EntrepriseContact" (
 );
 `;
 
-const TYPES_DOSSIER = ['HOSPITALISATION', 'CONSULTATION', 'PHARMACIE', 'MATERNITE', 'CHIRURGIE', 'EXAMEN', 'SOINS DENTAIRES', 'OPTIQUE'];
+const TYPES_DOSSIER = [
+  'HOSPITALISATION_CHIRURGICAL', 'HOSPITALISATION_MEDICAL',
+  'CONSULTATION_SPECIALISE', 'CONSULTATION_PRE_NATAL', 'CONSULTATION_SIMPLE',
+  'EXAMEN',
+  'ACCOUCHEMENT_CHIRURGICAL', 'ACCOUCHEMENT_NORMAL',
+  'IMAGERIE', 'OPTIQUE', 'PHARMACIE',
+  'DENTAIRES_SOIN', 'DENTAIRES_DETARTRAGE', 'DENTAIRES_EXTRACTION', 'DENTAIRES_PROTHESE', 'DENTAIRES_ORTHODONTIE',
+];
 const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
 const MOYENS_PAIEMENT = ['VIREMENT', 'CHEQUE', 'ESPECES'];
 const OBSERVATIONS = [
@@ -282,13 +289,13 @@ const PRESTATAIRES_DATA = [
 ];
 
 const BAREMES_DATA = [
-  { prestation: 'HOSPITALISATION', tauxCouverture: 80, plafond: 5_000_000, description: 'Prise en charge hospitalisation complète' },
-  { prestation: 'CONSULTATION', tauxCouverture: 70, plafond: 100_000, description: 'Consultation médicale générale ou spécialisée' },
+  { prestation: 'HOSPITALISATION', tauxCouverture: 80, plafond: 5_000_000, description: 'Hospitalisation chirurgicale et médicale' },
+  { prestation: 'CONSULTATION', tauxCouverture: 70, plafond: 100_000, description: 'Consultation spécialisée, prénatale et simple' },
   { prestation: 'PHARMACIE', tauxCouverture: 60, plafond: 200_000, description: 'Médicaments sur ordonnance' },
-  { prestation: 'MATERNITE', tauxCouverture: 85, plafond: 3_000_000, description: 'Suivi de grossesse et accouchement' },
-  { prestation: 'CHIRURGIE', tauxCouverture: 80, plafond: 10_000_000, description: 'Interventions chirurgicales' },
-  { prestation: 'EXAMEN', tauxCouverture: 75, plafond: 500_000, description: 'Examens de laboratoire et imagerie' },
-  { prestation: 'SOINS DENTAIRES', tauxCouverture: 60, plafond: 300_000, description: 'Soins dentaires courants et prothèses' },
+  { prestation: 'EXAMEN', tauxCouverture: 75, plafond: 500_000, description: 'Examens de laboratoire' },
+  { prestation: 'ACCOUCHEMENT', tauxCouverture: 85, plafond: 3_000_000, description: 'Accouchement chirurgical et normal' },
+  { prestation: 'IMAGERIE', tauxCouverture: 70, plafond: 800_000, description: 'Radiologie, échographie, scanner, IRM' },
+  { prestation: 'DENTAIRES', tauxCouverture: 60, plafond: 300_000, description: 'Soins, détartrage, extraction, prothèse, orthodontie' },
   { prestation: 'OPTIQUE', tauxCouverture: 50, plafond: 250_000, description: 'Lunettes et lentilles correctrices' },
 ];
 

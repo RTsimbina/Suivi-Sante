@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { checkAuth } from "@/lib/authorize";
+import { getPrestationLabel } from "@/lib/prestations";
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,16 +62,7 @@ export async function POST(request: NextRequest) {
       PAYE: "Payé",
     };
 
-    const typeLabels: Record<string, string> = {
-      HOSPITALISATION: "Hospitalisation",
-      CONSULTATION: "Consultation",
-      PHARMACIE: "Pharmacie",
-      MATERNITE: "Maternité",
-      CHIRURGIE: "Chirurgie",
-      EXAMEN: "Examen",
-      "SOINS DENTAIRES": "Soins Dentaires",
-      OPTIQUE: "Optique",
-    };
+
 
     const formatMontant = (n: number) =>
       new Intl.NumberFormat("fr-FR").format(n) + " Ar";
@@ -87,7 +79,7 @@ export async function POST(request: NextRequest) {
         numeroDossier: d.numeroDossier,
         statut: d.statut,
         statutLabel: statutLabels[d.statut] || d.statut,
-        typeDossier: typeLabels[d.typeDossier] || d.typeDossier,
+        typeDossier: getPrestationLabel(d.typeDossier),
         dateReception: d.dateReception,
         montantReclame: d.montantReclame,
       };
@@ -107,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     // Générer un résumé lisible en français
     const resumes = dossiers.map((d) => {
-      const type = typeLabels[d.typeDossier] || d.typeDossier;
+      const type = getPrestationLabel(d.typeDossier);
       const montant = formatMontant(d.montantReclame);
 
       if (d.statut === "PAYE" && d.montantPaye && d.datePaiement) {

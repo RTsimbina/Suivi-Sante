@@ -41,16 +41,5 @@ export function statutColor(statut: string): string {
   return colors[statut] || 'bg-muted text-muted-foreground';
 }
 
-export function typeDossierLabel(type: string): string {
-  const labels: Record<string, string> = {
-    HOSPITALISATION: 'Hospitalisation',
-    CONSULTATION: 'Consultation',
-    PHARMACIE: 'Pharmacie',
-    MATERNITE: 'Maternité',
-    CHIRURGIE: 'Chirurgie',
-    EXAMEN: 'Examen',
-    'SOINS DENTAIRES': 'Soins Dentaires',
-    OPTIQUE: 'Optique',
-  };
-  return labels[type] || type;
-}
+// typeDossierLabel supprimé — utiliser getPrestationLabel depuis @/lib/prestations
+export { getPrestationLabel as typeDossierLabel } from '@/lib/prestations';
