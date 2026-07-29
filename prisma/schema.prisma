@@ -194,21 +194,27 @@ model ImportDossier {
 }
 
 model Assure {
-  id              String     @id @default(cuid())
-  societeId       String
-  societe         Societe    @relation(fields: [societeId], references: [id], onDelete: Cascade)
-  nom             String
-  nSS             String?    @unique
-  prenom          String?
-  dateNaissance   DateTime?
-  sexe            String?
-  telephone       String?
-  email           String?
-  adresse         String?
-  actif           Boolean    @default(true)
-  dossiers        Dossier[]  @relation("AssureDossier")
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  societeId         String
+  societe           Societe    @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  nom               String
+  prenom            String?
+  nSS               String?    @unique
+  matricule         String?
+  typeBeneficiaire  String     @default("ASSURE")   // ASSURE | CONJOINT | ENFANT
+  assurePrincipalId String?                            // Clé de rattachement familial (ayants droit → assuré principal, géré en applicatif)
+  codeFamille       String?                            // Code famille (regroupement administratif)
+  dateNaissance     DateTime?
+  sexe              String?
+  dateEffet         DateTime?                          // Date de début de couverture
+  bareme            Float?                             // Coefficient de cotisation / garantie (ex: 0.8)
+  telephone         String?
+  email             String?
+  adresse           String?
+  actif             Boolean    @default(true)
+  dossiers          Dossier[]  @relation("AssureDossier")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 }
 
 model Prestataire {
