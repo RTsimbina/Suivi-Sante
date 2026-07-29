@@ -88,6 +88,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   const [linkPrestataireId, setLinkPrestataireId] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState('');
 
   // ─── Fetches ────────────────────────────────────────────────────────────
   const fetchSocietes = useCallback(async () => {
@@ -111,8 +112,13 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
       if (res.ok) {
         const data = await res.json();
         setLiens(data.liens || []);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setFetchError(err.erreur || `Erreur serveur (${res.status})`);
       }
-    } catch { /* silent */ }
+    } catch (e) {
+      setFetchError('Erreur réseau lors du chargement des liens prestataire-société.');
+    }
   }, []);
 
   const fetchAllPrestataires = useCallback(async () => {
@@ -127,7 +133,9 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
           }))
         );
       }
-    } catch { /* silent */ } finally {
+    } catch (e) {
+      console.error('Erreur chargement prestataires:', e);
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -301,6 +309,18 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
           </div>
         </CardContent></Card>
       </div>
+
+      {/* ─── Erreur fetch ─── */}
+      {fetchError && (
+        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
+          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-red-700 dark:text-red-300">Erreur de chargement</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{fetchError}</p>
+            <p className="text-[10px] text-red-500 dark:text-red-500 mt-1">La table PrestataireSociete doit être créée en base de données. Vérifiez que le déploiement inclut « prisma db push ».</p>
+          </div>
+        </div>
+      )}
 
       {/* ─── Info banner ─── */}
       <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
