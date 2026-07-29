@@ -8,10 +8,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { assureId, typeActe, montantDemande } = body as {
+    const { assureId, typeActe, montantDemande, prestataireId } = body as {
       assureId?: string;
       typeActe?: string;
       montantDemande?: number;
+      prestataireId?: string;
     };
 
     if (!assureId || !typeActe || !montantDemande || montantDemande <= 0) {
@@ -39,6 +40,22 @@ export async function POST(request: NextRequest) {
         message: "L'assuré est inactif. Aucune prise en charge possible.",
         details: { assureActif: false },
       });
+    }
+
+    // Vérifier que le prestataire est actif pour cette société (si prestataireId fourni)
+    if (prestataireId) {
+      const lienPS = await db.prestataireSociete.findUnique({
+        where: { prestataireId_societeId: { prestataireId, societeId: assure.societeId } },
+      });
+      // Si un lien existe et est inactif → refus
+      if (lienPS && !lienPS.actif) {
+        return Response.json({
+          autorise: false,
+          raison: "PRESTATAIRE_INACTIF_POUR_SOCIETE",
+          message: `Le prestataire est inactif pour la société ${assure.societe.nom}. Les actes sont refusés automatiquement.`,
+          details: { prestataireId, societeId: assure.societeId, prestataireActifPourSociete: false },
+        });
+      }
     }
 
     // Récupérer le barème pour ce type d'acte
