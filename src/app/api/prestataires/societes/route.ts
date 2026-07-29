@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         prestataire: { select: { id: true, nom: true, type: true, telephone: true, actif: true } },
-        societe: { select: { id: true, nom: true, actif: true } },
+        societe: { select: { id: true, nom: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
