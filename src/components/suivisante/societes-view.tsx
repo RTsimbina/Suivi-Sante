@@ -46,6 +46,12 @@ interface AssureDetail {
   nom: string;
   prenom?: string;
   nSS?: string;
+  matricule?: string;
+  typeBeneficiaire?: string;
+  codeFamille?: string;
+  dateNaissance?: string;
+  dateEffet?: string;
+  bareme?: number | null;
   telephone?: string;
   email?: string;
   actif: boolean;
@@ -755,13 +761,20 @@ function AssuresTab({ assures, search, onSearchChange, totalCount }: {
   onSearchChange: (v: string) => void;
   totalCount: number;
 }) {
+  const TYPE_BENEF_LABELS: Record<string, string> = { ASSURE: 'Assuré', CONJOINT: 'Conjoint', ENFANT: 'Enfant' };
+  const TYPE_BENEF_COLORS: Record<string, string> = {
+    ASSURE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+    CONJOINT: 'bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300',
+    ENFANT: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+  };
+
   return (
     <div>
       {totalCount > 3 && (
         <div className="relative w-56 mb-3">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Filtrer par nom, N° SS..."
+            placeholder="Filtrer par nom, matricule..."
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             className="pl-8 h-8 text-xs"
@@ -771,16 +784,17 @@ function AssuresTab({ assures, search, onSearchChange, totalCount }: {
       {assures.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
           <Users className="h-8 w-8 mx-auto mb-2 opacity-20" />
-          <p className="text-xs">Aucun assuré trouvé</p>
+          <p className="text-xs">Aucun bénéficiaire trouvé</p>
         </div>
       ) : (
         <div className="max-h-[50vh] overflow-y-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/50 sticky top-0">
               <tr className="text-left">
-                <th className="py-2.5 px-3 font-medium text-muted-foreground">Nom complet</th>
-                <th className="py-2.5 px-3 font-medium text-muted-foreground">N° SS</th>
-                <th className="py-2.5 px-3 font-medium text-muted-foreground">Téléphone</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Bénéficiaire</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Type</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Matricule</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Barème</th>
                 <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Dossiers</th>
                 <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Statut</th>
               </tr>
@@ -796,13 +810,18 @@ function AssuresTab({ assures, search, onSearchChange, totalCount }: {
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium">{a.prenom} {a.nom}</p>
-                        {a.email && <p className="text-[11px] text-muted-foreground">{a.email}</p>}
+                        <p className="font-medium text-xs">{a.prenom} {a.nom}</p>
+                        {a.email && <p className="text-[10px] text-muted-foreground">{a.email}</p>}
                       </div>
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-muted-foreground text-xs">{a.nSS || '-'}</td>
-                  <td className="py-2.5 px-3 text-xs">{a.telephone || '-'}</td>
+                  <td className="py-2.5 px-3">
+                    <Badge className={cn('text-[9px]', TYPE_BENEF_COLORS[a.typeBeneficiaire || ''] || 'bg-muted text-muted-foreground')}>
+                      {TYPE_BENEF_LABELS[a.typeBeneficiaire || ''] || 'Assuré'}
+                    </Badge>
+                  </td>
+                  <td className="py-2.5 px-3 font-mono text-muted-foreground text-xs">{a.matricule || '-'}</td>
+                  <td className="py-2.5 px-3 text-center text-xs font-mono">{a.bareme ?? '-'}</td>
                   <td className="py-2.5 px-3 text-center">
                     <Badge variant="outline" className="text-[10px]">{a._count.dossiers}</Badge>
                   </td>

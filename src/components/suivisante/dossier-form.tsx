@@ -14,7 +14,7 @@ import { getPrestationSelectOptions, getParentType } from '@/lib/prestations';
 
 interface Societe { id: string; nom: string; }
 interface Gestionnaire { id: string; nom: string; service: string; }
-interface AssureOption { id: string; nom: string; prenom: string | null; nSS: string | null; societeId: string; }
+interface AssureOption { id: string; nom: string; prenom: string | null; nSS: string | null; matricule: string | null; societeId: string; }
 interface PrestataireOption { id: string; nom: string; type: string; actif?: boolean; }
 
 interface CalculResult {
@@ -271,7 +271,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
               }} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors">
                 <option value="">Sélectionner...</option>
                 {assuresList.filter(a => !societeId || a.societeId === societeId).map(a => (
-                  <option key={a.id} value={a.id}>{a.prenom ? `${a.prenom} ${a.nom}` : a.nom}{a.nSS ? ` (${a.nSS})` : ''}</option>
+                  <option key={a.id} value={a.id}>{a.prenom ? `${a.prenom} ${a.nom}` : a.nom}{a.matricule ? ` [${a.matricule}]` : ''}{a.nSS ? ` (${a.nSS})` : ''}</option>
                 ))}
               </select>
             </div>
