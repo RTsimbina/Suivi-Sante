@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Building2, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp,
-  Users, FileText, DollarSign, X, Loader2, CheckCircle2,
-  Stethoscope, Percent, Shield, Eye, EyeOff,
+  Users, FileText, DollarSign, Loader2, CheckCircle2,
+  Stethoscope, Percent, X, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -341,6 +341,21 @@ export default function SocietesView({ userRole }: Props) {
             const isLoading = detailsLoading[soc.id];
             const isExpanded = expanded === soc.id;
 
+            // Filtrage des sous-listes
+            const filteredBaremes = (details?.baremes || []).filter(b =>
+              !baremeSearch || b.prestation.toLowerCase().includes(baremeSearch.toLowerCase())
+            );
+            const filteredAssures = (details?.assures || []).filter(a => {
+              const q = assureSearch.toLowerCase();
+              if (!q) return true;
+              return `${a.nom} ${a.prenom || ''} ${a.nSS || ''}`.toLowerCase().includes(q);
+            });
+            const filteredPrestataires = (details?.prestataires || []).filter(p => {
+              const q = prestataireSearch.toLowerCase();
+              if (!q) return true;
+              return `${p.nom} ${p.type || ''}`.toLowerCase().includes(q);
+            });
+
             return (
               <Card key={soc.id} className={cn(!soc.actif && 'opacity-60')}>
                 <CardContent className="p-0">
@@ -371,7 +386,7 @@ export default function SocietesView({ userRole }: Props) {
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
                       <Badge variant="outline" className="text-[10px]">
-                        <Users className="h-2.5 w-2.5 mr-0.5" />{soc._count.assures}
+                        <Users className="h-2.5 w-2.5 mr-0.5" />{details?.assures.length ?? soc._count.assures}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">
                         <Stethoscope className="h-2.5 w-2.5 mr-0.5" />{details?.prestataires.length ?? '...'}
@@ -492,7 +507,7 @@ export default function SocietesView({ userRole }: Props) {
                                   </div>
                                 )}
                               </div>
-                              {details.baremes.length === 0 ? (
+                              {filteredBaremes.length === 0 ? (
                                 <div className="text-center py-4 text-muted-foreground rounded-lg border border-dashed">
                                   <Percent className="h-6 w-6 mx-auto mb-1 opacity-30" />
                                   <p className="text-[11px]">Aucun barème configuré</p>
@@ -500,4 +515,265 @@ export default function SocietesView({ userRole }: Props) {
                               ) : (
                                 <div className="overflow-x-auto rounded-lg border">
                                   <table className="w-full text-xs">
-                                  
+                                    <thead className="border-b bg-muted/50">
+                                      <tr className="text-left">
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Prestation</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Taux</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Plafond</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredBaremes.map(b => (
+                                        <tr key={b.id} className="border-b last:border-0 hover:bg-muted/30">
+                                          <td className="py-1.5 px-2">
+                                            <Badge className={cn('text-[10px]', PRESTATION_COLORS[b.prestation] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300')}>
+                                              {b.prestation}
+                                            </Badge>
+                                          </td>
+                                          <td className="py-1.5 px-2 text-center font-mono font-medium">{b.tauxCouverture}%</td>
+                                          <td className="py-1.5 px-2 text-right font-mono">{b.plafond.toLocaleString('fr-FR')} Ar</td>
+                                          <td className="py-1.5 px-2 text-center">
+                                            {b.active ? (
+                                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
+                                            ) : (
+                                              <X className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ━━━ Section 2 : Assurés ━━━ */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                  <Users className="h-3.5 w-3.5 text-blue-500" />
+                                  Assurés
+                                  <Badge variant="outline" className="text-[9px] ml-1">{details.assures.length}</Badge>
+                                </p>
+                                {details.assures.length > 3 && (
+                                  <div className="relative w-48">
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Filtrer..."
+                                      value={assureSearch}
+                                      onChange={e => setAssureSearch(e.target.value)}
+                                      className="pl-7 h-6 text-[11px]"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              {filteredAssures.length === 0 ? (
+                                <div className="text-center py-4 text-muted-foreground rounded-lg border border-dashed">
+                                  <Users className="h-6 w-6 mx-auto mb-1 opacity-30" />
+                                  <p className="text-[11px]">Aucun assuré trouvé</p>
+                                </div>
+                              ) : (
+                                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                                  <table className="w-full text-xs">
+                                    <thead className="border-b bg-muted/50 sticky top-0">
+                                      <tr className="text-left">
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Nom complet</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">N° SS</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Téléphone</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Dossiers</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredAssures.map(a => (
+                                        <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
+                                          <td className="py-1.5 px-2">
+                                            <div className="flex items-center gap-1.5">
+                                              <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
+                                                <span className="text-[9px] font-semibold text-blue-700 dark:text-blue-300">
+                                                  {a.prenom?.[0]}{a.nom[0]}
+                                                </span>
+                                              </div>
+                                              <div>
+                                                <p className="font-medium">{a.prenom} {a.nom}</p>
+                                                {a.email && <p className="text-[10px] text-muted-foreground">{a.email}</p>}
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="py-1.5 px-2 font-mono text-muted-foreground">{a.nSS || '-'}</td>
+                                          <td className="py-1.5 px-2">{a.telephone || '-'}</td>
+                                          <td className="py-1.5 px-2 text-center">
+                                            <Badge variant="outline" className="text-[9px]">{a._count.dossiers}</Badge>
+                                          </td>
+                                          <td className="py-1.5 px-2 text-center">
+                                            {a.actif ? (
+                                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
+                                            ) : (
+                                              <X className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ━━━ Section 3 : Prestataires ━━━ */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                  <Stethoscope className="h-3.5 w-3.5 text-purple-500" />
+                                  Prestataires
+                                  <Badge variant="outline" className="text-[9px] ml-1">{details.prestataires.length}</Badge>
+                                </p>
+                                {details.prestataires.length > 3 && (
+                                  <div className="relative w-48">
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Filtrer..."
+                                      value={prestataireSearch}
+                                      onChange={e => setPrestataireSearch(e.target.value)}
+                                      className="pl-7 h-6 text-[11px]"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              {filteredPrestataires.length === 0 ? (
+                                <div className="text-center py-4 text-muted-foreground rounded-lg border border-dashed">
+                                  <Stethoscope className="h-6 w-6 mx-auto mb-1 opacity-30" />
+                                  <p className="text-[11px]">Aucun prestataire lié</p>
+                                </div>
+                              ) : (
+                                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                                  <table className="w-full text-xs">
+                                    <thead className="border-b bg-muted/50 sticky top-0">
+                                      <tr className="text-left">
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Prestataire</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Type</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Téléphone</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Dossiers</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Montant total</th>
+                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {filteredPrestataires.map(p => (
+                                        <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
+                                          <td className="py-1.5 px-2">
+                                            <div className="flex items-center gap-1.5">
+                                              <div className="h-6 w-6 rounded-full bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center shrink-0">
+                                                <Stethoscope className="h-3 w-3 text-purple-700 dark:text-purple-300" />
+                                              </div>
+                                              <p className="font-medium">{p.nom}</p>
+                                            </div>
+                                          </td>
+                                          <td className="py-1.5 px-2">
+                                            <Badge variant="outline" className="text-[9px]">{p.type || '-'}</Badge>
+                                          </td>
+                                          <td className="py-1.5 px-2">{p.telephone || '-'}</td>
+                                          <td className="py-1.5 px-2 text-center">
+                                            <Badge variant="outline" className="text-[9px]">{p.nbDossiers}</Badge>
+                                          </td>
+                                          <td className="py-1.5 px-2 text-right font-mono font-medium">
+                                            {p.montantTotal.toLocaleString('fr-FR')} Ar
+                                          </td>
+                                          <td className="py-1.5 px-2 text-center">
+                                            {p.actif ? (
+                                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
+                                            ) : (
+                                              <X className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─── Dialog : Créer / Modifier une société ─── */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Modifier la société' : 'Nouvelle société'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Nom *</Label>
+              <Input value={formNom} onChange={e => setFormNom(e.target.value)} className="h-8 text-sm" placeholder="Nom de la société" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Téléphone</Label>
+                <Input value={formTelephone} onChange={e => setFormTelephone(e.target.value)} className="h-8 text-sm" placeholder="034 00 000 00" />
+              </div>
+              <div>
+                <Label className="text-xs">NIF</Label>
+                <Input value={formNif} onChange={e => setFormNif(e.target.value)} className="h-8 text-sm" placeholder="NIF" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Email</Label>
+              <Input value={formEmail} onChange={e => setFormEmail(e.target.value)} className="h-8 text-sm" type="email" placeholder="email@exemple.com" />
+            </div>
+            <div>
+              <Label className="text-xs">Adresse</Label>
+              <Input value={formAdresse} onChange={e => setFormAdresse(e.target.value)} className="h-8 text-sm" placeholder="Adresse" />
+            </div>
+            <div>
+              <Label className="text-xs">Contact principal</Label>
+              <Input value={formContact} onChange={e => setFormContact(e.target.value)} className="h-8 text-sm" placeholder="Nom du contact" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setFormOpen(false)} className="h-8 text-sm">Annuler</Button>
+              <Button onClick={handleSave} disabled={saving || !formNom.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-sm">
+                {saving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
+                {editing ? 'Enregistrer' : 'Créer'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog : Confirmation de suppression ─── */}
+      <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmer la suppression
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Cette action est irréversible. La société et tous ses barèmes associés seront supprimés.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="h-8 text-sm">Annuler</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
+              className="h-8 text-sm"
+            >
+              Supprimer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
