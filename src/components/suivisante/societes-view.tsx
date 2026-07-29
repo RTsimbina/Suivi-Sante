@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Building2, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp,
+  Building2, Search, Plus, Pencil, Trash2, ChevronRight,
   Users, FileText, DollarSign, Loader2, CheckCircle2,
-  Stethoscope, Percent, X, AlertTriangle,
+  Stethoscope, Percent, X, AlertTriangle, Phone, Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +67,8 @@ interface SocieteDetails {
   prestataires: PrestataireDetail[];
 }
 
+type DetailTab = 'baremes' | 'assures' | 'prestataires';
+
 // ─── Couleurs par prestation ─────────────────────────────────────────────────
 
 const PRESTATION_COLORS: Record<string, string> = {
@@ -89,16 +91,15 @@ interface Props {
 export default function SocietesView({ userRole }: Props) {
   const canWrite = userRole === 'ADMINISTRATEUR' || userRole === 'TECHNIQUE';
 
+  // ─── État ───────────────────────────────────────────────────────────────
   const [societes, setSocietes] = useState<Societe[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Societe | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [contratsMap, setContratsMap] = useState<Record<string, { reference: string; budgetAnnuel: number; budgetUtilise: number; solde: number; statut: string; dateFin: string }[]>>({});
-
-  // Détails étendus par société
   const [detailsMap, setDetailsMap] = useState<Record<string, SocieteDetails>>({});
   const [detailsLoading, setDetailsLoading] = useState<Record<string, boolean>>({});
 
@@ -111,11 +112,13 @@ export default function SocietesView({ userRole }: Props) {
   const [formContact, setFormContact] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Filtres dans les sections
+  // Détail : onglet actif + filtres
+  const [activeTab, setActiveTab] = useState<DetailTab>('baremes');
   const [assureSearch, setAssureSearch] = useState('');
   const [prestataireSearch, setPrestataireSearch] = useState('');
   const [baremeSearch, setBaremeSearch] = useState('');
 
+  // ─── Fetch sociétés ─────────────────────────────────────────────────────
   const fetchSocietes = useCallback(async () => {
     try {
       const params = new URLSearchParams();
@@ -123,7 +126,8 @@ export default function SocietesView({ userRole }: Props) {
       const res = await fetch(`/api/technique/societes?${params}`);
       if (res.status === 401 || res.status === 403) return;
       const data = await res.json();
-      setSocietes(Array.isArray(data) ? data : data.societes || []);
+      const list = Array.isArray(data) ? data : data.societes || [];
+      setSocietes(list);
     } catch { /* silent */ } finally {
       setLoading(false);
     }
@@ -131,6 +135,7 @@ export default function SocietesView({ userRole }: Props) {
 
   useEffect(() => { fetchSocietes(); }, [fetchSocietes]);
 
+  // ─── Fetch contrats (budget) ────────────────────────────────────────────
   useEffect(() => {
     async function fetchContrats() {
       try {
@@ -152,7 +157,7 @@ export default function SocietesView({ userRole }: Props) {
     fetchContrats();
   }, []);
 
-  // Charger les détails d'une société au dépliage
+  // ─── Fetch détails d'une société ────────────────────────────────────────
   const fetchDetails = useCallback(async (societeId: string) => {
     if (detailsMap[societeId]) return;
     setDetailsLoading((prev) => ({ ...prev, [societeId]: true }));
@@ -167,14 +172,19 @@ export default function SocietesView({ userRole }: Props) {
     }
   }, [detailsMap]);
 
-  function handleToggleExpand(soc: Societe) {
-    const newExpanded = expanded === soc.id ? null : soc.id;
-    setExpanded(newExpanded);
-    if (newExpanded) {
-      fetchDetails(soc.id);
+  // Auto-sélectionner la première société au chargement
+  useEffect(() => {
+    if (societes.length > 0 && !selectedId) {
+      setSelectedId(societes[0].id);
     }
-  }
+  }, [societes, selectedId]);
 
+  // Charger les détails quand on sélectionne
+  useEffect(() => {
+    if (selectedId) fetchDetails(selectedId);
+  }, [selectedId, fetchDetails]);
+
+  // ─── Formulaires ────────────────────────────────────────────────────────
   function resetForm() {
     setFormNom(''); setFormAdresse(''); setFormTelephone('');
     setFormEmail(''); setFormNif(''); setFormContact('');
@@ -230,15 +240,51 @@ export default function SocietesView({ userRole }: Props) {
   async function handleDelete(id: string) {
     try {
       const res = await fetch(`/api/technique/societes/${id}`, { method: 'DELETE' });
-      if (res.ok) { setDeleteConfirm(null); fetchSocietes(); }
+      if (res.ok) {
+        setDeleteConfirm(null);
+        if (selectedId === id) setSelectedId(null);
+        fetchSocietes();
+      }
     } catch { /* silent */ }
   }
 
+  // ─── Dérivés ────────────────────────────────────────────────────────────
   const totalDossiers = societes.reduce((s, soc) => s + soc._count.dossiers, 0);
   const totalAssures = societes.reduce((s, soc) => s + soc._count.assures, 0);
   const totalContrats = societes.reduce((s, soc) => s + soc._count.contrats, 0);
   const totalBaremes = societes.reduce((s, soc) => s + soc._count.baremes, 0);
   const societesActives = societes.filter(s => s.actif).length;
+
+  const selectedSociete = societes.find(s => s.id === selectedId);
+  const details = selectedId ? detailsMap[selectedId] : null;
+  const isLoading = selectedId ? detailsLoading[selectedId] : false;
+
+  // Filtres
+  const filteredBaremes = useMemo(() =>
+    (details?.baremes || []).filter(b =>
+      !baremeSearch || b.prestation.toLowerCase().includes(baremeSearch.toLowerCase())
+    ), [details, baremeSearch]);
+
+  const filteredAssures = useMemo(() =>
+    (details?.assures || []).filter(a => {
+      const q = assureSearch.toLowerCase();
+      if (!q) return true;
+      return `${a.nom} ${a.prenom || ''} ${a.nSS || ''}`.toLowerCase().includes(q);
+    }), [details, assureSearch]);
+
+  const filteredPrestataires = useMemo(() =>
+    (details?.prestataires || []).filter(p => {
+      const q = prestataireSearch.toLowerCase();
+      if (!q) return true;
+      return `${p.nom} ${p.type || ''}`.toLowerCase().includes(q);
+    }), [details, prestataireSearch]);
+
+  // Tabs config
+  const tabs: { key: DetailTab; label: string; icon: typeof Percent; count: number }[] = [
+    { key: 'baremes', label: 'Barèmes', icon: Percent, count: filteredBaremes.length },
+    { key: 'assures', label: 'Assurés', icon: Users, count: filteredAssures.length },
+    { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, count: filteredPrestataires.length },
+  ];
 
   // ─── Rendu ──────────────────────────────────────────────────────────────
 
@@ -322,7 +368,7 @@ export default function SocietesView({ userRole }: Props) {
         )}
       </div>
 
-      {/* Liste des sociétés */}
+      {/* ─── Layout maître-détail ─── */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
@@ -335,374 +381,243 @@ export default function SocietesView({ userRole }: Props) {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {societes.map(soc => {
-            const details = detailsMap[soc.id];
-            const isLoading = detailsLoading[soc.id];
-            const isExpanded = expanded === soc.id;
-
-            // Filtrage des sous-listes
-            const filteredBaremes = (details?.baremes || []).filter(b =>
-              !baremeSearch || b.prestation.toLowerCase().includes(baremeSearch.toLowerCase())
-            );
-            const filteredAssures = (details?.assures || []).filter(a => {
-              const q = assureSearch.toLowerCase();
-              if (!q) return true;
-              return `${a.nom} ${a.prenom || ''} ${a.nSS || ''}`.toLowerCase().includes(q);
-            });
-            const filteredPrestataires = (details?.prestataires || []).filter(p => {
-              const q = prestataireSearch.toLowerCase();
-              if (!q) return true;
-              return `${p.nom} ${p.type || ''}`.toLowerCase().includes(q);
-            });
-
-            return (
-              <Card key={soc.id} className={cn(!soc.actif && 'opacity-60')}>
-                <CardContent className="p-0">
-                  {/* En-tête de la carte société */}
-                  <div className="flex items-center gap-3 p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* ─── Colonne gauche : liste des sociétés ─── */}
+          <div className="lg:col-span-4 xl:col-span-3 space-y-1.5 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
+            {societes.map(soc => {
+              const isSelected = selectedId === soc.id;
+              return (
+                <button
+                  key={soc.id}
+                  onClick={() => { setSelectedId(soc.id); setActiveTab('baremes'); }}
+                  className={cn(
+                    'w-full text-left rounded-lg border p-3 transition-all duration-150',
+                    isSelected
+                      ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/30 shadow-sm'
+                      : 'border-transparent hover:bg-muted/60 hover:border-muted'
+                  )}
+                >
+                  <div className="flex items-start gap-2.5">
                     <div className={cn(
-                      'h-10 w-10 rounded-lg flex items-center justify-center shrink-0',
-                      soc.actif ? 'bg-emerald-50 dark:bg-emerald-950/40' : 'bg-muted'
+                      'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
+                      soc.actif ? 'bg-emerald-100 dark:bg-emerald-950/50' : 'bg-muted'
                     )}>
-                      <Building2 className={cn('h-5 w-5', soc.actif ? 'text-emerald-600' : 'text-muted-foreground')} />
+                      <Building2 className={cn('h-4 w-4', soc.actif ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{soc.nom}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={cn('text-sm font-medium truncate', !soc.actif && 'text-muted-foreground')}>{soc.nom}</p>
                         {soc.actif ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[9px] border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100">
-                            <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Active
-                          </Badge>
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                         ) : (
-                          <Badge variant="outline" className="text-[9px] text-muted-foreground">Inactive</Badge>
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
-                        {soc.telephone && <span>Tél: {soc.telephone}</span>}
-                        {soc.email && <span>{soc.email}</span>}
-                        {soc.nif && <span>NIF: {soc.nif}</span>}
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-0.5"><Users className="h-2.5 w-2.5" />{soc._count.assures}</span>
+                        <span className="flex items-center gap-0.5"><Stethoscope className="h-2.5 w-2.5" />{detailsMap[soc.id]?.prestataires?.length ?? '...'}</span>
+                        <span className="flex items-center gap-0.5"><Percent className="h-2.5 w-2.5" />{soc._count.baremes}</span>
+                        <span className="flex items-center gap-0.5"><FileText className="h-2.5 w-2.5" />{soc._count.dossiers}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground shrink-0">
-                      <Badge variant="outline" className="text-[10px]">
-                        <Users className="h-2.5 w-2.5 mr-0.5" />{details?.assures.length ?? soc._count.assures}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px]">
-                        <Stethoscope className="h-2.5 w-2.5 mr-0.5" />{details?.prestataires.length ?? '...'}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px]">
-                        <Percent className="h-2.5 w-2.5 mr-0.5" />{soc._count.baremes}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px]">
-                        <FileText className="h-2.5 w-2.5 mr-0.5" />{soc._count.dossiers}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleExpand(soc)}>
-                        {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      </Button>
+                    <div className="flex items-center gap-0.5 shrink-0">
                       {canWrite && (
                         <>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(soc)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => setDeleteConfirm(soc.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={e => { e.stopPropagation(); openEdit(soc); }}
+                            onKeyDown={e => e.key === 'Enter' && (e.stopPropagation(), openEdit(soc))}
+                            className="p-1 rounded hover:bg-muted/80 cursor-pointer"
+                          >
+                            <Pencil className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                          </span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={e => { e.stopPropagation(); setDeleteConfirm(soc.id); }}
+                            onKeyDown={e => e.key === 'Enter' && (e.stopPropagation(), setDeleteConfirm(soc.id))}
+                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                          >
+                            <Trash2 className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                          </span>
                         </>
                       )}
+                      <ChevronRight className={cn(
+                        'h-4 w-4 text-muted-foreground transition-transform duration-150',
+                        isSelected && 'text-emerald-600 dark:text-emerald-400 translate-x-0.5'
+                      )} />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ─── Colonne droite : détail de la société sélectionnée ─── */}
+          <div className="lg:col-span-8 xl:col-span-9">
+            {!selectedSociete ? (
+              <Card>
+                <CardContent className="text-center py-16 text-muted-foreground">
+                  <Building2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-medium">Sélectionnez une société</p>
+                  <p className="text-xs mt-1">Cliquez sur une société dans la liste pour voir ses détails</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-4">
+                  {/* En-tête société */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
+                        <Building2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold">{selectedSociete.nom}</h3>
+                          {selectedSociete.actif ? (
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactive</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                          {selectedSociete.telephone && (
+                            <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{selectedSociete.telephone}</span>
+                          )}
+                          {selectedSociete.email && (
+                            <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{selectedSociete.email}</span>
+                          )}
+                          {selectedSociete.nif && (
+                            <span>NIF: {selectedSociete.nif}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Stats rapides */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-xs gap-1"><Users className="h-3 w-3" />{selectedSociete._count.assures} assurés</Badge>
+                      <Badge variant="outline" className="text-xs gap-1"><Percent className="h-3 w-3" />{selectedSociete._count.baremes} barèmes</Badge>
+                      <Badge variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />{selectedSociete._count.dossiers} dossiers</Badge>
                     </div>
                   </div>
 
-                  {/* Détails étendus — 3 sections simultanées */}
-                  {isExpanded && (
-                    <div className="px-3 pb-3 border-t bg-muted/10">
-                      {/* Infos générales + Contrats */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 text-xs">
-                        <div>
-                          <p className="text-muted-foreground">Adresse</p>
-                          <p className="font-medium">{soc.adresse || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Contact principal</p>
-                          <p className="font-medium">{soc.contactPrincipal || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Contrats</p>
-                          <p className="font-medium">{soc._count.contrats}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Créée le</p>
-                          <p className="font-medium">{new Date(soc.createdAt).toLocaleDateString('fr-FR')}</p>
-                        </div>
+                  {/* Infos générales */}
+                  {selectedSociete.adresse && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 p-3 rounded-lg bg-muted/30 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Adresse</p>
+                        <p className="font-medium">{selectedSociete.adresse}</p>
                       </div>
-
-                      {/* Contrats et soldes */}
-                      {(contratsMap[soc.id] || []).length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                            <DollarSign className="h-3.5 w-3.5 text-rose-500" />
-                            Contrats et soldes
-                          </p>
-                          <div className="overflow-x-auto rounded-lg border">
-                            <table className="w-full text-xs">
-                              <thead className="border-b bg-muted/50">
-                                <tr className="text-left">
-                                  <th className="py-1.5 px-2 font-medium text-muted-foreground">Référence</th>
-                                  <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Budget</th>
-                                  <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Utilisé</th>
-                                  <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Solde</th>
-                                  <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {contratsMap[soc.id]!.map((c, i) => (
-                                  <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
-                                    <td className="py-1.5 px-2 font-mono">{c.reference}</td>
-                                    <td className="py-1.5 px-2 text-right">{c.budgetAnnuel.toLocaleString('fr-FR')} Ar</td>
-                                    <td className="py-1.5 px-2 text-right text-amber-600">{c.budgetUtilise.toLocaleString('fr-FR')} Ar</td>
-                                    <td className={cn('py-1.5 px-2 text-right font-medium', c.solde < 0 ? 'text-red-600' : 'text-emerald-600')}>{c.solde.toLocaleString('fr-FR')} Ar</td>
-                                    <td className="py-1.5 px-2 text-center">
-                                      <Badge variant="outline" className={cn('text-[9px]',
-                                        c.statut === 'ACTIF' ? 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                                        : c.statut === 'EXPIRE' ? 'border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
-                                        : 'border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                                      )}>{c.statut}</Badge>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Sections : Barèmes + Assurés + Prestataires simultanément */}
-                      <div className="border-t mt-3 pt-3 space-y-4">
-                        {isLoading ? (
-                          <div className="flex items-center justify-center py-8">
-                            <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
-                            <span className="ml-2 text-xs text-muted-foreground">Chargement des données...</span>
-                          </div>
-                        ) : details ? (
-                          <>
-                            {/* ━━━ Section 1 : Barèmes ━━━ */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                  <Percent className="h-3.5 w-3.5 text-emerald-500" />
-                                  Barèmes
-                                  <Badge variant="outline" className="text-[9px] ml-1">{details.baremes.length}</Badge>
-                                </p>
-                                {details.baremes.length > 3 && (
-                                  <div className="relative w-48">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                                    <Input
-                                      placeholder="Filtrer..."
-                                      value={baremeSearch}
-                                      onChange={e => setBaremeSearch(e.target.value)}
-                                      className="pl-7 h-6 text-[11px]"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                              {filteredBaremes.length === 0 ? (
-                                <div className="text-center py-4 text-muted-foreground rounded-lg border border-dashed">
-                                  <Percent className="h-6 w-6 mx-auto mb-1 opacity-30" />
-                                  <p className="text-[11px]">Aucun barème configuré</p>
-                                </div>
-                              ) : (
-                                <div className="overflow-x-auto rounded-lg border">
-                                  <table className="w-full text-xs">
-                                    <thead className="border-b bg-muted/50">
-                                      <tr className="text-left">
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Prestation</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Taux</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Plafond</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {filteredBaremes.map(b => (
-                                        <tr key={b.id} className="border-b last:border-0 hover:bg-muted/30">
-                                          <td className="py-1.5 px-2">
-                                            <Badge className={cn('text-[10px]', PRESTATION_COLORS[b.prestation] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300')}>
-                                              {b.prestation}
-                                            </Badge>
-                                          </td>
-                                          <td className="py-1.5 px-2 text-center font-mono font-medium">{b.tauxCouverture}%</td>
-                                          <td className="py-1.5 px-2 text-right font-mono">{b.plafond.toLocaleString('fr-FR')} Ar</td>
-                                          <td className="py-1.5 px-2 text-center">
-                                            {b.active ? (
-                                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
-                                            ) : (
-                                              <X className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* ━━━ Section 2 : Assurés ━━━ */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                  <Users className="h-3.5 w-3.5 text-blue-500" />
-                                  Assurés
-                                  <Badge variant="outline" className="text-[9px] ml-1">{details.assures.length}</Badge>
-                                </p>
-                                {details.assures.length > 3 && (
-                                  <div className="relative w-48">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                                    <Input
-                                      placeholder="Filtrer..."
-                                      value={assureSearch}
-                                      onChange={e => setAssureSearch(e.target.value)}
-                                      className="pl-7 h-6 text-[11px]"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                              {filteredAssures.length === 0 ? (
-                                <div className="text-center py-4 text-muted-foreground rounded-lg border border-dashed">
-                                  <Users className="h-6 w-6 mx-auto mb-1 opacity-30" />
-                                  <p className="text-[11px]">Aucun assuré trouvé</p>
-                                </div>
-                              ) : (
-                                <div className="max-h-64 overflow-y-auto rounded-lg border">
-                                  <table className="w-full text-xs">
-                                    <thead className="border-b bg-muted/50 sticky top-0">
-                                      <tr className="text-left">
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Nom complet</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">N° SS</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Téléphone</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Dossiers</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {filteredAssures.map(a => (
-                                        <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
-                                          <td className="py-1.5 px-2">
-                                            <div className="flex items-center gap-1.5">
-                                              <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
-                                                <span className="text-[9px] font-semibold text-blue-700 dark:text-blue-300">
-                                                  {a.prenom?.[0]}{a.nom[0]}
-                                                </span>
-                                              </div>
-                                              <div>
-                                                <p className="font-medium">{a.prenom} {a.nom}</p>
-                                                {a.email && <p className="text-[10px] text-muted-foreground">{a.email}</p>}
-                                              </div>
-                                            </div>
-                                          </td>
-                                          <td className="py-1.5 px-2 font-mono text-muted-foreground">{a.nSS || '-'}</td>
-                                          <td className="py-1.5 px-2">{a.telephone || '-'}</td>
-                                          <td className="py-1.5 px-2 text-center">
-                                            <Badge variant="outline" className="text-[9px]">{a._count.dossiers}</Badge>
-                                          </td>
-                                          <td className="py-1.5 px-2 text-center">
-                                            {a.actif ? (
-                                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
-                                            ) : (
-                                              <X className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* ━━━ Section 3 : Prestataires ━━━ */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                  <Stethoscope className="h-3.5 w-3.5 text-purple-500" />
-                                  Prestataires
-                                  <Badge variant="outline" className="text-[9px] ml-1">{details.prestataires.length}</Badge>
-                                </p>
-                                {details.prestataires.length > 3 && (
-                                  <div className="relative w-48">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                                    <Input
-                                      placeholder="Filtrer..."
-                                      value={prestataireSearch}
-                                      onChange={e => setPrestataireSearch(e.target.value)}
-                                      className="pl-7 h-6 text-[11px]"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                              {filteredPrestataires.length === 0 ? (
-                                <div className="text-center py-4 text-muted-foreground rounded-lg border border-dashed">
-                                  <Stethoscope className="h-6 w-6 mx-auto mb-1 opacity-30" />
-                                  <p className="text-[11px]">Aucun prestataire lié</p>
-                                </div>
-                              ) : (
-                                <div className="max-h-64 overflow-y-auto rounded-lg border">
-                                  <table className="w-full text-xs">
-                                    <thead className="border-b bg-muted/50 sticky top-0">
-                                      <tr className="text-left">
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Prestataire</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Type</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground">Téléphone</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Dossiers</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-right">Montant total</th>
-                                        <th className="py-1.5 px-2 font-medium text-muted-foreground text-center">Statut</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {filteredPrestataires.map(p => (
-                                        <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
-                                          <td className="py-1.5 px-2">
-                                            <div className="flex items-center gap-1.5">
-                                              <div className="h-6 w-6 rounded-full bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center shrink-0">
-                                                <Stethoscope className="h-3 w-3 text-purple-700 dark:text-purple-300" />
-                                              </div>
-                                              <p className="font-medium">{p.nom}</p>
-                                            </div>
-                                          </td>
-                                          <td className="py-1.5 px-2">
-                                            <Badge variant="outline" className="text-[9px]">{p.type || '-'}</Badge>
-                                          </td>
-                                          <td className="py-1.5 px-2">{p.telephone || '-'}</td>
-                                          <td className="py-1.5 px-2 text-center">
-                                            <Badge variant="outline" className="text-[9px]">{p.nbDossiers}</Badge>
-                                          </td>
-                                          <td className="py-1.5 px-2 text-right font-mono font-medium">
-                                            {p.montantTotal.toLocaleString('fr-FR')} Ar
-                                          </td>
-                                          <td className="py-1.5 px-2 text-center">
-                                            {p.actif ? (
-                                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 mx-auto" />
-                                            ) : (
-                                              <X className="h-3.5 w-3.5 text-muted-foreground mx-auto" />
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        ) : null}
+                      <div>
+                        <p className="text-muted-foreground">Contact principal</p>
+                        <p className="font-medium">{selectedSociete.contactPrincipal || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Contrats</p>
+                        <p className="font-medium">{selectedSociete._count.contrats}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Créée le</p>
+                        <p className="font-medium">{new Date(selectedSociete.createdAt).toLocaleDateString('fr-FR')}</p>
                       </div>
                     </div>
                   )}
+
+                  {/* Contrats */}
+                  {(contratsMap[selectedSociete.id] || []).length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                        <DollarSign className="h-3.5 w-3.5 text-rose-500" />
+                        Contrats et soldes
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border">
+                        <table className="w-full text-xs">
+                          <thead className="border-b bg-muted/50">
+                            <tr className="text-left">
+                              <th className="py-2 px-3 font-medium text-muted-foreground">Référence</th>
+                              <th className="py-2 px-3 font-medium text-muted-foreground text-right">Budget</th>
+                              <th className="py-2 px-3 font-medium text-muted-foreground text-right">Utilisé</th>
+                              <th className="py-2 px-3 font-medium text-muted-foreground text-right">Solde</th>
+                              <th className="py-2 px-3 font-medium text-muted-foreground text-center">Statut</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {contratsMap[selectedSociete.id]!.map((c, i) => (
+                              <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                                <td className="py-2 px-3 font-mono">{c.reference}</td>
+                                <td className="py-2 px-3 text-right">{c.budgetAnnuel.toLocaleString('fr-FR')} Ar</td>
+                                <td className="py-2 px-3 text-right text-amber-600">{c.budgetUtilise.toLocaleString('fr-FR')} Ar</td>
+                                <td className={cn('py-2 px-3 text-right font-medium', c.solde < 0 ? 'text-red-600' : 'text-emerald-600')}>{c.solde.toLocaleString('fr-FR')} Ar</td>
+                                <td className="py-2 px-3 text-center">
+                                  <Badge variant="outline" className={cn('text-[9px]',
+                                    c.statut === 'ACTIF' ? 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                    : c.statut === 'EXPIRE' ? 'border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+                                    : 'border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                                  )}>{c.statut}</Badge>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ─── Onglets Barèmes / Assurés / Prestataires ─── */}
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+                      <span className="ml-2 text-xs text-muted-foreground">Chargement des données...</span>
+                    </div>
+                  ) : details ? (
+                    <div>
+                      {/* Tabs */}
+                      <div className="flex items-center gap-1 border-b mb-4">
+                        {tabs.map(tab => {
+                          const Icon = tab.icon;
+                          const isActive = activeTab === tab.key;
+                          return (
+                            <button
+                              key={tab.key}
+                              onClick={() => setActiveTab(tab.key)}
+                              className={cn(
+                                'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px',
+                                isActive
+                                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
+                              )}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {tab.label}
+                              <Badge variant="outline" className={cn(
+                                'text-[9px] ml-0.5',
+                                isActive && 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                              )}>{tab.count}</Badge>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Contenu des onglets */}
+                      {activeTab === 'baremes' && (
+                        <BaremesTab baremes={filteredBaremes} search={baremeSearch} onSearchChange={setBaremeSearch} totalCount={details.baremes.length} />
+                      )}
+                      {activeTab === 'assures' && (
+                        <AssuresTab assures={filteredAssures} search={assureSearch} onSearchChange={setAssureSearch} totalCount={details.assures.length} />
+                      )}
+                      {activeTab === 'prestataires' && (
+                        <PrestatairesTab prestataires={filteredPrestataires} search={prestataireSearch} onSearchChange={setPrestataireSearch} totalCount={details.prestataires.length} />
+                      )}
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
 
@@ -774,6 +689,223 @@ export default function SocietesView({ userRole }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Sous-composant : Onglet Barèmes ──────────────────────────────────────────
+
+function BaremesTab({ baremes, search, onSearchChange, totalCount }: {
+  baremes: BaremeDetail[];
+  search: string;
+  onSearchChange: (v: string) => void;
+  totalCount: number;
+}) {
+  return (
+    <div>
+      {totalCount > 3 && (
+        <div className="relative w-56 mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filtrer par prestation..."
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+      )}
+      {baremes.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
+          <Percent className="h-8 w-8 mx-auto mb-2 opacity-20" />
+          <p className="text-xs">Aucun barème configuré</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/50">
+              <tr className="text-left">
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Prestation</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Taux</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-right">Plafond</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {baremes.map(b => (
+                <tr key={b.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="py-2.5 px-3">
+                    <Badge className={cn('text-[11px]', PRESTATION_COLORS[b.prestation] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300')}>
+                      {b.prestation}
+                    </Badge>
+                  </td>
+                  <td className="py-2.5 px-3 text-center font-mono font-semibold text-emerald-600 dark:text-emerald-400">{b.tauxCouverture}%</td>
+                  <td className="py-2.5 px-3 text-right font-mono">{b.plafond.toLocaleString('fr-FR')} Ar</td>
+                  <td className="py-2.5 px-3 text-center">
+                    {b.active ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                    ) : (
+                      <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sous-composant : Onglet Assurés ──────────────────────────────────────────
+
+function AssuresTab({ assures, search, onSearchChange, totalCount }: {
+  assures: AssureDetail[];
+  search: string;
+  onSearchChange: (v: string) => void;
+  totalCount: number;
+}) {
+  return (
+    <div>
+      {totalCount > 3 && (
+        <div className="relative w-56 mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filtrer par nom, N° SS..."
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+      )}
+      {assures.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
+          <Users className="h-8 w-8 mx-auto mb-2 opacity-20" />
+          <p className="text-xs">Aucun assuré trouvé</p>
+        </div>
+      ) : (
+        <div className="max-h-[50vh] overflow-y-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/50 sticky top-0">
+              <tr className="text-left">
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Nom complet</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">N° SS</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Téléphone</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Dossiers</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assures.map(a => (
+                <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="py-2.5 px-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                          {a.prenom?.[0]}{a.nom[0]}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{a.prenom} {a.nom}</p>
+                        {a.email && <p className="text-[11px] text-muted-foreground">{a.email}</p>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3 font-mono text-muted-foreground text-xs">{a.nSS || '-'}</td>
+                  <td className="py-2.5 px-3 text-xs">{a.telephone || '-'}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <Badge variant="outline" className="text-[10px]">{a._count.dossiers}</Badge>
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    {a.actif ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                    ) : (
+                      <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sous-composant : Onglet Prestataires ─────────────────────────────────────
+
+function PrestatairesTab({ prestataires, search, onSearchChange, totalCount }: {
+  prestataires: PrestataireDetail[];
+  search: string;
+  onSearchChange: (v: string) => void;
+  totalCount: number;
+}) {
+  return (
+    <div>
+      {totalCount > 3 && (
+        <div className="relative w-56 mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filtrer par nom, type..."
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+      )}
+      {prestataires.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
+          <Stethoscope className="h-8 w-8 mx-auto mb-2 opacity-20" />
+          <p className="text-xs">Aucun prestataire lié à cette société</p>
+        </div>
+      ) : (
+        <div className="max-h-[50vh] overflow-y-auto rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/50 sticky top-0">
+              <tr className="text-left">
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Prestataire</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Type</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Téléphone</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Dossiers</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-right">Montant total</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prestataires.map(p => (
+                <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="py-2.5 px-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center shrink-0">
+                        <Stethoscope className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                      </div>
+                      <p className="font-medium">{p.nom}</p>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <Badge variant="outline" className="text-[10px]">{p.type || '-'}</Badge>
+                  </td>
+                  <td className="py-2.5 px-3 text-xs">{p.telephone || '-'}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <Badge variant="outline" className="text-[10px]">{p.nbDossiers}</Badge>
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                    {p.montantTotal.toLocaleString('fr-FR')} Ar
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    {p.actif ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                    ) : (
+                      <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
