@@ -89,6 +89,8 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState('');
 
   // ─── Fetches ────────────────────────────────────────────────────────────
   const fetchSocietes = useCallback(async () => {
@@ -219,6 +221,27 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   const selectedSociete = societes.find(s => s.id === selectedSocieteId);
 
   // ─── Actions ────────────────────────────────────────────────────────────
+  async function handleSyncFromDossiers() {
+    setSyncing(true);
+    setSyncResult('');
+    try {
+      const res = await fetch('/api/prestataires/societes/sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setSyncResult(data.message || `Synchronisation OK : ${data.created} lien(s) créé(s).`);
+        // Recharger les données
+        fetchLiens();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setSyncResult(err.erreur || 'Erreur lors de la synchronisation.');
+      }
+    } catch {
+      setSyncResult('Erreur réseau.');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleLinkPrestataire() {
     if (!selectedSocieteId || !linkPrestataireId) return;
     setSaving(true);
@@ -310,7 +333,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         </CardContent></Card>
       </div>
 
-      {/* ─── Erreur fetch ─── */}
+      {/* ─── Erreur fetch ─── */
       {fetchError && (
         <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
           <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
@@ -318,6 +341,37 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
             <p className="text-xs font-medium text-red-700 dark:text-red-300">Erreur de chargement</p>
             <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{fetchError}</p>
             <p className="text-[10px] text-red-500 dark:text-red-500 mt-1">La table PrestataireSociete doit être créée en base de données. Vérifiez que le déploiement inclut « prisma db push ».</p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Synchronisation nécessaire ─── */
+      {!fetchError && liens.length === 0 && !loading && societes.length > 0 && allPrestatairesList.length > 0 && (
+        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+              <Link2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Aucun lien prestataire-société</p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                Les prestataires doivent être liés aux sociétés pour gérer leur statut (actif/inactif).{' '}
+                Cliquez ci-dessous pour créer automatiquement les liens à partir des dossiers existants.
+              </p>
+              {syncResult && (
+                <p className="text-xs mt-2 font-medium text-emerald-700 dark:text-emerald-300">{syncResult}</p>
+              )}
+              <div className="mt-3">
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+                  onClick={handleSyncFromDossiers}
+                  disabled={syncing}
+                >
+                  {syncing && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                  {syncing ? 'Synchronisation...' : 'Synchroniser depuis les dossiers'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
