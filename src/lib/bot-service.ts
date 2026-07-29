@@ -1,5 +1,6 @@
 import { db } from './db';
 import { callLLM } from './llm';
+import { getPrestationLabel, getParentType } from './prestations';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type CanalBot = 'WHATSAPP' | 'TELEGRAM' | 'MESSENGER';
@@ -197,7 +198,7 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
     n != null ? `${n.toLocaleString('fr-FR')} Ar` : 'Non déterminé';
 
   let reponse = `Dossier ${dossier.numeroDossier}\n`;
-  reponse += `Type : ${dossier.typeDossier}\n`;
+  reponse += `Type : ${getPrestationLabel(dossier.typeDossier)}\n`;
   reponse += `Statut : ${STATUT_LABELS[dossier.statut] || dossier.statut}\n`;
   reponse += `Société : ${dossier.societe.nom}\n`;
   reponse += '─────────────────────\n';
@@ -214,11 +215,12 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
     }
   }
 
-  // 3. Recherche du barème applicable
-  const bareme = dossier.societe.baremes.find(b => b.prestation === dossier.typeDossier);
+  // 3. Recherche du barème applicable (match parent type or sous-type)
+  const bareme = dossier.societe.baremes.find(b => b.prestation === dossier.typeDossier)
+    || dossier.societe.baremes.find(b => b.prestation === getParentType(dossier.typeDossier));
   if (bareme) {
     reponse += '\n─────────────────────';
-    reponse += `\nBarème applicable (${dossier.typeDossier}) :`;
+    reponse += `\nBarème applicable (${getPrestationLabel(dossier.typeDossier)}) :`;
     reponse += `\n  Taux de couverture : ${bareme.tauxCouverture}%`;
     reponse += `\n  Plafond : ${fmt(bareme.plafond)}`;
 

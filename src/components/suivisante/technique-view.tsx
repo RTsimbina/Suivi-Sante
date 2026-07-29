@@ -64,6 +64,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { toast } from 'sonner';
 import { formatMontant, formatMontantCourt } from './format';
+import { PARENT_TYPES, PARENT_LABELS } from '@/lib/prestations';
 
 interface TechniqueViewProps {
   kpis: {
@@ -73,32 +74,13 @@ interface TechniqueViewProps {
   loading: boolean;
 }
 
-const PRESTATIONS = [
-  'HOSPITALISATION',
-  'CONSULTATION',
-  'PHARMACIE',
-  'MATERNITE',
-  'CHIRURGIE',
-  'EXAMEN',
-  'SOINS DENTAIRES',
-  'OPTIQUE',
-] as const;
-
+const PRESTATIONS = [...PARENT_TYPES] as const;
 type PrestationType = (typeof PRESTATIONS)[number];
 
-const PRESTATION_LABELS: Record<PrestationType, string> = {
-  HOSPITALISATION: 'Hospitalisation',
-  CONSULTATION: 'Consultation',
-  PHARMACIE: 'Pharmacie',
-  MATERNITE: 'Maternité',
-  CHIRURGIE: 'Chirurgie',
-  EXAMEN: 'Examen',
-  'SOINS DENTAIRES': 'Soins Dentaires',
-  OPTIQUE: 'Optique',
-};
+const PRESTATION_LABELS: Record<string, string> = { ...PARENT_LABELS };
 
 interface BaremeRow {
-  prestation: PrestationType;
+  prestation: string;
   tauxCouverture: number;
   plafond: number;
   description: string;
@@ -341,7 +323,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
 
     const bareme = societe.baremes?.find((b) => b.prestation === calcPrestation);
     if (!bareme || (!bareme.tauxCouverture && !bareme.plafond)) {
-      toast.error(`Aucun barème configuré pour "${PRESTATION_LABELS[calcPrestation as PrestationType] || calcPrestation}" dans "${societe.nom}". Modifiez d'abord les barèmes de cette société.`);
+      toast.error(`Aucun barème configuré pour "${PRESTATION_LABELS[calcPrestation] || calcPrestation}" dans "${societe.nom}". Modifiez d'abord les barèmes de cette société.`);
       return;
     }
 

@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
 import * as crypto from 'crypto';
+import { PARENT_TYPES, ALL_SOUS_TYPES } from '../src/lib/prestations';
 
 const db = new PrismaClient();
 
-const TYPES_DOSSIER = ['HOSPITALISATION', 'CONSULTATION', 'PHARMACIE', 'MATERNITE', 'CHIRURGIE', 'EXAMEN', 'SOINS DENTAIRES', 'OPTIQUE'];
+const TYPES_DOSSIER = [...ALL_SOUS_TYPES];
 const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
 const MOYENS_PAIEMENT = ['VIREMENT', 'CHEQUE', 'ESPECES'];
 const OBSERVATIONS = [
@@ -36,16 +37,16 @@ const PRESTATAIRES_DATA = [
   { nom: 'Policlinique du Nord', type: 'CLINIQUE', telephone: '032 89 012 34', email: 'contact@policlinique-nord.mg', adresse: 'Antsahamarina, Antananarivo', nif: '4010123456' },
 ];
 
-// Barèmes par prestation (taux et plafonds)
+// Barèmes par prestation (taux et plafonds) — uses parent types
 const BAREMES_DATA = [
   { prestation: 'HOSPITALISATION', tauxCouverture: 80, plafond: 5_000_000, description: 'Prise en charge hospitalisation complète' },
   { prestation: 'CONSULTATION', tauxCouverture: 70, plafond: 100_000, description: 'Consultation médicale générale ou spécialisée' },
-  { prestation: 'PHARMACIE', tauxCouverture: 60, plafond: 200_000, description: 'Médicaments sur ordonnance' },
-  { prestation: 'MATERNITE', tauxCouverture: 85, plafond: 3_000_000, description: 'Suivi de grossesse et accouchement' },
-  { prestation: 'CHIRURGIE', tauxCouverture: 80, plafond: 10_000_000, description: 'Interventions chirurgicales' },
   { prestation: 'EXAMEN', tauxCouverture: 75, plafond: 500_000, description: 'Examens de laboratoire et imagerie' },
-  { prestation: 'SOINS DENTAIRES', tauxCouverture: 60, plafond: 300_000, description: 'Soins dentaires courants et prothèses' },
+  { prestation: 'ACCOUCHEMENT', tauxCouverture: 85, plafond: 3_000_000, description: 'Suivi de grossesse et accouchement' },
+  { prestation: 'IMAGERIE', tauxCouverture: 70, plafond: 400_000, description: 'Imagerie médicale' },
   { prestation: 'OPTIQUE', tauxCouverture: 50, plafond: 250_000, description: 'Lunettes et lentilles correctrices' },
+  { prestation: 'PHARMACIE', tauxCouverture: 60, plafond: 200_000, description: 'Médicaments sur ordonnance' },
+  { prestation: 'DENTAIRES', tauxCouverture: 60, plafond: 300_000, description: 'Soins dentaires courants et prothèses' },
 ];
 
 function randomInt(min: number, max: number) {

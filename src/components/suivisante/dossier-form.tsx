@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { getPrestationSelectOptions, getParentType } from '@/lib/prestations';
 
 interface Societe { id: string; nom: string; }
 interface Gestionnaire { id: string; nom: string; service: string; }
@@ -28,16 +29,7 @@ interface CalculResult {
   explication: string;
 }
 
-const TYPES = [
-  { value: 'HOSPITALISATION', label: 'Hospitalisation' },
-  { value: 'CONSULTATION', label: 'Consultation' },
-  { value: 'PHARMACIE', label: 'Pharmacie' },
-  { value: 'MATERNITE', label: 'Maternité' },
-  { value: 'CHIRURGIE', label: 'Chirurgie' },
-  { value: 'EXAMEN', label: 'Examen' },
-  { value: 'SOINS DENTAIRES', label: 'Soins Dentaires' },
-  { value: 'OPTIQUE', label: 'Optique' },
-];
+// Dossier.typeDossier uses sous-types from getPrestationSelectOptions()
 
 const MOYENS = [
   { value: 'VIREMENT', label: 'Virement bancaire' },
@@ -110,7 +102,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           societeId,
-          prestation: typeDossier,
+          prestation: getParentType(typeDossier),
           montantReclame: parseFloat(montantReclame),
         }),
       });
@@ -320,7 +312,13 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
               <Label>Type de soins *</Label>
               <select value={typeDossier} onChange={e => setTypeDossier(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors" required>
                 <option value="">Sélectionner...</option>
-                {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {getPrestationSelectOptions().map(group => (
+                  <optgroup key={group.group} label={group.group}>
+                    {group.options.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div className="space-y-1.5">

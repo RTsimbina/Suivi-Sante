@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { logParametreChange, getUserIdFromRequest } from "@/lib/audit-log";
+import { PARENT_TYPES, ALL_SOUS_TYPES } from "@/lib/prestations";
 
-const PRESTATIONS_VALIDES = [
-  "HOSPITALISATION", "CONSULTATION", "PHARMACIE", "MATERNITE",
-  "CHIRURGIE", "EXAMEN", "SOINS DENTAIRES", "OPTIQUE",
-];
+const PRESTATIONS_VALIDES = [...ALL_SOUS_TYPES];
 
 // GET — Lister les barèmes (optionnel: filtrer par societeId)
 export async function GET(request: NextRequest) {
@@ -44,8 +42,8 @@ export async function POST(request: NextRequest) {
     if (!societeId || !prestation) {
       return NextResponse.json({ error: "societeId et prestation requis" }, { status: 400 });
     }
-    if (!PRESTATIONS_VALIDES.includes(prestation)) {
-      return NextResponse.json({ error: `Prestation invalide. Valeurs: ${PRESTATIONS_VALIDES.join(", ")}` }, { status: 400 });
+    if (!PRESTATIONS_VALIDES.includes(prestation) && !PARENT_TYPES.includes(prestation)) {
+      return NextResponse.json({ error: `Prestation invalide. Valeurs: ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(", ")}` }, { status: 400 });
     }
     if (tauxCouverture === undefined || tauxCouverture < 0 || tauxCouverture > 100) {
       return NextResponse.json({ error: "tauxCouverture doit être entre 0 et 100" }, { status: 400 });
