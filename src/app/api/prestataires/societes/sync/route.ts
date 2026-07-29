@@ -1,85 +1,67 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { getUserIdFromRequest } from '@/lib/audit-log';
 
-// ─── POST : Synchroniser les liens prestataire-société depuis les dossiers existants ──
-// Crée les liens manquants dans PrestataireSociete à partir des dossiers.
-// Les liens créés sont automatiquement "actif: true".
-
-export async function POST(request: Request) {
+/**
+ * POST /api/prestataires/societes/sync
+ * Synchronise la table PrestataireSociete à partir des dossiers existants.
+ * Pour chaque dossier ayant un prestataireId + societeId, crée un lien
+ * PrestataireSociete (actif: true) s'il n'existe pas déjà.
+ */
+export async function POST(request: NextRequest) {
   try {
-    const authError = await checkAuth(request as any);
+    const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request as any);
-
-    // Récupérer toutes les paires uniques (societeId, prestataireId) depuis les dossiers
-    const uniquePairs = await db.dossier.groupBy({
-      by: ['societeId', 'prestataireId'],
-      where: { prestataireId: { not: null } },
+    // 1. Récupérer toutes les paires (prestataireId, societeId) uniques des dossiers
+    const dossiers = await db.dossier.findMany({
+      where: {
+        prestataireId: { not: null },
+        societeId: { not: null },
+      },
+      select: { prestataireId: true, societeId: true },
+      distinct: ['prestataireId', 'societeId'],
     });
 
-    if (uniquePairs.length === 0) {
+    if (dossiers.length === 0) {
       return NextResponse.json({
-        message: 'Aucun dossier avec prestataire trouvé. Aucune synchronisation nécessaire.',
-        created: 0, total: 0,
+        message: 'Aucun dossier avec prestataire trouvé.',
+        created: 0, existing: 0,
       });
     }
 
-    // Récupérer les liens existants
+    // 2. Récupérer les liens déjà existants
     const existingLinks = await db.prestataireSociete.findMany({
       select: { prestataireId: true, societeId: true },
     });
     const existingSet = new Set(
-      existingLinks.map(l => `${l.prestataireId}::${l.societeId}`)
+      existingLinks.map(l => `${l.prestataireId}|${l.societeId}`)
     );
 
-    // Filtrer les paires qui n'ont pas encore de lien
-    const toCreate = uniquePairs.filter(
-      p => !existingSet.has(`${p.prestataireId}::${p.societeId}`)
+    // 3. Filtrer les nouvelles paires à créer
+    const toCreate = dossiers.filter(
+      d => !existingSet.has(`${d.prestataireId}|${d.societeId}`)
     );
 
-    if (toCreate.length === 0) {
-      return NextResponse.json({
-        message: 'Tous les liens sont déjà à jour.',
-        created: 0, total: uniquePairs.length,
-      });
-    }
-
-    // Créer les liens manquants (par batch de 50)
+    // 4. Créer les liens en batch
     let created = 0;
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < toCreate.length; i += BATCH_SIZE) {
-      const batch = toCreate.slice(i, i + BATCH_SIZE);
+    if (toCreate.length > 0) {
       const result = await db.prestataireSociete.createMany({
-        data: batch.map(p => ({
-          prestataireId: p.prestataireId!,
-          societeId: p.societeId,
+        data: toCreate.map(d => ({
+          prestataireId: d.prestataireId!,
+          societeId: d.societeId,
           actif: true,
         })),
         skipDuplicates: true,
       });
-      created += result.count;
-    }
-
-    // Log audit
-    if (userId) {
-      await db.historiqueParametre.create({
-        data: {
-          entite: 'PrestataireSociete',
-          entiteId: 'SYNC',
-          champ: 'SYNCHRONISATION',
-          nouvelleValeur: `${created} liens créés depuis ${uniquePairs.length} dossiers`,
-          modifiePar: userId,
-        },
-      });
+      created = result.count;
     }
 
     return NextResponse.json({
-      message: `Synchronisation terminée : ${created} lien(s) créé(s) sur ${uniquePairs.length} paire(s) trouvée(s) dans les dossiers.`,
+      message: `Synchronisation terminée. ${created} lien(s) créé(s), ${existingLinks.length} déjà existant(s).`,
       created,
-      total: uniquePairs.length,
+      existing: existingLinks.length,
+      total: dossiers.length,
     });
   } catch (error) {
     console.error('Erreur synchronisation prestataire-société :', error);
