@@ -51,77 +51,8 @@ export async function GET(
         },
       }),
 
-      // Prestataires liés à cette société via PrestataireSociete (avec statut actif/inactif)
-      // Si aucun lien n'existe, fallback sur les dossiers existants
-      db.prestataireSociete.findMany({
-        where: { societeId: id },
-        include: {
-          prestataire: {
-            select: { id: true, nom: true, type: true, telephone: true, actif: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      }).then(async (lienPS) => {
-        // Fallback : si PrestataireSociete vide, utiliser les dossiers
-        if (lienPS.length === 0) {
-          const grouped = await db.dossier.groupBy({
-            by: ['prestataireId'],
-            where: { societeId: id, prestataireId: { not: null } },
-            _count: { prestataireId: true },
-            _sum: { montantReclame: true },
-          });
-          const ids = grouped.map((g) => g.prestataireId!).filter(Boolean);
-          if (ids.length === 0) return [];
-          const prestas = await db.prestataire.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, nom: true, type: true, telephone: true, actif: true },
-          });
-          const map = new Map(prestas.map((p) => [p.id, p]));
-          return grouped
-            .map((g) => {
-              const p = map.get(g.prestataireId!);
-              if (!p) return null;
-              return {
-                lienId: '',
-                id: p.id,
-                nom: p.nom,
-                type: p.type,
-                telephone: p.telephone,
-                actifGlobal: p.actif,
-                actifSociete: true, // pas de lien = considéré actif par défaut
-                nbDossiers: g._count.prestataireId,
-                montantTotal: g._sum.montantReclame || 0,
-              };
-            })
-            .filter(Boolean);
-        }
-
-        // PrestataireSociete a des données : enrichir avec les dossiers
-        const prestaIds = lienPS.map((l) => l.prestataire.id);
-        const grouped = await db.dossier.groupBy({
-          by: ['prestataireId'],
-          where: { societeId: id, prestataireId: { in: prestaIds } },
-          _count: { prestataireId: true },
-          _sum: { montantReclame: true },
-        });
-        const dossiersMap = new Map(
-          grouped.map((g) => [g.prestataireId!, { nb: g._count.prestataireId, montant: g._sum.montantReclame || 0 }])
-        );
-        return lienPS.map((l) => {
-          const d = dossiersMap.get(l.prestataire.id);
-          return {
-            lienId: l.id,
-            id: l.prestataire.id,
-            nom: l.prestataire.nom,
-            type: l.prestataire.type,
-            telephone: l.prestataire.telephone,
-            actifGlobal: l.prestataire.actif,
-            actifSociete: l.actif,
-            nbDossiers: d?.nb || 0,
-            montantTotal: d?.montant || 0,
-          };
-        });
-      }),
+      // Prestataires liés à cette société via PrestataireSociete
+      getPrestatairesForSociete(id),
     ]);
 
     return NextResponse.json({
@@ -135,5 +66,100 @@ export async function GET(
       { erreur: 'Erreur serveur.' },
       { status: 500 }
     );
+  }
+}
+
+// ─── Helper : prestataires pour une société avec stats dossiers ─────────────
+async function getPrestatairesForSociete(societeId: string) {
+  // Essayer via PrestataireSociete d'abord
+  const lienPS = await db.prestataireSociete.findMany({
+    where: { societeId },
+    include: {
+      prestataire: {
+        select: { id: true, nom: true, type: true, telephone: true, actif: true },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  // Fallback : si PrestataireSociete vide, utiliser les dossiers
+  if (lienPS.length === 0) {
+    try {
+      const grouped = await db.dossier.groupBy({
+        by: ['prestataireId'],
+        where: { societeId, prestataireId: { not: null } },
+        _count: true,
+        _sum: { montantReclame: true },
+      });
+      const ids = grouped.map((g) => g.prestataireId!).filter(Boolean);
+      if (ids.length === 0) return [];
+      const prestas = await db.prestataire.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, nom: true, type: true, telephone: true, actif: true },
+      });
+      const map = new Map(prestas.map((p) => [p.id, p]));
+      return grouped
+        .map((g) => {
+          const p = map.get(g.prestataireId!);
+          if (!p) return null;
+          return {
+            lienId: '',
+            id: p.id,
+            nom: p.nom,
+            type: p.type,
+            telephone: p.telephone,
+            actifGlobal: p.actif,
+            actifSociete: true,
+            nbDossiers: g._count,
+            montantTotal: g._sum.montantReclame || 0,
+          };
+        })
+        .filter(Boolean);
+    } catch (err) {
+      console.error('Erreur fallback dossiers pour prestataires :', err);
+      return [];
+    }
+  }
+
+  // PrestataireSociete a des données : enrichir avec les dossiers
+  const prestaIds = lienPS.map((l) => l.prestataire.id);
+  try {
+    const grouped = await db.dossier.groupBy({
+      by: ['prestataireId'],
+      where: { societeId, prestataireId: { in: prestaIds } },
+      _count: true,
+      _sum: { montantReclame: true },
+    });
+    const dossiersMap = new Map(
+      grouped.map((g) => [g.prestataireId!, { nb: g._count, montant: g._sum.montantReclame || 0 }])
+    );
+    return lienPS.map((l) => {
+      const d = dossiersMap.get(l.prestataire.id);
+      return {
+        lienId: l.id,
+        id: l.prestataire.id,
+        nom: l.prestataire.nom,
+        type: l.prestataire.type,
+        telephone: l.prestataire.telephone,
+        actifGlobal: l.prestataire.actif,
+        actifSociete: l.actif,
+        nbDossiers: d?.nb || 0,
+        montantTotal: d?.montant || 0,
+      };
+    });
+  } catch (err) {
+    console.error('Erreur stats dossiers pour prestataires :', err);
+    // Retourner les liens sans stats plutôt que de planter
+    return lienPS.map((l) => ({
+      lienId: l.id,
+      id: l.prestataire.id,
+      nom: l.prestataire.nom,
+      type: l.prestataire.type,
+      telephone: l.prestataire.telephone,
+      actifGlobal: l.prestataire.actif,
+      actifSociete: l.actif,
+      nbDossiers: 0,
+      montantTotal: 0,
+    }));
   }
 }

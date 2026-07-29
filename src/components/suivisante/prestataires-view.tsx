@@ -109,8 +109,9 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
     } catch { /* silent */ }
   }, []);
 
-  // Référence pour éviter double appel au sync
+  // Référence pour éviter double appel au sync manuel
   const autoSyncDone = useRef(false);
+  const [syncMessage, setSyncMessage] = useState('');
 
   const fetchLiens = useCallback(async () => {
     try {
@@ -120,21 +121,10 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         const data = await res.json();
         const liensData = data.liens || [];
         setLiens(liensData);
-        // Si aucun lien et pas encore de sync auto → déclencher
+        // Si aucun lien même après le auto-sync côté API → proposer sync manuel
         if (liensData.length === 0 && !autoSyncDone.current) {
           autoSyncDone.current = true;
-          // Ne pas bloquer le chargement, lancer en arrière-plan
-          fetch('/api/prestataires/societes/sync', { method: 'POST' })
-            .then(r => r.ok ? r.json() : null)
-            .then(result => {
-              if (result && result.created > 0) {
-                // Recharger les liens après sync
-                fetch('/api/prestataires/societes')
-                  .then(r => r.ok ? r.json() : { liens: [] })
-                  .then(d => setLiens(d.liens || []));
-              }
-            })
-            .catch(() => {});
+          setSyncMessage('Aucun lien trouvé. Vérifiez que des dossiers existent avec un prestataire et une société.');
         }
       } else {
         const err = await res.json().catch(() => ({}));
@@ -379,7 +369,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
             <div className="flex-1">
               <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Aucun lien prestataire-société</p>
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                Les prestataires doivent être liés aux sociétés pour gérer leur statut (actif/inactif).{' '}
+                {syncMessage || 'Les prestataires doivent être liés aux sociétés pour gérer leur statut (actif/inactif). '}
                 Cliquez ci-dessous pour créer automatiquement les liens à partir des dossiers existants.
               </p>
               {syncResult && (
@@ -392,7 +382,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
                   disabled={syncing}
                 >
                   {syncing && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                  {syncing ? 'Synchronisation...' : 'Synchroniser depuis les dossiers'}
+                  {syncing ? 'Synchronisation...' : 'Synchroniser manuellement depuis les dossiers'}
                 </Button>
               </div>
             </div>
