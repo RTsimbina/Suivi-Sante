@@ -51,42 +51,43 @@ export async function GET(
         },
       }),
 
-      // Prestataires ayant des dossiers pour cette société
-      db.dossier.groupBy({
-        by: ['prestataireId'],
-        where: {
-          societeId: id,
-          prestataireId: { not: null },
-        },
-        _count: { prestataireId: true },
-        _sum: { montantReclame: true },
-      }).then((grouped) => {
-        // Récupérer les infos des prestataires
-        const ids = grouped.map((g) => g.prestataireId!).filter(Boolean);
-        if (ids.length === 0) return [];
-        return db.prestataire
-          .findMany({
-            where: { id: { in: ids } },
+      // Prestataires liés à cette société via PrestataireSociete (avec statut actif/inactif)
+      db.prestataireSociete.findMany({
+        where: { societeId: id },
+        include: {
+          prestataire: {
             select: { id: true, nom: true, type: true, telephone: true, actif: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }).then((lienPS) => {
+        if (lienPS.length === 0) return [];
+        const prestaIds = lienPS.map((l) => l.prestataire.id);
+        return db.dossier
+          .groupBy({
+            by: ['prestataireId'],
+            where: { societeId: id, prestataireId: { in: prestaIds } },
+            _count: { prestataireId: true },
+            _sum: { montantReclame: true },
           })
-          .then((prestas) => {
-            const map = new Map(prestas.map((p) => [p.id, p]));
-            return grouped
-              .map((g) => {
-                const p = map.get(g.prestataireId!);
-                if (!p) return null;
-                return {
-                  id: p.id,
-                  nom: p.nom,
-                  type: p.type,
-                  telephone: p.telephone,
-                  actif: p.actif,
-                  nbDossiers: g._count.prestataireId,
-                  montantTotal: g._sum.montantReclame || 0,
-                };
-              })
-              .filter(Boolean)
-              .sort((a, b) => (b as any).nbDossiers - (a as any).nbDossiers);
+          .then((grouped) => {
+            const dossiersMap = new Map(
+              grouped.map((g) => [g.prestataireId!, { nb: g._count.prestataireId, montant: g._sum.montantReclame || 0 }])
+            );
+            return lienPS.map((l) => {
+              const d = dossiersMap.get(l.prestataire.id);
+              return {
+                lienId: l.id,
+                id: l.prestataire.id,
+                nom: l.prestataire.nom,
+                type: l.prestataire.type,
+                telephone: l.prestataire.telephone,
+                actifGlobal: l.prestataire.actif,
+                actifSociete: l.actif,
+                nbDossiers: d?.nb || 0,
+                montantTotal: d?.montant || 0,
+              };
+            });
           });
       }),
     ]);

@@ -53,10 +53,12 @@ interface AssureDetail {
 
 interface PrestataireDetail {
   id: string;
+  lienId: string;
   nom: string;
   type: string;
   telephone?: string;
-  actif: boolean;
+  actifGlobal: boolean;
+  actifSociete: boolean;
   nbDossiers: number;
   montantTotal: number;
 }
@@ -835,14 +837,37 @@ function AssuresTab({ assures, search, onSearchChange, totalCount }: {
 
 // ─── Sous-composant : Onglet Prestataires ─────────────────────────────────────
 
+const PRESTA_TYPE_LABELS: Record<string, string> = {
+  HOPITAL: 'Hôpital', CLINIQUE: 'Clinique', PHARMACIE: 'Pharmacie',
+  CABINET_MEDICAL: 'Cabinet médical', LABORATOIRE: 'Laboratoire',
+  DENTAIRE: 'Dentaire', OPTICIEN: 'Opticien', AUTRE: 'Autre',
+};
+
 function PrestatairesTab({ prestataires, search, onSearchChange, totalCount }: {
   prestataires: PrestataireDetail[];
   search: string;
   onSearchChange: (v: string) => void;
   totalCount: number;
 }) {
+  const nbActifs = prestataires.filter(p => p.actifSociete).length;
+  const nbInactifs = prestataires.filter(p => !p.actifSociete).length;
+
   return (
     <div>
+      {/* Stats rapides */}
+      {prestataires.length > 0 && (
+        <div className="flex items-center gap-4 mb-3 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            <span className="font-medium text-emerald-600">{nbActifs} actif(s)</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <X className="h-3 w-3 text-red-500" />
+            <span className="font-medium text-red-600">{nbInactifs} inactif(s) — actes refusés automatiquement</span>
+          </span>
+        </div>
+      )}
+
       {totalCount > 3 && (
         <div className="relative w-56 mb-3">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -869,22 +894,38 @@ function PrestatairesTab({ prestataires, search, onSearchChange, totalCount }: {
                 <th className="py-2.5 px-3 font-medium text-muted-foreground">Téléphone</th>
                 <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Dossiers</th>
                 <th className="py-2.5 px-3 font-medium text-muted-foreground text-right">Montant total</th>
-                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Statut</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Statut société</th>
               </tr>
             </thead>
             <tbody>
               {prestataires.map(p => (
-                <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
+                <tr key={p.lienId} className={cn(
+                  'border-b last:border-0 transition-colors',
+                  !p.actifSociete && 'bg-red-50/40 dark:bg-red-950/10'
+                )}>
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center shrink-0">
-                        <Stethoscope className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                      <div className={cn(
+                        'h-8 w-8 rounded-full flex items-center justify-center shrink-0',
+                        p.actifSociete ? 'bg-purple-100 dark:bg-purple-950/40' : 'bg-muted'
+                      )}>
+                        <Stethoscope className={cn(
+                          'h-4 w-4',
+                          p.actifSociete ? 'text-purple-700 dark:text-purple-300' : 'text-muted-foreground'
+                        )} />
                       </div>
-                      <p className="font-medium">{p.nom}</p>
+                      <div>
+                        <p className={cn('font-medium text-xs', !p.actifSociete && 'text-muted-foreground')}>{p.nom}</p>
+                        {!p.actifGlobal && (
+                          <p className="text-[9px] text-amber-600">Inactif (global)</p>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-2.5 px-3">
-                    <Badge variant="outline" className="text-[10px]">{p.type || '-'}</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      {PRESTA_TYPE_LABELS[p.type] || p.type || '-'}
+                    </Badge>
                   </td>
                   <td className="py-2.5 px-3 text-xs">{p.telephone || '-'}</td>
                   <td className="py-2.5 px-3 text-center">
@@ -894,10 +935,14 @@ function PrestatairesTab({ prestataires, search, onSearchChange, totalCount }: {
                     {p.montantTotal.toLocaleString('fr-FR')} Ar
                   </td>
                   <td className="py-2.5 px-3 text-center">
-                    {p.actif ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                    {p.actifSociete ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] hover:bg-emerald-100">
+                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Actif
+                      </Badge>
                     ) : (
-                      <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                      <Badge variant="destructive" className="text-[10px]">
+                        <X className="h-2.5 w-2.5 mr-0.5" /> Inactif
+                      </Badge>
                     )}
                   </td>
                 </tr>
