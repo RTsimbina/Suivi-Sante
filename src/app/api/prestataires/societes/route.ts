@@ -3,8 +3,123 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserIdFromRequest } from '@/lib/audit-log';
 
+// ─── Helper : synchroniser PrestataireSociete depuis les dossiers ─────────────
+async function syncFromDossiers(): Promise<number> {
+  const existingLinks = await db.prestataireSociete.findMany({
+    select: { prestataireId: true, societeId: true },
+  });
+  const existingSet = new Set(
+    existingLinks.map(l => `${l.prestataireId}|${l.societeId}`)
+  );
+
+  let created = 0;
+
+  // Source 1 : Dossiers avec prestataireId FK
+  const dossiersFK = await db.dossier.findMany({
+    where: { prestataireId: { not: null } },
+    select: { prestataireId: true, societeId: true },
+    distinct: ['prestataireId', 'societeId'],
+  });
+
+  const toCreateFromFK = dossiersFK.filter(
+    d => !existingSet.has(`${d.prestataireId!}|${d.societeId}`)
+  );
+
+  if (toCreateFromFK.length > 0) {
+    const result = await db.prestataireSociete.createMany({
+      data: toCreateFromFK.map(d => ({
+        prestataireId: d.prestataireId!,
+        societeId: d.societeId,
+        actif: true,
+      })),
+      skipDuplicates: true,
+    });
+    created += result.count;
+    for (const d of toCreateFromFK) {
+      existingSet.add(`${d.prestataireId!}|${d.societeId}`);
+    }
+  }
+
+  // Source 2 : Dossiers avec prestataireLegacy (nom texte)
+  const dossiersLegacy = await db.dossier.findMany({
+    where: {
+      AND: [
+        { prestataireLegacy: { not: null } },
+        { NOT: { prestataireLegacy: '' } },
+      ],
+    },
+    select: { prestataireLegacy: true, societeId: true },
+    distinct: ['prestataireLegacy', 'societeId'],
+  });
+
+  if (dossiersLegacy.length > 0) {
+    const allPrestataires = await db.prestataire.findMany({
+      select: { id: true, nom: true },
+    });
+    const prestaByName = new Map<string, string[]>();
+    for (const p of allPrestataires) {
+      const key = p.nom.trim().toLowerCase();
+      if (!prestaByName.has(key)) prestaByName.set(key, []);
+      prestaByName.get(key)!.push(p.id);
+    }
+
+    const toCreateFromLegacy: { prestataireId: string; societeId: string }[] = [];
+    for (const d of dossiersLegacy) {
+      const legacyName = d.prestataireLegacy!.trim().toLowerCase();
+      const matchedIds = prestaByName.get(legacyName);
+      if (!matchedIds) continue;
+      for (const prestaId of matchedIds) {
+        if (!existingSet.has(`${prestaId}|${d.societeId}`)) {
+          toCreateFromLegacy.push({ prestataireId: prestaId, societeId: d.societeId });
+          existingSet.add(`${prestaId}|${d.societeId}`);
+        }
+      }
+    }
+
+    if (toCreateFromLegacy.length > 0) {
+      for (let i = 0; i < toCreateFromLegacy.length; i += 100) {
+        const batch = toCreateFromLegacy.slice(i, i + 100);
+        const result = await db.prestataireSociete.createMany({
+          data: batch.map(d => ({
+            prestataireId: d.prestataireId,
+            societeId: d.societeId,
+            actif: true,
+          })),
+          skipDuplicates: true,
+        });
+        created += result.count;
+      }
+    }
+  }
+
+  return created;
+}
+
+// ─── Helper : récupérer les stats dossiers par (prestataireId, societeId) ─────
+async function getDossierStats(): Promise<Map<string, { nbDossiers: number; montantTotal: number }>> {
+  const statsMap = new Map<string, { nbDossiers: number; montantTotal: number }>();
+  try {
+    const dossierStats = await db.dossier.groupBy({
+      by: ['prestataireId', 'societeId'],
+      where: { prestataireId: { not: null } },
+      _count: true,
+      _sum: { montantReclame: true },
+    });
+    for (const stat of dossierStats) {
+      if (stat.prestataireId && stat.societeId) {
+        statsMap.set(`${stat.prestataireId}|${stat.societeId}`, {
+          nbDossiers: stat._count,
+          montantTotal: stat._sum.montantReclame ?? 0,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Erreur calcul stats dossiers (fallback à 0) :', err);
+  }
+  return statsMap;
+}
+
 // ─── GET : Lister tous les liens prestataire-société ────────────────────────
-// Query params optionnels : societeId, prestataireId
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +134,18 @@ export async function GET(request: NextRequest) {
     if (societeId) where.societeId = societeId;
     if (prestataireId) where.prestataireId = prestataireId;
 
+    // ── Auto-sync si la table est vide ─────────────────────────────────────
+    try {
+      const linkCount = await db.prestataireSociete.count();
+      if (linkCount === 0) {
+        const created = await syncFromDossiers();
+        console.log(`[PrestataireSociete] Auto-sync : ${created} lien(s) créé(s).`);
+      }
+    } catch (syncErr) {
+      console.error('[PrestataireSociete] Erreur auto-sync (table peut ne pas exister) :', syncErr);
+    }
+
+    // ── Récupérer les liens ────────────────────────────────────────────────
     const liens = await db.prestataireSociete.findMany({
       where,
       include: {
@@ -28,41 +155,10 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // ─── Stats dossiers par paire (prestataireId, societeId) ────────────────
-    // Récupérer toutes les paires uniques de la réponse pour chercher les stats
-    const pairKeys = liens.map(l => ({
-      prestataireId: l.prestataireId,
-      societeId: l.societeId,
-    }));
+    // ── Stats dossiers : une seule requête groupBy globale ────────────────
+    const statsMap = await getDossierStats();
 
-    // Chercher les stats par batch : nbDossiers et montantTotal par (prestataireId, societeId)
-    const statsMap = new Map<string, { nbDossiers: number; montantTotal: number }>();
-
-    if (pairKeys.length > 0) {
-      // Utiliser groupBy pour chaque paire
-      const dossierStats = await db.dossier.groupBy({
-        by: ['prestataireId', 'societeId'],
-        where: {
-          OR: pairKeys.map(pk => ({
-            prestataireId: pk.prestataireId,
-            societeId: pk.societeId,
-          })),
-        },
-        _count: true,
-        _sum: { montantReclame: true, montantValide: true, montantPaye: true },
-      });
-
-      for (const stat of dossierStats) {
-        if (stat.prestataireId && stat.societeId) {
-          statsMap.set(`${stat.prestataireId}|${stat.societeId}`, {
-            nbDossiers: stat._count,
-            montantTotal: stat._sum.montantReclame ?? 0,
-          });
-        }
-      }
-    }
-
-    // Enrichir les liens avec les stats
+    // ── Enrichir les liens avec les stats ──────────────────────────────────
     const enrichedLiens = liens.map(l => {
       const stats = statsMap.get(`${l.prestataireId}|${l.societeId}`);
       return {
@@ -94,7 +190,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'prestataireId et societeId requis.' }, { status: 400 });
     }
 
-    // Vérifier que les deux existent
     const [prestataire, societe] = await Promise.all([
       db.prestataire.findUnique({ where: { id: prestataireId } }),
       db.societe.findUnique({ where: { id: societeId } }),
