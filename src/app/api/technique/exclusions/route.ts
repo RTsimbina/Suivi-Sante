@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { getParentType } from '@/lib/prestations';
 
 /**
  * GET /api/technique/exclusions
@@ -108,9 +109,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Chercher le barème pour cette société + prestation
+      // Chercher le barème pour cette société + prestation (match exact ou par parent type)
       const societeBaremes = baremesBySociete[d.societeId];
-      const bareme = societeBaremes?.[d.typeDossier] ?? null;
+      const bareme = societeBaremes?.[d.typeDossier] ?? societeBaremes?.[getParentType(d.typeDossier)] ?? null;
 
       if (!bareme) {
         // Pas de barème → exclusion totale

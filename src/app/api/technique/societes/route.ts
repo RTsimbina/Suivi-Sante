@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { PARENT_TYPES, ALL_SOUS_TYPES } from '@/lib/prestations';
 
 // Types pour la validation
 interface BaremeInput {
@@ -11,16 +12,7 @@ interface BaremeInput {
   active?: boolean;
 }
 
-const PRESTATIONS_VALIDES = [
-  'HOSPITALISATION',
-  'CONSULTATION',
-  'PHARMACIE',
-  'MATERNITE',
-  'CHIRURGIE',
-  'EXAMEN',
-  'SOINS DENTAIRES',
-  'OPTIQUE',
-];
+const PRESTATIONS_VALIDES = [...ALL_SOUS_TYPES];
 
 // ─── GET : Lister toutes les sociétés ─────────────────────────────────────────
 
@@ -96,10 +88,10 @@ export async function POST(request: NextRequest) {
     // Validation des barèmes si fournis
     if (baremes && Array.isArray(baremes)) {
       for (const b of baremes) {
-        if (!b.prestation || !PRESTATIONS_VALIDES.includes(b.prestation)) {
+        if (!b.prestation || (!PRESTATIONS_VALIDES.includes(b.prestation) && !PARENT_TYPES.includes(b.prestation))) {
           return NextResponse.json(
             {
-              erreur: `Prestation invalide : "${b.prestation}". Valeurs autorisées : ${PRESTATIONS_VALIDES.join(', ')}.`,
+              erreur: `Prestation invalide : "${b.prestation}". Valeurs autorisées : ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(', ')}.`,
             },
             { status: 400 }
           );

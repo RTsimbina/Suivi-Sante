@@ -1,5 +1,6 @@
 import { db } from './db';
 import { envoyerEmail } from './email';
+import { getPrestationLabel } from './prestations';
 
 // ─── Template HTML du rapport mensuel par société ──────────────────────────
 
@@ -42,7 +43,7 @@ function genererHTMLRapportSociete(data: {
 
   const prestationRows = data.topPrestations.map(p => `
     <tr>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${p.type}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${getPrestationLabel(p.type)}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align:center;">${p.count}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align:right;">${fmt(p.montant)} AR</td>
     </tr>
