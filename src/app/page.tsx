@@ -97,7 +97,7 @@ export default function Home() {
   }, [role, navItems, view]);
 
   // Vérifier si l'utilisateur peut créer des dossiers
-  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE' || role === 'SANTE';
+  const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE';
 
   // Défense en profondeur : s'assurer que la vue actuelle est autorisée pour le rôle
   // (le rôle SANTE ne doit jamais voir les vues financières : reporting, comptabilite, direction)
