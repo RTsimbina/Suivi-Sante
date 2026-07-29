@@ -13,7 +13,6 @@ const PUBLIC_PAGES = ['/login', '/reset-password'];
 const PUBLIC_API_PREFIXES = [
   '/api/auth/',           // NextAuth login/logout/callback
   '/api/webhook/',        // WhatsApp, Telegram, Messenger
-  '/api/bot-status',      // Statut des bots
   '/api/setup',           // Initialisation DB
   '/api/health',          // Health check
   '/api/session/lockout', // Vérification verrouillage
