@@ -5,7 +5,7 @@ describe('formatMontant', () => {
   it('formate un montant normal en français', () => {
     const result = formatMontant(1234567.89);
     expect(result).toContain('Ar');
-    expect(result).toContain('1'); // au moins le premier chiffre
+    expect(result).toContain('1');
   });
 
   it('retourne "0 Ar" pour undefined', () => {
@@ -101,16 +101,29 @@ describe('statutLabel', () => {
   });
 });
 
-describe('typeDossierLabel', () => {
-  it('retourne le label pour les types connus', () => {
-    expect(typeDossierLabel('HOSPITALISATION')).toBe('Hospitalisation');
-    expect(typeDossierLabel('CONSULTATION')).toBe('Consultation');
-    expect(typeDossierLabel('PHARMACIE')).toBe('Pharmacie');
+describe('typeDossierLabel (délègue à getPrestationLabel)', () => {
+  it('retourne le label pour les parents sans sous-type', () => {
+    expect(typeDossierLabel('EXAMEN')).toBe('Examen');
+    expect(typeDossierLabel('IMAGERIE')).toBe('Imagerie');
     expect(typeDossierLabel('OPTIQUE')).toBe('Optique');
+    expect(typeDossierLabel('PHARMACIE')).toBe('Pharmacie');
+  });
+
+  it('retourne le label pour les sous-types', () => {
+    expect(typeDossierLabel('HOSPITALISATION_CHIRURGICAL')).toBe('Hospitalisation - Chirurgical');
+    expect(typeDossierLabel('HOSPITALISATION_MEDICAL')).toBe('Hospitalisation - Medical');
+    expect(typeDossierLabel('CONSULTATION_SPECIALISE')).toBe('Consultation - Specialise');
+    expect(typeDossierLabel('ACCOUCHEMENT_NORMAL')).toBe('Accouchement - Normal');
+    expect(typeDossierLabel('DENTAIRES_PROTHESE')).toBe('Dentaires - Prothese');
+  });
+
+  it('gère la compatibilité ascendante avec les anciens types', () => {
+    expect(typeDossierLabel('MATERNITE')).toBe('Maternité');
+    expect(typeDossierLabel('CHIRURGIE')).toBe('Chirurgie');
     expect(typeDossierLabel('SOINS DENTAIRES')).toBe('Soins Dentaires');
   });
 
-  it('retourne le type brut si inconnu', () => {
-    expect(typeDossierLabel('RADIOLOGIE')).toBe('RADIOLOGIE');
+  it('retourne le label formaté si inconnu (première lettre majuscule)', () => {
+    expect(typeDossierLabel('RADIOLOGIE')).toBe('Radiologie');
   });
 });

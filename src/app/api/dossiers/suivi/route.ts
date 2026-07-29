@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { checkAuth } from "@/lib/authorize";
+import { ALL_SOUS_TYPES, PARENT_TYPES } from "@/lib/prestations";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
@@ -14,7 +15,7 @@ function round2(n: number | null | undefined): number {
 }
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "REJETE", "EN_PAIEMENT", "PAYE"];
-const VALID_TYPES = ["HOSPITALISATION", "CONSULTATION", "PHARMACIE", "MATERNITE", "CHIRURGIE", "EXAMEN", "SOINS DENTAIRES", "OPTIQUE"];
+const VALID_TYPES = [...ALL_SOUS_TYPES, ...PARENT_TYPES];
 
 export async function GET(request: NextRequest) {
   try {
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest) {
       andConditions.push({ statut });
     }
 
-    if (type && VALID_TYPES.includes(type)) {
+    if (type && VALID_TYPES.includes(type as never)) {
       andConditions.push({ typeDossier: type });
     }
 
