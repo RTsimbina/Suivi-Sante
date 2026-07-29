@@ -152,7 +152,11 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/societes': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+      DELETE: ['ADMINISTRATEUR'],
+    },
   },
   '/api/baremes': {
     roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'ACCUEIL', 'COMPTABILITE'],

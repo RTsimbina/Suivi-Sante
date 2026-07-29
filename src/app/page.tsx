@@ -56,7 +56,7 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
 
   { key: 'assures', label: 'Assurés', icon: Heart, section: 'GESTION', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, section: 'GESTION', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
-  { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR'] },
+  { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR', 'SANTE'] },
   { key: 'sante', label: 'Contrôle Santé', icon: HeartPulse, badge: 'Santé', section: 'SANTE', roles: ['ADMINISTRATEUR', 'SANTE'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
