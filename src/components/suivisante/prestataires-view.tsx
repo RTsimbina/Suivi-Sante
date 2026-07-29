@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Stethoscope, Plus, Pencil, Trash2, Search, Loader2, X, Building2, FileText,
   CheckCircle2, AlertTriangle, ChevronRight, Phone, Link2, Unlink, UserPlus,
@@ -63,6 +63,8 @@ interface LienPS {
   actif: boolean;
   prestataire: PrestataireItem;
   societe: { id: string; nom: string };
+  nbDossiers?: number;
+  montantTotal?: number;
 }
 
 // ─── Composant principal ────────────────────────────────────────────────────
@@ -107,13 +109,33 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
     } catch { /* silent */ }
   }, []);
 
+  // Référence pour éviter double appel au sync
+  const autoSyncDone = useRef(false);
+
   const fetchLiens = useCallback(async () => {
     try {
       const res = await fetch('/api/prestataires/societes');
       if (res.status === 401 || res.status === 403) return;
       if (res.ok) {
         const data = await res.json();
-        setLiens(data.liens || []);
+        const liensData = data.liens || [];
+        setLiens(liensData);
+        // Si aucun lien et pas encore de sync auto → déclencher
+        if (liensData.length === 0 && !autoSyncDone.current) {
+          autoSyncDone.current = true;
+          // Ne pas bloquer le chargement, lancer en arrière-plan
+          fetch('/api/prestataires/societes/sync', { method: 'POST' })
+            .then(r => r.ok ? r.json() : null)
+            .then(result => {
+              if (result && result.created > 0) {
+                // Recharger les liens après sync
+                fetch('/api/prestataires/societes')
+                  .then(r => r.ok ? r.json() : { liens: [] })
+                  .then(d => setLiens(d.liens || []));
+              }
+            })
+            .catch(() => {});
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         setFetchError(err.erreur || `Erreur serveur (${res.status})`);
@@ -194,10 +216,12 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
 
   // Compteur par société
   const societeStats = useMemo(() => {
-    const stats: Record<string, { total: number; actifs: number; inactifs: number }> = {};
+    const stats: Record<string, { total: number; actifs: number; inactifs: number; nbDossiers: number; montantTotal: number }> = {};
     for (const l of liens) {
-      if (!stats[l.societeId]) stats[l.societeId] = { total: 0, actifs: 0, inactifs: 0 };
+      if (!stats[l.societeId]) stats[l.societeId] = { total: 0, actifs: 0, inactifs: 0, nbDossiers: 0, montantTotal: 0 };
       stats[l.societeId].total++;
+      stats[l.societeId].nbDossiers += l.nbDossiers ?? 0;
+      stats[l.societeId].montantTotal += l.montantTotal ?? 0;
       if (l.actif) stats[l.societeId].actifs++;
       else stats[l.societeId].inactifs++;
     }
@@ -333,7 +357,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         </CardContent></Card>
       </div>
 
-      {/* ─── Erreur fetch ─── */
+      {/* ─── Erreur fetch ─── */}
       {fetchError && (
         <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
           <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
@@ -345,7 +369,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         </div>
       )}
 
-      {/* ─── Synchronisation nécessaire ─── */
+      {/* ─── Synchronisation nécessaire ─── */}
       {!fetchError && liens.length === 0 && !loading && societes.length > 0 && allPrestatairesList.length > 0 && (
         <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40">
           <div className="flex items-start gap-3">
@@ -444,6 +468,9 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
                           {stats.inactifs > 0 && (
                             <span className="text-red-500 font-medium">{stats.inactifs} inact.</span>
                           )}
+                          {stats.nbDossiers > 0 && (
+                            <span className="text-blue-500 font-medium">{stats.nbDossiers} dossier(s)</span>
+                          )}
                         </div>
                       </div>
                       <ChevronRight className={cn(
@@ -479,6 +506,14 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
                           <span className="text-emerald-600 font-medium">{selectedLiens.filter(l => l.actif).length} actif(s)</span>
                           <span>·</span>
                           <span className="text-red-500 font-medium">{selectedLiens.filter(l => !l.actif).length} inactif(s)</span>
+                          {selectedLiens.length > 0 && (
+                            <>
+                              <span>·</span>
+                              <span className="font-medium">{selectedLiens.reduce((s, l) => s + (l.nbDossiers ?? 0), 0)} dossier(s)</span>
+                              <span>·</span>
+                              <span className="font-medium">{selectedLiens.reduce((s, l) => s + (l.montantTotal ?? 0), 0).toLocaleString('fr-MG')} Ar réclamés</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -553,6 +588,8 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
                           <tr className="text-left">
                             <th className="py-2.5 px-3 font-medium text-muted-foreground text-xs">Prestataire</th>
                             <th className="py-2.5 px-3 font-medium text-muted-foreground text-xs">Type</th>
+                            <th className="py-2.5 px-3 font-medium text-muted-foreground text-xs text-center">Dossiers</th>
+                            <th className="py-2.5 px-3 font-medium text-muted-foreground text-xs text-right">Montant réclamé</th>
                             <th className="py-2.5 px-3 font-medium text-muted-foreground text-xs text-center">Statut</th>
                             <th className="py-2.5 px-3 font-medium text-muted-foreground text-xs text-center">Action</th>
                             {canEdit && (
@@ -602,6 +639,18 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
                                 <Badge variant="outline" className={cn('text-[10px]', TYPE_COLORS[l.prestataire.type])}>
                                   {TYPE_LABELS[l.prestataire.type] || l.prestataire.type}
                                 </Badge>
+                              </td>
+
+                              {/* Dossiers */}
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="text-xs font-medium">{(l.nbDossiers ?? 0) > 0 ? l.nbDossiers : '—'}</span>
+                              </td>
+
+                              {/* Montant réclamé */}
+                              <td className="py-2.5 px-3 text-right">
+                                <span className="text-xs font-medium">
+                                  {(l.montantTotal ?? 0) > 0 ? (l.montantTotal ?? 0).toLocaleString('fr-MG') + ' Ar' : '—'}
+                                </span>
                               </td>
 
                               {/* Statut actif/inactif */}
