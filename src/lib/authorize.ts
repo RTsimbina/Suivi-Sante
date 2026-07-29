@@ -139,6 +139,15 @@ export const API_PERMISSIONS: Record<
       // SANTE : lecture seule (GET)
     },
   },
+  '/api/prestataires/societes': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
+      PATCH: ['ADMINISTRATEUR', 'TECHNIQUE'],
+      DELETE: ['ADMINISTRATEUR'],
+      // SANTE : lecture seule (GET)
+    },
+  },
   '/api/bot-messages': {
     roles: ['ADMINISTRATEUR'],
   },

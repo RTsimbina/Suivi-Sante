@@ -39,6 +39,7 @@ model Societe {
   courriels Courriel[]
   assures   Assure[]
   contacts  EntrepriseContact[]
+  prestataires PrestataireSociete[]
   createdAt DateTime  @default(now())
 }
 
@@ -211,19 +212,35 @@ model Assure {
 }
 
 model Prestataire {
-  id              String     @id @default(cuid())
-  nom             String
-  type            String
-  telephone       String?
-  email           String?
-  adresse         String?
-  nif             String?
-  statut          String?
-  rib             String?
-  actif           Boolean    @default(true)
-  dossiers        Dossier[]  @relation("PrestataireDossier")
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id                String              @id @default(cuid())
+  nom               String
+  type              String
+  telephone         String?
+  email             String?
+  adresse           String?
+  nif               String?
+  statut            String?
+  rib               String?
+  actif             Boolean             @default(true)
+  dossiers          Dossier[]           @relation("PrestataireDossier")
+  societes          PrestataireSociete[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+/// Liaison many-to-many entre Prestataire et Societe avec statut actif/inactif par société.
+/// Inactif = le prestataire ne peut pas être utilisé par cette société (acte refusé automatiquement).
+model PrestataireSociete {
+  id            String      @id @default(cuid())
+  prestataireId String
+  prestataire   Prestataire @relation(fields: [prestataireId], references: [id], onDelete: Cascade)
+  societeId     String
+  societe       Societe     @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  actif         Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([prestataireId, societeId])
 }
 
 model Courriel {
