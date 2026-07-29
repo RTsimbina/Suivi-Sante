@@ -17,7 +17,9 @@ import type { RoleType } from './auth-context';
  *    - /api/appels-fonds (CRUD appels de fonds)
  *    - /api/comptabilite/* (imports comptables, suivi paiements)
  *    - /api/kpis (indicateurs financiers : montants, paiements)
- *    - /api/contrats (gestion contrats / budgets)
+ *    SANTE a un accès LECTURE SEULE (GET) à : /api/contrats, /api/assures,
+ *    /api/prestataires, /api/technique/societes, /api/societes, /api/ia,
+ *    /api/chat, /api/portail, /api/dossiers.
  */
 export const API_PERMISSIONS: Record<
   string,
@@ -40,12 +42,13 @@ export const API_PERMISSIONS: Record<
   },
   '/api/kpis': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    // SANTE volontairement exclu : données financières
   },
   '/api/ia': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/chat': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/import': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],
@@ -66,11 +69,12 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
   },
   '/api/contrats': {
-    roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
       DELETE: ['ADMINISTRATEUR'],
+      // SANTE : lecture seule (GET)
     },
   },
   '/api/appels-fonds': {
@@ -82,10 +86,11 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/portail': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/upload': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    // SANTE exclu : upload réservé aux rôles opérationnels
   },
   '/api/reporting': {
     roles: ['ADMINISTRATEUR', 'COMPTABILITE'],
@@ -94,11 +99,12 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE', 'ACCUEIL'],
   },
   '/api/technique/societes': {
-    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'SANTE', 'ACCUEIL', 'COMPTABILITE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
       DELETE: ['ADMINISTRATEUR'],
+      // SANTE, ACCUEIL, COMPTABILITE : lecture seule (GET)
     },
   },
   '/api/technique/baremes': {
@@ -110,11 +116,12 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/assures': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
       DELETE: ['ADMINISTRATEUR', 'TECHNIQUE'],
+      // SANTE : lecture seule (GET)
     },
   },
   '/api/assures/import': {
@@ -124,14 +131,18 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/prestataires': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
       DELETE: ['ADMINISTRATEUR'],
+      // SANTE : lecture seule (GET)
     },
   },
   '/api/bot-messages': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  '/api/bot-status': {
     roles: ['ADMINISTRATEUR'],
   },
   '/api/email-mensuel': {

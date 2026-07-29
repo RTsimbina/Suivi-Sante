@@ -1,6 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { checkAuth } from '@/lib/authorize';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = await checkAuth(request);
+  if (authError) return authError;
+
   const status = {
     whatsapp: {
       actif: !!process.env.WHATSAPP_ACCESS_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID,
