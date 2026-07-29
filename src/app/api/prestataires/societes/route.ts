@@ -28,7 +28,51 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ liens });
+    // ─── Stats dossiers par paire (prestataireId, societeId) ────────────────
+    // Récupérer toutes les paires uniques de la réponse pour chercher les stats
+    const pairKeys = liens.map(l => ({
+      prestataireId: l.prestataireId,
+      societeId: l.societeId,
+    }));
+
+    // Chercher les stats par batch : nbDossiers et montantTotal par (prestataireId, societeId)
+    const statsMap = new Map<string, { nbDossiers: number; montantTotal: number }>();
+
+    if (pairKeys.length > 0) {
+      // Utiliser groupBy pour chaque paire
+      const dossierStats = await db.dossier.groupBy({
+        by: ['prestataireId', 'societeId'],
+        where: {
+          OR: pairKeys.map(pk => ({
+            prestataireId: pk.prestataireId,
+            societeId: pk.societeId,
+          })),
+        },
+        _count: true,
+        _sum: { montantReclame: true, montantValide: true, montantPaye: true },
+      });
+
+      for (const stat of dossierStats) {
+        if (stat.prestataireId && stat.societeId) {
+          statsMap.set(`${stat.prestataireId}|${stat.societeId}`, {
+            nbDossiers: stat._count,
+            montantTotal: stat._sum.montantReclame ?? 0,
+          });
+        }
+      }
+    }
+
+    // Enrichir les liens avec les stats
+    const enrichedLiens = liens.map(l => {
+      const stats = statsMap.get(`${l.prestataireId}|${l.societeId}`);
+      return {
+        ...l,
+        nbDossiers: stats?.nbDossiers ?? 0,
+        montantTotal: stats?.montantTotal ?? 0,
+      };
+    });
+
+    return NextResponse.json({ liens: enrichedLiens });
   } catch (error) {
     console.error('Erreur récupération liens prestataire-société :', error);
     return NextResponse.json({ erreur: 'Erreur serveur.' }, { status: 500 });
