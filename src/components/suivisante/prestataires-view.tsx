@@ -45,7 +45,6 @@ const TYPE_COLORS: Record<string, string> = {
 interface SocieteItem {
   id: string;
   nom: string;
-  actif: boolean;
 }
 
 interface PrestataireItem {
@@ -63,7 +62,7 @@ interface LienPS {
   societeId: string;
   actif: boolean;
   prestataire: PrestataireItem;
-  societe: SocieteItem;
+  societe: { id: string; nom: string };
 }
 
 // ─── Composant principal ────────────────────────────────────────────────────
@@ -74,6 +73,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   // ─── État ───────────────────────────────────────────────────────────────
   const [societes, setSocietes] = useState<SocieteItem[]>([]);
   const [liens, setLiens] = useState<LienPS[]>([]);
+  const [allPrestatairesList, setAllPrestatairesList] = useState<PrestataireItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchSociete, setSearchSociete] = useState('');
   const [searchPrestataire, setSearchPrestataire] = useState('');
@@ -97,7 +97,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
       if (res.ok) {
         const data = await res.json();
         const list = (Array.isArray(data) ? data : data.societes || []).map(
-          (s: { id: string; nom: string; actif: boolean }) => ({ id: s.id, nom: s.nom, actif: s.actif })
+          (s: { id: string; nom: string }) => ({ id: s.id, nom: s.nom })
         );
         setSocietes(list);
       }
@@ -112,6 +112,21 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         const data = await res.json();
         setLiens(data.liens || []);
       }
+    } catch { /* silent */ }
+  }, []);
+
+  const fetchAllPrestataires = useCallback(async () => {
+    try {
+      const res = await fetch('/api/prestataires?limit=500');
+      if (res.status === 401 || res.status === 403) return;
+      if (res.ok) {
+        const data = await res.json();
+        setAllPrestatairesList(
+          (data.prestataires || []).map((p: { id: string; nom: string; type: string; telephone: string | null; actif: boolean }) => ({
+            id: p.id, nom: p.nom, type: p.type, telephone: p.telephone, actif: p.actif,
+          }))
+        );
+      }
     } catch { /* silent */ } finally {
       setLoading(false);
     }
@@ -120,7 +135,8 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   useEffect(() => {
     fetchSocietes();
     fetchLiens();
-  }, [fetchSocietes, fetchLiens]);
+    fetchAllPrestataires();
+  }, [fetchSocietes, fetchLiens, fetchAllPrestataires]);
 
   // Auto-sélection première société
   useEffect(() => {
@@ -178,29 +194,19 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
     return stats;
   }, [liens]);
 
-  // Tous les prestataires existants (pour le dialog d'ajout)
-  const allPrestataires = useMemo(() => {
-    const seen = new Map<string, PrestataireItem>();
-    for (const l of liens) {
-      if (!seen.has(l.prestataireId)) {
-        seen.set(l.prestataireId, l.prestataire);
-      }
-    }
-    return Array.from(seen.values());
-  }, [liens]);
-
   // Prestataires disponibles à lier (pas encore liés à cette société)
+  // Utilise la liste complète des prestataires, pas seulement ceux déjà liés
   const availablePrestataires = useMemo(() => {
     const linkedIds = new Set(selectedLiens.map(l => l.prestataireId));
-    return allPrestataires.filter(p => !linkedIds.has(p.id) && p.actif);
-  }, [allPrestataires, selectedLiens]);
+    return allPrestatairesList.filter(p => !linkedIds.has(p.id) && p.actif);
+  }, [allPrestatairesList, selectedLiens]);
 
   // Stats globales
   const totalSocietesAvecPresta = Object.keys(societeStats).length;
   const totalLiens = liens.length;
   const totalActifs = liens.filter(l => l.actif).length;
   const totalInactifs = liens.filter(l => !l.actif).length;
-  const totalPrestatairesUniques = allPrestataires.length;
+  const totalPrestatairesUniques = allPrestatairesList.length;
 
   const selectedSociete = societes.find(s => s.id === selectedSocieteId);
 
