@@ -31,13 +31,17 @@ export const API_PERMISSIONS: Record<
   '/api/dossiers/assigner-bulk': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
+  '/api/portail-client': {
+    roles: ['PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
+  },
   '/api/dossiers': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
       DELETE: ['ADMINISTRATEUR'],
       PATCH: ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE'], // Changer statut
+      // PORTEAIL_CLIENT et CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/kpis': {
@@ -69,12 +73,12 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
   },
   '/api/contrats': {
-    roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
       DELETE: ['ADMINISTRATEUR'],
-      // SANTE : lecture seule (GET)
+      // SANTE, PORTEAIL_CLIENT, CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/appels-fonds': {
@@ -116,12 +120,12 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/assures': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
       DELETE: ['ADMINISTRATEUR', 'TECHNIQUE'],
-      // SANTE : lecture seule (GET)
+      // SANTE, PORTEAIL_CLIENT, CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/assures/import': {
@@ -175,10 +179,11 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/societes': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
       DELETE: ['ADMINISTRATEUR'],
+      // SANTE, CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/baremes': {

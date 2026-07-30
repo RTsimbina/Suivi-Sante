@@ -171,6 +171,31 @@ export const authOptions: NextAuthOptions = {
         // Réinitialiser les tentatives après succès
         await resetAttempts(email);
 
+        // Récupérer les identifiants de portail pour les rôles externes
+        let assureId: string | undefined;
+        let societeId: string | undefined;
+
+        if (user.role === 'PORTEAIL_CLIENT') {
+          // Rechercher l'assuré correspondant à cet e-mail
+          const assure = await db.assure.findFirst({
+            where: { email: { equals: user.email, mode: 'insensitive' } },
+            select: { id: true, societeId: true },
+          });
+          if (assure) {
+            assureId = assure.id;
+            societeId = assure.societeId ?? undefined;
+          }
+        } else if (user.role === 'CONTACT_ENTREPRISE') {
+          // Rechercher le contact d'entreprise correspondant à cet e-mail
+          const contact = await db.entrepriseContact.findFirst({
+            where: { email: { equals: user.email, mode: 'insensitive' } },
+            select: { societeId: true },
+          });
+          if (contact) {
+            societeId = contact.societeId ?? undefined;
+          }
+        }
+
         // Mettre à jour la dernière connexion
         await updateLastLogin(user.id);
 
@@ -180,6 +205,8 @@ export const authOptions: NextAuthOptions = {
           nom: user.nom,
           role: user.role,
           avatar: user.avatar,
+          assureId,
+          societeId,
         };
       },
     }),
@@ -191,6 +218,10 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role || 'SANTE';
         token.nom = (user as any).nom || (user as any).name || '';
         token.email = user.email || '';
+        // Stocker les identifiants de portail pour les rôles externes
+        const userAny = user as any;
+        if (userAny.assureId) token.assureId = userAny.assureId;
+        if (userAny.societeId) token.societeId = userAny.societeId;
       }
       return token;
     },
@@ -200,6 +231,9 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string;
         session.user.nom = token.nom as string;
         session.user.email = token.email as string;
+        // Exposer les identifiants de portail pour les rôles externes
+        if (token.assureId) (session.user as any).assureId = token.assureId;
+        if (token.societeId) (session.user as any).societeId = token.societeId;
       }
       return session;
     },
@@ -231,6 +265,8 @@ declare module 'next-auth' {
       nom: string;
       role: string;
       avatar?: string | null;
+      assureId?: string;
+      societeId?: string;
     };
   }
 
@@ -240,6 +276,8 @@ declare module 'next-auth' {
     nom: string;
     role: string;
     avatar?: string | null;
+    assureId?: string;
+    societeId?: string;
   }
 }
 
@@ -250,5 +288,7 @@ declare module 'next-auth/jwt' {
     nom: string;
     role: string;
     avatar?: string | null;
+    assureId?: string;
+    societeId?: string;
   }
 }

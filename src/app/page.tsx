@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
@@ -67,12 +68,20 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
 
 export default function Home() {
   const { role, isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [view, setView] = useState<View>('direction');
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loadingKpis, setLoadingKpis] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
+
+  // Rediriger les utilisateurs portail vers leur page dédiée
+  useEffect(() => {
+    if (role === 'PORTEAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
+      router.replace('/portail');
+    }
+  }, [role, router]);
 
   // Filtrer la navigation selon le rôle
   const navItems = useMemo(() => {
