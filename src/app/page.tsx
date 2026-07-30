@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
-  Heart, Stethoscope, Building2, Zap, HeartPulse, Mail, Shield,
+  Heart, Stethoscope, Building2, Zap, HeartPulse, Mail, Shield, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import UserMenu from '@/components/suivisante/user-menu';
+import UtilisateursView from '@/components/suivisante/utilisateurs-view';
 import { ThemeToggle } from '@/components/theme-toggle';
 import DirectionView from '@/components/suivisante/direction-view';
 import TechniqueView from '@/components/suivisante/technique-view';
@@ -34,7 +35,7 @@ import SanteView from '@/components/suivisante/sante-view';
 import ReceptionView from '@/components/suivisante/reception-view';
 import JournalView from '@/components/suivisante/journal-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'configuration' | 'sante' | 'journal';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'utilisateurs' | 'configuration' | 'sante' | 'journal';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -59,6 +60,7 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, section: 'GESTION', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'societes', label: 'Sociétés Client', icon: Building2, section: 'GESTION', roles: ['ADMINISTRATEUR', 'TECHNIQUE', 'SANTE', 'COMPTABILITE'] },
   { key: 'sante', label: 'Contrôle Santé', icon: HeartPulse, badge: 'Santé', section: 'SANTE', roles: ['ADMINISTRATEUR', 'SANTE'] },
+  { key: 'utilisateurs', label: 'Gestion Utilisateurs', icon: Users, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
@@ -287,6 +289,7 @@ export default function Home() {
           {isViewAllowed && view === 'assures' && <AssuresView userRole={role || ''} />}
           {isViewAllowed && view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
           {isViewAllowed && view === 'societes' && <SocietesView userRole={role || ''} />}
+          {isViewAllowed && view === 'utilisateurs' && <UtilisateursView />}
           {isViewAllowed && view === 'configuration' && <ConfigurationView />}
           {isViewAllowed && view === 'journal' && <JournalView />}
           {isViewAllowed && view === 'sante' && <SanteView />}
