@@ -57,6 +57,20 @@ export default function LoginPage() {
         setError('Identifiants incorrects. Veuillez vérifier votre e-mail et mot de passe.');
       }
     } else if (result?.ok) {
+      // Récupérer la session pour déterminer la redirection selon le rôle
+      try {
+        const sessionRes = await fetch('/api/auth/session');
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          const role = sessionData?.user?.role;
+          if (role === 'PORTEAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
+            window.location.href = '/portail';
+            return;
+          }
+        }
+      } catch {
+        // En cas d'erreur, redirection par défaut
+      }
       window.location.href = '/';
     }
   }
