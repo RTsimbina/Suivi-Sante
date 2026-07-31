@@ -1,8 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { traiterMessageBot, sauvegarderMessage, envoyerWhatsApp } from "@/lib/bot-service";
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  verifyMeta,
+  webhookUnauthorized,
+  checkRateLimit,
+  getClientIp,
+} from '@/lib/webhook-verify';
+import { traiterMessageBot, sauvegarderMessage, envoyerWhatsApp } from '@/lib/bot-service';
 
-const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || "suivisante_verify_token";
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
+const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
+const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || '';
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 
 // GET: Vérification du webhook (configuration Meta)
 export async function GET(request: NextRequest) {
@@ -11,6 +18,10 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
+  if (!WHATSAPP_VERIFY_TOKEN) {
+    return NextResponse.json({ error: 'WHATSAPP_VERIFY_TOKEN non configuré' }, { status: 500 });
+  }
+
   if (mode === 'subscribe' && token === WHATSAPP_VERIFY_TOKEN && challenge) {
     console.log('[WHATSAPP] Webhook vérifié avec succès');
     return new NextResponse(challenge, { status: 200 });
@@ -18,37 +29,61 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ error: 'Échec de la vérification' }, { status: 403 });
 }
 
-// POST: Réception et traitement des messages WhatsApp
+// POST: Réception des messages WhatsApp (HMAC-SHA256 obligatoire si secret configuré)
 export async function POST(request: NextRequest) {
+  // ── Rate limit ──
+  const ip = getClientIp(request.headers);
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
+  }
+
+  // ── Lire le body brut pour la vérification HMAC ──
+  const rawBody = await request.arrayBuffer();
+
+  // ── Vérification signature Meta ──
+  if (WHATSAPP_APP_SECRET) {
+    const signature = request.headers.get('x-hub-signature-256');
+    const valid = await verifyMeta(signature, WHATSAPP_APP_SECRET, rawBody);
+    if (!valid) {
+      return webhookUnauthorized('WhatsApp HMAC-SHA256 signature invalide');
+    }
+  }
+
+  // ── Parser le JSON manuellement (body déjà consommé par arrayBuffer) ──
+  let body: Record<string, unknown>;
   try {
-    const body = await request.json();
+    body = JSON.parse(new TextDecoder().decode(rawBody));
+  } catch {
+    return NextResponse.json({ error: 'JSON invalide' }, { status: 400 });
+  }
 
+  try {
     // Vérifier si c'est une notification de statut (delivery/read)
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-    const statuses = value?.statuses?.[0];
+    const entry = body.entry as Array<Record<string, unknown>> | undefined;
+    const changes = (entry?.[0]?.changes as Array<Record<string, unknown>> | undefined)?.[0] as Record<string, unknown> | undefined;
+    const value = changes?.value as Record<string, unknown> | undefined;
+    const statuses = value?.statuses as Array<unknown> | undefined;
 
-    if (statuses) {
-      // Accusé de réception de Meta — on ignore, pas besoin de répondre
+    if (statuses && statuses.length > 0) {
       return NextResponse.json({ status: 'status_acknowledged' });
     }
 
     // Extraire le message entrant
-    const messages = value?.messages?.[0];
-    const contacts = value?.contacts?.[0];
+    const messages = (value?.messages as Array<Record<string, unknown>> | undefined)?.[0];
+    const contacts = (value?.contacts as Array<Record<string, unknown>> | undefined)?.[0];
+    const profile = contacts?.profile as Record<string, string> | undefined;
 
     if (!messages) {
       return NextResponse.json({ status: 'no_message' });
     }
 
-    const from = messages.from;
-    const text = messages.text?.body || '';
-    const contactName = contacts?.profile?.name || 'Inconnu';
+    const from = String(messages.from);
+    const textObj = messages.text as Record<string, string> | undefined;
+    const text = textObj?.body || '';
+    const contactName = profile?.name || 'Inconnu';
 
     console.log(`[WHATSAPP] Message de ${contactName} (${from}): ${text}`);
 
-    // Traiter le message via le service bot
     const reponse = await traiterMessageBot({
       canal: 'WHATSAPP',
       expeditieurId: from,
@@ -56,13 +91,11 @@ export async function POST(request: NextRequest) {
       texte: text,
     });
 
-    // Persister la conversation
     await sauvegarderMessage(
       { canal: 'WHATSAPP', expeditieurId: from, expeditieurNom: contactName, texte: text },
-      reponse
+      reponse,
     );
 
-    // Envoyer la réponse via WhatsApp Cloud API (async, ne bloque pas le webhook)
     if (WHATSAPP_PHONE_NUMBER_ID) {
       envoyerWhatsApp(WHATSAPP_PHONE_NUMBER_ID, from, reponse)
         .then(ok => console.log(`[WHATSAPP] Réponse envoyée à ${from}: ${ok ? 'OK' : 'ÉCHEC'}`))
