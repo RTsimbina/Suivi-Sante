@@ -7,6 +7,186 @@ import { hash } from 'bcryptjs';
 // Protégé par SETUP_TOKEN — à appeler UNE SEULE FOIS après le déploiement
 // GET /api/setup?token=VOTRE_TOKEN
 
+// ─── Clés étrangères (contraintes d'intégrité référentielle) ────────────────
+// Ajoutées après la création des tables et l'insertion des données,
+// car les INSERT en masse nécessitent l'absence temporaire de FK.
+// Chaque ALTER est idempotent (DO $$ ... $$) et non bloquant.
+
+const FOREIGN_KEYS_SQL = `
+DO $$ BEGIN
+  -- Contrat → Societe
+  ALTER TABLE "Contrat" ADD CONSTRAINT "Contrat_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- AppelDeFonds → Contrat
+  ALTER TABLE "AppelDeFonds" ADD CONSTRAINT "AppelDeFonds_contratId_fkey"
+    FOREIGN KEY ("contratId") REFERENCES "Contrat"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Societe
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Gestionnaire (accueil)
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_gestionnaireAccueilId_fkey"
+    FOREIGN KEY ("gestionnaireAccueilId") REFERENCES "Gestionnaire"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Utilisateur (créateur)
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_createurId_fkey"
+    FOREIGN KEY ("createurId") REFERENCES "Utilisateur"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Assure
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_assureId_fkey"
+    FOREIGN KEY ("assureId") REFERENCES "Assure"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Prestataire
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_prestataireId_fkey"
+    FOREIGN KEY ("prestataireId") REFERENCES "Prestataire"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Gestionnaire (technique)
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_gestionnaireTechniqueId_fkey"
+    FOREIGN KEY ("gestionnaireTechniqueId") REFERENCES "Gestionnaire"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Gestionnaire (compta)
+  ALTER TABLE "Dossier" ADD CONSTRAINT "Dossier_gestionnaireComptaId_fkey"
+    FOREIGN KEY ("gestionnaireComptaId") REFERENCES "Gestionnaire"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Dossier → Courriel (1:1)
+  ALTER TABLE "Courriel" ADD CONSTRAINT "Courriel_dossierId_fkey"
+    FOREIGN KEY ("dossierId") REFERENCES "Dossier"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Commentaire → Dossier (CASCADE)
+  ALTER TABLE "Commentaire" ADD CONSTRAINT "Commentaire_dossierId_fkey"
+    FOREIGN KEY ("dossierId") REFERENCES "Dossier"("id") ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Commentaire → Utilisateur
+  ALTER TABLE "Commentaire" ADD CONSTRAINT "Commentaire_auteurId_fkey"
+    FOREIGN KEY ("auteurId") REFERENCES "Utilisateur"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Justificatif → Dossier (CASCADE)
+  ALTER TABLE "Justificatif" ADD CONSTRAINT "Justificatif_dossierId_fkey"
+    FOREIGN KEY ("dossierId") REFERENCES "Dossier"("id") ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- ImportDossier → ImportHistorique
+  ALTER TABLE "ImportDossier" ADD CONSTRAINT "ImportDossier_importId_fkey"
+    FOREIGN KEY ("importId") REFERENCES "ImportHistorique"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- ImportDossier → Dossier
+  ALTER TABLE "ImportDossier" ADD CONSTRAINT "ImportDossier_dossierId_fkey"
+    FOREIGN KEY ("dossierId") REFERENCES "Dossier"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Bareme → Societe
+  ALTER TABLE "Bareme" ADD CONSTRAINT "Bareme_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Assure → Societe (CASCADE)
+  ALTER TABLE "Assure" ADD CONSTRAINT "Assure_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id") ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- PrestataireSociete → Prestataire (CASCADE)
+  ALTER TABLE "PrestataireSociete" ADD CONSTRAINT "PrestataireSociete_prestataireId_fkey"
+    FOREIGN KEY ("prestataireId") REFERENCES "Prestataire"("id") ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- PrestataireSociete → Societe (CASCADE)
+  ALTER TABLE "PrestataireSociete" ADD CONSTRAINT "PrestataireSociete_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id") ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- Courriel → Societe
+  ALTER TABLE "Courriel" ADD CONSTRAINT "Courriel_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  -- EntrepriseContact → Societe (CASCADE)
+  ALTER TABLE "EntrepriseContact" ADD CONSTRAINT "EntrepriseContact_societeId_fkey"
+    FOREIGN KEY ("societeId") REFERENCES "Societe"("id") ON DELETE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+`;
+
+async function applyForeignKeys(log: string[]): Promise<void> {
+  try {
+    const statements = FOREIGN_KEYS_SQL
+      .split('DO $$')
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(s => 'DO $$ ' + s);
+
+    let added = 0;
+    for (const sql of statements) {
+      try {
+        await db.$executeRawUnsafe(sql);
+        added++;
+      } catch (e: any) {
+        if (!e.message?.includes('duplicate_object')) {
+          console.warn(`[SETUP] FK warning: ${e.message?.slice(0, 120)}`);
+        }
+      }
+    }
+    log.push(`Clés étrangères vérifiées (${added} traitées)`);
+  } catch (e: any) {
+    console.warn(`[SETUP] FK migration (non bloquant): ${e.message?.slice(0, 120)}`);
+    log.push('Migration FK non bloquante : échec silencieux');
+  }
+}
+
 // ─── DDL SQL : création de toutes les tables ──────────────────────────────────
 const CREATE_TABLES_SQL = `
 CREATE SCHEMA IF NOT EXISTS "public";
@@ -417,6 +597,8 @@ export async function GET(request: Request) {
     // Le setup ne doit réinitialiser les mdp qu'à la création initiale.
     const existingUsers = await db.utilisateur.count();
     if (existingUsers > 0) {
+      // Appliquer les FK si elles n'existent pas encore
+      await applyForeignKeys(log);
       return NextResponse.json({
         success: true,
         message: 'Base de données déjà initialisée — migrations appliquées',
@@ -722,6 +904,9 @@ export async function GET(request: Request) {
       });
     }
     log.push('3 courriels créés');
+
+    // 12. Clés étrangères (contraintes d'intégrité référentielle)
+    await applyForeignKeys(log);
 
     return NextResponse.json({
       success: true,
