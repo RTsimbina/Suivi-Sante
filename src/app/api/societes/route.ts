@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import { logParametreChange, getUserIdFromRequest } from "@/lib/audit-log";
+import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
 
 // GET — Lister toutes les sociétés
 export async function GET(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const body = await request.json();
     const { nom } = body;
 
@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
     // Audit log : création
     await logParametreChange({
       entite: 'Societe', entiteId: societe.id, champ: 'CREATION',
-      ancienneValeur: null, nouvelleValeur: nom.trim(), modifiePar: userId,
+      ancienneValeur: null, nouvelleValeur: nom.trim(),
+      modifiePar: userName, modifieParId: userId, objet: nom.trim(), request,
     });
 
     return NextResponse.json({ societe }, { status: 201 });
@@ -64,7 +65,7 @@ export async function DELETE(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -95,7 +96,8 @@ export async function DELETE(request: NextRequest) {
     if (societe) {
       await logParametreChange({
         entite: 'Societe', entiteId: id, champ: 'SUPPRESSION',
-        ancienneValeur: societe.nom, nouvelleValeur: null, modifiePar: userId,
+        ancienneValeur: societe.nom, nouvelleValeur: null,
+        modifiePar: userName, modifieParId: userId, objet: societe.nom, societeId: id, request,
       });
     }
 

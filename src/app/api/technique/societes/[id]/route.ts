@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { logParametreChange, getUserIdFromRequest } from '@/lib/audit-log';
+import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 import { Prisma } from '@prisma/client';
 import { PARENT_TYPES, ALL_SOUS_TYPES } from '@/lib/prestations';
 
@@ -63,7 +63,7 @@ export async function PUT(
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const { id } = await params;
     const body = await request.json();
     const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = body as {
@@ -198,13 +198,15 @@ export async function PUT(
             if (String(existingBareme.tauxCouverture) !== String(b.tauxCouverture)) {
               await logParametreChange({
                 entite: 'Bareme', entiteId: existingBareme.id, champ: 'tauxCouverture',
-                ancienneValeur: existingBareme.tauxCouverture, nouvelleValeur: b.tauxCouverture, modifiePar: userId,
+                ancienneValeur: existingBareme.tauxCouverture, nouvelleValeur: b.tauxCouverture,
+                modifiePar: userName, modifieParId: userId, societeId: id, objet: b.prestation, request,
               });
             }
             if (String(existingBareme.plafond) !== String(b.plafond)) {
               await logParametreChange({
                 entite: 'Bareme', entiteId: existingBareme.id, champ: 'plafond',
-                ancienneValeur: existingBareme.plafond, nouvelleValeur: b.plafond, modifiePar: userId,
+                ancienneValeur: existingBareme.plafond, nouvelleValeur: b.plafond,
+                modifiePar: userName, modifieParId: userId, societeId: id, objet: b.prestation, request,
               });
             }
           }
@@ -215,7 +217,8 @@ export async function PUT(
           await logParametreChange({
             entite: 'Bareme', entiteId: rb.id, champ: 'SUPPRESSION',
             ancienneValeur: `${rb.prestation} (taux: ${rb.tauxCouverture}%, plafond: ${rb.plafond})`,
-            nouvelleValeur: null, modifiePar: userId,
+            nouvelleValeur: null,
+            modifiePar: userName, modifieParId: userId, societeId: id, objet: rb.prestation, request,
           });
         }
       }
@@ -241,7 +244,8 @@ export async function PUT(
     if (nom && nom.trim() !== existing.nom) {
       await logParametreChange({
         entite: 'Societe', entiteId: id, champ: 'nom',
-        ancienneValeur: existing.nom, nouvelleValeur: nom.trim(), modifiePar: userId,
+        ancienneValeur: existing.nom, nouvelleValeur: nom.trim(),
+        modifiePar: userName, modifieParId: userId, objet: existing.nom, societeId: id, request,
       });
     }
 
@@ -281,7 +285,7 @@ export async function DELETE(
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const { id } = await params;
 
     // Vérifier que la société existe
@@ -314,7 +318,8 @@ export async function DELETE(
     await logParametreChange({
       entite: 'Societe', entiteId: id, champ: 'SUPPRESSION',
       ancienneValeur: `${societe.nom} (${societe.baremes.length} barème(s), ${societe._count.contrats} contrat(s))`,
-      nouvelleValeur: null, modifiePar: userId,
+      nouvelleValeur: null,
+      modifiePar: userName, modifieParId: userId, objet: societe.nom, societeId: id, request,
     });
 
     // Supprimer la société (les barèmes et contrats seront supprimés en cascade par Prisma si configuré)

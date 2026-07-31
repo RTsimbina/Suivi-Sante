@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import { logParametreChange, getUserIdFromRequest } from "@/lib/audit-log";
+import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
 import { PARENT_TYPES, ALL_SOUS_TYPES } from "@/lib/prestations";
 
 const PRESTATIONS_VALIDES = [...ALL_SOUS_TYPES];
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const body = await request.json();
     const { societeId, prestation, tauxCouverture, plafond, description } = body;
 
@@ -80,25 +80,29 @@ export async function POST(request: NextRequest) {
       if (String(existing.tauxCouverture) !== String(tauxCouverture)) {
         await logParametreChange({
           entite: 'Bareme', entiteId: logId, champ: 'tauxCouverture',
-          ancienneValeur: existing.tauxCouverture, nouvelleValeur: tauxCouverture, modifiePar: userId,
+          ancienneValeur: existing.tauxCouverture, nouvelleValeur: tauxCouverture,
+          modifiePar: userName, modifieParId: userId, societeId, objet: prestation, request,
         });
       }
       if (String(existing.plafond) !== String(plafond)) {
         await logParametreChange({
           entite: 'Bareme', entiteId: logId, champ: 'plafond',
-          ancienneValeur: existing.plafond, nouvelleValeur: plafond, modifiePar: userId,
+          ancienneValeur: existing.plafond, nouvelleValeur: plafond,
+          modifiePar: userName, modifieParId: userId, societeId, objet: prestation, request,
         });
       }
       if ((existing.description || '') !== (description || '')) {
         await logParametreChange({
           entite: 'Bareme', entiteId: logId, champ: 'description',
-          ancienneValeur: existing.description || '', nouvelleValeur: description || '', modifiePar: userId,
+          ancienneValeur: existing.description || '', nouvelleValeur: description || '',
+          modifiePar: userName, modifieParId: userId, societeId, objet: prestation, request,
         });
       }
       if (!existing.active) {
         await logParametreChange({
           entite: 'Bareme', entiteId: logId, champ: 'active',
-          ancienneValeur: false, nouvelleValeur: true, modifiePar: userId,
+          ancienneValeur: false, nouvelleValeur: true,
+          modifiePar: userName, modifieParId: userId, societeId, objet: prestation, request,
         });
       }
     }
@@ -116,7 +120,7 @@ export async function PATCH(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const body = await request.json();
     const { id, active } = body;
 
@@ -125,7 +129,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Récupérer l'ancien barème pour l'audit
-    const existing = await db.bareme.findUnique({ where: { id } });
+    const existing = await db.bareme.findUnique({ where: { id }, include: { societe: { select: { id: true, nom: true } } } });
 
     const bareme = await db.bareme.update({
       where: { id },
@@ -136,7 +140,10 @@ export async function PATCH(request: NextRequest) {
     if (existing && existing.active !== bareme.active) {
       await logParametreChange({
         entite: 'Bareme', entiteId: id, champ: 'active',
-        ancienneValeur: existing.active, nouvelleValeur: bareme.active, modifiePar: userId,
+        ancienneValeur: existing.active, nouvelleValeur: bareme.active,
+        modifiePar: userName, modifieParId: userId,
+        societeId: existing.societe?.id, objet: `${existing.prestation} — ${existing.societe?.nom || ''}`,
+        request,
       });
     }
 
@@ -167,11 +174,15 @@ export async function DELETE(request: NextRequest) {
 
     // Audit log : suppression = ancienneValeur complète, nouvelleValeur vide
     if (existing) {
-      const userId = getUserIdFromRequest(request);
+      const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
+      const societe = await db.societe.findUnique({ where: { id: existing.societeId }, select: { id: true, nom: true } }).catch(() => null);
       await logParametreChange({
         entite: 'Bareme', entiteId: id, champ: 'SUPPRESSION',
         ancienneValeur: `${existing.prestation} (taux: ${existing.tauxCouverture}%, plafond: ${existing.plafond})`,
-        nouvelleValeur: null, modifiePar: userId,
+        nouvelleValeur: null,
+        modifiePar: userName, modifieParId: userId,
+        societeId: existing.societeId, objet: `${existing.prestation} — ${societe?.nom || ''}`,
+        request,
       });
     }
 
