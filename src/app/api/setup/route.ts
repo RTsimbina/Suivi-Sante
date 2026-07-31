@@ -413,22 +413,13 @@ export async function GET(request: Request) {
       log.push(`Email migré: ${u.email} → ${newEmail}`);
     }
 
+    // Si des utilisateurs existent déjà, on ne touche PAS aux mots de passe.
+    // Le setup ne doit réinitialiser les mdp qu'à la création initiale.
     const existingUsers = await db.utilisateur.count();
     if (existingUsers > 0) {
-      // Update passwords to SuiviSante@2026 for all demo users
-      const passwordHash = await hash('SuiviSante@2026', 10);
-      const demoEmails = [
-        `admin@${newDomain}`, `accueil@${newDomain}`, `technique@${newDomain}`,
-        `compta@${newDomain}`, `utilisateur@${newDomain}`,
-      ];
-      for (const email of demoEmails) {
-        await db.utilisateur.updateMany({ where: { email }, data: { password: passwordHash } });
-      }
-      log.push(`${demoEmails.length} mots de passe mis à jour`);
-
       return NextResponse.json({
         success: true,
-        message: 'Base de données mise à jour',
+        message: 'Base de données déjà initialisée — migrations appliquées',
         users: existingUsers,
         migrated: oldUsers.length,
         details: log,
