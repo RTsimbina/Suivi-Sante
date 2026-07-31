@@ -173,6 +173,10 @@ export async function envoyerEmail(opts: {
   texte: string;
   html?: string;
   attachments?: EmailAttachment[];
+  /** Expéditeur personnalisé : "Nom Comptable <email@exemple.com>". Utilise smtpFrom par défaut. */
+  fromPersonnalise?: string;
+  /** Adresse de réponse (Reply-To) */
+  replyTo?: string;
 }): Promise<void> {
   if (opts.destinataires.length === 0) return;
 
@@ -183,8 +187,12 @@ export async function envoyerEmail(opts: {
 
   const transporter = await getTransporter();
 
-  await transporter.sendMail({
-    from: config.from,
+  // Si un expéditeur personnalisé est fourni (ex: email d'un comptable),
+  // on l'utilise comme FROM tout en gardant l'auth SMTP configuré.
+  const from = opts.fromPersonnalise || config.from;
+
+  const mailOptions: nodemailer.SendMailOptions = {
+    from,
     to: opts.destinataires.join(', '),
     subject: opts.sujet,
     text: opts.texte,
@@ -194,7 +202,14 @@ export async function envoyerEmail(opts: {
       content: a.content,
       contentType: a.contentType || 'application/pdf',
     })),
-  });
+  };
+
+  // Ajouter Reply-To si fourni et différent du from
+  if (opts.replyTo && opts.replyTo !== from) {
+    mailOptions.replyTo = opts.replyTo;
+  }
+
+  await transporter.sendMail(mailOptions);
 }
 
 // ─── Vérification de la connexion SMTP ─────────────────────────────────────
