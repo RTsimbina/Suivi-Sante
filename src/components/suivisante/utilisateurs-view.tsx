@@ -304,12 +304,12 @@ export default function UtilisateursView() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filtreActif} onValueChange={v => setFiltreActif(v)}>
+            <Select value={filtreActif || '__all__'} onValueChange={v => setFiltreActif(v === '__all__' ? '' : v)}>
               <SelectTrigger className="h-9 text-sm w-full md:w-32">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tous</SelectItem>
+                <SelectItem value="__all__">Tous</SelectItem>
                 <SelectItem value="true">Actif</SelectItem>
                 <SelectItem value="false">Inactif</SelectItem>
               </SelectContent>
