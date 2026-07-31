@@ -1,129 +1,111 @@
 /**
- * ─── Vérification de signature des webhooks ─────────────────────────────────
+ * webhook-verify.ts — Vérification cryptographique des webhooks entrants
  *
- * Ce module centralise la vérification d'authenticité des webhooks entrants :
- * - WhatsApp/Messenger : vérification HMAC-SHA256 de la signature X-Hub-Signature-256
- * - Telegram          : vérification du hash SHA256 du paramètre hash_string
+ * - Telegram  : comparaison du header X-Telegram-Bot-Api-Secret-Token
+ * - WhatsApp   : HMAC-SHA256 du body brut via header X-Hub-Signature-256
+ * - Messenger  : HMAC-SHA256 du body brut via header X-Hub-Signature-256
  *
- * Les webhooks non signés ou mal signés sont rejetés avec un 401.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Toute requête non signée ou mal signée est rejetée (401).
  */
 
-import { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-/**
- * Vérifie la signature HMAC-SHA256 d'un webhook Meta (WhatsApp / Messenger).
- * Meta envoie un header "X-Hub-Signature-256" contenant "sha256=<hex>".
- * Le payload brut (arrayBuffer) est signé avec le secret de l'application.
- */
-export function verifyMetaSignature(
-  request: NextRequest,
-  appSecret: string
-): boolean {
-  const signatureHeader = request.headers.get('x-hub-signature-256');
-  if (!signatureHeader || !appSecret) {
-    return false;
-  }
+// ─── Helpers crypto ───────────────────────────────────────────────────────────
 
-  // Format attendu : "sha256=abcdef..."
-  if (!signatureHeader.startsWith('sha256=')) {
-    return false;
-  }
-
-  // En Next.js Edge/Serverless, on ne peut pas accéder au raw body
-  // après que Next.js l'ait parsé. On utilise une approche sécurisée :
-  // vérifier que le token est bien configuré ET que la signature est présente.
-  // Pour une vérification HMAC complète en production, il faudrait utiliser
-  // un middleware raw body ou configurer Next.js avec api.bodyParser.
-  //
-  // Pour ce déploiement, on vérifie :
-  // 1. Le header de signature est présent et bien formaté
-  // 2. Le secret n'est pas la valeur par défaut
-  // 3. La longueur de la signature est valide (64 hex chars = 256 bits)
-  const hexPart = signatureHeader.slice(7);
-  if (hexPart.length !== 64 || !/^[0-9a-f]{64}$/.test(hexPart)) {
-    return false;
-  }
-
-  // Refuser si le secret est la valeur par défaut (pas de production)
-  if (appSecret === 'CHANGE_ME_IN_PRODUCTION') {
-    return false;
-  }
-
-  return true;
+async function hmacSha256(secret: string, payload: ArrayBuffer): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, payload);
+  return Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
-/**
- * Vérifie la signature d'un webhook Telegram.
- * Telegram envoie un paramètre "hash" calculé comme :
- *   HMAC-SHA256(secret, "hash_string=" + sorted(key=value) pairs)
- *
- * Note : Cette vérification nécessite le body brut (non parsé).
- * En production avec un reverse proxy (Caddy), ajouter une vérification
- * au niveau du proxy est recommandé. Ici on vérifie que le token bot
- * est configuré et on valide la structure du message.
- */
-export function verifyTelegramSignature(
-  body: Record<string, unknown>,
-  botToken: string
-): boolean {
-  if (!botToken || botToken === 'CHANGE_ME_IN_PRODUCTION') {
-    return false;
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const enc = new TextEncoder();
+  const aBuf = enc.encode(a);
+  const bBuf = enc.encode(b);
+  const result = new Uint8Array(aBuf.length);
+  for (let i = 0; i < aBuf.length; i++) {
+    result[i] = aBuf[i] ^ bBuf[i];
   }
-
-  // Vérifier la structure minimale d'un update Telegram
-  const updateId = body.update_id;
-  if (typeof updateId !== 'number') {
-    return false;
-  }
-
-  // Vérifier que le message a la structure attendue
-  const message = body.message as Record<string, unknown> | undefined;
-  if (!message) {
-    return true; // Les updates sans message (ex: callback_query) sont valides
-  }
-
-  // Vérifier que chat.id existe et est un nombre
-  const chat = message.chat as Record<string, unknown> | undefined;
-  if (!chat || typeof chat.id !== 'number') {
-    return false;
-  }
-
-  return true;
+  return result.every(v => v === 0);
 }
 
-/**
- * Rate limiter basique en mémoire pour les webhooks (par IP).
- * Limite à 30 requêtes par minute par adresse IP.
- */
-const webhookRateLimit = new Map<string, { count: number; resetAt: number }>();
-const WEBHOOK_RATE_LIMIT = 30;
-const WEBHOOK_RATE_WINDOW = 60 * 1000; // 1 minute
+// ─── Telegram ─────────────────────────────────────────────────────────────────
 
-export function checkWebhookRateLimit(ip: string): boolean {
+/**
+ * Telegram Bot API 7.0+ envoie le header `X-Telegram-Bot-Api-Secret-Token`
+ * défini au moment du setWebhook. On le compare directement.
+ */
+export function verifyTelegram(
+  headerValue: string | null,
+  secretToken: string,
+): boolean {
+  if (!secretToken) return false;
+  if (!headerValue) return false;
+  return timingSafeEqual(headerValue, secretToken);
+}
+
+// ─── Meta (WhatsApp / Messenger) ──────────────────────────────────────────────
+
+/**
+ * Meta envoie `X-Hub-Signature-256: sha256=<hex>`.
+ * On recalcule le HMAC-SHA256 du body brut avec l'App Secret
+ * et on compare en temps constant.
+ */
+export async function verifyMeta(
+  headerValue: string | null,
+  appSecret: string,
+  rawBody: ArrayBuffer,
+): Promise<boolean> {
+  if (!appSecret) return false;
+  if (!headerValue || !headerValue.startsWith('sha256=')) return false;
+
+  const expectedHex = headerValue.slice(7);
+  if (expectedHex.length !== 64 || !/^[0-9a-f]{64}$/.test(expectedHex)) {
+    return false;
+  }
+
+  const computedHex = await hmacSha256(appSecret, rawBody);
+  return timingSafeEqual(computedHex, expectedHex);
+}
+
+// ─── Réponses d'erreur standardisées ───────────────────────────────────────────
+
+export function webhookUnauthorized(reason: string) {
+  console.warn(`[WEBHOOK] Rejeté — ${reason}`);
+  return NextResponse.json(
+    { error: 'Unauthorized', reason },
+    { status: 401 },
+  );
+}
+
+// ─── Rate limiter (par IP, en mémoire) ────────────────────────────────────────
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 30;
+const RATE_WINDOW = 60_000;
+
+export function checkRateLimit(ip: string): boolean {
   const now = Date.now();
-  const record = webhookRateLimit.get(ip);
-
-  if (!record || now > record.resetAt) {
-    webhookRateLimit.set(ip, { count: 1, resetAt: now + WEBHOOK_RATE_WINDOW });
+  const rec = rateLimitMap.get(ip);
+  if (!rec || now > rec.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
     return true;
   }
-
-  record.count++;
-  if (record.count > WEBHOOK_RATE_LIMIT) {
-    return false; // Trop de requêtes
-  }
-
-  return true;
+  rec.count++;
+  return rec.count <= RATE_LIMIT;
 }
 
-/**
- * Extrait l'adresse IP de la requête (gère les headers X-Forwarded-For).
- */
-export function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-  return request.headers.get('x-real-ip') || 'unknown';
+export function getClientIp(headers: Headers): string {
+  const xff = headers.get('x-forwarded-for');
+  return xff ? xff.split(',')[0].trim() : headers.get('x-real-ip') || 'unknown';
 }
