@@ -34,8 +34,9 @@ import SocietesView from '@/components/suivisante/societes-view';
 import SanteView from '@/components/suivisante/sante-view';
 import ReceptionView from '@/components/suivisante/reception-view';
 import JournalView from '@/components/suivisante/journal-view';
+import ProfilView from '@/components/suivisante/profil-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'utilisateurs' | 'configuration' | 'sante' | 'journal';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'utilisateurs' | 'profil' | 'configuration' | 'sante' | 'journal';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -269,7 +270,7 @@ export default function Home() {
               En ligne
             </Badge>
             <ThemeToggle />
-            <UserMenu />
+            <UserMenu onProfilClick={() => setView('profil')} />
           </div>
         </header>
 
@@ -290,6 +291,7 @@ export default function Home() {
           {isViewAllowed && view === 'prestataires' && <PrestatairesView userRole={role || ''} />}
           {isViewAllowed && view === 'societes' && <SocietesView userRole={role || ''} />}
           {isViewAllowed && view === 'utilisateurs' && <UtilisateursView />}
+          {view === 'profil' && <ProfilView />}
           {isViewAllowed && view === 'configuration' && <ConfigurationView />}
           {isViewAllowed && view === 'journal' && <JournalView />}
           {isViewAllowed && view === 'sante' && <SanteView />}
