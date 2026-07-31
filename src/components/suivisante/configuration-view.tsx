@@ -345,7 +345,9 @@ export default function ConfigurationView() {
                 smtpStatus.ok ? 'Connexion SMTP établie' : 'Service email non configuré'}
             </span>
             {smtpStatus && smtpStatus.erreur && (
-              <span className="text-xs text-amber-600 ml-2">({smtpStatus.erreur})</span>
+              <div className="text-xs text-amber-700 dark:text-amber-300 mt-1 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded p-2">
+                <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed">{smtpStatus.erreur}</pre>
+              </div>
             )}
           </div>
 
@@ -436,11 +438,32 @@ export default function ConfigurationView() {
               </div>
             </div>
 
+            {/* Aide contextuelle Microsoft 365 / Gmail */}
+            {smtpForm.smtpHost && (
+              <div className="text-[10px] text-blue-600 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded p-2 space-y-0.5">
+                {smtpForm.smtpHost.toLowerCase().includes('office365') || smtpForm.smtpHost.toLowerCase().includes('outlook') ? (
+                  <>
+                    <p className="font-semibold">Microsoft 365 / Outlook détecté</p>
+                    <p>Hôte : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">smtp.office365.com</code> — Port : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">587</code></p>
+                    <p>Si MFA est activé, utilisez un <strong>Mot de passe d&apos;application</strong> (<a href="https://myaccount.microsoft.com/security-info" target="_blank" rel="noopener" className="underline">myaccount.microsoft.com/security-info</a>), pas le mot de passe du compte.</p>
+                  </>
+                ) : smtpForm.smtpHost.toLowerCase().includes('gmail') || smtpForm.smtpHost.toLowerCase().includes('google') ? (
+                  <>
+                    <p className="font-semibold">Gmail détecté</p>
+                    <p>Hôte : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">smtp.gmail.com</code> — Port : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">587</code></p>
+                    <p>Utilisez un <strong>Mot de passe d&apos;application</strong> (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" className="underline">myaccount.google.com/apppasswords</a>), pas le mot de passe du compte.</p>
+                  </>
+                ) : null}
+              </div>
+            )}
+
             {/* Résultat du test de connexion */}
             {testConnResult && (
-              <div className={`flex items-center gap-2 text-xs p-2 rounded ${testConnResult.ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                {testConnResult.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
-                {testConnResult.message}
+              <div className={`p-3 rounded ${testConnResult.ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                <div className="flex items-start gap-2">
+                  {testConnResult.ok ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
+                  <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{testConnResult.message}</pre>
+                </div>
               </div>
             )}
 
