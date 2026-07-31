@@ -1,6 +1,29 @@
 import { db } from './db';
-import { envoyerEmail, getEmailRapportDestinataire } from './email';
+import { envoyerEmail } from './email';
 import { getPrestationLabel } from './prestations';
+
+// ─── Type pour un expéditeur Comptabilité ──────────────────────────────────
+interface ExpediteurComptable {
+  nom: string;
+  email: string;
+}
+
+/** Récupère les utilisateurs COMPTABILITE actifs (pour l'expéditeur des rapports) */
+async function getExpediteursComptabilite(): Promise<ExpediteurComptable[]> {
+  try {
+    return await db.utilisateur.findMany({
+      where: { role: 'COMPTABILITE', actif: true },
+      select: { nom: true, email: true },
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Formate l'adresse d'expéditeur : "Nom Prénom <email>" */
+function formatExpediteur(exp: ExpediteurComptable): string {
+  return `"${exp.nom}" <${exp.email}>`;
+}
 
 // ─── Template HTML du rapport mensuel par société ──────────────────────────
 
@@ -19,6 +42,9 @@ function genererHTMLRapportSociete(data: {
   fondsDisponibles: number;
   budgetUtilise: number;
   budgetTotal: number;
+  /** Signature de l'expéditeur (comptable) */
+  expediteurNom?: string;
+  expediteurEmail?: string;
 }): string {
   const statutColors: Record<string, string> = {
     RECU: '#f59e0b', EN_ANALYSE: '#3b82f6', VALIDE: '#8b5cf6',
@@ -220,12 +246,28 @@ function genererHTMLRapportSociete(data: {
           </td>
         </tr>` : ''}
 
+        <!-- Signature expéditeur -->
+        ${data.expediteurNom ? `
+        <tr>
+          <td style="padding: 12px 32px 4px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:0;">
+                  <p style="margin:0; font-size:13px; color:#374151; font-weight:600;">${data.expediteurNom}</p>
+                  <p style="margin:2px 0 0 0; font-size:11px; color:#6b7280;">Service Comptabilité — Suivi Santé</p>
+                  ${data.expediteurEmail ? `<p style="margin:2px 0 0 0; font-size:11px; color:#059669;">${data.expediteurEmail}</p>` : ''}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>` : ''}
+
         <!-- Pied de page -->
         <tr>
           <td style="background:#f9fafb; padding:16px 32px; border-top:1px solid #e5e7eb;">
             <p style="margin:0; font-size:11px; color:#9ca3af; text-align:center;">
               Ce rapport est généré automatiquement par Suivi Santé — Plateforme de gestion des dossiers de santé.
-              <br>Pour toute question, contactez votre gestionnaire de compte.
+              <br>Pour toute question, répondez directement à cet email.
             </p>
           </td>
         </tr>
@@ -242,7 +284,7 @@ function genererHTMLRapportSociete(data: {
 export async function envoyerRapportMensuel(): Promise<{
   envoyes: number;
   erreurs: { societe: string; erreur: string }[];
-  details: { societe: string; destinataires: string[] }[];
+  details: { societe: string; destinataires: string[]; expediteur: string }[];
 }> {
   const maintenant = new Date();
   const moisPrecedent = new Date(maintenant.getFullYear(), maintenant.getMonth() - 1, 1);
@@ -251,16 +293,25 @@ export async function envoyerRapportMensuel(): Promise<{
   const nomsMois = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
   const periode = `${nomsMois[moisPrecedent.getMonth()]} ${moisPrecedent.getFullYear()}`;
 
-  // Récupérer toutes les sociétés actives avec leurs contrats et appels de fonds
+  // Récupérer les expéditeurs (utilisateurs COMPTABILITE actifs)
+  const comptables = await getExpediteursComptabilite();
+  if (comptables.length === 0) {
+    console.warn('[EMAIL MENSUEL] Aucun utilisateur COMPTABILITE actif trouvé — envoi annulé');
+    return { envoyes: 0, erreurs: [{ societe: 'Système', erreur: 'Aucun utilisateur Comptabilité actif trouvé pour l\'expédition des rapports.' }], details: [] };
+  }
+
+  // Récupérer toutes les sociétés avec leurs contacts email
   const societes = await db.societe.findMany({
     include: {
-      contrats: { where: { statut: 'ACTIF' }, include: { appelsDeFonds: { orderBy: { createdAt: 'desc' } } } },
-      _count: { select: { dossiers: true } },
+      contacts: { where: { actif: true, email: { not: null } }, select: { email: true, nom: true, prenom: true } },
     },
   });
 
-  const envoyes: { societe: string; destinataires: string[] }[] = [];
+  const envoyes: { societe: string; destinataires: string[]; expediteur: string }[] = [];
   const erreurs: { societe: string; erreur: string }[] = [];
+
+  // Distribuer les sociétés entre les comptables (round-robin)
+  let comptableIndex = 0;
 
   for (const societe of societes) {
     try {
@@ -270,10 +321,34 @@ export async function envoyerRapportMensuel(): Promise<{
           societeId: societe.id,
           dateReception: { gte: moisPrecedent, lt: moisSuivant },
         },
-        include: { societe: true },
       });
 
-      if (dossiers.length === 0) continue; // Pas de dossiers = pas d'email
+      if (dossiers.length === 0) continue;
+
+      // ── Destinataires : uniquement les emails de la société cliente ──
+      const destinataires: string[] = [];
+
+      // 1. Email principal de la société
+      if (societe.email) {
+        destinataires.push(societe.email);
+      }
+
+      // 2. Emails des contacts de la société
+      for (const contact of societe.contacts) {
+        if (contact.email && !destinataires.includes(contact.email)) {
+          destinataires.push(contact.email);
+        }
+      }
+
+      if (destinataires.length === 0) {
+        console.warn(`[EMAIL MENSUEL] ${societe.nom} : aucun email de contact trouvé — ignoré`);
+        continue;
+      }
+
+      // ── Expéditeur : utilisateur COMPTABILITE (round-robin) ──
+      const comptable = comptables[comptableIndex % comptables.length];
+      comptableIndex++;
+      const fromPersonnalise = formatExpediteur(comptable);
 
       // Calculer les statistiques
       const parStatut = dossiers.reduce<Record<string, number>>((acc, d) => {
@@ -310,7 +385,7 @@ export async function envoyerRapportMensuel(): Promise<{
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
-      // Depenses par assure (beneficiaire)
+      // Dépenses par assuré (bénéficiaire)
       const assureMap = new Map<string, { nom: string; nbDossiers: number; montantReclame: number; montantPaye: number }>();
       for (const d of dossiers) {
         const key = d.beneficiaire;
@@ -322,7 +397,7 @@ export async function envoyerRapportMensuel(): Promise<{
       }
       const parAssure = Array.from(assureMap.values()).sort((a, b) => b.montantReclame - a.montantReclame);
 
-      // Appels de fonds regles et budget
+      // Appels de fonds et budget
       const tousContrats = await db.contrat.findMany({
         where: { societeId: societe.id },
         include: { appelsDeFonds: { select: { montant: true, reference: true, statut: true, datePaiement: true } } },
@@ -339,31 +414,6 @@ export async function envoyerRapportMensuel(): Promise<{
         datePaiement: af.datePaiement ? af.datePaiement.toLocaleDateString('fr-FR') : null,
       }));
 
-      // Destinataires : contacts de la société (emails actifs) + email rapport configuré
-      const destinataires: string[] = [];
-
-      // 1. Emails des contacts de la société
-      const contacts = await db.entrepriseContact.findMany({
-        where: { societeId: societe.id, actif: true, email: { not: null } },
-        select: { email: true },
-      });
-      for (const c of contacts) {
-        if (c.email) destinataires.push(c.email);
-      }
-
-      // 2. Email de contact de la société elle-même
-      if (societe.email) {
-        destinataires.push(societe.email);
-      }
-
-      // 3. Email rapport configuré (admin global) en copie
-      const adminEmail = await getEmailRapportDestinataire();
-      if (adminEmail && !destinataires.includes(adminEmail)) {
-        destinataires.push(adminEmail);
-      }
-
-      if (destinataires.length === 0) continue;
-
       const html = genererHTMLRapportSociete({
         societeNom: societe.nom,
         periode,
@@ -379,17 +429,21 @@ export async function envoyerRapportMensuel(): Promise<{
         fondsDisponibles,
         budgetUtilise,
         budgetTotal,
+        expediteurNom: comptable.nom,
+        expediteurEmail: comptable.email,
       });
 
       await envoyerEmail({
         destinataires,
         sujet: `Suivi Santé — Rapport Mensuel ${periode} — ${societe.nom}`,
-        texte: `Veuillez trouver ci-joint le rapport mensuel de gestion des dossiers de santé pour ${societe.nom} — ${periode}.`,
+        texte: `Bonjour,\n\nVeuillez trouver ci-joint le rapport mensuel de gestion des dossiers de santé pour ${societe.nom} — ${periode}.\n\nCordialement,\n${comptable.nom}\nService Comptabilité — Suivi Santé`,
         html,
+        fromPersonnalise,
+        replyTo: comptable.email,
       });
 
-      envoyes.push({ societe: societe.nom, destinataires });
-      console.log(`[EMAIL MENSUEL] Rapport envoyé pour ${societe.nom} (${dossiers.length} dossiers)`);
+      envoyes.push({ societe: societe.nom, destinataires, expediteur: fromPersonnalise });
+      console.log(`[EMAIL MENSUEL] Rapport envoyé pour ${societe.nom} → ${destinataires.join(', ')} (par ${comptable.nom})`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       erreurs.push({ societe: societe.nom, erreur: msg });
