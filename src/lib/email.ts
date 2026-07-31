@@ -186,6 +186,8 @@ export async function envoyerEmail(opts: {
   fromPersonnalise?: string;
   /** Adresse de réponse (Reply-To) */
   replyTo?: string;
+  /** Destinataire(s) en copie cachée (BCC) — ex: email admin pour copie des rapports */
+  bcc?: string[];
 }): Promise<void> {
   if (opts.destinataires.length === 0) return;
 
@@ -212,6 +214,11 @@ export async function envoyerEmail(opts: {
       contentType: a.contentType || 'application/pdf',
     })),
   };
+
+  // Ajouter BCC si fourni (copie admin des rapports)
+  if (opts.bcc && opts.bcc.length > 0) {
+    mailOptions.bcc = opts.bcc.join(', ');
+  }
 
   // Ajouter Reply-To si fourni et différent du from
   if (opts.replyTo && opts.replyTo !== from) {
