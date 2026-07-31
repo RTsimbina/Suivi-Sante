@@ -71,8 +71,11 @@ describe('API_PERMISSIONS — /api/contrats', () => {
     expect(checkPermission('/api/contrats', 'GET', 'ACCUEIL').allowed).toBe(false);
   });
 
-  it('SANTE ne peut pas accéder aux contrats', () => {
-    expect(checkPermission('/api/contrats', 'GET', 'SANTE').allowed).toBe(false);
+  it('SANTE a accès en lecture seule aux contrats (pas POST/PUT/DELETE)', () => {
+    expect(checkPermission('/api/contrats', 'GET', 'SANTE').allowed).toBe(true);
+    expect(checkPermission('/api/contrats', 'POST', 'SANTE').allowed).toBe(false);
+    expect(checkPermission('/api/contrats', 'PUT', 'SANTE').allowed).toBe(false);
+    expect(checkPermission('/api/contrats', 'DELETE', 'SANTE').allowed).toBe(false);
   });
 });
 
