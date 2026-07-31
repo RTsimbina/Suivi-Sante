@@ -1,5 +1,5 @@
 import { db } from './db';
-import { envoyerEmail } from './email';
+import { envoyerEmail, getEmailRapportDestinataire } from './email';
 import { getPrestationLabel } from './prestations';
 
 // ─── Template HTML du rapport mensuel par société ──────────────────────────
@@ -339,12 +339,26 @@ export async function envoyerRapportMensuel(): Promise<{
         datePaiement: af.datePaiement ? af.datePaiement.toLocaleDateString('fr-FR') : null,
       }));
 
-      // Destinataires : email de la société (si disponible) + contacts contrat
+      // Destinataires : contacts de la société (emails actifs) + email rapport configuré
       const destinataires: string[] = [];
-      // Vérifier si la société a un email de contact (on pourrait ajouter un champ email à Societe)
-      // Pour l'instant, on envoie à l'admin configuré
-      const adminEmail = process.env.EMAIL_RAPPORT_DESTINATAIRE;
-      if (adminEmail) {
+
+      // 1. Emails des contacts de la société
+      const contacts = await db.entrepriseContact.findMany({
+        where: { societeId: societe.id, actif: true, email: { not: null } },
+        select: { email: true },
+      });
+      for (const c of contacts) {
+        if (c.email) destinataires.push(c.email);
+      }
+
+      // 2. Email de contact de la société elle-même
+      if (societe.email) {
+        destinataires.push(societe.email);
+      }
+
+      // 3. Email rapport configuré (admin global) en copie
+      const adminEmail = await getEmailRapportDestinataire();
+      if (adminEmail && !destinataires.includes(adminEmail)) {
         destinataires.push(adminEmail);
       }
 

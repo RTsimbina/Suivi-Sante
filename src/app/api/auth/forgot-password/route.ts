@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import jwt from 'jsonwebtoken';
-import { envoyerEmail, smtpEstConfigure } from '@/lib/email';
+import { envoyerEmail, smtpEstConfigureAsync } from '@/lib/email';
 
 // Durée de validité du token de réinitialisation : 30 minutes
 const RESET_TOKEN_EXPIRY = '30m';
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
     // Tenter l'envoi d'un vrai e-mail via SMTP
-    if (smtpEstConfigure()) {
+    if (await smtpEstConfigureAsync()) {
       try {
         await envoyerEmail({
           destinataires: [user.email],

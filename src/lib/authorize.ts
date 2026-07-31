@@ -167,6 +167,9 @@ export const API_PERMISSIONS: Record<
       DELETE: ['ADMINISTRATEUR'],
     },
   },
+  '/api/email-config': {
+    roles: ['ADMINISTRATEUR'],
+  },
   '/api/alertes': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
