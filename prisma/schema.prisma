@@ -296,14 +296,31 @@ model EntrepriseContact {
 }
 model HistoriqueParametre {
   id               String   @id @default(cuid())
-  entite           String
-  entiteId         String
-  champ            String
-  ancienneValeur   String?
-  nouvelleValeur   String?
-  modifiePar       String
+  entite           String                              // Type d'entité (Bareme, Contrat, Utilisateur, Societe, etc.)
+  entiteId         String                              // ID de l'enregistrement modifié
+  champ            String                              // Nom du champ ou 'CREATION' / 'SUPPRESSION'
+  ancienneValeur   String?                             // Valeur avant modification
+  nouvelleValeur   String?                             // Valeur après modification
+  modifiePar       String                              // Nom ou email de l'utilisateur
+  modifieParId     String?                             // ID utilisateur (cuid)
   dateModification DateTime @default(now())
+
+  // --- Champs enrichis pour le journal d'audit complet ---
+  action           String   @default("MODIFICATION")   // CREATION | MODIFICATION | SUPPRESSION
+  niveau           String   @default("STANDARD")       // INFO | STANDARD | SENSIBLE | CRITIQUE
+  module           String?                             // Libellé lisible : "Barèmes", "Utilisateurs", "Prestataire/Société"
+  objet            String?                             // Description de l'objet concerné (ex: "Profil utilisateur", "Soins dentaires")
+  societeId        String?                             // ID société liée (pour filtre par société)
+  ipAdresse        String?                             // Adresse IP de l'utilisateur
+  navigateur       String?                             // User-Agent du navigateur
+  sessionId        String?                             // ID de session NextAuth
+  motif            String?                             // Motif / description de l'opération
 
   @@index([entite, entiteId])
   @@index([dateModification])
+  @@index([action])
+  @@index([niveau])
+  @@index([modifieParId])
+  @@index([societeId])
+  @@index([module])
 }

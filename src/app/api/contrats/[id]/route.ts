@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { logParametreChange, getUserIdFromRequest } from '@/lib/audit-log';
+import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 
 // ─── GET : Un contrat par ID ───────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
 
     const body = await request.json();
     const { reference, budgetAnnuel, dateDebut, dateFin, statut } = body;
@@ -117,7 +117,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Audit log : enregistrer chaque champ modifié
     for (const change of changes) {
       await logParametreChange({
-        entite: 'Contrat', entiteId: id, ...change, modifiePar: userId,
+        entite: 'Contrat', entiteId: id, ...change,
+        modifiePar: userName, modifieParId: userId, societeId: existing.societeId,
+        objet: `Contrat ${existing.reference}`, request,
       });
     }
 
@@ -137,7 +139,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
 
     const existing = await db.contrat.findUnique({
       where: { id },
@@ -161,7 +163,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await logParametreChange({
       entite: 'Contrat', entiteId: id, champ: 'SUPPRESSION',
       ancienneValeur: `Réf: ${existing.reference}, Budget: ${existing.budgetAnnuel}, Statut: ${existing.statut}`,
-      nouvelleValeur: null, modifiePar: userId,
+      nouvelleValeur: null,
+      modifiePar: userName, modifieParId: userId, societeId: existing.societeId,
+      objet: `Contrat ${existing.reference}`, request,
     });
 
     return NextResponse.json({ message: 'Contrat supprimé.' });

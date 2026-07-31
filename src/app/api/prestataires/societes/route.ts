@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { logParametreChange, getUserIdFromRequest } from '@/lib/audit-log';
+import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 
 // ─── Helper : synchroniser PrestataireSociete depuis les dossiers ─────────────
 async function syncFromDossiers(): Promise<number> {
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const body = await request.json();
     const { prestataireId, societeId } = body as { prestataireId?: string; societeId?: string };
 
@@ -206,7 +206,8 @@ export async function POST(request: NextRequest) {
 
     await logParametreChange({
       entite: 'PrestataireSociete', entiteId: lien.id, champ: 'CREATION',
-      ancienneValeur: null, nouvelleValeur: `${prestataire.nom} → ${societe.nom}`, modifiePar: userId,
+      ancienneValeur: null, nouvelleValeur: `${prestataire.nom} → ${societe.nom}`,
+      modifiePar: userName, modifieParId: userId, societeId, objet: `Association ${prestataire.nom} ↔ ${societe.nom}`, request,
     });
 
     return NextResponse.json({ lien }, { status: 201 });
@@ -223,7 +224,7 @@ export async function PATCH(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const body = await request.json();
     const { id, actif } = body as { id?: string; actif?: boolean };
 
@@ -247,7 +248,8 @@ export async function PATCH(request: NextRequest) {
       entite: 'PrestataireSociete', entiteId: id, champ: 'actif',
       ancienneValeur: existing.actif ? 'Actif' : 'Inactif',
       nouvelleValeur: actif ? 'Actif' : 'Inactif',
-      modifiePar: userId,
+      modifiePar: userName, modifieParId: userId,
+      societeId: existing.societeId, objet: `${existing.prestataire.nom} ↔ ${existing.societe.nom}`, request,
     });
 
     return NextResponse.json({
@@ -269,7 +271,7 @@ export async function DELETE(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const userId = getUserIdFromRequest(request);
+    const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -287,7 +289,9 @@ export async function DELETE(request: NextRequest) {
     await logParametreChange({
       entite: 'PrestataireSociete', entiteId: id, champ: 'SUPPRESSION',
       ancienneValeur: `${existing.prestataire.nom} → ${existing.societe.nom}`,
-      nouvelleValeur: null, modifiePar: userId,
+      nouvelleValeur: null,
+      modifiePar: userName, modifieParId: userId,
+      societeId: existing.societeId, objet: `${existing.prestataire.nom} ↔ ${existing.societe.nom}`, request,
     });
 
     return NextResponse.json({ success: true });
