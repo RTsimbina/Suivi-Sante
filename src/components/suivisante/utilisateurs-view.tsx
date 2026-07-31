@@ -13,10 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -62,6 +62,32 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
+}
+
+/* ─── Select natif (evite l'erreur Radix SelectItem value="") ─── */
+function FilterSelect({ value, onChange, options, className, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  className?: string;
+  placeholder?: string;
+}) {
+  return (
+    <select
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+      className={cn(
+        'h-9 text-sm rounded-md border border-input bg-background px-3 py-1 ring-offset-background',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer',
+        className
+      )}
+    >
+      <option value="">{placeholder || 'Tous'}</option>
+      {options.map(o => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
 }
 
 // ─── Composant principal ────────────────────────────────────────────────────
@@ -293,27 +319,20 @@ export default function UtilisateursView() {
                 </button>
               )}
             </div>
-            <Select value={filtreRole} onValueChange={v => setFiltreRole(v === '__all__' ? '' : v)}>
-              <SelectTrigger className="h-9 text-sm w-full md:w-44">
-                <SelectValue placeholder="Tous les roles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Tous les roles</SelectItem>
-                {ROLES.map(r => (
-                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filtreActif || '__all__'} onValueChange={v => setFiltreActif(v === '__all__' ? '' : v)}>
-              <SelectTrigger className="h-9 text-sm w-full md:w-32">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Tous</SelectItem>
-                <SelectItem value="true">Actif</SelectItem>
-                <SelectItem value="false">Inactif</SelectItem>
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              value={filtreRole}
+              onChange={v => setFiltreRole(v)}
+              placeholder="Tous les roles"
+              options={ROLES.map(r => ({ value: r.value, label: r.label }))}
+              className="w-full md:w-44"
+            />
+            <FilterSelect
+              value={filtreActif}
+              onChange={v => setFiltreActif(v)}
+              placeholder="Statut"
+              options={[{ value: 'true', label: 'Actif' }, { value: 'false', label: 'Inactif' }]}
+              className="w-full md:w-32"
+            />
             <Button onClick={openCreateDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm shrink-0">
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Nouvel utilisateur
