@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Bot, MessageSquare, Send, Loader2, CheckCircle2, XCircle, RefreshCw,
-  Mail, Calendar, Search, Trash2, Zap, Settings,
+  Mail, Calendar, Search, Trash2, Zap, Settings, Save, Eye, EyeOff, Plug,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,26 @@ interface MessageBot {
   createdAt: string;
 }
 
+interface SmtpConfigForm {
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFrom: string;
+  emailRapportDestinataire: string;
+}
+
+interface SmtpConfigDB {
+  id: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpFrom: string;
+  emailRapportDestinataire: string | null;
+  actif: boolean;
+  updatedAt: string;
+}
+
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -51,6 +71,20 @@ export default function ConfigurationView() {
   const [filterCanal, setFilterCanal] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [botStatus, setBotStatus] = useState<Record<string, { actif: boolean; details?: string }>>({});
+
+  // Formulaire SMTP
+  const [smtpForm, setSmtpForm] = useState<SmtpConfigForm>({
+    smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '',
+    smtpFrom: '', emailRapportDestinataire: '',
+  });
+  const [dbConfig, setDbConfig] = useState<SmtpConfigDB | null>(null);
+  const [envFallback, setEnvFallback] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testConnResult, setTestConnResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [configSource, setConfigSource] = useState<'db' | 'env' | 'aucune'>('aucune');
+
   const smtpConfigured = smtpStatus !== null && smtpStatus.ok;
 
   const fetchMessages = useCallback(async () => {
@@ -66,19 +100,50 @@ export default function ConfigurationView() {
     }
   }, [filterCanal]);
 
+  // Charger la config SMTP et vérifier le statut
+  const fetchEmailConfig = useCallback(async () => {
+    try {
+      // Charger la config depuis la DB
+      const configRes = await fetch('/api/email-config');
+      if (configRes.ok) {
+        const data = await configRes.json();
+        if (data.config) {
+          setDbConfig(data.config);
+          setSmtpForm({
+            smtpHost: data.config.smtpHost,
+            smtpPort: String(data.config.smtpPort),
+            smtpUser: data.config.smtpUser,
+            smtpPass: '', // On ne renvoie jamais le mot de passe
+            smtpFrom: data.config.smtpFrom,
+            emailRapportDestinataire: data.config.emailRapportDestinataire || '',
+          });
+          setConfigSource('db');
+        } else if (data.envFallback) {
+          setConfigSource('env');
+        } else {
+          setConfigSource('aucune');
+        }
+        setEnvFallback(data.envFallback);
+      }
+
+      // Vérifier SMTP
+      const smtpRes = await fetch('/api/email-mensuel');
+      if (smtpRes.ok) {
+        const smtpData = await smtpRes.json();
+        setSmtpStatus(smtpData);
+      }
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     fetchMessages();
-    // Vérifier SMTP
-    fetch('/api/email-mensuel')
-      .then(r => r.json())
-      .then(setSmtpStatus)
-      .catch(() => {});
+    fetchEmailConfig();
     // Vérifier statut bots côté serveur
     fetch('/api/bot-status')
       .then(r => r.json())
       .then(setBotStatus)
       .catch(() => {});
-  }, [fetchMessages]);
+  }, [fetchMessages, fetchEmailConfig]);
 
   async function handleTestEmail() {
     if (!testEmail) return;
@@ -116,6 +181,80 @@ export default function ConfigurationView() {
     await fetch(`/api/bot-messages?id=${id}`, { method: 'DELETE' });
     setDeleteConfirm(null);
     fetchMessages();
+  }
+
+  async function handleSaveConfig() {
+    setSavingConfig(true);
+    setTestConnResult(null);
+    try {
+      const res = await fetch('/api/email-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtpHost: smtpForm.smtpHost,
+          smtpPort: Number(smtpForm.smtpPort) || 587,
+          smtpUser: smtpForm.smtpUser,
+          smtpPass: smtpForm.smtpPass,
+          smtpFrom: smtpForm.smtpFrom,
+          emailRapportDestinataire: smtpForm.emailRapportDestinataire || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Configuration SMTP sauvegardée avec succès !');
+        await fetchEmailConfig();
+        // Re-vérifier SMTP
+        const smtpRes = await fetch('/api/email-mensuel');
+        if (smtpRes.ok) setSmtpStatus(await smtpRes.json());
+      } else {
+        alert(`Erreur : ${data.erreur}`);
+      }
+    } catch {
+      alert('Erreur réseau lors de la sauvegarde');
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function handleTestConnection() {
+    setTestingConnection(true);
+    setTestConnResult(null);
+    try {
+      const res = await fetch('/api/email-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtpHost: smtpForm.smtpHost,
+          smtpPort: Number(smtpForm.smtpPort) || 587,
+          smtpUser: smtpForm.smtpUser,
+          smtpPass: smtpForm.smtpPass,
+          smtpFrom: smtpForm.smtpFrom,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setTestConnResult({ ok: true, message: data.message || 'Connexion réussie !' });
+      } else {
+        setTestConnResult({ ok: false, message: data.erreur || 'Échec de la connexion' });
+      }
+    } catch {
+      setTestConnResult({ ok: false, message: 'Erreur réseau' });
+    } finally {
+      setTestingConnection(false);
+    }
+  }
+
+  async function handleDeleteConfig() {
+    if (!confirm('Supprimer la configuration SMTP ? Le système utilisera les variables d\'environnement si disponibles.')) return;
+    try {
+      const res = await fetch('/api/email-config', { method: 'DELETE' });
+      if (res.ok) {
+        setSmtpForm({ smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpFrom: '', emailRapportDestinataire: '' });
+        setDbConfig(null);
+        setConfigSource(envFallback ? 'env' : 'aucune');
+        await fetchEmailConfig();
+      }
+    } catch { /* silent */ }
   }
 
   const canalColors: Record<string, string> = {
@@ -174,10 +313,22 @@ export default function ConfigurationView() {
       {/* Configuration Email */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Mail className="h-4 w-4 text-emerald-600" />
-            Email mensuel aux sociétés client
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Mail className="h-4 w-4 text-emerald-600" />
+              Email mensuel aux sociétés client
+            </CardTitle>
+            {configSource === 'db' && (
+              <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200">
+                Configuré en base de données
+              </Badge>
+            )}
+            {configSource === 'env' && !dbConfig && (
+              <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200">
+                Variables d&apos;environnement
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Statut SMTP */}
@@ -193,23 +344,137 @@ export default function ConfigurationView() {
               {smtpStatus === null ? 'Vérification SMTP...' :
                 smtpStatus.ok ? 'Connexion SMTP établie' : 'Service email non configuré'}
             </span>
+            {smtpStatus && smtpStatus.erreur && (
+              <span className="text-xs text-amber-600 ml-2">({smtpStatus.erreur})</span>
+            )}
           </div>
 
-          {smtpStatus !== null && !smtpStatus.ok && (
-            <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-              <p className="font-medium mb-1">Configuration requise</p>
-              <p className="text-amber-600">Ajoutez les variables suivantes dans votre fichier <code className="bg-amber-100 px-1 rounded text-xs">.env</code> :</p>
-              <code className="block mt-2 text-xs bg-amber-100/60 px-3 py-2 rounded font-mono">
-                SMTP_HOST=smtp.votre-serveur.com<br />
-                SMTP_PORT=587<br />
-                SMTP_USER=votre@email.com<br />
-                SMTP_PASS=votre-mot-de-passe<br />
-                SMTP_FROM=noreply@votre-domaine.com<br />
-                EMAIL_RAPPORT_DESTINATAIRE=rapport@votre-domaine.com
-              </code>
+          {/* Formulaire de configuration SMTP */}
+          <div className="border rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Plug className="h-3.5 w-3.5 text-emerald-600" />
+                Configuration du serveur SMTP
+              </h4>
+              {dbConfig && (
+                <Button variant="ghost" size="sm" className="text-[11px] h-7 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleDeleteConfig}>
+                  <Trash2 className="h-3 w-3 mr-1" /> Supprimer
+                </Button>
+              )}
             </div>
-          )}
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Hôte SMTP <span className="text-red-500">*</span></Label>
+                <Input
+                  type="text"
+                  placeholder="smtp.exemple.com"
+                  value={smtpForm.smtpHost}
+                  onChange={e => setSmtpForm(f => ({ ...f, smtpHost: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Port</Label>
+                <Input
+                  type="number"
+                  placeholder="587"
+                  value={smtpForm.smtpPort}
+                  onChange={e => setSmtpForm(f => ({ ...f, smtpPort: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Utilisateur <span className="text-red-500">*</span></Label>
+                <Input
+                  type="text"
+                  placeholder="votre@email.com"
+                  value={smtpForm.smtpUser}
+                  onChange={e => setSmtpForm(f => ({ ...f, smtpUser: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mot de passe <span className="text-red-500">*</span></Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder={dbConfig ? '•••••••• (inchangé si vide)' : 'Votre mot de passe'}
+                    value={smtpForm.smtpPass}
+                    onChange={e => setSmtpForm(f => ({ ...f, smtpPass: e.target.value }))}
+                    className="h-9 text-sm pr-9"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Adresse expéditeur <span className="text-red-500">*</span></Label>
+                <Input
+                  type="email"
+                  placeholder="noreply@votre-domaine.com"
+                  value={smtpForm.smtpFrom}
+                  onChange={e => setSmtpForm(f => ({ ...f, smtpFrom: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Destinataire rapports (copie admin)</Label>
+                <Input
+                  type="email"
+                  placeholder="rapport@votre-domaine.com"
+                  value={smtpForm.emailRapportDestinataire}
+                  onChange={e => setSmtpForm(f => ({ ...f, emailRapportDestinataire: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">Reçoit une copie de chaque rapport mensuel en plus des contacts de la société</p>
+              </div>
+            </div>
+
+            {/* Résultat du test de connexion */}
+            {testConnResult && (
+              <div className={`flex items-center gap-2 text-xs p-2 rounded ${testConnResult.ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                {testConnResult.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                {testConnResult.message}
+              </div>
+            )}
+
+            {/* Boutons d'action */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestConnection}
+                disabled={testingConnection || !smtpForm.smtpHost || !smtpForm.smtpUser || (!smtpForm.smtpPass && !dbConfig)}
+                className="text-xs h-8"
+              >
+                {testingConnection ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plug className="h-3.5 w-3.5 mr-1" />}
+                Tester la connexion
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveConfig}
+                disabled={savingConfig || !smtpForm.smtpHost || !smtpForm.smtpUser || (!smtpForm.smtpPass && !dbConfig) || !smtpForm.smtpFrom}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
+              >
+                {savingConfig ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+                Sauvegarder
+              </Button>
+            </div>
+
+            {configSource === 'env' && !dbConfig && (
+              <p className="text-[10px] text-blue-600 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded p-2">
+                La configuration actuelle provient des variables d&apos;environnement (.env). Vous pouvez la remplacer en remplissant le formulaire ci-dessus.
+              </p>
+            )}
+          </div>
+
+          {/* Test email + Envoi manuel */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Test email */}
             <div className="space-y-2">

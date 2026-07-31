@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/authorize";
 import { envoyerRapportMensuel, envoyerTestEmail } from "@/lib/email-mensuel";
-import { verifierSMTP, smtpEstConfigure } from "@/lib/email";
+import { verifierSMTP, smtpEstConfigureAsync } from "@/lib/email";
 
 // GET: Vérifier la connexion SMTP
 export async function GET(request: NextRequest) {
@@ -17,9 +17,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ erreur: "Paramètre 'email' requis pour le test" }, { status: 400 });
     }
 
-    if (!smtpEstConfigure()) {
+    const configure = await smtpEstConfigureAsync();
+    if (!configure) {
       return NextResponse.json(
-        { erreur: "SMTP non configure. Ajoutez SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS dans .env" },
+        { erreur: "SMTP non configure. Configurez-le depuis la page Configuration." },
         { status: 503 }
       );
     }
@@ -41,9 +42,10 @@ export async function POST(request: NextRequest) {
   const authError = await checkAuth(request);
   if (authError) return authError;
 
-  if (!smtpEstConfigure()) {
+  const configure = await smtpEstConfigureAsync();
+  if (!configure) {
     return NextResponse.json(
-      { erreur: "SMTP non configure. Ajoutez SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS dans .env" },
+      { erreur: "SMTP non configure. Configurez-le depuis la page Configuration." },
       { status: 503 }
     );
   }

@@ -2,9 +2,9 @@
  * Cron Job — Envoi automatique du rapport mensuel par email
  * S'exécute le 1er de chaque mois à 07h00 (heure de Madagascar, UTC+3)
  *
- * Configuration requise dans .env :
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
- *   EMAIL_RAPPORT_DESTINATAIRE (optionnel : email par défaut pour les rapports)
+ * Configuration :
+ *   - Soit via l'interface d'administration (ConfigurationEmail en BDD)
+ *   - Soit via les variables d'environnement (.env) : SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
  *
  * Activation :
  *   - En production : ce fichier est importé dans instrumentation.ts
@@ -13,20 +13,22 @@
 
 import cron, { type ScheduledTask } from 'node-cron';
 import { envoyerRapportMensuel } from '@/lib/email-mensuel';
+import { smtpEstConfigureAsync } from '@/lib/email';
 
 let cronInstance: ScheduledTask | null = null;
 
-export function demarrerCronMensuel() {
+export async function demarrerCronMensuel() {
   // Ne pas démarrer en dev sauf si explicitement activé
   if (process.env.NODE_ENV === 'development' && process.env.CRON_ENABLED !== 'true') {
     console.log('[CRON] Désactivé en développement (CRON_ENABLED non défini)');
     return;
   }
 
-  // Vérifier que SMTP est configuré
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+  // Vérifier que SMTP est configuré (BDD ou env vars)
+  const configure = await smtpEstConfigureAsync();
+  if (!configure) {
     console.warn('[CRON] SMTP non configuré — cron emails mensuels désactivé');
-    console.warn('[CRON] Configurez SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS dans .env');
+    console.warn('[CRON] Configurez SMTP depuis la page Configuration ou dans les variables d\'environnement');
     return;
   }
 
