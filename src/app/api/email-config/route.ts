@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/lib/authorize';
 import { db } from '@/lib/db';
 import nodemailer from 'nodemailer';
-import { invalidateCache } from '@/lib/email';
+import { invalidateCache, interpreterErreurSMTP } from '@/lib/email';
 
 // GET: Récupérer la configuration SMTP (masquer le mot de passe)
 export async function GET(request: NextRequest) {
@@ -131,7 +131,9 @@ export async function POST(request: NextRequest) {
       host: smtpHost,
       port,
       secure: port === 465,
+      requireTLS: port === 587,
       auth: { user: smtpUser, pass: smtpPass },
+      tls: { rejectUnauthorized: false },
     });
 
     await transporter.verify();
@@ -139,6 +141,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, message: 'Connexion SMTP réussie !' });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ ok: false, erreur: `Échec de la connexion : ${msg}` }, { status: 400 });
+    return NextResponse.json({ ok: false, erreur: interpreterErreurSMTP(msg) }, { status: 400 });
   }
 }

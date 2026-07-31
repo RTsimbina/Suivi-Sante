@@ -136,6 +136,13 @@ export async function getSmtpConfigForUI(): Promise<{
 
 let _transporter: nodemailer.Transporter | null = null;
 
+/** Options TLS optimisées pour Microsoft 365, Gmail, et autres fournisseurs modernes */
+function getTlsOptions(port: number) {
+  if (port === 465) return { rejectUnauthorized: false };
+  // Port 587 (STARTTLS) — compatible Microsoft 365
+  return { rejectUnauthorized: false };
+}
+
 async function getTransporter(): Promise<nodemailer.Transporter> {
   if (!_transporter) {
     const config = await getSmtpConfig();
@@ -144,7 +151,9 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
       host: config.host,
       port: config.port,
       secure: config.port === 465,
+      requireTLS: config.port === 587,
       auth: { user: config.user, pass: config.pass },
+      tls: getTlsOptions(config.port),
     });
   }
   return _transporter;
@@ -228,14 +237,86 @@ export async function verifierSMTP(): Promise<{ ok: boolean; erreur?: string }> 
       host: config.host,
       port: config.port,
       secure: config.port === 465,
+      requireTLS: config.port === 587,
       auth: { user: config.user, pass: config.pass },
+      tls: getTlsOptions(config.port),
     });
     await transporter.verify();
     return { ok: true };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, erreur: `Erreur de connexion SMTP : ${msg}` };
+    return { ok: false, erreur: interpreterErreurSMTP(msg) };
   }
+}
+
+// ─── Interprétation intelligente des erreurs SMTP ────────────────────────────
+
+/** Détecte le fournisseur et retourne un message d'aide en français */
+export function interpreterErreurSMTP(rawMsg: string): string {
+  const msg = rawMsg.toLowerCase();
+
+  // Microsoft 365 / Outlook
+  if (msg.includes('535') && (msg.includes('outlook') || msg.includes('office365') || msg.includes('microsoft') || msg.includes('namprd'))) {
+    return [
+      'Authentification Microsoft 365 échouée.',
+      '',
+      'Si votre compte a l\'authentification à 2 facteurs (MFA) activée, le mot de passe habituel ne fonctionnera pas.',
+      'Vous devez créer un Mot de passe d\'application :',
+      '  1. Allez sur https://myaccount.microsoft.com/security-info',
+      '  2. Ajoutez une méthode "Mot de passe d\'application"',
+      '  3. Copiez le mot de passe généré et collez-le dans le champ Mot de passe ci-dessus',
+      '',
+      'Assurez-vous aussi que :',
+      '  - Hôte : smtp.office365.com',
+      '  - Port : 587',
+      '  - L\'authentification SMTP est activée dans l\'admin Microsoft 365',
+    ].join('\n');
+  }
+
+  // Gmail
+  if (msg.includes('535') && (msg.includes('gmail') || msg.includes('google'))) {
+    return [
+      'Authentification Gmail échouée.',
+      '',
+      'Pour Gmail, vous devez utiliser un Mot de passe d\'application :',
+      '  1. Allez sur https://myaccount.google.com/security',
+      '  2. Activez la validation en 2 étapes si ce n\'est pas fait',
+      '  3. Créez un Mot de passe d\'application (catégorie \"Courrier\")',
+      '  4. Utilisez ce mot de passe (16 caractères) dans le champ ci-dessus',
+    ].join('\n');
+  }
+
+  // Erreur d'authentification générique (535)
+  if (msg.includes('535') || msg.includes('invalid login') || msg.includes('authentication unsuccessful')) {
+    return [
+      'Authentification échouée : identifiants incorrects.',
+      '',
+      'Vérifiez votre nom d\'utilisateur et mot de passe.',
+      'Si vous utilisez Microsoft 365 ou Gmail avec la double authentification,',
+      'vous devez utiliser un Mot de passe d\'application (voir la documentation de votre fournisseur).',
+    ].join('\n');
+  }
+
+  // Connexion refusée / timeout
+  if (msg.includes('econnrefused') || msg.includes('connect etimedout')) {
+    return [
+      'Impossible de se connecter au serveur SMTP.',
+      '',
+      'Vérifiez :',
+      '  - L\'hôte et le port sont corrects',
+      '  - Le port 587 ou 465 est autorisé par votre pare-feu',
+      '  - Pour Microsoft 365 : utilisez smtp.office365.com:587',
+      '  - Pour Gmail : utilisez smtp.gmail.com:587',
+    ].join('\n');
+  }
+
+  // Certificat SSL/TLS
+  if (msg.includes('self signed certificate') || msg.includes('unable to verify')) {
+    return 'Erreur de certificat SSL/TLS. Le serveur SMTP utilise un certificat auto-signé. Contactez votre administrateur réseau.';
+  }
+
+  // Erreur générique
+  return `Erreur de connexion SMTP : ${rawMsg}`;
 }
 
 // ─── Export pour invalidate le cache après modification ─────────────────────
