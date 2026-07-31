@@ -79,6 +79,45 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ─── Helper : résoudre les noms complets depuis les IDs utilisateur ────────
+
+async function resolveUserNames(modifieParIds: (string | null)[]): Promise<Map<string, string>> {
+  const ids = [...new Set(modifieParIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return new Map();
+
+  const users = await db.utilisateur.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, nom: true, email: true },
+  });
+
+  const map = new Map<string, string>();
+  for (const u of users) {
+    map.set(u.id, u.nom);
+  }
+  return map;
+}
+
+/** Résout le nom d'affichage d'une entrée : utilise le nom DB si modifieParId existe,
+ *  sinon essaie de matcher modifiePar contre un email/nom d'utilisateur. */
+function resolveEntryUserName(
+  entry: { modifiePar: string; modifieParId: string | null },
+  userMap: Map<string, string>
+): string {
+  // 1. Si on a l'ID utilisateur, chercher le nom dans la map
+  if (entry.modifieParId && userMap.has(entry.modifieParId)) {
+    return userMap.get(entry.modifieParId)!;
+  }
+  // 2. Sinon, vérifier si modifiePar est un ID utilisateur (anciennes entrées)
+  if (entry.modifiePar && userMap.has(entry.modifiePar)) {
+    return userMap.get(entry.modifiePar)!;
+  }
+  // 3. Fallback : afficher modifiePar tel quel (sauf 'inconnu')
+  if (entry.modifiePar && entry.modifiePar !== 'inconnu') {
+    return entry.modifiePar;
+  }
+  return 'Inconnu';
+}
+
 // ─── Stats Dashboard ────────────────────────────────────────────────────────
 
 async function getStats() {
@@ -89,9 +128,23 @@ async function getStats() {
     db.historiqueParametre.count({ where: { action: 'SUPPRESSION' } }),
     db.historiqueParametre.findFirst({
       orderBy: { dateModification: 'desc' },
-      select: { modifiePar: true, dateModification: true },
+      select: { modifiePar: true, modifieParId: true, dateModification: true },
     }),
   ]);
+
+  // Résoudre le nom complet du dernier administrateur
+  let dernierAdministrateur: string | null = null;
+  if (dernierAdmin) {
+    const ids = [dernierAdmin.modifieParId].filter((id): id is string => !!id);
+    if (dernierAdmin.modifiePar && dernierAdmin.modifiePar !== 'inconnu' && !dernierAdmin.modifieParId) {
+      ids.push(dernierAdmin.modifiePar);
+    }
+    const userMap = await resolveUserNames(ids);
+    dernierAdministrateur = resolveEntryUserName(
+      { modifiePar: dernierAdmin.modifiePar, modifieParId: dernierAdmin.modifieParId },
+      userMap,
+    );
+  }
 
   return NextResponse.json({
     total,
@@ -99,7 +152,7 @@ async function getStats() {
     modifications,
     suppressions,
     derniereModification: dernierAdmin?.dateModification || null,
-    dernierAdministrateur: dernierAdmin?.modifiePar || null,
+    dernierAdministrateur,
   });
 }
 
@@ -121,12 +174,26 @@ async function getListe(request: NextRequest, searchParams: URLSearchParams) {
     db.historiqueParametre.count({ where }),
   ]);
 
-  // Enrichir chaque entrée avec le numéro de journal et le module
-  const enriched = entries.map((e) => ({
-    ...e,
-    journalNumero: formatJournalNumber(e.id, e.dateModification),
-    moduleLibelle: e.module || MODULE_MAP[e.entite] || e.entite,
-  }));
+  // Résoudre les noms complets des utilisateurs
+  const modifieParIds = entries.map((e) => e.modifieParId);
+  // Inclure aussi les modifiePar qui pourraient être des IDs (anciennes entrées)
+  for (const e of entries) {
+    if (e.modifiePar && e.modifiePar !== 'inconnu' && !e.modifieParId) {
+      modifieParIds.push(e.modifiePar);
+    }
+  }
+  const userMap = await resolveUserNames(modifieParIds);
+
+  // Enrichir chaque entrée avec le numéro de journal, le module et le nom résolu
+  const enriched = entries.map((e) => {
+    const nomResolu = resolveEntryUserName(e, userMap);
+    return {
+      ...e,
+      journalNumero: formatJournalNumber(e.id, e.dateModification),
+      moduleLibelle: e.module || MODULE_MAP[e.entite] || e.entite,
+      modifiePar: nomResolu, // Remplacer par le nom complet résolu
+    };
+  });
 
   // Récupérer la liste des utilisateurs et sociétés pour les filtres dropdown
   const [utilisateurs, societes] = await Promise.all([
@@ -233,6 +300,13 @@ async function exportExcel(request: NextRequest, searchParams: URLSearchParams) 
     take: limit,
   });
 
+  // Résoudre les noms complets pour l'export
+  const ids = entries.map((e) => e.modifieParId).filter((id): id is string => !!id);
+  for (const e of entries) {
+    if (e.modifiePar && e.modifiePar !== 'inconnu' && !e.modifieParId) ids.push(e.modifiePar);
+  }
+  const userMap = await resolveUserNames(ids);
+
   const rows = entries.map((e) => ({
     'Date / Heure': formatDateTimeFr(e.dateModification),
     'N° Journal': formatJournalNumber(e.id, e.dateModification),
@@ -243,7 +317,7 @@ async function exportExcel(request: NextRequest, searchParams: URLSearchParams) 
     'Champ': e.champ === 'CREATION' || e.champ === 'SUPPRESSION' ? '-' : e.champ,
     'Ancienne Valeur': e.ancienneValeur || '-',
     'Nouvelle Valeur': e.nouvelleValeur || '-',
-    'Utilisateur': e.modifiePar,
+    'Utilisateur': resolveEntryUserName(e, userMap),
     'Adresse IP': e.ipAdresse || '-',
     'Navigateur': e.navigateur || '-',
   }));
@@ -284,6 +358,13 @@ async function exportPdf(request: NextRequest, searchParams: URLSearchParams) {
     take: limit,
   });
 
+  // Résoudre les noms complets pour l'export
+  const ids = entries.map((e) => e.modifieParId).filter((id): id is string => !!id);
+  for (const e of entries) {
+    if (e.modifiePar && e.modifiePar !== 'inconnu' && !e.modifieParId) ids.push(e.modifiePar);
+  }
+  const userMap = await resolveUserNames(ids);
+
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   // En-tête
@@ -304,7 +385,7 @@ async function exportPdf(request: NextRequest, searchParams: URLSearchParams) {
     e.champ === 'CREATION' || e.champ === 'SUPPRESSION' ? '-' : e.champ,
     (e.ancienneValeur || '-').slice(0, 40),
     (e.nouvelleValeur || '-').slice(0, 40),
-    e.modifiePar,
+    resolveEntryUserName(e, userMap),
   ]);
 
   autoTable(doc, {
