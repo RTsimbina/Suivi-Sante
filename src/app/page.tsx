@@ -94,6 +94,8 @@ export default function Home() {
 
   // Définir la vue par défaut selon le rôle
   useEffect(() => {
+    // 'profil' est accessible via le menu utilisateur, pas la sidebar — ne pas réinitialiser
+    if (view === 'profil') return;
     if (role && navItems.length > 0) {
       const currentAllowed = navItems.find(n => n.key === view);
       if (!currentAllowed) {
