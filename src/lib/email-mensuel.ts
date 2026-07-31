@@ -1,5 +1,5 @@
 import { db } from './db';
-import { envoyerEmail } from './email';
+import { envoyerEmail, getEmailRapportDestinataire } from './email';
 import { getPrestationLabel } from './prestations';
 
 // ─── Type pour un expéditeur Comptabilité ──────────────────────────────────
@@ -433,6 +433,10 @@ export async function envoyerRapportMensuel(): Promise<{
         expediteurEmail: comptable.email,
       });
 
+      // Récupérer l'email admin BCC (copie des rapports)
+      const emailBccAdmin = await getEmailRapportDestinataire();
+      const bcc = emailBccAdmin ? [emailBccAdmin] : undefined;
+
       await envoyerEmail({
         destinataires,
         sujet: `Suivi Santé — Rapport Mensuel ${periode} — ${societe.nom}`,
@@ -440,6 +444,7 @@ export async function envoyerRapportMensuel(): Promise<{
         html,
         fromPersonnalise,
         replyTo: comptable.email,
+        bcc,
       });
 
       envoyes.push({ societe: societe.nom, destinataires, expediteur: fromPersonnalise });
