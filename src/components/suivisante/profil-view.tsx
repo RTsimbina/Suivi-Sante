@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   User, Lock, Palette, Eye, EyeOff, Loader2, CheckCircle, Shield,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,17 @@ interface ProfilData {
   updatedAt: string;
 }
 
+interface HistoriqueEntry {
+  id: string;
+  entite: string;
+  entiteId: string;
+  champ: string;
+  ancienneValeur: string;
+  nouvelleValeur: string;
+  modifiePar: string;
+  dateModification: string;
+}
+
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
 const AVATARS = [
@@ -41,6 +53,15 @@ const AVATARS = [
   { key: 'G', label: 'Orange',   bg: 'bg-orange-500', ring: 'ring-orange-300 dark:ring-orange-700' },
   { key: 'H', label: 'Slate',    bg: 'bg-slate-500',  ring: 'ring-slate-300 dark:ring-slate-700' },
 ];
+
+const CHAMP_LABELS: Record<string, string> = {
+  password: 'Mot de passe',
+  avatar: 'Avatar',
+  nom: 'Nom',
+  email: 'E-mail',
+  role: 'Rôle',
+  actif: 'Statut',
+};
 
 const ROLE_COLORS: Record<string, string> = {
   ADMINISTRATEUR: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
@@ -70,6 +91,10 @@ export default function ProfilView() {
   const [profil, setProfil] = useState<ProfilData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Historique
+  const [historique, setHistorique] = useState<HistoriqueEntry[]>([]);
+  const [loadingHistorique, setLoadingHistorique] = useState(true);
+
   // Mot de passe
   const [ancienMdp, setAncienMdp] = useState('');
   const [nouveauMdp, setNouveauMdp] = useState('');
@@ -88,6 +113,10 @@ export default function ProfilView() {
       setLoading(true);
       const res = await fetch('/api/profil');
       if (res.status === 401) return;
+      if (!res.ok) {
+        toast.error('Erreur de chargement du profil');
+        return;
+      }
       const data = await res.json();
       setProfil(data.utilisateur);
     } catch {
@@ -97,7 +126,27 @@ export default function ProfilView() {
     }
   }, []);
 
-  useEffect(() => { fetchProfil(); }, [fetchProfil]);
+  // ─── Fetch historique ────────────────────────────────────────────────────
+
+  const fetchHistorique = useCallback(async () => {
+    try {
+      setLoadingHistorique(true);
+      const res = await fetch('/api/profil/historique');
+      if (res.status === 401) return;
+      if (!res.ok) return;
+      const data = await res.json();
+      setHistorique(data.entries || []);
+    } catch {
+      // silencieux
+    } finally {
+      setLoadingHistorique(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfil();
+    fetchHistorique();
+  }, [fetchProfil, fetchHistorique]);
 
   // ─── Changement mot de passe ─────────────────────────────────────────────
 
@@ -122,6 +171,7 @@ export default function ProfilView() {
       if (!res.ok) { toast.error(data.erreur || 'Erreur'); return; }
       toast.success('Mot de passe modifié avec succès');
       setAncienMdp(''); setNouveauMdp(''); setConfirmMdp('');
+      fetchHistorique(); // rafraîchir l'historique
     } catch {
       toast.error('Erreur réseau');
     } finally {
@@ -142,7 +192,8 @@ export default function ProfilView() {
       const data = await res.json();
       if (!res.ok) { toast.error(data.erreur || 'Erreur'); return; }
       toast.success(key ? 'Avatar mis à jour' : 'Avatar supprimé');
-      fetchProfil(); // rafraîchir
+      fetchProfil(); // rafraîchir le profil
+      fetchHistorique(); // rafraîchir l'historique
     } catch {
       toast.error('Erreur réseau');
     } finally {
@@ -166,7 +217,15 @@ export default function ProfilView() {
     );
   }
 
-  if (!profil) return null;
+  if (!profil) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <User className="h-10 w-10 text-muted-foreground mb-3" />
+        <p className="text-sm text-muted-foreground">Impossible de charger le profil.</p>
+        <p className="text-xs text-muted-foreground mt-1">Vérifiez votre connexion et réessayez.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -352,6 +411,60 @@ export default function ProfilView() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Traçabilité — Historique des modifications */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <History className="h-4 w-4 text-blue-500" />
+            Historique des modifications
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingHistorique ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Chargement de l'historique...
+            </div>
+          ) : historique.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">Aucune modification enregistrée.</p>
+          ) : (
+            <div className="space-y-2">
+              {historique.map(entry => (
+                <div
+                  key={entry.id}
+                  className="flex items-start gap-3 py-2 px-3 rounded-lg bg-muted/40 border border-border/50 text-sm"
+                >
+                  <div className="shrink-0 mt-0.5">
+                    <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center">
+                      <History className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-xs">
+                        {CHAMP_LABELS[entry.champ] || entry.champ}
+                      </span>
+                      <span className="text-muted-foreground text-xs">modifié</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatDate(entry.dateModification)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded font-medium',
+                      'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+                    )}>
+                      {entry.nouvelleValeur}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 
 const AVATAR_OPTIONS = [
@@ -10,8 +10,11 @@ const AVATAR_OPTIONS = [
 // Corps : { avatar: "A" | "B" | ... | "H" | null }
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession();
-    if (!session?.user?.email) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+    if (!token?.email) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
     }
 
@@ -27,7 +30,7 @@ export async function PATCH(request: NextRequest) {
 
     // Récupérer l'ancien avatar pour l'historique
     const user = await db.utilisateur.findUnique({
-      where: { email: session.user.email },
+      where: { email: token.email as string },
       select: { id: true, avatar: true },
     });
 
