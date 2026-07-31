@@ -59,7 +59,7 @@ function getRoleBadgeClass(role: string): string {
   }
 }
 
-export default function UserMenu() {
+export default function UserMenu({ onProfilClick }: { onProfilClick?: () => void }) {
   const { data: session } = useSession();
   const user = session?.user;
 
@@ -116,7 +116,7 @@ export default function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={onProfilClick}>
           <User className="mr-2 h-4 w-4" />
           <span>Profil</span>
         </DropdownMenuItem>
