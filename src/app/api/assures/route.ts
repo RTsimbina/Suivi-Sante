@@ -87,10 +87,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       assures,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
       ayantsDroitMap: avecAyantsDroit ? ayantsDroitMap : undefined,
       countsByType,
     });

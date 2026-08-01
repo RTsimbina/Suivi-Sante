@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
     const filtreRole = searchParams.get('role') || '';
     const filtreActif = searchParams.get('actif');
     const recherche = searchParams.get('q') || '';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
 
     const where: Record<string, unknown> = {};
 
@@ -48,23 +50,28 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const utilisateurs = await db.utilisateur.findMany({
-      where,
-      select: {
-        id: true,
-        email: true,
-        nom: true,
-        role: true,
-        actif: true,
-        avatar: true,
-        dernierLogin: true,
-        createdAt: true,
-        updatedAt: true,
-        failedAttempts: true,
-        lockoutUntil: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [utilisateurs, total] = await Promise.all([
+      db.utilisateur.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          nom: true,
+          role: true,
+          actif: true,
+          avatar: true,
+          dernierLogin: true,
+          createdAt: true,
+          updatedAt: true,
+          failedAttempts: true,
+          lockoutUntil: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.utilisateur.count({ where }),
+    ]);
 
     // Enrichir avec le label de role
     const enriched = utilisateurs.map(u => ({
@@ -72,7 +79,10 @@ export async function GET(request: NextRequest) {
       roleLabel: ROLE_LABELS[u.role] || u.role,
     }));
 
-    return NextResponse.json({ utilisateurs: enriched });
+    return NextResponse.json({
+      utilisateurs: enriched,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     console.error('[UTILISATEURS] Erreur GET :', error);
     return NextResponse.json(
