@@ -49,10 +49,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       prestataires,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     console.error('Erreur lors de la récupération des prestataires :', error);

@@ -24,12 +24,13 @@ import {
 } from '@/components/ui/select';
 import {
   FileInput, Timer, AlertTriangle, ChevronRight, ChevronDown, Database, ArrowRight,
-  Mail, Plus, Search, CheckCircle2, XCircle, Eye, Pencil, Trash2, ChevronLeft,
+  Mail, Plus, Search, CheckCircle2, XCircle, Eye, Pencil, Trash2,
   FileText, Receipt, ClipboardList, Filter,
 } from 'lucide-react';
 import { formatMontantCourt, formatDate, statutLabel, statutColor } from './format';
 /* statutLabel & statutColor used in code but not directly in JSX — kept for extensibility */
 import { toast } from 'sonner';
+import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,12 +65,7 @@ interface SocieteOption {
   nom: string;
 }
 
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -107,7 +103,7 @@ const steps = [
 export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
   // Courriels state
   const [courriels, setCourriels] = useState<CourrielItem[]>([]);
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState<PaginationState>({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
   const [loadingCourriels, setLoadingCourriels] = useState(true);
 
   // Filters
@@ -167,7 +163,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
     try {
       const params = new URLSearchParams();
       params.set('page', page.toString());
-      params.set('limit', '20');
+      params.set('limit', String(PAGE_SIZE));
       if (filterType !== 'TOUS') params.set('type', filterType);
       if (filterStatut !== 'TOUS') params.set('statut', filterStatut);
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
@@ -176,7 +172,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
       if (res.ok) {
         const data = await res.json();
         setCourriels(data.courriels || []);
-        setPagination(data.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 });
+        setPagination(data.pagination || { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
       }
     } catch {
       toast.error('Erreur lors du chargement des courriels.');
@@ -550,34 +546,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                 </div>
               </div>
 
-              {/* ─── Pagination ────────────────────────────────────────────── */}
-              {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-xs text-muted-foreground">
-                    {pagination.total} courriel{pagination.total > 1 ? 's' : ''} • Page {pagination.page} sur {pagination.totalPages}
-                  </p>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      disabled={pagination.page <= 1}
-                      onClick={() => fetchCourriels(pagination.page - 1)}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      disabled={pagination.page >= pagination.totalPages}
-                      onClick={() => fetchCourriels(pagination.page + 1)}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <SharedPagination pagination={pagination} onPageChange={(p) => fetchCourriels(p)} label="courriel" />
             </>
           )}
         </CardContent>

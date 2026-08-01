@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
+import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
 
 interface Dossier {
   id: string;
@@ -27,33 +28,36 @@ interface Dossier {
 
 export default function DossiersView() {
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationState>({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
   const [search, setSearch] = useState('');
   const [statutFilter, setStatutFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const limit = 15;
 
   const fetchDossiers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      const params = new URLSearchParams({ page: String(pagination.page), limit: String(pagination.limit) });
       if (search) params.set('search', search);
       if (statutFilter) params.set('statut', statutFilter);
       const res = await fetch(`/api/dossiers?${params}`);
       const data = await res.json();
       setDossiers(data.dossiers || []);
-      setTotal(data.pagination?.total || 0);
+      if (data.pagination) {
+        setPagination(data.pagination);
+      }
     } catch {
       setDossiers([]);
     } finally {
       setLoading(false);
     }
-  }, [page, search, statutFilter]);
+  }, [pagination.page, pagination.limit, search, statutFilter]);
 
   useEffect(() => { fetchDossiers(); }, [fetchDossiers]);
 
-  const totalPages = Math.ceil(total / limit);
+  const handlePageChange = (newPage: number) => {
+    setPagination(p => ({ ...p, page: newPage }));
+  };
+
   const statuts = ['RECU', 'EN_ANALYSE', 'VALIDE', 'REJETE', 'EN_PAIEMENT', 'PAYE'];
 
   return (
@@ -61,14 +65,14 @@ export default function DossiersView() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <CardTitle className="text-sm font-medium">Tous les dossiers ({total})</CardTitle>
+            <CardTitle className="text-sm font-medium">Tous les dossiers ({pagination.total})</CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher..."
                   value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  onChange={(e) => { setSearch(e.target.value); handlePageChange(1); }}
                   className="pl-8 w-full sm:w-56"
                 />
               </div>
@@ -79,7 +83,7 @@ export default function DossiersView() {
                     variant={statutFilter === s ? 'default' : 'outline'}
                     size="sm"
                     className="text-xs h-7"
-                    onClick={() => { setStatutFilter(statutFilter === s ? '' : s); setPage(1); }}
+                    onClick={() => { setStatutFilter(statutFilter === s ? '' : s); handlePageChange(1); }}
                   >
                     {statutLabel(s)}
                   </Button>
@@ -129,19 +133,7 @@ export default function DossiersView() {
                   </table>
                 </div>
               </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <p className="text-xs text-muted-foreground">Page {page} sur {totalPages}</p>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <SharedPagination pagination={pagination} onPageChange={handlePageChange} label="dossier" />
             </>
           )}
         </CardContent>

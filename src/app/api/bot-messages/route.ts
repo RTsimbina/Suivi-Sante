@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ messages, total, page, limit, totalPages: Math.ceil(total / limit) });
+    return NextResponse.json({ messages, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error) {
     console.error("Erreur récupération messages bot:", error);
     return NextResponse.json({ erreur: "Erreur serveur" }, { status: 500 });

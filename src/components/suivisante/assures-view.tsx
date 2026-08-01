@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,7 @@ export default function AssuresView({ userRole }: { userRole: string }) {
   const [search, setSearch] = useState('');
   const [filterSociete, setFilterSociete] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [pagination, setPagination] = useState<PaginationState>({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAssure, setEditingAssure] = useState<Assure | null>(null);
   const [saving, setSaving] = useState(false);
@@ -143,17 +145,19 @@ export default function AssuresView({ userRole }: { userRole: string }) {
       if (filterSociete) params.set('societeId', filterSociete);
       if (filterType) params.set('typeBeneficiaire', filterType);
       params.set('avecAyantsDroit', 'true');
-      params.set('limit', '200');
+      params.set('page', String(pagination.page));
+      params.set('limit', String(pagination.limit));
       const res = await fetch(`/api/assures?${params}`);
       if (res.status === 401 || res.status === 403) return;
       const data = await res.json();
       setAssures(data.assures || []);
       setAyantsDroitMap(data.ayantsDroitMap || {});
       setCountsByType(data.countsByType || {});
+      if (data.pagination) setPagination(data.pagination);
     } catch { /* silent */ } finally {
       setLoading(false);
     }
-  }, [search, filterSociete, filterType]);
+  }, [search, filterSociete, filterType, pagination.page, pagination.limit]);
 
   useEffect(() => {
     Promise.all([
@@ -421,13 +425,13 @@ export default function AssuresView({ userRole }: { userRole: string }) {
         <div className="flex gap-2 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 h-9 text-sm" />
+            <Input placeholder="Rechercher..." value={search} onChange={(e) => { setSearch(e.target.value); setPagination(p => ({ ...p, page: 1 })); }} className="pl-10 h-9 text-sm" />
           </div>
-          <select value={filterSociete} onChange={(e) => setFilterSociete(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <select value={filterSociete} onChange={(e) => { setFilterSociete(e.target.value); setPagination(p => ({ ...p, page: 1 })); }} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
             <option value="">Toutes les sociétés</option>
             {societes.map((s) => (<option key={s.id} value={s.id}>{s.nom}</option>))}
           </select>
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+          <select value={filterType} onChange={(e) => { setFilterType(e.target.value); setPagination(p => ({ ...p, page: 1 })); }} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
             <option value="">Tous les types</option>
             <option value="ASSURE">Assurés principaux</option>
             <option value="CONJOINT">Conjoints</option>
@@ -522,7 +526,8 @@ export default function AssuresView({ userRole }: { userRole: string }) {
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30">
@@ -567,7 +572,13 @@ export default function AssuresView({ userRole }: { userRole: string }) {
                   <p className="text-sm">Aucun bénéficiaire trouvé</p>
                 </div>
               )}
-            </div>
+              </div>
+              <SharedPagination
+                pagination={pagination}
+                onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+                label="bénéficiaire"
+              />
+            </>
           )}
         </CardContent>
       </Card>

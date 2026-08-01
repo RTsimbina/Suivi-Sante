@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Search, Filter, X, Download, FileSpreadsheet, FileText,
-  Clock, User, ChevronLeft, ChevronRight, ChevronUp, Eye,
+  Clock, User, ChevronUp, Eye,
   Info, AlertTriangle, AlertCircle, AlertOctagon,
   Calendar, ArrowUpDown, RotateCcw,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { SharedPagination, type PaginationState } from '@/components/ui/shared-pagination';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -53,12 +54,7 @@ interface FilterOption {
   label: string;
 }
 
-interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -137,7 +133,7 @@ function truncate(str: string | null, max: number): string {
 
 export default function JournalView() {
   const [entries, setEntries] = useState<HistoriqueEntry[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [pagination, setPagination] = useState<PaginationState | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -179,7 +175,7 @@ export default function JournalView() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ page: String(p), limit: '50' });
+      const params = new URLSearchParams({ page: String(p), limit: '50' }); // Journal garde 50 items par page
       if (entite) params.set('entite', entite);
       if (action) params.set('action', action);
       if (criticalOnly) {
@@ -643,22 +639,7 @@ export default function JournalView() {
             </Card>
           )}
 
-          {/* ═══ Pagination ═══ */}
-          {pagination && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Page {pagination.page} sur {pagination.totalPages} — {pagination.total} résultat(s)
-              </p>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page <= 1} onClick={() => fetchEntries(pagination.page - 1)}>
-                  <ChevronLeft className="h-3.5 w-3.5" /> Précédent
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page >= pagination.totalPages} onClick={() => fetchEntries(pagination.page + 1)}>
-                  Suivant <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <SharedPagination pagination={pagination!} onPageChange={(p) => fetchEntries(p)} label="résultat" />
         </>
       )}
 
