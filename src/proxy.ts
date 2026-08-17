@@ -41,6 +41,8 @@ export default async function proxy(request: NextRequest) {
   securityHeaders.set('X-XSS-Protection', '1; mode=block');
   securityHeaders.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   securityHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // Empêcher l'indexation par les moteurs de recherche (outil interne)
+  securityHeaders.set('X-Robots-Tag', 'noindex, nofollow');
   // CSP restrictive : autorise uniquement les sources nécessaires
   const csp = [
     "default-src 'self'",
