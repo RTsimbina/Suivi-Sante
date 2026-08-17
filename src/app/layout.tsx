@@ -15,14 +15,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SUIVI SANTE — Gestion des Dossiers de Santé",
-  description: "Plateforme intelligente de suivi des dossiers de santé. Centralisation Excel, ISA et SAGE avec analyses IA en temps réel.",
+  title: {
+    template: '%s | Suivi Santé',
+    default: 'Suivi Santé — Gestion des Dossiers de Santé',
+  },
+  description: 'Plateforme intelligente de suivi des dossiers de santé. Centralisation Excel, ISA et SAGE avec analyses IA en temps réel.',
   icons: {
-    icon: "/favicon.svg",
+    icon: '/favicon.svg',
   },
   robots: {
     index: false,
     follow: false,
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'Suivi Santé',
+    title: 'Suivi Santé — Gestion des Dossiers de Santé',
+    description: 'Plateforme interne de suivi des dossiers de santé.',
+    locale: 'fr_MG',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Suivi Santé',
+    description: 'Plateforme interne de suivi des dossiers de santé.',
   },
 };
 
