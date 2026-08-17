@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/lib/authorize';
 import { db } from '@/lib/db';
-import * as XLSX from 'xlsx';
+import { readExcelRows } from '@/lib/excel';
 
 const STATUTS_VALIDES = ['ASSURE', 'CONJOINT', 'ENFANT'];
 const STATUT_ALIASES: Record<string, string> = {
@@ -98,9 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName]);
+    const { rows } = await readExcelRows(buffer);
 
     if (rows.length === 0) {
       return NextResponse.json(

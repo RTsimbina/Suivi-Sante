@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import * as XLSX from "xlsx";
+import { readExcelRows } from "@/lib/excel";
 
 /**
  * Import Suivi Comptabilité (Excel)
@@ -57,9 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Lecture du fichier Excel
     const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
-    const sheetName = workbook.SheetNames[0];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName]);
+    const { rows } = await readExcelRows(buffer);
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "Le fichier est vide (aucune ligne de données)" }, { status: 400 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { getToken } from 'next-auth/jwt';
+import { writeExcelFromJson } from '@/lib/excel';
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 
@@ -289,7 +290,6 @@ function buildWhere(searchParams: URLSearchParams): Record<string, unknown> {
 // ─── Export Excel ────────────────────────────────────────────────────────────
 
 async function exportExcel(request: NextRequest, searchParams: URLSearchParams) {
-  const XLSX = await import('xlsx');
 
   const where = buildWhere(searchParams);
   const limit = Math.min(10000, parseInt(searchParams.get('limit') || '5000', 10) || 5000);
@@ -322,20 +322,13 @@ async function exportExcel(request: NextRequest, searchParams: URLSearchParams) 
     'Navigateur': e.navigateur || '-',
   }));
 
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  // Largeurs de colonnes
-  ws['!cols'] = [
+  const buffer = await writeExcelFromJson(rows, "Journal d'audit", [
     { wch: 22 }, { wch: 24 }, { wch: 22 }, { wch: 28 },
     { wch: 14 }, { wch: 10 }, { wch: 20 }, { wch: 24 },
     { wch: 24 }, { wch: 22 }, { wch: 16 }, { wch: 20 },
-  ];
+  ]);
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Journal d\'audit');
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="journal-audit-${new Date().toISOString().slice(0, 10)}.xlsx"`,
