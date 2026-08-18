@@ -94,6 +94,17 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState('');
 
+  // Dialog créer un nouveau prestataire
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    nom: '', type: '', telephone: '', email: '', adresse: '', nif: '', statut: '', rib: '',
+  });
+  const [createSelectedSocietes, setCreateSelectedSocietes] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createSuccess, setCreateSuccess] = useState('');
+  const [createSocieteSearch, setCreateSocieteSearch] = useState('');
+
   // ─── Fetches ────────────────────────────────────────────────────────────
   const fetchSocietes = useCallback(async () => {
     try {
@@ -234,6 +245,13 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
 
   const selectedSociete = societes.find(s => s.id === selectedSocieteId);
 
+  // Sociétés filtrées pour le dialogue de création
+  const filteredCreateSocietes = useMemo(() => {
+    if (!createSocieteSearch) return societes;
+    const q = createSocieteSearch.toLowerCase();
+    return societes.filter(s => s.nom.toLowerCase().includes(q));
+  }, [societes, createSocieteSearch]);
+
   // ─── Actions ────────────────────────────────────────────────────────────
   async function handleSyncFromDossiers() {
     setSyncing(true);
@@ -295,9 +313,99 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
     } catch { /* silent */ } finally { setSaving(false); }
   }
 
+  async function handleCreatePrestataire() {
+    setCreateError('');
+    setCreateSuccess('');
+    if (!createForm.nom.trim() || !createForm.type) {
+      setCreateError('Le nom et le type sont obligatoires.');
+      return;
+    }
+    setCreating(true);
+    try {
+      // 1) Créer le prestataire
+      const res = await fetch('/api/prestataires', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nom: createForm.nom,
+          type: createForm.type,
+          telephone: createForm.telephone || undefined,
+          email: createForm.email || undefined,
+          adresse: createForm.adresse || undefined,
+          nif: createForm.nif || undefined,
+          statut: createForm.statut || undefined,
+          rib: createForm.rib || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setCreateError(err.erreur || 'Erreur lors de la création du prestataire.');
+        return;
+      }
+      const { prestataire } = await res.json();
+
+      // 2) Rattacher aux sociétés sélectionnées
+      if (createSelectedSocietes.length > 0) {
+        const linkResults = await Promise.allSettled(
+          createSelectedSocietes.map(societeId =>
+            fetch('/api/prestataires/societes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prestataireId: prestataire.id, societeId }),
+            })
+          )
+        );
+        const failed = linkResults.filter(r => r.status === 'rejected' || !r.value.ok).length;
+        if (failed > 0) {
+          setCreateSuccess(`Prestataire créé mais ${failed} rattachement(s) sur ${createSelectedSocietes.length} ont échoué.`);
+        } else {
+          setCreateSuccess(`Prestataire créé et rattaché à ${createSelectedSocietes.length} société(s) avec succès.`);
+        }
+      } else {
+        setCreateSuccess('Prestataire créé avec succès. Aucune société sélectionnée.');
+      }
+
+      // 3) Réinitialiser le formulaire et rafraîchir les données
+      setCreateForm({ nom: '', type: '', telephone: '', email: '', adresse: '', nif: '', statut: '', rib: '' });
+      setCreateSelectedSocietes([]);
+      fetchAllPrestataires();
+      fetchLiens();
+      // Fermer le dialogue après un court délai pour montrer le succès
+      setTimeout(() => {
+        setCreateDialogOpen(false);
+        setCreateSuccess('');
+      }, 1500);
+    } catch {
+      setCreateError('Erreur réseau lors de la création.');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function toggleSocieteSelection(societeId: string) {
+    setCreateSelectedSocietes(prev =>
+      prev.includes(societeId)
+        ? prev.filter(id => id !== societeId)
+        : [...prev, societeId]
+    );
+  }
+
   // ─── Rendu ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      {/* ─── Barre d'actions globale ─── */}
+      <div className="flex items-center justify-between">
+        <div />
+        {canEdit && (
+          <Button
+            className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-xs"
+            onClick={() => { setCreateDialogOpen(true); setCreateError(''); setCreateSuccess(''); setCreateSocieteSearch(''); }}
+          >
+            <Plus className="h-4 w-4 mr-1.5" /> Nouveau prestataire
+          </Button>
+        )}
+      </div>
+
       {/* ─── Stats ─── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card><CardContent className="p-3 flex items-center gap-3">
@@ -794,6 +902,227 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog : Créer un nouveau prestataire ─── */}
+      <Dialog open={createDialogOpen} onOpenChange={open => { setCreateDialogOpen(open); if (!open) { setCreateError(''); setCreateSuccess(''); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-emerald-600" /> Nouveau prestataire
+            </DialogTitle>
+          </DialogHeader>
+
+          {createSuccess ? (
+            <div className="flex items-center gap-2.5 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+              <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">{createSuccess}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Erreur */}
+              {createError && (
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
+                  <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                  <p className="text-xs text-red-700 dark:text-red-300">{createError}</p>
+                </div>
+              )}
+
+              {/* Nom * */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Nom <span className="text-red-500">*</span></Label>
+                <Input
+                  placeholder="Ex : Centre Hospitalier Universitaire de..."
+                  value={createForm.nom}
+                  onChange={e => setCreateForm(f => ({ ...f, nom: e.target.value }))}
+                  className="h-9 text-sm"
+                  autoFocus
+                />
+              </div>
+
+              {/* Type * */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Type / Catégorie <span className="text-red-500">*</span></Label>
+                <select
+                  value={createForm.type}
+                  onChange={e => setCreateForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sélectionner un type...</option>
+                  {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Téléphone + Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Téléphone</Label>
+                  <Input
+                    placeholder="034 00 000 00"
+                    value={createForm.telephone}
+                    onChange={e => setCreateForm(f => ({ ...f, telephone: e.target.value }))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Email</Label>
+                  <Input
+                    type="email"
+                    placeholder="contact@prestataire.mg"
+                    value={createForm.email}
+                    onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Adresse */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Adresse</Label>
+                <Input
+                  placeholder="Ex : Lot XYZ, Antananarivo"
+                  value={createForm.adresse}
+                  onChange={e => setCreateForm(f => ({ ...f, adresse: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {/* NIF + Statut */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">NIF</Label>
+                  <Input
+                    placeholder="Numéro d'identification fiscale"
+                    value={createForm.nif}
+                    onChange={e => setCreateForm(f => ({ ...f, nif: e.target.value }))}
+                  className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Statut juridique</Label>
+                  <Input
+                    placeholder="Ex : SA, SARL..."
+                    value={createForm.statut}
+                    onChange={e => setCreateForm(f => ({ ...f, statut: e.target.value }))}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* RIB */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">RIB (Relevé d'Identité Bancaire)</Label>
+                <Input
+                  placeholder="Numéro de compte bancaire"
+                  value={createForm.rib}
+                  onChange={e => setCreateForm(f => ({ ...f, rib: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {/* Séparation */}
+              <div className="border-t pt-3">
+                <Label className="text-xs font-medium flex items-center gap-1.5 mb-2">
+                  <Building2 className="h-3.5 w-3.5" />
+                  Rattacher à des sociétés clientes
+                  <span className="text-muted-foreground font-normal">(optionnel)</span>
+                </Label>
+                {societes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-3 text-center rounded-lg border border-dashed">
+                    Aucune société enregistrée. Vous pourrez rattacher ce prestataire plus tard.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Input
+                        placeholder="Rechercher une société..."
+                        value={createSocieteSearch}
+                        onChange={e => setCreateSocieteSearch(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      {createSelectedSocietes.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 shrink-0"
+                          onClick={() => setCreateSelectedSocietes([])}
+                        >
+                          Tout retirer
+                        </Button>
+                      )}
+                    </div>
+                    <div className="max-h-48 overflow-y-auto rounded-lg border divide-y">
+                      {filteredCreateSocietes.length === 0 ? (
+                        <p className="text-xs text-muted-foreground p-3 text-center">Aucune société trouvée</p>
+                      ) : (
+                        filteredCreateSocietes.map(s => {
+                          const selected = createSelectedSocietes.includes(s.id);
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => toggleSocieteSelection(s.id)}
+                              className={cn(
+                                'w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors cursor-pointer',
+                                selected
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/30'
+                                  : 'hover:bg-muted/60'
+                              )}
+                            >
+                              <div className={cn(
+                                'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                                selected
+                                  ? 'bg-emerald-600 border-emerald-600'
+                                  : 'border-muted-foreground/30'
+                              )}>
+                                {selected && <CheckCircle2 className="h-3 w-3 text-white" />}
+                              </div>
+                              <Building2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                              <span className={cn('truncate', selected && 'font-medium text-emerald-700 dark:text-emerald-300')}>
+                                {s.nom}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                    {createSelectedSocietes.length > 0 && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 font-medium">
+                        {createSelectedSocietes.length} société(s) sélectionnée(s)
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setCreateDialogOpen(false)}
+                  disabled={creating}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={handleCreatePrestataire}
+                  disabled={creating}
+                >
+                  {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {createSelectedSocietes.length > 0
+                    ? `Créer et rattacher (${createSelectedSocietes.length})`
+                    : 'Créer le prestataire'
+                  }
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
