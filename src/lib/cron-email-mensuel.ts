@@ -1,14 +1,15 @@
 /**
- * Cron Job — Envoi automatique du rapport mensuel par email
- * S'exécute le 1er de chaque mois à 07h00 (heure de Madagascar, UTC+3)
+ * Cron local (node-cron) — Envoi automatique du rapport mensuel par email
  *
- * Configuration :
- *   - Soit via l'interface d'administration (ConfigurationEmail en BDD)
- *   - Soit via les variables d'environnement (.env) : SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+ * ⚠️  Ce fichier est désormais réservé au DÉVELOPPEMENT LOCAL uniquement.
+ *     Sur Vercel (production), le cron est géré par Vercel Cron Jobs :
+ *       vercel.json → /api/cron/rapport-mensuel
  *
- * Activation :
- *   - En production : ce fichier est importé dans instrumentation.ts
- *   - En développement : le cron ne s'active que si CRON_ENABLED=true
+ * Pour activer en dev : CRON_ENABLED=true dans .env.local
+ *
+ * Configuration SMTP :
+ *   - Via l'interface d'administration (ConfigurationEmail en BDD)
+ *   - Via variables d'environnement : SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
  */
 
 import cron, { type ScheduledTask } from 'node-cron';
