@@ -5,6 +5,7 @@ import {
   Building2, Search, Plus, Pencil, Trash2, ChevronRight,
   Users, FileText, DollarSign, Loader2, CheckCircle2,
   Stethoscope, Percent, X, AlertTriangle, Phone, Mail,
+  Download, AddressBook,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,7 +77,19 @@ interface SocieteDetails {
   prestataires: PrestataireDetail[];
 }
 
-type DetailTab = 'baremes' | 'assures' | 'prestataires';
+type DetailTab = 'baremes' | 'assures' | 'prestataires' | 'contacts';
+
+interface EntrepriseContact {
+  id: string;
+  societeId: string;
+  nom: string;
+  prenom?: string;
+  fonction?: string;
+  telephone?: string;
+  email?: string;
+  actif: boolean;
+  createdAt: string;
+}
 
 // ─── Composant principal ────────────────────────────────────────────────────
 
@@ -86,6 +99,7 @@ interface Props {
 
 export default function SocietesView({ userRole }: Props) {
   const canWrite = userRole === 'ADMINISTRATEUR' || userRole === 'TECHNIQUE';
+  const canManageContacts = ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'].includes(userRole || '');
 
   // ─── État ───────────────────────────────────────────────────────────────
   const [societes, setSocietes] = useState<Societe[]>([]);
@@ -113,6 +127,20 @@ export default function SocietesView({ userRole }: Props) {
   const [assureSearch, setAssureSearch] = useState('');
   const [prestataireSearch, setPrestataireSearch] = useState('');
   const [baremeSearch, setBaremeSearch] = useState('');
+  const [contactSearch, setContactSearch] = useState('');
+
+  // Contacts entreprise
+  const [contacts, setContacts] = useState<EntrepriseContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactFormOpen, setContactFormOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<EntrepriseContact | null>(null);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactDeleteId, setContactDeleteId] = useState<string | null>(null);
+  const [cFormNom, setCFormNom] = useState('');
+  const [cFormPrenom, setCFormPrenom] = useState('');
+  const [cFormFonction, setCFormFonction] = useState('');
+  const [cFormTel, setCFormTel] = useState('');
+  const [cFormEmail, setCFormEmail] = useState('');
 
   // ─── Fetch sociétés ─────────────────────────────────────────────────────
   const fetchSocietes = useCallback(async () => {
@@ -275,11 +303,99 @@ export default function SocietesView({ userRole }: Props) {
       return `${p.nom} ${p.type || ''}`.toLowerCase().includes(q);
     }), [details, prestataireSearch]);
 
+  const filteredContacts = useMemo(() =>
+    contacts.filter(c => {
+      const q = contactSearch.toLowerCase();
+      if (!q) return true;
+      return `${c.nom} ${c.prenom || ''} ${c.fonction || ''} ${c.email || ''}`.toLowerCase().includes(q);
+    }), [contacts, contactSearch]);
+
+  // ─── Contacts CRUD ─────────────────────────────────────────────────────
+  const fetchContacts = useCallback(async (societeId: string) => {
+    setContactsLoading(true);
+    try {
+      const res = await fetch(`/api/entreprise-contacts?societeId=${societeId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setContacts(Array.isArray(data.contacts) ? data.contacts : []);
+      }
+    } catch { /* silent */ } finally {
+      setContactsLoading(false);
+    }
+  }, []);
+
+  // Charger les contacts quand la société sélectionnée change
+  useEffect(() => {
+    if (selectedId) fetchContacts(selectedId);
+  }, [selectedId, fetchContacts]);
+
+  const openNewContact = () => {
+    setEditingContact(null);
+    setCFormNom(''); setCFormPrenom(''); setCFormFonction(''); setCFormTel(''); setCFormEmail('');
+    setContactFormOpen(true);
+  };
+
+  const openEditContact = (c: EntrepriseContact) => {
+    setEditingContact(c);
+    setCFormNom(c.nom); setCFormPrenom(c.prenom || ''); setCFormFonction(c.fonction || '');
+    setCFormTel(c.telephone || ''); setCFormEmail(c.email || '');
+    setContactFormOpen(true);
+  };
+
+  const handleSaveContact = async () => {
+    if (!cFormNom.trim() || !selectedId) return;
+    setContactSaving(true);
+    try {
+      const url = editingContact ? `/api/entreprise-contacts/${editingContact.id}` : '/api/entreprise-contacts';
+      const method = editingContact ? 'PUT' : 'POST';
+      const body: any = { nom: cFormNom.trim(), prenom: cFormPrenom.trim() || null, fonction: cFormFonction.trim() || null, telephone: cFormTel.trim() || null, email: cFormEmail.trim() || null };
+      if (!editingContact) body.societeId = selectedId;
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.ok) {
+        setContactFormOpen(false);
+        fetchContacts(selectedId);
+      }
+    } catch { /* silent */ } finally {
+      setContactSaving(false);
+    }
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    try {
+      const res = await fetch(`/api/entreprise-contacts/${id}`, { method: 'DELETE' });
+      if (res.ok && selectedId) fetchContacts(selectedId);
+    } catch { /* silent */ }
+    setContactDeleteId(null);
+  };
+
+  // ─── Télécharger rapport PDF ─────────────────────────────────────────────
+  const [rapportLoading, setRapportLoading] = useState(false);
+  const handleDownloadRapport = async () => {
+    if (!selectedId) return;
+    setRapportLoading(true);
+    try {
+      const now = new Date();
+      const res = await fetch(`/api/entreprises/${selectedId}/rapport?mois=${now.getMonth() + 1}&annee=${now.getFullYear()}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rapport-${selectedSociete?.nom || 'societe'}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch { /* silent */ } finally {
+      setRapportLoading(false);
+    }
+  };
+
   // Tabs config
   const tabs: { key: DetailTab; label: string; icon: typeof Percent; count: number }[] = [
     { key: 'baremes', label: 'Barèmes', icon: Percent, count: filteredBaremes.length },
     { key: 'assures', label: 'Assurés', icon: Users, count: filteredAssures.length },
     { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, count: filteredPrestataires.length },
+    { key: 'contacts', label: 'Contacts', icon: AddressBook, count: contacts.length },
   ];
 
   // ─── Rendu ──────────────────────────────────────────────────────────────
@@ -498,6 +614,16 @@ export default function SocietesView({ userRole }: Props) {
                       <Badge variant="outline" className="text-xs gap-1"><Users className="h-3 w-3" />{selectedSociete._count.assures} assurés</Badge>
                       <Badge variant="outline" className="text-xs gap-1"><Percent className="h-3 w-3" />{selectedSociete._count.baremes} barèmes</Badge>
                       <Badge variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />{selectedSociete._count.dossiers} dossiers</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1 ml-1"
+                        onClick={handleDownloadRapport}
+                        disabled={rapportLoading}
+                      >
+                        {rapportLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                        Rapport PDF
+                      </Button>
                     </div>
                   </div>
 
@@ -608,6 +734,24 @@ export default function SocietesView({ userRole }: Props) {
                       {activeTab === 'prestataires' && (
                         <PrestatairesTab prestataires={filteredPrestataires} search={prestataireSearch} onSearchChange={setPrestataireSearch} totalCount={details.prestataires.length} />
                       )}
+                      {activeTab === 'contacts' && canManageContacts && (
+                        <ContactsTab
+                          contacts={filteredContacts}
+                          search={contactSearch}
+                          onSearchChange={setContactSearch}
+                          totalCount={contacts.length}
+                          loading={contactsLoading}
+                          onAdd={openNewContact}
+                          onEdit={openEditContact}
+                          onDelete={(id) => setContactDeleteId(id)}
+                        />
+                      )}
+                      {activeTab === 'contacts' && !canWrite && (
+                        <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
+                          <AddressBook className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                          <p className="text-xs">Accès réservé aux administrateurs et techniciens</p>
+                        </div>
+                      )}
                     </div>
                   ) : null}
                 </CardContent>
@@ -682,6 +826,65 @@ export default function SocietesView({ userRole }: Props) {
             >
               Supprimer
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog : Formulaire contact ─── */}
+      <Dialog open={contactFormOpen} onOpenChange={setContactFormOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingContact ? 'Modifier le contact' : 'Nouveau contact'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Nom *</Label>
+                <Input value={cFormNom} onChange={e => setCFormNom(e.target.value)} className="h-8 text-sm" placeholder="Nom" />
+              </div>
+              <div>
+                <Label className="text-xs">Prénom</Label>
+                <Input value={cFormPrenom} onChange={e => setCFormPrenom(e.target.value)} className="h-8 text-sm" placeholder="Prénom" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Fonction</Label>
+              <Input value={cFormFonction} onChange={e => setCFormFonction(e.target.value)} className="h-8 text-sm" placeholder="Directeur, Responsable RH..." />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Téléphone</Label>
+                <Input value={cFormTel} onChange={e => setCFormTel(e.target.value)} className="h-8 text-sm" placeholder="034 00 000 00" />
+              </div>
+              <div>
+                <Label className="text-xs">Email</Label>
+                <Input value={cFormEmail} onChange={e => setCFormEmail(e.target.value)} className="h-8 text-sm" type="email" placeholder="email@exemple.com" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setContactFormOpen(false)} className="h-8 text-sm">Annuler</Button>
+              <Button onClick={handleSaveContact} disabled={contactSaving || !cFormNom.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-sm">
+                {contactSaving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
+                {editingContact ? 'Enregistrer' : 'Ajouter'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Dialog : Confirmation suppression contact ─── */}
+      <Dialog open={!!contactDeleteId} onOpenChange={() => setContactDeleteId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Supprimer ce contact
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Cette action est irréversible.</p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setContactDeleteId(null)} className="h-8 text-sm">Annuler</Button>
+            <Button variant="destructive" onClick={() => contactDeleteId && handleDeleteContact(contactDeleteId)} className="h-8 text-sm">Supprimer</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -951,6 +1154,100 @@ function PrestatairesTab({ prestataires, search, onSearchChange, totalCount }: {
                         <X className="h-2.5 w-2.5 mr-0.5" /> Inactif
                       </Badge>
                     )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sous-composant : Onglet Contacts entreprise ─────────────────────────────
+
+function ContactsTab({ contacts, search, onSearchChange, totalCount, loading, onAdd, onEdit, onDelete }: {
+  contacts: EntrepriseContact[];
+  search: string;
+  onSearchChange: (v: string) => void;
+  totalCount: number;
+  loading: boolean;
+  onAdd: () => void;
+  onEdit: (c: EntrepriseContact) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+        <span className="ml-2 text-xs text-muted-foreground">Chargement des contacts...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        {totalCount > 3 && (
+          <div className="relative w-56">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Filtrer par nom, fonction..."
+              value={search}
+              onChange={e => onSearchChange(e.target.value)}
+              className="pl-8 h-8 text-xs"
+            />
+          </div>
+        )}
+        <Button size="sm" onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs gap-1">
+          <Plus className="h-3.5 w-3.5" /> Ajouter
+        </Button>
+      </div>
+      {contacts.length === 0 ? (
+        <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
+          <AddressBook className="h-8 w-8 mx-auto mb-2 opacity-20" />
+          <p className="text-xs">Aucun contact enregistré pour cette société</p>
+        </div>
+      ) : (
+        <div className="rounded-lg border">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/50">
+              <tr className="text-left">
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Nom complet</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Fonction</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Téléphone</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground">Email</th>
+                <th className="py-2.5 px-3 font-medium text-muted-foreground text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contacts.map(c => (
+                <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30">
+                  <td className="py-2.5 px-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-full bg-teal-50 dark:bg-teal-950/40 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-teal-700 dark:text-teal-300">
+                          {(c.prenom?.[0] || '')}{c.nom[0]}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-xs">{c.prenom} {c.nom}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3 text-xs text-muted-foreground">{c.fonction || '-'}</td>
+                  <td className="py-2.5 px-3 text-xs">{c.telephone || '-'}</td>
+                  <td className="py-2.5 px-3 text-xs">{c.email || '-'}</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onEdit(c)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600" onClick={() => onDelete(c.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
