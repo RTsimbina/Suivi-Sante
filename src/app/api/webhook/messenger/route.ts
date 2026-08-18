@@ -39,13 +39,15 @@ export async function POST(request: NextRequest) {
   // ── Lire le body brut pour la vérification HMAC ──
   const rawBody = await request.arrayBuffer();
 
-  // ── Vérification signature Meta ──
-  if (MESSENGER_APP_SECRET) {
-    const signature = request.headers.get('x-hub-signature-256');
-    const valid = await verifyMeta(signature, MESSENGER_APP_SECRET, rawBody);
-    if (!valid) {
-      return webhookUnauthorized('Messenger HMAC-SHA256 signature invalide');
-    }
+  // ── Vérification signature Meta (obligatoire) ──
+  if (!MESSENGER_APP_SECRET) {
+    console.warn('[MESSENGER] MESSENGER_APP_SECRET non configuré — message rejeté');
+    return webhookUnauthorized('Webhook Messenger non configuré (MESSENGER_APP_SECRET manquant)');
+  }
+  const signature = request.headers.get('x-hub-signature-256');
+  const valid = await verifyMeta(signature, MESSENGER_APP_SECRET, rawBody);
+  if (!valid) {
+    return webhookUnauthorized('Messenger HMAC-SHA256 signature invalide');
   }
 
   // ── Parser le JSON manuellement ──

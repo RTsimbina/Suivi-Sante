@@ -53,12 +53,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
   }
 
-  // ── Vérification signature Telegram ──
-  if (TELEGRAM_WEBHOOK_SECRET) {
-    const secretHeader = request.headers.get('x-telegram-bot-api-secret-token');
-    if (!verifyTelegram(secretHeader, TELEGRAM_WEBHOOK_SECRET)) {
-      return webhookUnauthorized('Telegram secret token invalide');
-    }
+  // ── Vérification signature Telegram (obligatoire) ──
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    console.warn('[TELEGRAM] TELEGRAM_WEBHOOK_SECRET non configuré — message rejeté');
+    return webhookUnauthorized('Webhook Telegram non configuré (TELEGRAM_WEBHOOK_SECRET manquant)');
+  }
+  const secretHeader = request.headers.get('x-telegram-bot-api-secret-token');
+  if (!verifyTelegram(secretHeader, TELEGRAM_WEBHOOK_SECRET)) {
+    return webhookUnauthorized('Telegram secret token invalide');
   }
 
   try {

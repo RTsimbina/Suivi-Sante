@@ -273,9 +273,12 @@ export async function authorizeRequest(
   }
 
   // 2. Trouver la permission correspondante au chemin
-  const matchedPrefix = Object.keys(API_PERMISSIONS).find((prefix) =>
-    pathname.startsWith(prefix)
-  );
+  //    ⚠️ On cherche le PLUS LONG préfixe qui correspond (pas le premier).
+  //    Ex: /api/prestataires/societes/sync doit matcher sa règle propre,
+  //    pas la règle générique /api/prestataires.
+  const matchedPrefix = Object.keys(API_PERMISSIONS)
+    .filter((prefix) => pathname.startsWith(prefix))
+    .sort((a, b) => b.length - a.length)[0];
 
   if (!matchedPrefix) {
     // Route non définie dans les permissions → accès refusé par défaut
