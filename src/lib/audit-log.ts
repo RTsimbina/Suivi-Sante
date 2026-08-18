@@ -157,7 +157,7 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
     const niveau = niveauOverride || classifyNiveau(action, entite, champ);
 
     // Module lisible
-    const module = moduleOverride || ENTITE_MODULE_MAP[entite] || entite;
+    const moduleLabel = moduleOverride || ENTITE_MODULE_MAP[entite] || entite;
 
     // Ne pas logger si les valeurs sont identiques (sauf création/suppression)
     if (action === 'MODIFICATION') {
@@ -183,7 +183,7 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
         modifieParId: modifieParId || null,
         action,
         niveau,
-        module,
+        module: moduleLabel,
         objet: objetOverride || null,
         societeId: societeId || null,
         ipAdresse: ctx.ipAdresse || null,
