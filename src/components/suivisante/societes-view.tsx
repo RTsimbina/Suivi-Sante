@@ -5,7 +5,7 @@ import {
   Building2, Search, Plus, Pencil, Trash2, ChevronRight,
   Users, FileText, DollarSign, Loader2, CheckCircle2,
   Stethoscope, Percent, X, AlertTriangle, Phone, Mail,
-  Download, AddressBook,
+  Download, BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -395,7 +395,7 @@ export default function SocietesView({ userRole }: Props) {
     { key: 'baremes', label: 'Barèmes', icon: Percent, count: filteredBaremes.length },
     { key: 'assures', label: 'Assurés', icon: Users, count: filteredAssures.length },
     { key: 'prestataires', label: 'Prestataires', icon: Stethoscope, count: filteredPrestataires.length },
-    { key: 'contacts', label: 'Contacts', icon: AddressBook, count: contacts.length },
+    { key: 'contacts', label: 'Contacts', icon: BookOpen, count: contacts.length },
   ];
 
   // ─── Rendu ──────────────────────────────────────────────────────────────
@@ -746,9 +746,9 @@ export default function SocietesView({ userRole }: Props) {
                           onDelete={(id) => setContactDeleteId(id)}
                         />
                       )}
-                      {activeTab === 'contacts' && !canWrite && (
+                      {activeTab === 'contacts' && !canManageContacts && (
                         <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
-                          <AddressBook className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                          <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-20" />
                           <p className="text-xs">Accès réservé aux administrateurs et techniciens</p>
                         </div>
                       )}
@@ -1206,7 +1206,7 @@ function ContactsTab({ contacts, search, onSearchChange, totalCount, loading, on
       </div>
       {contacts.length === 0 ? (
         <div className="text-center py-10 text-muted-foreground rounded-lg border border-dashed">
-          <AddressBook className="h-8 w-8 mx-auto mb-2 opacity-20" />
+          <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-20" />
           <p className="text-xs">Aucun contact enregistré pour cette société</p>
         </div>
       ) : (
