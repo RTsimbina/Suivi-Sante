@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { toast } from 'sonner';
 import { formatMontant, formatMontantCourt } from './format';
-import { PARENT_TYPES, PARENT_LABELS } from '@/lib/prestations';
+import { PARENT_TYPES, PARENT_LABELS, PRESTATION_COLORS } from '@/lib/prestations';
 
 interface TechniqueViewProps {
   kpis: {
@@ -139,6 +139,58 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   const [baremesForm, setBaremesForm] = useState<BaremeRow[]>(emptyBaremes());
   const [savingSociete, setSavingSociete] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ─── State: Filtre barèmes par société ───
+  const [filtreSocieteId, setFiltreSocieteId] = useState<string | undefined>(undefined);
+  const [filtrePrestation, setFiltrePrestation] = useState<string>('all');
+  const [baremesLoading, setBaremesLoading] = useState(false);
+
+  // Barèmes détaillés de la société sélectionnée (rechargés depuis l'API)
+  const [baremesSociete, setBaremesSociete] = useState<BaremeRow[]>([]);
+
+  // Charger les barèmes d'une société quand elle est sélectionnée
+  const fetchBaremesSociete = useCallback(async (societeId: string) => {
+    setBaremesLoading(true);
+    try {
+      const res = await fetch(`/api/technique/societes/${societeId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const baremes = data.societe?.baremes || [];
+        setBaremesSociete(baremes);
+      } else {
+        setBaremesSociete([]);
+      }
+    } catch {
+      setBaremesSociete([]);
+    } finally {
+      setBaremesLoading(false);
+    }
+  }, []);
+
+  const handleFiltreSocieteChange = (value: string) => {
+    if (value === '__all__') {
+      setFiltreSocieteId(undefined);
+      setBaremesSociete([]);
+      setFiltrePrestation('all');
+    } else {
+      setFiltreSocieteId(value);
+      setFiltrePrestation('all');
+      fetchBaremesSociete(value);
+    }
+  };
+
+  // Barèmes filtrés par type de prestation
+  const baremesFiltres = useMemo(() => {
+    if (!filtreSocieteId) return [];
+    if (filtrePrestation === 'all') return baremesSociete;
+    return baremesSociete.filter((b) => b.prestation === filtrePrestation);
+  }, [filtreSocieteId, filtrePrestation, baremesSociete]);
+
+  // Société sélectionnée (pour l'en-tête)
+  const societeSelectionnee = useMemo(
+    () => societes.find((s) => s.id === filtreSocieteId),
+    [societes, filtreSocieteId]
+  );
 
   // ─── State: Calcul Ticket Modérateur ───
   const [calcSocieteId, setCalcSocieteId] = useState<string | undefined>(undefined);
@@ -629,6 +681,125 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ─── Consultation des barèmes par société ─── */}
+          <Card className="mt-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Filter className="h-4 w-4 text-emerald-600" />
+                Barèmes par société
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Filtre société */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor="filtre-societe">Société</Label>
+                  <Select value={filtreSocieteId || '__all__'} onValueChange={handleFiltreSocieteChange}>
+                    <SelectTrigger id="filtre-societe">
+                      <SelectValue placeholder="Sélectionner une société" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">— Toutes les sociétés —</SelectItem>
+                      {societes.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.nom}
+                          <span className="ml-2 text-xs text-muted-foreground">({s.nbBaremes ?? (s.baremes?.length ?? 0)} barèmes)</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Filtre type de prestation */}
+                <div className="w-full sm:w-64 space-y-1.5">
+                  <Label htmlFor="filtre-prestation">Type de prestation</Label>
+                  <Select value={filtrePrestation} onValueChange={setFiltrePrestation} disabled={!filtreSocieteId}>
+                    <SelectTrigger id="filtre-prestation">
+                      <SelectValue placeholder="Tous les types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les types</SelectItem>
+                      {PRESTATIONS.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {PRESTATION_LABELS[p]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Contenu : barèmes filtrés */}
+              {!filtreSocieteId ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <Building2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">Sélectionnez une société ci-dessus pour consulter ses barèmes.</p>
+                </div>
+              ) : baremesLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : baremesFiltres.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <Ban className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm">
+                    {filtrePrestation !== 'all'
+                      ? `Aucun barème configuré pour le type « ${PRESTATION_LABELS[filtrePrestation] || filtrePrestation} ».`
+                      : `Aucun barème configuré pour ${societeSelectionnee?.nom || 'cette société'}.`}
+                  </p>
+                  <p className="text-xs mt-1">Modifiez la société pour ajouter des barèmes.</p>
+                </div>
+              ) : (
+                <>
+                  {societeSelectionnee && filtrePrestation === 'all' && (
+                    <p className="text-sm text-muted-foreground">
+                      {baremesFiltres.length} barème(s) configuré(s) pour <span className="font-medium text-foreground">{societeSelectionnee.nom}</span>
+                    </p>
+                  )}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type de prestation</TableHead>
+                        <TableHead className="text-center">Taux de couverture</TableHead>
+                        <TableHead className="text-right">Plafond (Ar)</TableHead>
+                        <TableHead className="hidden md:table-cell">Description</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {baremesFiltres.map((b) => {
+                        const hasValues = b.tauxCouverture > 0 || b.plafond > 0;
+                        return (
+                          <TableRow key={b.prestation} className={!hasValues ? 'opacity-50' : ''}>
+                            <TableCell className="font-medium">
+                              <Badge variant={hasValues ? 'default' : 'secondary'} className={hasValues ? (PRESTATION_COLORS[b.prestation] || '') : ''}>
+                                {PRESTATION_LABELS[b.prestation] || b.prestation}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className={hasValues ? 'font-semibold text-emerald-600' : 'text-muted-foreground'}>
+                                {b.tauxCouverture > 0 ? `${b.tauxCouverture}%` : '—'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className={hasValues ? 'font-medium' : 'text-muted-foreground'}>
+                                {b.plafond > 0 ? formatMontant(b.plafond) : '—'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                              {b.description || '—'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </>
               )}
             </CardContent>
           </Card>
