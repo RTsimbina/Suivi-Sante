@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { verifierPlafondAnnuel } from "@/lib/plafond-check";
 
 const VALID_STATUTS = [
   "RECU",
@@ -48,7 +49,21 @@ export async function PATCH(
     const userId = request.headers.get('x-user-id');
 
     const body = await request.json();
-    const { statut, gestionnaireAccueilId, gestionnaireTechniqueId, gestionnaireComptaId } = body;
+    const {
+      statut,
+      gestionnaireAccueilId,
+      gestionnaireTechniqueId,
+      gestionnaireComptaId,
+      assureId,
+      montantValide,
+      ticketModerateur,
+      nSS,
+      prestataireId,
+      dateSoins,
+      moyenPaiement,
+      observations,
+      motifRejet,
+    } = body;
 
     const existing = await db.dossier.findUnique({
       where: { id },
@@ -59,7 +74,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    // ─── Partie 1 : Changement de statut ───
+    // ─── Partie 1 : Changement de statut ─────────────────────────────────
     if (statut) {
       if (!VALID_STATUTS.includes(statut)) {
         return NextResponse.json(
@@ -92,40 +107,94 @@ export async function PATCH(
           { status: 403 }
         );
       }
+
+      // ─── Vérification du plafond à la transition EN_ANALYSE → VALIDE ──
+      if (existing.statut === 'EN_ANALYSE' && statut === 'VALIDE') {
+        const dossierAssureId = assureId || existing.assureId;
+        if (dossierAssureId) {
+          const plafondResult = await verifierPlafondAnnuel({
+            assureId: dossierAssureId,
+            societeId: existing.societeId,
+            typeActe: existing.typeDossier,
+            montantDemande: existing.montantReclame,
+            prestataireId: prestataireId || existing.prestataireId || undefined,
+            excludeDossierId: id,
+          });
+
+          // Bloquer si plafond épuisé
+          if (!plafondResult.autorise &&
+              ['ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'PRESTATAIRE_INACTIF'].includes(plafondResult.raison)) {
+            return NextResponse.json(
+              {
+                error: `Transition bloquée : ${plafondResult.message}`,
+                plafondAtteint: true,
+                plafondDetails: plafondResult.details,
+                raison: plafondResult.raison,
+              },
+              { status: 422 }
+            );
+          }
+        }
+      }
     }
 
-    // ─── Partie 2 : Assignation de gestionnaires ───
-    const assignData: Record<string, string | null> = {};
+    // ─── Partie 2 : Champs modifiables ────────────────────────────────────
+    const updateData: Record<string, unknown> = {};
     const assignComments: string[] = [];
 
+    // Gestionnaires
     if (gestionnaireAccueilId !== undefined) {
-      assignData.gestionnaireAccueilId = gestionnaireAccueilId || null;
+      updateData.gestionnaireAccueilId = gestionnaireAccueilId || null;
       if (gestionnaireAccueilId && !existing.gestionnaireAccueilId) {
         assignComments.push('Assigné à un gestionnaire Accueil');
       }
     }
     if (gestionnaireTechniqueId !== undefined) {
-      assignData.gestionnaireTechniqueId = gestionnaireTechniqueId || null;
+      updateData.gestionnaireTechniqueId = gestionnaireTechniqueId || null;
       if (gestionnaireTechniqueId && !existing.gestionnaireTechniqueId) {
         assignComments.push('Assigné à un gestionnaire Technique');
       }
     }
     if (gestionnaireComptaId !== undefined) {
-      assignData.gestionnaireComptaId = gestionnaireComptaId || null;
+      updateData.gestionnaireComptaId = gestionnaireComptaId || null;
       if (gestionnaireComptaId && !existing.gestionnaireComptaId) {
         assignComments.push('Assigné à un gestionnaire Comptabilité');
       }
     }
 
-    // Si ni statut ni gestionnaire à modifier
-    if (!statut && Object.keys(assignData).length === 0) {
+    // Assuré
+    if (assureId !== undefined) {
+      updateData.assureId = assureId || null;
+    }
+
+    // Prestataire
+    if (prestataireId !== undefined) {
+      updateData.prestataireId = prestataireId || null;
+    }
+
+    // Champs financiers et administratifs
+    if (montantValide !== undefined) updateData.montantValide = montantValide || null;
+    if (ticketModerateur !== undefined) updateData.ticketModerateur = ticketModerateur || null;
+    if (nSS !== undefined) updateData.nSS = nSS || null;
+    if (dateSoins !== undefined) updateData.dateSoins = dateSoins ? new Date(dateSoins) : null;
+    if (moyenPaiement !== undefined) updateData.moyenPaiement = moyenPaiement || null;
+    if (observations !== undefined) updateData.observations = observations || null;
+    if (motifRejet !== undefined) updateData.motifRejet = motifRejet || null;
+
+    // Auto-set dateTraitementTechnique si transition vers EN_ANALYSE
+    if (statut === 'EN_ANALYSE' && !existing.dateTraitementTechnique) {
+      updateData.dateTraitementTechnique = new Date();
+    }
+
+    // Si ni statut ni gestionnaire ni autre champ à modifier
+    if (!statut && Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: "Aucune modification demandée" },
         { status: 400 }
       );
     }
 
-    // ─── Historique ───
+    // ─── Historique ────────────────────────────────────────────────────────
     const currentHistorique: unknown[] = (() => {
       try {
         return JSON.parse(existing.historique || "[]");
@@ -155,12 +224,12 @@ export async function PATCH(
       });
     }
 
-    // ─── Mise à jour ───
+    // ─── Mise à jour ──────────────────────────────────────────────────────
     const updated = await db.dossier.update({
       where: { id },
       data: {
         ...(statut ? { statut } : {}),
-        ...assignData,
+        ...updateData,
         historique: JSON.stringify(newHistorique),
       },
       include: {

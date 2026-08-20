@@ -171,6 +171,8 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
         categorieDossier: categorieDossier || undefined,
         montantReclame: parseFloat(montantReclame),
         gestionnaireAccueilId: gestionnaires[0]?.id || null,
+        assureId: assure || undefined,
+        prestataireId: prestataire || undefined,
       };
 
       // Auto-fill ticket modérateur fields if calculation is available
@@ -187,14 +189,26 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
 
       if (!res.ok) {
         const err = await res.json();
+        // Afficher les erreurs de plafond de manière spécifique
+        if (err.plafondAtteint) {
+          throw new Error(err.error || 'Plafond de couverture atteint');
+        }
         throw new Error(err.error || 'Erreur de création');
       }
 
       const dossier = await res.json();
 
-      // Mettre à jour les champs additionnels
+      // Afficher les alertes de plafond dans un toast
+      if (dossier.plafondCheck?.alertes?.length > 0) {
+        for (const alerte of dossier.plafondCheck.alertes) {
+          if (alerte.type === 'danger' || alerte.type === 'warning') {
+            toast.warning(alerte.message);
+          }
+        }
+      }
+
+      // Mettre à jour les champs additionnels (ceux qui ne sont pas dans le POST)
       const updateData: Record<string, unknown> = {};
-      if (assure) updateData.assureId = assure;
       if (nSS) updateData.nSS = nSS;
       if (prestataire) updateData.prestataireId = prestataire;
       if (dateSoins) updateData.dateSoins = new Date(dateSoins);

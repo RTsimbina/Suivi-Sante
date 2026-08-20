@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/authorize";
 import { db } from "@/lib/db";
 import { readExcelRows } from "@/lib/excel";
+import { verifierPlafondAnnuel } from "@/lib/plafond-check";
 
 /**
  * Recherche une valeur dans un objet de ligne Excel en ignorant la casse.
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
 
     let nbSucces = 0;
     let nbErreurs = 0;
+    let nbAvertissementsPlafond = 0;
     const erreursDetail: { ligne: number; numeroDossier: string; message: string }[] = [];
     const importDossiers: {
       numeroLigne: number;
@@ -140,6 +142,60 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // ─── Vérification non bloquante du plafond annuel ────────────────
+        // Si le dossier a un assureId, vérifier le plafond.
+        // Non bloquant pour les imports : on enregistre un avertissement
+        // dans l'historique du dossier et dans le rapport d'import.
+        if (existingDossier.assureId && updateData.montantValide) {
+          try {
+            const plafondResult = await verifierPlafondAnnuel({
+              assureId: existingDossier.assureId,
+              societeId: existingDossier.societeId,
+              typeActe: existingDossier.typeDossier,
+              montantDemande: existingDossier.montantReclame,
+              excludeDossierId: existingDossier.id,
+            });
+
+            if (!plafondResult.autorise) {
+              nbAvertissementsPlafond++;
+              erreursDetail.push({
+                ligne: ligneNum,
+                numeroDossier,
+                message: `[PLAFOND] ${plafondResult.message}`,
+              });
+
+              // Ajouter dans l'historique du dossier
+              let hist: unknown[] = [];
+              try { hist = JSON.parse(existingDossier.historique || '[]'); } catch { hist = []; }
+              if (!Array.isArray(hist)) hist = [];
+              hist.push({
+                date: new Date().toISOString(),
+                action: 'IMPORT_ISA_PLAFOND',
+                commentaire: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
+              });
+              updateData.historique = JSON.stringify(hist);
+            } else if (plafondResult.alertes.length > 0) {
+              // Avertissements non bloquants (> 70%, etc.)
+              let hist: unknown[] = [];
+              try { hist = JSON.parse(existingDossier.historique || '[]'); } catch { hist = []; }
+              if (!Array.isArray(hist)) hist = [];
+              for (const alerte of plafondResult.alertes) {
+                hist.push({
+                  date: new Date().toISOString(),
+                  action: 'IMPORT_ISA_PLAFOND',
+                  commentaire: `[PLAFOND] ${alerte.message}`,
+                });
+                if (alerte.type === 'warning') {
+                  nbAvertissementsPlafond++;
+                }
+              }
+              updateData.historique = JSON.stringify(hist);
+            }
+          } catch {
+            // Erreur de vérification de plafond : ne pas bloquer l'import
+          }
+        }
+
         await db.dossier.update({
           where: { numeroDossier },
           data: updateData,
@@ -197,6 +253,7 @@ export async function POST(request: NextRequest) {
       nbLignes: rows.length,
       nbSucces,
       nbErreurs,
+      nbAvertissementsPlafond,
       tauxSucces:
         rows.length > 0 ? Math.round((nbSucces / rows.length) * 100) : 0,
       erreurs: erreursDetail.slice(0, 50),

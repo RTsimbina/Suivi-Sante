@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { Prisma } from "@prisma/client";
+import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
 
 export async function GET(request: NextRequest) {
   try {
@@ -110,13 +111,15 @@ export async function POST(request: NextRequest) {
       categorieDossier,
       gestionnaireAccueilId,
       montantReclame,
-      assure,
+      assureId,
       nSS,
-      prestataire,
+      prestataireId,
       dateSoins,
       moyenPaiement,
       observations,
       source,
+      montantValide,
+      ticketModerateur,
     } = body;
 
     // Validate required fields
@@ -139,11 +142,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ─── Vérification du plafond annuel ────────────────────────────────────
+    // Si un assureId est fourni, vérifier que le plafond n'est pas atteint.
+    // Ce contrôle est le même que simuler-acte, appliqué automatiquement.
+    let plafondResult: PlafondCheckResult | null = null;
+    if (assureId && societeId && typeDossier && montantReclame) {
+      plafondResult = await verifierPlafondAnnuel({
+        assureId,
+        societeId,
+        typeActe: typeDossier,
+        montantDemande: montantReclame,
+        prestataireId: prestataireId || undefined,
+      });
+
+      // Bloquer si le plafond est atteint (assuré inactif, plafond acte/global épuisé)
+      if (!plafondResult.autorise &&
+          ['ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'PRESTATAIRE_INACTIF'].includes(plafondResult.raison)) {
+        return NextResponse.json(
+          {
+            error: plafondResult.message,
+            plafondAtteint: true,
+            plafondDetails: plafondResult.details,
+            raison: plafondResult.raison,
+          },
+          { status: 422 }
+        );
+      }
+    }
+
     const userId = request.headers.get('x-user-id') || '';
 
-    const historiqueInit = JSON.stringify([
+    // ─── Historique initial ────────────────────────────────────────────────
+    const historiqueEntries: Record<string, unknown>[] = [
       { date: new Date().toISOString(), statut: "RECU", commentaire: "Dossier créé manuellement" },
-    ]);
+    ];
+
+    // Ajouter les alertes de plafond dans l'historique
+    if (plafondResult && plafondResult.alertes.length > 0) {
+      for (const alerte of plafondResult.alertes) {
+        historiqueEntries.push({
+          date: new Date().toISOString(),
+          statut: "RECU",
+          commentaire: `[PLAFOND] ${alerte.message}`,
+        });
+      }
+    }
+
+    // ─── Calcul du montant validé ──────────────────────────────────────────
+    // Si le plafond a été vérifié et le montant est partiellement couvert,
+    // recalculer montantValide selon le reliquat
+    let finalMontantValide = montantValide || null;
+    let finalTicketModerateur = ticketModerateur || null;
+
+    if (plafondResult && plafondResult.details.montantCouvert !== undefined) {
+      // Utiliser le montant couvert par le plafond (qui tient compte du reliquat)
+      // et le taux de couverture du barème
+      const taux = plafondResult.details.tauxCouverture || 0;
+      const montantCouvert = plafondResult.details.montantCouvert;
+      finalMontantValide = Math.round(montantCouvert * (taux / 100) * 100) / 100;
+      finalTicketModerateur = Math.round((montantCouvert - finalMontantValide) * 100) / 100;
+    }
 
     const dossier = await db.dossier.create({
       data: {
@@ -156,15 +214,17 @@ export async function POST(request: NextRequest) {
         gestionnaireAccueilId: gestionnaireAccueilId || null,
         createurId: userId,
         montantReclame: montantReclame || 0,
-        assure: assure || null,
+        assureId: assureId || null,
         nSS: nSS || null,
-        prestataire: prestataire || null,
+        prestataireId: prestataireId || null,
         dateSoins: dateSoins ? new Date(dateSoins) : null,
         moyenPaiement: moyenPaiement || null,
         observations: observations || null,
         statut: "RECU",
         source: source || "MANUEL",
-        historique: historiqueInit,
+        montantValide: finalMontantValide,
+        ticketModerateur: finalTicketModerateur,
+        historique: JSON.stringify(historiqueEntries),
       },
       include: {
         societe: true,
@@ -174,7 +234,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(dossier, { status: 201 });
+    const response: Record<string, unknown> = { ...dossier } as Record<string, unknown>;
+    if (plafondResult) {
+      response.plafondCheck = plafondResult;
+    }
+
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("Error creating dossier:", error);
     return NextResponse.json(
