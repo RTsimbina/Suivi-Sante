@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Search, ShieldCheck, ShieldAlert, ShieldX, User, Building2,
   AlertTriangle, CheckCircle2, XCircle, Activity, Calculator,
   ChevronDown, ChevronUp, FileText, Loader2, HeartPulse,
-  Ban, Clock, ArrowRight, Plus, Trash2,
+  Ban, Clock, ArrowRight, Plus, Trash2, Filter, ClipboardList,
+  ChevronLeft, ChevronRight, CalendarDays, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,12 +75,60 @@ interface SearchResult {
   actif: boolean; societe: { nom: string };
 }
 
+/* ── Types pour l'historique des actes ── */
+
+interface ActeItem {
+  id: string;
+  numeroDossier: string;
+  typeDossier: string;
+  beneficiaire: string;
+  dateReception: string;
+  dateSoins: string | null;
+  montantReclame: number;
+  montantValide: number | null;
+  montantPaye: number | null;
+  partPatient: number | null;
+  statut: string;
+  prestataireId: string | null;
+  prestataire: string | null;
+  prestataireType: string | null;
+}
+
+interface ActesPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+interface ActesFiltres {
+  typesActe: string[];
+  statuts: string[];
+}
+
 function formatAr(n: number) {
   return n.toLocaleString('fr-FR') + ' Ar';
 }
 
 function formatPercent(n: number) {
   return n.toFixed(1) + '%';
+}
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('fr-FR');
+}
+
+/* ── Statut badge color helper ── */
+function getStatutBadge(statut: string) {
+  const map: Record<string, 'default' | 'outline' | 'destructive' | 'secondary'> = {
+    RECU: 'secondary',
+    EN_COURS_TECHNIQUE: 'outline',
+    VALIDE: 'outline',
+    EN_COURS_COMPTA: 'outline',
+    PAYE: 'default',
+    REJETE: 'destructive',
+};
+  return map[statut] || 'outline';
 }
 
 /* ── Composant principal ── */
@@ -99,6 +148,21 @@ export default function SanteView() {
   ]);
   const [simLoading, setSimLoading] = useState(false);
   const [simResults, setSimResults] = useState<MultiSimResult[]>([]);
+
+  // Historique des actes — état
+  const [actesLoading, setActesLoading] = useState(false);
+  const [actes, setActes] = useState<ActeItem[]>([]);
+  const [actesPagination, setActesPagination] = useState<ActesPagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [actesFiltres, setActesFiltres] = useState<ActesFiltres>({ typesActe: [], statuts: [] });
+
+  // Filtres actifs
+  const [filtreType, setFiltreType] = useState('');
+  const [filtreStatut, setFiltreStatut] = useState('');
+  const [filtreDateDebut, setFiltreDateDebut] = useState('');
+  const [filtreDateFin, setFiltreDateFin] = useState('');
+  const [filtreSearch, setFiltreSearch] = useState('');
+  const [actesPage, setActesPage] = useState(1);
+  const [showFiltres, setShowFiltres] = useState(true);
 
   // Autocomplétion
   const handleSearch = useCallback(async (value: string) => {
@@ -126,6 +190,16 @@ export default function SanteView() {
     setSimResults([]);
     setSimLignes([{ id: crypto.randomUUID(), typeActe: '', montant: '' }]);
     setShowResults(false);
+    // Reset historique actes
+    setActes([]);
+    setActesPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
+    setActesFiltres({ typesActe: [], statuts: [] });
+    setFiltreType('');
+    setFiltreStatut('');
+    setFiltreDateDebut('');
+    setFiltreDateFin('');
+    setFiltreSearch('');
+    setActesPage(1);
 
     try {
       const res = await fetch('/api/sante/verifier-assure', {
@@ -144,6 +218,94 @@ export default function SanteView() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Charger l'historique des actes ──
+  const fetchActes = useCallback(async (assureId: string, page: number, overrides?: {
+    typeDossier?: string; statut?: string; dateDebut?: string; dateFin?: string; search?: string;
+  }) => {
+    setActesLoading(true);
+    try {
+      const params = new URLSearchParams({
+        assureId,
+        page: String(page),
+        limit: '10',
+      });
+      const t = overrides?.typeDossier ?? filtreType;
+      const s = overrides?.statut ?? filtreStatut;
+      const dd = overrides?.dateDebut ?? filtreDateDebut;
+      const df = overrides?.dateFin ?? filtreDateFin;
+      const q = overrides?.search ?? filtreSearch;
+      if (t) params.set('typeDossier', t);
+      if (s) params.set('statut', s);
+      if (dd) params.set('dateDebut', dd);
+      if (df) params.set('dateFin', df);
+      if (q) params.set('search', q);
+
+      const res = await fetch(`/api/sante/actes-assure?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActes(data.dossiers);
+        setActesPagination(data.pagination);
+        if (data.filtres) setActesFiltres(data.filtres);
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setActesLoading(false);
+    }
+  }, [filtreType, filtreStatut, filtreDateDebut, filtreDateFin, filtreSearch]);
+
+  // Charger automatiquement quand result change
+  useEffect(() => {
+    if (result?.assure.id) {
+      fetchActes(result.assure.id, 1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result?.assure.id]);
+
+  // Recharger quand les filtres changent
+  useEffect(() => {
+    if (!result?.assure.id) return;
+    setActesPage(1);
+    fetchActes(result.assure.id, 1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtreType, filtreStatut, filtreDateDebut, filtreDateFin]);
+
+  // Recharger quand la page change
+  useEffect(() => {
+    if (!result?.assure.id) return;
+    fetchActes(result.assure.id, actesPage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actesPage]);
+
+  // Recherche avec debounce
+  useEffect(() => {
+    if (!result?.assure.id) return;
+    if (filtreSearch.length === 0 || filtreSearch.length >= 2) {
+      const timer = setTimeout(() => {
+        setActesPage(1);
+        fetchActes(result.assure.id, 1);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtreSearch]);
+
+  // Appliquer les filtres (handler pour bouton Rechercher)
+  const handleAppliquerFiltres = () => {
+    if (!result?.assure.id) return;
+    setActesPage(1);
+    fetchActes(result.assure.id, 1);
+  };
+
+  // Réinitialiser les filtres
+  const handleResetFiltres = () => {
+    setFiltreType('');
+    setFiltreStatut('');
+    setFiltreDateDebut('');
+    setFiltreDateFin('');
+    setFiltreSearch('');
   };
 
   // Gestion des lignes de simulation multi-actes
@@ -214,8 +376,11 @@ export default function SanteView() {
     return 'dark:bg-emerald-400';
   }
 
+  // Compteur de filtres actifs
+  const nbFiltresActifs = [filtreType, filtreStatut, filtreDateDebut, filtreDateFin, filtreSearch].filter(Boolean).length;
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* En-tête */}
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -223,7 +388,7 @@ export default function SanteView() {
           Contrôle Santé — Vérification Assuré
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Recherchez un assuré par son N° SS, nom, prénom ou email pour vérifier ses plafonds et droits.
+          Recherchez un assuré par son N° SS, nom, prénom ou email pour vérifier ses plafonds, ses droits et consulter l\'historique de ses actes.
         </p>
       </div>
 
@@ -370,6 +535,255 @@ export default function SanteView() {
             </Card>
           </div>
 
+          {/* ═══════════════════════════════════════════════════════════
+              SECTION PRINCIPALE : Historique des actes réalisés
+              ═══════════════════════════════════════════════════════════ */}
+          <Card className="border-emerald-200 dark:border-emerald-800">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-emerald-600" />
+                  Historique des actes réalisés
+                  {actesPagination.total > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {actesPagination.total} acte{actesPagination.total > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setShowFiltres(!showFiltres)}
+                >
+                  <Filter className="h-3.5 w-3.5 mr-1" />
+                  Filtres
+                  {nbFiltresActifs > 0 && (
+                    <Badge className="ml-1.5 h-4 min-w-4 px-1 text-[10px] bg-emerald-600 text-white">
+                      {nbFiltresActifs}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Consultez et filtrez tous les actes médicaux déjà réalisés par cet assuré.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* ── Panneau de filtres ── */}
+              {showFiltres && (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Filter className="h-3 w-3" /> Critères de recherche
+                    </p>
+                    {nbFiltresActifs > 0 && (
+                      <button
+                        onClick={handleResetFiltres}
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                      >
+                        <X className="h-3 w-3" /> Réinitialiser
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    {/* Recherche texte */}
+                    <div className="sm:col-span-2 lg:col-span-1">
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Recherche</label>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="N° dossier, bénéficiaire..."
+                          value={filtreSearch}
+                          onChange={(e) => setFiltreSearch(e.target.value)}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    {/* Type d'acte */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Type d'acte</label>
+                      <select
+                        value={filtreType}
+                        onChange={(e) => setFiltreType(e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="">Tous les types</option>
+                        {actesFiltres.typesActe.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Statut */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Statut</label>
+                      <select
+                        value={filtreStatut}
+                        onChange={(e) => setFiltreStatut(e.target.value)}
+                        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                      >
+                        <option value="">Tous les statuts</option>
+                        {actesFiltres.statuts.map(s => (
+                          <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Date début */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Date début</label>
+                      <div className="relative">
+                        <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={filtreDateDebut}
+                          onChange={(e) => setFiltreDateDebut(e.target.value)}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    {/* Date fin */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Date fin</label>
+                      <div className="relative">
+                        <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={filtreDateFin}
+                          onChange={(e) => setFiltreDateFin(e.target.value)}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Tableau des actes ── */}
+              {actesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  <span className="ml-2 text-sm text-muted-foreground">Chargement des actes...</span>
+                </div>
+              ) : actes.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-muted/50 text-left text-muted-foreground">
+                          <th className="px-3 py-2.5 font-medium">N° Dossier</th>
+                          <th className="px-3 py-2.5 font-medium">Type d'acte</th>
+                          <th className="px-3 py-2.5 font-medium">Date réception</th>
+                          <th className="px-3 py-2.5 font-medium">Date soins</th>
+                          <th className="px-3 py-2.5 font-medium">Prestataire</th>
+                          <th className="px-3 py-2.5 font-medium text-right">Réclamé</th>
+                          <th className="px-3 py-2.5 font-medium text-right">Validé</th>
+                          <th className="px-3 py-2.5 font-medium text-right">Payé</th>
+                          <th className="px-3 py-2.5 font-medium text-right">Part patient</th>
+                          <th className="px-3 py-2.5 font-medium">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {actes.map((a) => (
+                          <tr key={a.id} className="border-t last:border-0 hover:bg-muted/30 transition-colors">
+                            <td className="px-3 py-2.5 font-mono font-medium">{a.numeroDossier}</td>
+                            <td className="px-3 py-2.5">
+                              <Badge variant="outline" className="text-[10px] font-normal">{a.typeDossier}</Badge>
+                            </td>
+                            <td className="px-3 py-2.5 text-muted-foreground">{formatDate(a.dateReception)}</td>
+                            <td className="px-3 py-2.5 text-muted-foreground">{a.dateSoins ? formatDate(a.dateSoins) : '—'}</td>
+                            <td className="px-3 py-2.5">
+                              <div>
+                                <span className="text-foreground">{a.prestataire || '—'}</span>
+                                {a.prestataireType && (
+                                  <span className="text-muted-foreground ml-1">({a.prestataireType})</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-mono">{formatAr(a.montantReclame)}</td>
+                            <td className="px-3 py-2.5 text-right font-mono">{a.montantValide ? formatAr(a.montantValide) : '—'}</td>
+                            <td className="px-3 py-2.5 text-right font-mono">{a.montantPaye ? formatAr(a.montantPaye) : '—'}</td>
+                            <td className="px-3 py-2.5 text-right font-mono">{a.partPatient ? formatAr(a.partPatient) : '—'}</td>
+                            <td className="px-3 py-2.5">
+                              <Badge variant={getStatutBadge(a.statut)} className="text-[10px]">
+                                {a.statut.replace(/_/g, ' ')}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* ── Pagination ── */}
+                  {actesPagination.totalPages > 1 && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">
+                        Affichage {(actesPage - 1) * actesPagination.limit + 1}–{Math.min(actesPage * actesPagination.limit, actesPagination.total)}
+                        sur {actesPagination.total} acte{actesPagination.total > 1 ? 's' : ''}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline" size="icon" className="h-7 w-7"
+                          disabled={actesPage <= 1}
+                          onClick={() => setActesPage(p => p - 1)}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        {/* Numéros de page */}
+                        {Array.from({ length: Math.min(actesPagination.totalPages, 5) }, (_, i) => {
+                          let pageNum: number;
+                          if (actesPagination.totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (actesPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (actesPage >= actesPagination.totalPages - 2) {
+                            pageNum = actesPagination.totalPages - 4 + i;
+                          } else {
+                            pageNum = actesPage - 2 + i;
+                          }
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={pageNum === actesPage ? 'default' : 'outline'}
+                              size="icon" className="h-7 w-7 text-xs"
+                              onClick={() => setActesPage(pageNum)}
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                        <Button
+                          variant="outline" size="icon" className="h-7 w-7"
+                          disabled={actesPage >= actesPagination.totalPages}
+                          onClick={() => setActesPage(p => p + 1)}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-10">
+                  <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+                  <p className="text-sm text-muted-foreground">
+                    {nbFiltresActifs > 0
+                      ? 'Aucun acte ne correspond aux filtres sélectionnés.'
+                      : 'Aucun acte réalisé par cet assuré cette année.'}
+                  </p>
+                  {nbFiltresActifs > 0 && (
+                    <button
+                      onClick={handleResetFiltres}
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-1"
+                    >
+                      Réinitialiser les filtres
+                    </button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Plafonds par type d'acte */}
           <Card>
             <CardHeader className="pb-2">
@@ -443,6 +857,7 @@ export default function SanteView() {
                                 <div className="flex items-center gap-2">
                                   <FileText className="h-3 w-3 text-muted-foreground" />
                                   <span className="font-mono">{d.numeroDossier}</span>
+                                  <span className="text-muted-foreground">{formatDate(d.dateReception)}</span>
                                   <span className="text-muted-foreground">{d.prestataire}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -663,49 +1078,6 @@ export default function SanteView() {
                   )}
                 </div>
               ))}
-            </CardContent>
-          </Card>
-
-          {/* Dossiers récents */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Dossiers récents de l'assuré ({result.dossiersRecent.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {result.dossiersRecent.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 font-medium">N° Dossier</th>
-                        <th className="pb-2 font-medium">Type</th>
-                        <th className="pb-2 font-medium">Date</th>
-                        <th className="pb-2 font-medium">Prestataire</th>
-                        <th className="pb-2 font-medium text-right">Réclamé</th>
-                        <th className="pb-2 font-medium text-right">Payé</th>
-                        <th className="pb-2 font-medium">Statut</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.dossiersRecent.map(d => (
-                        <tr key={d.id} className="border-b last:border-0">
-                          <td className="py-2 font-mono">{d.numeroDossier}</td>
-                          <td className="py-2">{d.typeDossier}</td>
-                          <td className="py-2 text-muted-foreground">{new Date(d.dateReception).toLocaleDateString('fr-FR')}</td>
-                          <td className="py-2">{d.prestataire || '—'}</td>
-                          <td className="py-2 text-right">{formatAr(d.montantReclame)}</td>
-                          <td className="py-2 text-right">{d.montantPaye ? formatAr(d.montantPaye) : '—'}</td>
-                          <td className="py-2"><Badge variant="outline" className="text-[9px] h-4">{d.statut}</Badge></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">Aucun dossier cette année.</p>
-              )}
             </CardContent>
           </Card>
         </>
