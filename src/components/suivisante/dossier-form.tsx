@@ -17,6 +17,23 @@ interface Gestionnaire { id: string; nom: string; service: string; }
 interface AssureOption { id: string; nom: string; prenom: string | null; nSS: string | null; matricule: string | null; societeId: string; }
 interface PrestataireOption { id: string; nom: string; type: string; actif?: boolean; }
 
+interface PlafondAnnuelInfo {
+  autorise: boolean;
+  raison: string;
+  message: string;
+  details: {
+    consommeActe?: number;
+    plafondActe?: number;
+    reliquatActe?: number;
+    consommeGlobal?: number;
+    plafondGlobal?: number;
+    reliquatGlobal?: number;
+    nbActesIdentiques?: number;
+    tauxCouverture?: number;
+  };
+  alertes: { type: string; message: string }[];
+}
+
 interface CalculResult {
   bareme: string;
   tauxCouverture: number;
@@ -27,6 +44,7 @@ interface CalculResult {
   };
   plafondAtteint: boolean;
   explication: string;
+  plafondAnnuel?: PlafondAnnuelInfo;
 }
 
 // Dossier.typeDossier uses sous-types from getPrestationSelectOptions()
@@ -97,14 +115,19 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
     }
     setCalculLoading(true);
     try {
-      const res = await fetch('/api/technique/baremes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const baremesBody: Record<string, unknown> = {
           societeId,
           prestation: getParentType(typeDossier),
           montantReclame: parseFloat(montantReclame),
-        }),
+        };
+        // Passer assureId et prestataireId pour la vérification du plafond annuel
+        if (assure) baremesBody.assureId = assure;
+        if (prestataire) baremesBody.prestataireId = prestataire;
+
+      const res = await fetch('/api/technique/baremes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(baremesBody),
       });
       if (!res.ok) {
         setCalculResult(null);
@@ -117,7 +140,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
     } finally {
       setCalculLoading(false);
     }
-  }, [societeId, typeDossier, montantReclame]);
+  }, [societeId, typeDossier, montantReclame, assure, prestataire]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -131,7 +154,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [societeId, typeDossier, montantReclame, fetchCalcul]);
+  }, [societeId, typeDossier, montantReclame, assure, prestataire, fetchCalcul]);
 
   function addFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const newFiles = Array.from(e.target.files || []);
@@ -388,6 +411,73 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
                 <span><span className="font-medium text-emerald-800 dark:text-emerald-300">Taux de couverture :</span> {calculResult.tauxCouverture}%</span>
                 <span><span className="font-medium text-emerald-800 dark:text-emerald-300">Plafond :</span> {formatAr(calculResult.plafond)}</span>
               </div>
+
+              {/* Plafond annuel : consommation et reliquat */}
+              {calculResult.plafondAnnuel && calculResult.plafondAnnuel.details.reliquatActe !== undefined && (
+                <div className={`rounded-lg border p-3 space-y-2 ${
+                  calculResult.plafondAnnuel.autorise
+                    ? 'bg-blue-50/70 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800/60'
+                    : 'bg-red-50/80 border-red-300 dark:bg-red-950/40 dark:border-red-800/60'
+                }`}>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-blue-800 dark:text-blue-300">
+                    {calculResult.plafondAnnuel.autorise
+                      ? <><span className="inline-block size-2 rounded-full bg-blue-500" /> Plafond annuel — consommation en cours</>
+                      : <><AlertTriangle className="size-3.5 text-red-600 dark:text-red-400" /> Plafond annuel — BLOQUÉ</>
+                    }
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Consommé</p>
+                      <p className={`font-bold ${calculResult.plafondAnnuel.autorise ? 'text-blue-700 dark:text-blue-300' : 'text-red-700 dark:text-red-300'}`}>
+                        {formatAr(calculResult.plafondAnnuel.details.consommeActe!)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Plafond acte</p>
+                      <p className="font-bold text-foreground">{formatAr(calculResult.plafondAnnuel.details.plafondActe!)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground">Reliquat</p>
+                      <p className={`font-bold ${
+                        (calculResult.plafondAnnuel.details.reliquatActe ?? 0) > 0
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-red-700 dark:text-red-300'
+                      }`}>{formatAr(calculResult.plafondAnnuel.details.reliquatActe!)}</p>
+                    </div>
+                  </div>
+                  {/* Jauge de consommation */}
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        (calculResult.plafondAnnuel.details.consommeActe! / calculResult.plafondAnnuel.details.plafondActe!) >= 1
+                          ? 'bg-red-500'
+                          : (calculResult.plafondAnnuel.details.consommeActe! / calculResult.plafondAnnuel.details.plafondActe!) >= 0.7
+                            ? 'bg-amber-500'
+                            : 'bg-blue-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (calculResult.plafondAnnuel.details.consommeActe! / calculResult.plafondAnnuel.details.plafondActe!) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    {((calculResult.plafondAnnuel.details.consommeActe! / calculResult.plafondAnnuel.details.plafondActe!) * 100).toFixed(1)}% consommé
+                    {calculResult.plafondAnnuel.details.nbActesIdentiques !== undefined && calculResult.plafondAnnuel.details.nbActesIdentiques > 0 && (
+                      <> · {calculResult.plafondAnnuel.details.nbActesIdentiques} acte(s) cette année</>
+                    )}
+                  </p>
+                  {/* Alertes */}
+                  {calculResult.plafondAnnuel.alertes.length > 0 && (
+                    <div className="space-y-1">
+                      {calculResult.plafondAnnuel.alertes.map((a, i) => (
+                        <p key={i} className={`text-xs ${
+                          a.type === 'danger' ? 'text-red-600 dark:text-red-400 font-medium' :
+                          a.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                          'text-blue-600 dark:text-blue-400'
+                        }`}>{a.message}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Two columns: Montant remboursé / Ticket modérateur */}
               <div className="grid grid-cols-2 gap-3">

@@ -5,7 +5,9 @@
  *   - /api/sante/simuler-acte (simulation)
  *   - POST /api/dossiers (création manuelle)
  *   - PATCH /api/dossiers/[id] (transition EN_ANALYSE → VALIDE)
- *   - Imports ISA / générique (alertes non bloquantes)
+ *   - POST /api/technique/baremes (prévisualisation formulaire + plafond annuel)
+ *   - POST /api/technique/import-isa (alertes non bloquantes)
+ *   - POST /api/import (alertes non bloquantes pour EXCEL avec assureId)
  *
  * La logique est extraite de simuler-acte pour garantir un calcul identique
  * partout dans le circuit de traitement.

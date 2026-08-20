@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { verifierPlafondAnnuel, type PlafondCheckResult } from '@/lib/plafond-check';
 
-// ─── POST : Calculer le ticket modérateur ─────────────────────────────────────
+// ─── POST : Calculer le ticket modérateur + vérification plafond annuel ──────
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,10 +11,18 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { societeId, prestation, montantReclame } = body as {
+    const {
+      societeId,
+      prestation,
+      montantReclame,
+      assureId,
+      prestataireId,
+    } = body as {
       societeId: string;
       prestation: string;
       montantReclame: number;
+      assureId?: string;
+      prestataireId?: string;
     };
 
     // Validations
@@ -84,20 +93,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ─── Vérification du plafond annuel (si assureId fourni) ────────────────
+    let plafondCheck: PlafondCheckResult | null = null;
+    let montantCouvertFinal = Math.min(montantReclame, bareme.plafond);
+
+    if (assureId) {
+      try {
+        plafondCheck = await verifierPlafondAnnuel({
+          assureId,
+          societeId,
+          typeActe: prestation.toUpperCase(),
+          montantDemande: montantReclame,
+          prestataireId: prestataireId || undefined,
+        });
+
+        // Si le plafond annuel est vérifié, utiliser le montant couvert
+        // qui tient compte du reliquat réel (et non juste le plafond du barème)
+        if (plafondCheck.details.montantCouvert !== undefined) {
+          montantCouvertFinal = plafondCheck.details.montantCouvert;
+        }
+      } catch (err) {
+        console.error('[BAREMES] Erreur vérification plafond annuel :', err);
+        // En cas d'erreur de vérification, on poursuit avec le calcul de base
+      }
+    }
+
     // Calcul du ticket modérateur
-    const montantCouvert = Math.min(montantReclame, bareme.plafond);
-    const montantRembourse = montantCouvert * (bareme.tauxCouverture / 100);
+    const montantRembourse = montantCouvertFinal * (bareme.tauxCouverture / 100);
     const ticketModerateur = montantReclame - montantRembourse;
 
     // Construction de l'explication en français
     const plafondAtteint = montantReclame > bareme.plafond;
+    const plafondAnnuelAtteint = plafondCheck ? !plafondCheck.autorise : false;
     let explication: string;
 
-    if (plafondAtteint) {
+    if (plafondAnnuelAtteint) {
+      // Plafond annuel épuisé — message prioritaire
+      explication = plafondCheck!.message;
+    } else if (plafondAtteint) {
       explication = [
         `Pour la prestation "${prestation}" de la société "${societe.nom}" :`,
         `Le montant réclamé (${montantReclame.toLocaleString('fr-FR')} FCFA) dépasse le plafond de ${bareme.plafond.toLocaleString('fr-FR')} FCFA.`,
-        `Le montant couvert est donc plafonné à ${montantCouvert.toLocaleString('fr-FR')} FCFA.`,
+        `Le montant couvert est donc plafonné à ${montantCouvertFinal.toLocaleString('fr-FR')} FCFA.`,
         `Avec un taux de couverture de ${bareme.tauxCouverture}%, le montant remboursé est de ${montantRembourse.toLocaleString('fr-FR')} FCFA.`,
         `Le ticket modérateur à la charge du bénéficiaire est de ${ticketModerateur.toLocaleString('fr-FR')} FCFA.`,
       ].join(' ');
@@ -110,7 +147,13 @@ export async function POST(request: NextRequest) {
       ].join(' ');
     }
 
-    return NextResponse.json({
+    // Ajouter les infos de consommation annuelle à l'explication
+    if (plafondCheck && plafondCheck.autorise && plafondCheck.details.reliquatActe !== undefined) {
+      const pctActe = ((plafondCheck.details.consommeActe! / plafondCheck.details.plafondActe!) * 100).toFixed(1);
+      explication += ` Consommation annuelle ${prestation} : ${pctActe}% (${plafondCheck.details.consommeActe!.toLocaleString('fr-FR')} / ${plafondCheck.details.plafondActe!.toLocaleString('fr-FR')} FCFA), reliquat : ${plafondCheck.details.reliquatActe!.toLocaleString('fr-FR')} FCFA.`;
+    }
+
+    const response: Record<string, unknown> = {
       societe: { id: societe.id, nom: societe.nom },
       bareme: {
         prestation: bareme.prestation,
@@ -120,14 +163,27 @@ export async function POST(request: NextRequest) {
       },
       calcul: {
         montantReclame,
-        plafondAtteint,
-        montantCouvert,
+        plafondAtteint: plafondAtteint || plafondAnnuelAtteint,
+        montantCouvert: montantCouvertFinal,
         tauxCouverture: bareme.tauxCouverture,
         montantRembourse: Math.round(montantRembourse * 100) / 100,
         ticketModerateur: Math.round(ticketModerateur * 100) / 100,
       },
       explication,
-    });
+    };
+
+    // Ajouter les détails du plafond annuel si vérifié
+    if (plafondCheck) {
+      response.plafondAnnuel = {
+        autorise: plafondCheck.autorise,
+        raison: plafondCheck.raison,
+        message: plafondCheck.message,
+        details: plafondCheck.details,
+        alertes: plafondCheck.alertes,
+      };
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Erreur lors du calcul du ticket modérateur :', error);
     return NextResponse.json(

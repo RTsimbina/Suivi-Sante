@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { readExcelRows } from "@/lib/excel";
 import { Prisma } from "@prisma/client";
+import { verifierPlafondAnnuel } from "@/lib/plafond-check";
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "EN_PAIEMENT", "PAYE", "REJETE"];
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
     const anomalies: Anomalie[] = [];
     let nbSucces = 0;
     let nbErreurs = 0;
+    let nbAvertissementsPlafond = 0;
     const importDossiers: { numeroLigne: number; statutImport: string; erreur: string | null; donnees: string }[] = [];
 
     // Récupérer toutes les sociétés pour le matching
@@ -101,6 +103,9 @@ export async function POST(request: NextRequest) {
         dateReception = new Date();
       }
 
+      // Extraire l'assureId optionnel (pour vérification plafond)
+      const assureIdImport = String(row["AssureId"] || row["assureId"] || "").trim() || undefined;
+
       try {
         // Vérifier si le dossier existe déjà
         const existing = await db.dossier.findUnique({ where: { numeroDossier } });
@@ -164,6 +169,60 @@ export async function POST(request: NextRequest) {
             createData.montantPaye = (updateData as Record<string, unknown>).montantPaye;
           }
 
+          // AssureId si fourni dans le fichier
+          if (assureIdImport) {
+            createData.assureId = assureIdImport;
+          }
+
+          // ─── Vérification non bloquante du plafond annuel (EXCEL) ──────────
+          let historiqueEntries: unknown[] = [];
+          if (assureIdImport && societe && (source === "EXCEL" || source === "ISA") && montantReclame > 0) {
+            try {
+              const plafondResult = await verifierPlafondAnnuel({
+                assureId: assureIdImport,
+                societeId: societe.id,
+                typeActe: typeDossier || "CONSULTATION",
+                montantDemande: montantReclame,
+              });
+
+              if (!plafondResult.autorise) {
+                nbAvertissementsPlafond++;
+                anomalies.push({
+                  ligne: ligneNum, type: "avertissement", champ: "PLAFOND",
+                  message: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
+                  donnees: row,
+                });
+                historiqueEntries.push({
+                  date: new Date().toISOString(),
+                  action: 'IMPORT_PLAFOND',
+                  commentaire: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
+                });
+              } else if (plafondResult.alertes.length > 0) {
+                for (const alerte of plafondResult.alertes) {
+                  if (alerte.type === 'warning' || alerte.type === 'danger') {
+                    nbAvertissementsPlafond++;
+                  }
+                  anomalies.push({
+                    ligne: ligneNum, type: "avertissement", champ: "PLAFOND",
+                    message: `[PLAFOND] ${alerte.message}`,
+                    donnees: row,
+                  });
+                  historiqueEntries.push({
+                    date: new Date().toISOString(),
+                    action: 'IMPORT_PLAFOND',
+                    commentaire: `[PLAFOND] ${alerte.message}`,
+                  });
+                }
+              }
+            } catch {
+              // Ne pas bloquer l'import en cas d'erreur de vérification
+            }
+          }
+
+          if (historiqueEntries.length > 0) {
+            createData.historique = JSON.stringify(historiqueEntries);
+          }
+
           await db.dossier.create({ data: createData as Prisma.DossierCreateInput });
         }
 
@@ -209,8 +268,9 @@ export async function POST(request: NextRequest) {
       nbLignes: rows.length,
       nbSucces,
       nbErreurs,
+      nbAvertissementsPlafond,
       tauxSucces: rows.length > 0 ? Math.round((nbSucces / rows.length) * 100) : 0,
-      anomalies: anomalies.slice(0, 50), // Limiter à 50
+      anomalies: anomalies.slice(0, 50),
     });
   } catch (error) {
     console.error("Import error:", error);
