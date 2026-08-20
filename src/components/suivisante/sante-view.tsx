@@ -155,11 +155,11 @@ export default function SanteView() {
   const [actesPagination, setActesPagination] = useState<ActesPagination>({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [actesFiltres, setActesFiltres] = useState<ActesFiltres>({ typesActe: [], statuts: [] });
 
-  // Filtres actifs
+  // Filtres actifs — dates par défaut = année courante
   const [filtreType, setFiltreType] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
-  const [filtreDateDebut, setFiltreDateDebut] = useState('');
-  const [filtreDateFin, setFiltreDateFin] = useState('');
+  const [filtreDateDebut, setFiltreDateDebut] = useState(`${new Date().getFullYear()}-01-01`);
+  const [filtreDateFin, setFiltreDateFin] = useState(`${new Date().getFullYear()}-12-31`);
   const [filtreSearch, setFiltreSearch] = useState('');
   const [actesPage, setActesPage] = useState(1);
   const [showFiltres, setShowFiltres] = useState(true);
@@ -196,8 +196,8 @@ export default function SanteView() {
     setActesFiltres({ typesActe: [], statuts: [] });
     setFiltreType('');
     setFiltreStatut('');
-    setFiltreDateDebut('');
-    setFiltreDateFin('');
+    setFiltreDateDebut(`${new Date().getFullYear()}-01-01`);
+    setFiltreDateFin(`${new Date().getFullYear()}-12-31`);
     setFiltreSearch('');
     setActesPage(1);
 
@@ -303,8 +303,8 @@ export default function SanteView() {
   const handleResetFiltres = () => {
     setFiltreType('');
     setFiltreStatut('');
-    setFiltreDateDebut('');
-    setFiltreDateFin('');
+    setFiltreDateDebut(`${new Date().getFullYear()}-01-01`);
+    setFiltreDateFin(`${new Date().getFullYear()}-12-31`);
     setFiltreSearch('');
   };
 
@@ -376,8 +376,16 @@ export default function SanteView() {
     return 'dark:bg-emerald-400';
   }
 
-  // Compteur de filtres actifs
-  const nbFiltresActifs = [filtreType, filtreStatut, filtreDateDebut, filtreDateFin, filtreSearch].filter(Boolean).length;
+  // Compteur de filtres actifs (dates par défaut = année courante, ne comptent pas)
+  const defaultDebut = `${new Date().getFullYear()}-01-01`;
+  const defaultFin = `${new Date().getFullYear()}-12-31`;
+  const nbFiltresActifs = [
+    filtreType,
+    filtreStatut,
+    filtreDateDebut !== defaultDebut ? filtreDateDebut : '',
+    filtreDateFin !== defaultFin ? filtreDateFin : '',
+    filtreSearch,
+  ].filter(Boolean).length;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
