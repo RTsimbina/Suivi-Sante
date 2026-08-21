@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     // Charger tous les numéros de dossier existants pour le matching rapide
     const existingDossiers = await db.dossier.findMany({
-      select: { numeroDossier: true, statut: true, montantPaye: true, montantReclame: true, historique: true },
+      select: { numeroDossier: true, statut: true, montantPaye: true, montantReclame: true, montantValide: true, historique: true },
     });
     const dossierMap = new Map(existingDossiers.map((d) => [d.numeroDossier, d]));
 
