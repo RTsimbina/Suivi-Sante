@@ -59,8 +59,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching IA analysis:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération de l'analyse IA" },
+    return NextResponse.json({ erreur: "Erreur lors de la récupération de l'analyse IA" },
       { status: 500 }
     );
   }

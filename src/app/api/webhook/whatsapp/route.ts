@@ -19,14 +19,14 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get('hub.challenge');
 
   if (!WHATSAPP_VERIFY_TOKEN) {
-    return NextResponse.json({ error: 'WHATSAPP_VERIFY_TOKEN non configuré' }, { status: 500 });
+    return NextResponse.json({ erreur: 'WHATSAPP_VERIFY_TOKEN non configuré' }, { status: 500 });
   }
 
   if (mode === 'subscribe' && token === WHATSAPP_VERIFY_TOKEN && challenge) {
     console.log('[WHATSAPP] Webhook vérifié avec succès');
     return new NextResponse(challenge, { status: 200 });
   }
-  return NextResponse.json({ error: 'Échec de la vérification' }, { status: 403 });
+  return NextResponse.json({ erreur: 'Échec de la vérification' }, { status: 403 });
 }
 
 // POST: Réception des messages WhatsApp (HMAC-SHA256 obligatoire si secret configuré)
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   // ── Rate limit ──
   const ip = getClientIp(request.headers);
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
+    return NextResponse.json({ erreur: 'Too Many Requests' }, { status: 429 });
   }
 
   // ── Lire le body brut pour la vérification HMAC ──
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   try {
     body = JSON.parse(new TextDecoder().decode(rawBody));
   } catch {
-    return NextResponse.json({ error: 'JSON invalide' }, { status: 400 });
+    return NextResponse.json({ erreur: 'JSON invalide' }, { status: 400 });
   }
 
   try {
@@ -109,6 +109,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'processed' });
   } catch (error) {
     console.error('[WHATSAPP] Erreur:', error);
-    return NextResponse.json({ error: 'Erreur de traitement' }, { status: 500 });
+    return NextResponse.json({ erreur: 'Erreur de traitement' }, { status: 500 });
   }
 }

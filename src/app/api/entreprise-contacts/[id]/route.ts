@@ -22,7 +22,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(contact);
   } catch (error) {
     console.error("Error updating contact:", error);
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }
 
@@ -35,6 +35,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting contact:", error);
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

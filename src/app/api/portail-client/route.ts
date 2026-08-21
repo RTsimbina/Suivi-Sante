@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 
 // ─── GET : Données du portail client ──────────────────────────────────────
 // Renvoie les données filtrées selon le rôle externe connecté :
-//   - PORTEAIL_CLIENT : données de l'assuré (avec ayants droit, contrats, dossiers)
+//   - PORTAIL_CLIENT : données de l'assuré (avec ayants droit, contrats, dossiers)
 //   - CONTACT_ENTREPRISE : données de la société (assurés, contrats, dossiers)
 //   - ADMINISTRATEUR : toutes les données (pour test)
 
@@ -25,12 +25,12 @@ export async function GET(request: NextRequest) {
     const userId = token.id as string;
 
     // Rôles internes n'ont rien à faire ici
-    if (!['PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'].includes(role)) {
+    if (!['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'].includes(role)) {
       return NextResponse.json({ erreur: 'Accès refusé.' }, { status: 403 });
     }
 
-    // ─── Mode PORTEAIL_CLIENT : vue assuré ───
-    if (role === 'PORTEAIL_CLIENT') {
+    // ─── Mode PORTAIL_CLIENT : vue assuré ───
+    if (role === 'PORTAIL_CLIENT') {
       if (!assureId) {
         return NextResponse.json(
           { erreur: 'Aucun assuré lié à votre compte. Contactez votre administrateur.' },
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
       const rejetes = dossiers.filter(d => d.statut === 'REJETE').length;
 
       return NextResponse.json({
-        type: 'PORTEAIL_CLIENT',
+        type: 'PORTAIL_CLIENT',
         assure: {
           id: assure.id,
           nom: assure.nom,

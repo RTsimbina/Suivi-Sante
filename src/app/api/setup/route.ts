@@ -524,7 +524,7 @@ export async function GET(request: Request) {
   const token = searchParams.get('token');
 
   if (!token || token !== process.env.SETUP_TOKEN) {
-    return NextResponse.json({ error: 'Token de setup invalide' }, { status: 403 });
+    return NextResponse.json({ erreur: 'Token de setup invalide' }, { status: 403 });
   }
 
   const log: string[] = [];

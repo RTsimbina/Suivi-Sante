@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       where: { id },
       include: { contrats: { include: { appelsDeFonds: { select: { montant: true } } } } },
     });
-    if (!societe) return NextResponse.json({ error: "Société non trouvée" }, { status: 404 });
+    if (!societe) return NextResponse.json({ erreur: "Société non trouvée" }, { status: 404 });
 
     const start = new Date(annee, mois - 1, 1);
     const end = new Date(annee, mois, 1);
@@ -103,6 +103,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
   } catch (error) {
     console.error("[RAPPORT ENTREPRISE] Erreur:", error);
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

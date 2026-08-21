@@ -10,7 +10,7 @@ const VALID_ROLES = [
   'TECHNIQUE',
   'COMPTABILITE',
   'SANTE',
-  'PORTEAIL_CLIENT',
+  'PORTAIL_CLIENT',
   'CONTACT_ENTREPRISE',
 ] as const;
 
@@ -20,7 +20,7 @@ const ROLE_LABELS: Record<string, string> = {
   TECHNIQUE: 'Service Technique',
   COMPTABILITE: 'Comptabilite',
   SANTE: 'Controle Sante',
-  PORTEAIL_CLIENT: 'Portail Client',
+  PORTAIL_CLIENT: 'Portail Client',
   CONTACT_ENTREPRISE: 'Contact Entreprise',
 };
 

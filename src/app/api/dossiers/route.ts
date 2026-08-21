@@ -89,8 +89,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching dossiers:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération des dossiers" },
+    return NextResponse.json({ erreur: "Erreur lors de la récupération des dossiers" },
       { status: 500 }
     );
   }
@@ -124,8 +123,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!numeroDossier || !dateReception || !societeId || !beneficiaire || !typeDossier) {
-      return NextResponse.json(
-        { error: "Les champs obligatoires sont manquants: numeroDossier, dateReception, societeId, beneficiaire, typeDossier" },
+      return NextResponse.json({ erreur: "Les champs obligatoires sont manquants: numeroDossier, dateReception, societeId, beneficiaire, typeDossier" },
         { status: 400 }
       );
     }
@@ -136,8 +134,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existing) {
-      return NextResponse.json(
-        { error: "Un dossier avec ce numéro existe déjà" },
+      return NextResponse.json({ erreur: "Un dossier avec ce numéro existe déjà" },
         { status: 409 }
       );
     }
@@ -158,9 +155,7 @@ export async function POST(request: NextRequest) {
       // Bloquer si le plafond est atteint (assuré inactif, plafond acte/global épuisé)
       if (!plafondResult.autorise &&
           ['ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'PRESTATAIRE_INACTIF'].includes(plafondResult.raison)) {
-        return NextResponse.json(
-          {
-            error: plafondResult.message,
+        return NextResponse.json({ erreur: plafondResult.message,
             plafondAtteint: true,
             plafondDetails: plafondResult.details,
             raison: plafondResult.raison,
@@ -203,7 +198,29 @@ export async function POST(request: NextRequest) {
       finalTicketModerateur = Math.round((montantCouvert - finalMontantValide) * 100) / 100;
     }
 
-    const dossier = await db.dossier.create({
+    // Transaction : vérifier le plafond ET créer le dossier de manière atomique
+    // pour éviter les race conditions (deux créations simultanées)
+    const dossier = await db.$transaction(async (tx) => {
+      // Re-vérifier le plafond dans la transaction
+      if (assureId && societeId && typeDossier && montantReclame) {
+        const plafondTx = await tx.dossier.findMany({
+          where: {
+            assureId,
+            societeId,
+            typeDossier,
+            dateReception: { gte: new Date(new Date().getFullYear(), 0, 1), lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59) },
+            statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
+          },
+          select: { montantValide: true, montantPaye: true, montantReclame: true },
+        });
+        const consomme = plafondTx.reduce((s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame), 0);
+        const baremeTx = await tx.bareme.findFirst({ where: { societeId, prestation: typeDossier, active: true } });
+        if (baremeTx && consomme >= baremeTx.plafond) {
+          throw new Error(`PLAFOND_ATTEINT_TRANSACTION: Plafond ${typeDossier} atteint lors de la création`);
+        }
+      }
+
+      return tx.dossier.create({
       data: {
         numeroDossier,
         dateReception: new Date(dateReception),
@@ -233,7 +250,9 @@ export async function POST(request: NextRequest) {
         gestionnaireCompta: true,
       },
     });
+    }); // fin $transaction
 
+    // Attraper l'erreur de plafond de la transaction
     const response: Record<string, unknown> = { ...dossier } as Record<string, unknown>;
     if (plafondResult) {
       response.plafondCheck = plafondResult;
@@ -242,8 +261,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error("Error creating dossier:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la création du dossier" },
+    return NextResponse.json({ erreur: "Erreur lors de la création du dossier" },
       { status: 500 }
     );
   }

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     if (!dossier) {
-      return NextResponse.json({ error: "Dossier introuvable" }, { status: 404 });
+      return NextResponse.json({ erreur: "Dossier introuvable" }, { status: 404 });
     }
 
     // Parser l'historique JSON
@@ -40,6 +40,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({ ...dossier, historiqueParsed });
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

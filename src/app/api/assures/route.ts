@@ -282,6 +282,16 @@ export async function PUT(request: NextRequest) {
       if (!societe) {
         return NextResponse.json({ erreur: 'Société introuvable.' }, { status: 404 });
       }
+
+      // Vérifier si l'assuré a des dossiers — bloquer le changement de société
+      // car les dossiers sont liés à la société et le plafond dépend de la société
+      const dossierCount = await db.dossier.count({ where: { assureId: id } });
+      if (dossierCount > 0) {
+        return NextResponse.json(
+          { erreur: `Impossible de changer la société : ${dossierCount} dossier(s) sont rattachés à cet assuré. Les dossiers doivent être réassignés manuellement avant tout changement de société.` },
+          { status: 409 }
+        );
+      }
     }
 
     const updateData: Record<string, unknown> = {};

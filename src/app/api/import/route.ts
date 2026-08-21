@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
     const categorieDossier = (formData.get("categorie") as string) || "";
 
     if (!file) {
-      return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
     }
     if (!["ISA", "SAGE", "EXCEL"].includes(source)) {
-      return NextResponse.json({ error: "Source invalide (ISA, SAGE ou EXCEL)" }, { status: 400 });
+      return NextResponse.json({ erreur: "Source invalide (ISA, SAGE ou EXCEL)" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -82,11 +82,16 @@ export async function POST(request: NextRequest) {
         anomalies.push({ ligne: ligneNum, type: "avertissement", champ: "MontantReclame", message: `Montant suspect: ${montantReclame.toLocaleString("fr-FR")} Ar`, donnees: row });
       }
 
-      // Trouver ou créer la société
+      // Trouver la société (NE JAMAIS créer automatiquement — risque de doublons)
       let societe = allSocietes.find((s) => s.nom.toLowerCase() === societeNom.toLowerCase());
       if (!societe && societeNom) {
-        societe = await db.societe.create({ data: { nom: societeNom } });
-        allSocietes.push(societe);
+        // Essai avec correspondance partielle (suppression espaces, accents)
+        const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+        const target = normalize(societeNom);
+        societe = allSocietes.find((s) => normalize(s.nom) === target);
+      }
+      if (!societe && societeNom) {
+        anomalies.push({ ligne: ligneNum, type: "avertissement", champ: "Societe", message: `Société "${societeNom}" introuvable. Créez-la d'abord dans la gestion des sociétés.`, donnees: row });
       }
 
       // Parser la date
@@ -274,7 +279,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Import error:", error);
-    return NextResponse.json({ error: "Erreur lors de l'importation" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de l'importation" }, { status: 500 });
   }
 }
 
@@ -289,6 +294,6 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ historiques });
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

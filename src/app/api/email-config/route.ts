@@ -3,6 +3,9 @@ import { checkAuth } from '@/lib/authorize';
 import { db } from '@/lib/db';
 import nodemailer from 'nodemailer';
 import { invalidateCache, interpreterErreurSMTP } from '@/lib/email';
+import { encrypt } from '@/lib/crypto';
+
+const ENCRYPTION_KEY = process.env.SERVER_ENCRYPTION_KEY || '';
 
 // GET: Récupérer la configuration SMTP (masquer le mot de passe)
 export async function GET(request: NextRequest) {
@@ -54,6 +57,9 @@ export async function PUT(request: NextRequest) {
 
     const port = Number(smtpPort) || 587;
 
+    // Chiffrer le mot de passe avant stockage (AES-256-GCM)
+    const encryptedPass = encrypt(String(smtpPass), ENCRYPTION_KEY);
+
     // Upsert : chercher une config existante, sinon en créer une nouvelle
     const existante = await db.configurationEmail.findFirst({ orderBy: { createdAt: 'desc' } });
 
@@ -65,7 +71,7 @@ export async function PUT(request: NextRequest) {
           smtpHost,
           smtpPort: port,
           smtpUser,
-          smtpPass, // nouveau mot de passe (ou le même)
+          smtpPass: encryptedPass, // chiffré — jamais en clair en BDD
           smtpFrom,
           emailRapportDestinataire: emailRapportDestinataire || null,
           actif: actif !== false,
@@ -74,8 +80,8 @@ export async function PUT(request: NextRequest) {
       });
     } else {
       config = await db.configurationEmail.create({
-        data: { smtpHost, smtpPort: port, smtpUser, smtpPass, smtpFrom, emailRapportDestinataire: emailRapportDestinataire || null },
-        select: { id: true, smtpHost: true, smtpPort: true, smtpUser: true, smtpFrom: true, emailRapportDestinataire: true, actif: true, updatedAt: true },
+        data: { smtpHost, smtpPort: port, smtpUser, smtpPass: encryptedPass, smtpFrom, emailRapportDestinataire: emailRapportDestinataire || null },
+        select: { id: true, smtpHost: true, smtpPort: true, smtpUser: true, smtpFrom: true, emailRapportDestinataire: true, actif: true, createdAt: true },
       });
     }
 

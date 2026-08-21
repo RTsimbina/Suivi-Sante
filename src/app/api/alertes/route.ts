@@ -27,8 +27,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching alertes:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération des alertes" },
+    return NextResponse.json({ erreur: "Erreur lors de la récupération des alertes" },
       { status: 500 }
     );
   }

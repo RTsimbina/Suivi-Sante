@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ baremes });
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }
 
@@ -40,16 +40,16 @@ export async function POST(request: NextRequest) {
     const { societeId, prestation, tauxCouverture, plafond, description } = body;
 
     if (!societeId || !prestation) {
-      return NextResponse.json({ error: "societeId et prestation requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "societeId et prestation requis" }, { status: 400 });
     }
     if (!PRESTATIONS_VALIDES.includes(prestation) && !PARENT_TYPES.includes(prestation)) {
-      return NextResponse.json({ error: `Prestation invalide. Valeurs: ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(", ")}` }, { status: 400 });
+      return NextResponse.json({ erreur: `Prestation invalide. Valeurs: ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(", ")}` }, { status: 400 });
     }
     if (tauxCouverture === undefined || tauxCouverture < 0 || tauxCouverture > 100) {
-      return NextResponse.json({ error: "tauxCouverture doit être entre 0 et 100" }, { status: 400 });
+      return NextResponse.json({ erreur: "tauxCouverture doit être entre 0 et 100" }, { status: 400 });
     }
     if (plafond === undefined || plafond <= 0) {
-      return NextResponse.json({ error: "plafond doit être un montant positif" }, { status: 400 });
+      return NextResponse.json({ erreur: "plafond doit être un montant positif" }, { status: 400 });
     }
 
     // Récupérer l'ancien barème s'il existe (pour l'audit)
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ bareme }, { status: 201 });
   } catch (error) {
     console.error("Erreur création barème:", error);
-    return NextResponse.json({ error: "Erreur lors de la création du barème" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de la création du barème" }, { status: 500 });
   }
 }
 
@@ -125,7 +125,7 @@ export async function PATCH(request: NextRequest) {
     const { id, active } = body;
 
     if (!id) {
-      return NextResponse.json({ error: "ID du barème requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "ID du barème requis" }, { status: 400 });
     }
 
     // Récupérer l'ancien barème pour l'audit
@@ -150,7 +150,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ bareme });
   } catch (error) {
     console.error("Erreur mise à jour barème:", error);
-    return NextResponse.json({ error: "Erreur lors de la mise à jour" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de la mise à jour" }, { status: 500 });
   }
 }
 
@@ -164,7 +164,7 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "ID du barème requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "ID du barème requis" }, { status: 400 });
     }
 
     // Récupérer le barème avant suppression pour l'audit
@@ -189,6 +189,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Erreur suppression barème:", error);
-    return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de la suppression" }, { status: 500 });
   }
 }

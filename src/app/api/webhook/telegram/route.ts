@@ -10,39 +10,12 @@ import { traiterMessageBot, sauvegarderMessage, envoyerTelegram } from '@/lib/bo
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || '';
 
-// GET: Information sur le bot + configuration du webhook
-export async function GET(request: NextRequest) {
-  if (!TELEGRAM_BOT_TOKEN) {
-    return NextResponse.json({ status: 'not_configured', message: 'TELEGRAM_BOT_TOKEN non défini' });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const setWebhook = searchParams.get('set_webhook');
-  const webhookUrl = searchParams.get('url');
-
-  if (setWebhook === 'true' && webhookUrl) {
-    // Inclure le secret_token dans la configuration du webhook
-    const secretToken = TELEGRAM_WEBHOOK_SECRET || undefined;
-    const params = new URLSearchParams({ url: webhookUrl });
-    if (secretToken) params.set('secret_token', secretToken);
-
-    try {
-      const res = await fetch(
-        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?${params.toString()}`,
-      );
-      const data = await res.json();
-      return NextResponse.json(data);
-    } catch {
-      return NextResponse.json({ error: 'Erreur de configuration webhook' }, { status: 500 });
-    }
-  }
-
-  return NextResponse.json({
-    status: 'active',
-    bot: 'Suivi Santé Telegram Bot',
-    signature_enabled: !!TELEGRAM_WEBHOOK_SECRET,
-    webhook_info: 'Envoyez GET ?set_webhook=true&url=https://votre-domaine.com/api/webhook/telegram pour configurer',
-  });
+// GET: Désactivé — la configuration du webhook Telegram doit se faire
+// en CLI ou via un endpoint admin dédié, jamais via GET public.
+export async function GET() {
+  return NextResponse.json({ erreur: 'Endpoint désactivé. Utilisez le CLI Telegram pour configurer le webhook.' },
+    { status: 403 }
+  );
 }
 
 // POST: Réception des messages Telegram (vérification de signature obligatoire)
@@ -50,7 +23,7 @@ export async function POST(request: NextRequest) {
   // ── Rate limit ──
   const ip = getClientIp(request.headers);
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
+    return NextResponse.json({ erreur: 'Too Many Requests' }, { status: 429 });
   }
 
   // ── Vérification signature Telegram (obligatoire) ──
@@ -101,6 +74,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'processed' });
   } catch (error) {
     console.error('[TELEGRAM] Erreur:', error);
-    return NextResponse.json({ error: 'Erreur de traitement' }, { status: 500 });
+    return NextResponse.json({ erreur: 'Erreur de traitement' }, { status: 500 });
   }
 }

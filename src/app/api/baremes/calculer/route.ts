@@ -27,14 +27,13 @@ export async function POST(request: NextRequest) {
     const { societeId, prestation, montantReclame } = body;
 
     if (!societeId || !prestation || !montantReclame) {
-      return NextResponse.json(
-        { error: "societeId, prestation et montantReclame sont requis" },
+      return NextResponse.json({ erreur: "societeId, prestation et montantReclame sont requis" },
         { status: 400 }
       );
     }
 
     if (montantReclame <= 0) {
-      return NextResponse.json({ error: "Le montant doit être positif" }, { status: 400 });
+      return NextResponse.json({ erreur: "Le montant doit être positif" }, { status: 400 });
     }
 
     // Récupérer le barème avec le nom de la société
@@ -93,6 +92,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erreur calcul barème:", error);
-    return NextResponse.json({ error: "Erreur lors du calcul" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors du calcul" }, { status: 500 });
   }
 }

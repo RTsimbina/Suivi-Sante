@@ -78,8 +78,7 @@ export async function GET(request: NextRequest) {
     // Il faut au moins un critère
     const hasFilter = queries.length > 0 || statut || type || societeId;
     if (!hasFilter) {
-      return NextResponse.json(
-        { error: "Au moins un critère de recherche est requis" },
+      return NextResponse.json({ erreur: "Au moins un critère de recherche est requis" },
         { status: 400 }
       );
     }
@@ -265,8 +264,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in suivi endpoint:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la recherche de suivi" },
+    return NextResponse.json({ erreur: "Erreur lors de la recherche de suivi" },
       { status: 500 }
     );
   }

@@ -12,8 +12,7 @@ export async function POST(request: NextRequest) {
     const { query } = body;
 
     if (!query || typeof query !== "string") {
-      return NextResponse.json(
-        { error: "Le champ 'query' est requis" },
+      return NextResponse.json({ erreur: "Le champ 'query' est requis" },
         { status: 400 }
       );
     }
@@ -21,8 +20,7 @@ export async function POST(request: NextRequest) {
     const q = query.trim();
 
     if (q.length < 2) {
-      return NextResponse.json(
-        { error: "La recherche doit contenir au moins 2 caractères" },
+      return NextResponse.json({ erreur: "La recherche doit contenir au moins 2 caractères" },
         { status: 400 }
       );
     }
@@ -137,8 +135,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in portail endpoint:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la recherche" },
+    return NextResponse.json({ erreur: "Erreur lors de la recherche" },
       { status: 500 }
     );
   }

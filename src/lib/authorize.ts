@@ -32,16 +32,16 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
   '/api/portail-client': {
-    roles: ['PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
+    roles: ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
   },
   '/api/dossiers': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
       DELETE: ['ADMINISTRATEUR'],
       PATCH: ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE'], // Changer statut
-      // PORTEAIL_CLIENT et CONTACT_ENTREPRISE : lecture seule (GET)
+      // PORTAIL_CLIENT et CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/kpis': {
@@ -73,12 +73,12 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
   },
   '/api/contrats': {
-    roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
+    roles: ['ADMINISTRATEUR', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
       PUT: ['ADMINISTRATEUR'],
       DELETE: ['ADMINISTRATEUR'],
-      // SANTE, PORTEAIL_CLIENT, CONTACT_ENTREPRISE : lecture seule (GET)
+      // SANTE, PORTAIL_CLIENT, CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/appels-fonds': {
@@ -120,12 +120,12 @@ export const API_PERMISSIONS: Record<
     },
   },
   '/api/assures': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
       DELETE: ['ADMINISTRATEUR', 'TECHNIQUE'],
-      // SANTE, PORTEAIL_CLIENT, CONTACT_ENTREPRISE : lecture seule (GET)
+      // SANTE, PORTAIL_CLIENT, CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
   '/api/assures/import': {
@@ -199,7 +199,7 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE'],
   },
   '/api/profil': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTEAIL_CLIENT', 'CONTACT_ENTREPRISE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
   },
   '/api/utilisateurs': {
     roles: ['ADMINISTRATEUR'],

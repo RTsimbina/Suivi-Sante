@@ -58,14 +58,13 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
     }
 
     const allowedExts = [".xlsx", ".xls"];
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     if (!allowedExts.includes(ext)) {
-      return NextResponse.json(
-        { error: "Format invalide. Utilisez .xlsx ou .xls" },
+      return NextResponse.json({ erreur: "Format invalide. Utilisez .xlsx ou .xls" },
         { status: 400 }
       );
     }
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
     const { rows } = await readExcelRows(buffer);
 
     if (rows.length === 0) {
-      return NextResponse.json({ error: "Le fichier est vide (aucune ligne de données)" }, { status: 400 });
+      return NextResponse.json({ erreur: "Le fichier est vide (aucune ligne de données)" }, { status: 400 });
     }
 
     const anomalies: Anomalie[] = [];
@@ -333,6 +332,19 @@ export async function POST(request: NextRequest) {
       }
       historiqueArr.push(historiqueEntry);
 
+      // Validation: montant payé ne doit pas dépasser le montant validé
+      if (montantPaye !== undefined && existing.montantValide !== null && existing.montantValide !== undefined) {
+        if (montantPaye > existing.montantValide * 1.05) { // Tolérance 5%
+          anomalies.push({
+            ligne: ligneNum,
+            type: "avertissement",
+            champ: "MontantPaye",
+            message: `Montant payé (${montantPaye.toLocaleString("fr-FR")} Ar) dépasse le montant validé (${existing.montantValide.toLocaleString("fr-FR")} Ar) de plus de 5%`,
+          });
+          // On n'empêche pas l'import mais on alerte
+        }
+      }
+
       try {
         await db.dossier.update({
           where: { numeroDossier },
@@ -408,6 +420,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[Import SAGE] Erreur:", error);
-    return NextResponse.json({ error: "Erreur lors de l'importation SAGE" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de l'importation SAGE" }, { status: 500 });
   }
 }

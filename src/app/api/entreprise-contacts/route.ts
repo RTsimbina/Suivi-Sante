@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ contacts });
   } catch (error) {
     console.error("Error fetching entreprise contacts:", error);
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
     const body = await request.json();
     const { societeId, nom, prenom, fonction, telephone, email } = body;
-    if (!societeId || !nom) return NextResponse.json({ error: "societeId et nom requis" }, { status: 400 });
+    if (!societeId || !nom) return NextResponse.json({ erreur: "societeId et nom requis" }, { status: 400 });
     const contact = await db.entrepriseContact.create({
       data: { societeId, nom, prenom: prenom || null, fonction: fonction || null, telephone: telephone || null, email: email || null },
       include: { societe: { select: { id: true, nom: true } } },
@@ -37,6 +37,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(contact, { status: 201 });
   } catch (error) {
     console.error("Error creating entreprise contact:", error);
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

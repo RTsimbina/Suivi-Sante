@@ -12,6 +12,6 @@ export async function GET(request: NextRequest) {
     const gestionnaires = await db.gestionnaire.findMany({ where, orderBy: { nom: "asc" } });
     return NextResponse.json(gestionnaires);
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

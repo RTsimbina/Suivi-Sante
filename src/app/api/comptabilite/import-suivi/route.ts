@@ -46,13 +46,13 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
     }
 
     const allowedExts = [".xlsx", ".xls"];
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     if (!allowedExts.includes(ext)) {
-      return NextResponse.json({ error: "Format de fichier invalide. Utilisez .xlsx ou .xls" }, { status: 400 });
+      return NextResponse.json({ erreur: "Format de fichier invalide. Utilisez .xlsx ou .xls" }, { status: 400 });
     }
 
     // Lecture du fichier Excel
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const { rows } = await readExcelRows(buffer);
 
     if (rows.length === 0) {
-      return NextResponse.json({ error: "Le fichier est vide (aucune ligne de données)" }, { status: 400 });
+      return NextResponse.json({ erreur: "Le fichier est vide (aucune ligne de données)" }, { status: 400 });
     }
 
     const anomalies: Anomalie[] = [];
@@ -333,6 +333,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[Import Suivi Compta] Erreur:", error);
-    return NextResponse.json({ error: "Erreur lors de l'importation du suivi" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de l'importation du suivi" }, { status: 500 });
   }
 }

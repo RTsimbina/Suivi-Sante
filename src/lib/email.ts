@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { db } from './db';
+import { decrypt } from './crypto';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,11 +37,12 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
   try {
     const config = await db.configurationEmail.findFirst({ where: { actif: true } });
     if (config) {
+      const ENCRYPTION_KEY = process.env.SERVER_ENCRYPTION_KEY || '';
       _cachedConfig = {
         host: config.smtpHost,
         port: config.smtpPort,
         user: config.smtpUser,
-        pass: config.smtpPass,
+        pass: decrypt(config.smtpPass, ENCRYPTION_KEY), // déchiffré
         from: config.smtpFrom,
         emailRapportDestinataire: config.emailRapportDestinataire,
       };

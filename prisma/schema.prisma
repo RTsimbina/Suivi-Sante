@@ -39,6 +39,7 @@ model Societe {
   assures   Assure[]
   contacts  EntrepriseContact[]
   prestataires PrestataireSociete[]
+  modeCalculAppelFonds ModeCalculAppelFonds?
   createdAt DateTime  @default(now())
 }
 
@@ -195,7 +196,7 @@ model ImportDossier {
 model Assure {
   id                String     @id @default(cuid())
   societeId         String
-  societe           Societe    @relation(fields: [societeId], references: [id], onDelete: Cascade)
+  societe           Societe    @relation(fields: [societeId], references: [id])  // Pas de cascade — la suppression de société est bloquée par l'API si des assurés existent
   nom               String
   prenom            String?
   nSS               String?    @unique
@@ -294,6 +295,21 @@ model EntrepriseContact {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 }
+
+/// Modes de calcul des appels de fonds par société
+model ModeCalculAppelFonds {
+  id            String    @id @default(cuid())
+  societeId     String    @unique
+  societe       Societe   @relation(fields: [societeId], references: [id])
+  mode          String    @default("DEPENSE_MENSUELLE")  // DEPENSE_MENSUELLE | FONDS_ROULEMENT | BUDGET_ANNUEL | FORMULE_SPECIFIQUE
+  parametres    String    @default("{}")  // JSON : { fondsRoulement?: number, periodicite?: string, formule?: string }
+  periodicite   String    @default("MENSUELLE")  // MENSUELLE | TRIMESTRIELLE | SEMESTRIELLE | PERSONNALISEE
+  dateDebut     DateTime?                          // Date de début d'application
+  actif         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
 model ConfigurationEmail {
   id        String   @id @default(cuid())
   smtpHost  String

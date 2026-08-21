@@ -16,6 +16,26 @@ import { db } from '@/lib/db';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+// ─── Rate limiting global IP (léger, sans dépendance externe) ─────────────
+const loginAttemptsByIp = new Map<string, { count: number; resetAt: number }>();
+const IP_MAX_ATTEMPTS_PER_MINUTE = 20;
+
+function checkGlobalIpRateLimit(email: string): boolean {
+  // On utilise l'email comme proxy d'IP rate limiting (puisque le login est par email)
+  // En serverless, il n'y a pas de mémoire partagée entre instances,
+  // mais cela ralentit au moins les tentatives dans une même instance.
+  const key = email.toLowerCase().trim();
+  const now = Date.now();
+  const entry = loginAttemptsByIp.get(key);
+  if (!entry || now > entry.resetAt) {
+    loginAttemptsByIp.set(key, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= IP_MAX_ATTEMPTS_PER_MINUTE;
+}
+
+
 interface LockRow {
   lockoutuntil: Date | null;
   failedattempts: number;
@@ -144,6 +164,12 @@ export const authOptions: NextAuthOptions = {
 
         const email = credentials.email.toLowerCase().trim();
 
+        // Rate limiting global (anti-brute force distribué)
+        if (!checkGlobalIpRateLimit(email)) {
+          console.warn(`Rate limit global atteint pour: ${email}`);
+          return null;
+        }
+
         // Vérifier le verrouillage (SQL brut, résilient)
         const lockStatus = await isLockedOut(email);
         if (lockStatus.locked) {
@@ -175,7 +201,7 @@ export const authOptions: NextAuthOptions = {
         let assureId: string | undefined;
         let societeId: string | undefined;
 
-        if (user.role === 'PORTEAIL_CLIENT') {
+        if (user.role === 'PORTAIL_CLIENT') {
           // Rechercher l'assuré correspondant à cet e-mail
           const assure = await db.assure.findFirst({
             where: { email: { equals: user.email, mode: 'insensitive' } },

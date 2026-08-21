@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface PortailData {
-  type: 'PORTEAIL_CLIENT' | 'CONTACT_ENTREPRISE';
+  type: 'PORTAIL_CLIENT' | 'CONTACT_ENTREPRISE';
   assure?: any;
   societe: { id: string; nom: string; adresse?: string | null; telephone?: string | null; email?: string | null };
   famille?: any[];
@@ -104,7 +104,7 @@ export default function PortailPage() {
   const [error, setError] = useState('');
 
   const role = session?.user?.role as string;
-  const isPortailUser = role === 'PORTEAIL_CLIENT' || role === 'CONTACT_ENTREPRISE';
+  const isPortailUser = role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE';
 
   // Rediriger les utilisateurs internes
   useEffect(() => {
@@ -190,7 +190,7 @@ export default function PortailPage() {
           </div>
           <div className='hidden sm:block'>
             <h1 className='font-bold text-sm leading-tight'>Suivi Santé</h1>
-            <p className='text-[10px] text-muted-foreground'>Portail {data.type === 'PORTEAIL_CLIENT' ? 'Assuré' : 'Entreprise'}</p>
+            <p className='text-[10px] text-muted-foreground'>Portail {data.type === 'PORTAIL_CLIENT' ? 'Assuré' : 'Entreprise'}</p>
           </div>
         </div>
         <div className='ml-auto flex items-center gap-2'>
@@ -207,7 +207,7 @@ export default function PortailPage() {
 
       {/* Contenu principal */}
       <main className='flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full'>
-        {data.type === 'PORTEAIL_CLIENT' && data.assure ? (
+        {data.type === 'PORTAIL_CLIENT' && data.assure ? (
           <PortailAssure data={data} />
         ) : (
           <PortailEntreprise data={data} />

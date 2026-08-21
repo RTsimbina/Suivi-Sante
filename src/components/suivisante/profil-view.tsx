@@ -69,7 +69,7 @@ const ROLE_COLORS: Record<string, string> = {
   TECHNIQUE: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
   COMPTABILITE: 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
   SANTE: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300',
-  PORTEAIL_CLIENT: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
+  PORTAIL_CLIENT: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
   CONTACT_ENTREPRISE: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300',
 };
 

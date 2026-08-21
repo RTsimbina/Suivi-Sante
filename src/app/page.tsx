@@ -81,7 +81,7 @@ export default function Home() {
 
   // Rediriger les utilisateurs portail vers leur page dédiée
   useEffect(() => {
-    if (role === 'PORTEAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
+    if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
       router.replace('/portail');
     }
   }, [role, router]);

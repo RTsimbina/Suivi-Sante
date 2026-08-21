@@ -63,7 +63,7 @@ export default function LoginPage() {
         if (sessionRes.ok) {
           const sessionData = await sessionRes.json();
           const role = sessionData?.user?.role;
-          if (role === 'PORTEAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
+          if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
             window.location.href = '/portail';
             return;
           }

@@ -36,6 +36,8 @@ export interface PlafondCheckResult {
     montantCouvert?: number;
     partAssureur?: number;
     partPatient?: number;
+    ticketModerateur?: number;
+    depassementPlafond?: number;
     plafondGlobal?: number;
     consommeGlobal?: number;
     reliquatGlobal?: number;
@@ -136,7 +138,9 @@ export async function verifierPlafondAnnuel(opts: {
 
   const whereBase: Record<string, unknown> = {
     dateReception: { gte: debutAnnee, lte: finAnnee },
-    statut: { not: 'REJETE' },
+    // Seuls les dossiers traités (au moins EN_ANALYSE) consomment le plafond.
+    // RECU = simplement reçu, pas encore validé → ne compte pas.
+    statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
   };
 
   // Si on a un assureId, filtrer par assuré
@@ -246,8 +250,13 @@ export async function verifierPlafondAnnuel(opts: {
 
   // ─── 6. Calcul final ─────────────────────────────────────────────────────
   const montantCouvert = Math.min(montantDemande, reliquatActe);
-  const partAssureur = montantCouvert * (bareme.tauxCouverture / 100);
-  const partPatient = montantCouvert - partAssureur;
+  const partAssureur = Math.round(montantCouvert * (bareme.tauxCouverture / 100) * 100) / 100;
+  // Ticket modérateur = part du patient sur le montant couvert (taux non couvert)
+  const ticketModerateur = Math.round((montantCouvert - partAssureur) * 100) / 100;
+  // Dépassement plafond = ce qui dépasse le plafond (à la charge totale du patient)
+  const depassementPlafond = Math.round(Math.max(0, montantDemande - reliquatActe) * 100) / 100;
+  // Part patient totale = ticket modérateur + dépassement plafond
+  const partPatient = Math.round((ticketModerateur + depassementPlafond) * 100) / 100;
   const autorise = montantDemande <= reliquatActe && consommeGlobal < plafondGlobal;
 
   return {

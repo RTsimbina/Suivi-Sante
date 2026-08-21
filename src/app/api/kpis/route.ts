@@ -87,8 +87,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching KPIs:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération des KPIs" },
+    return NextResponse.json({ erreur: "Erreur lors de la récupération des KPIs" },
       { status: 500 }
     );
   }

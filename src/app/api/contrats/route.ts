@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
 
     const enriched = contrats.map((c) => {
       const budget = Number(c.budgetAnnuel) || 0;
+      // Calcul dynamique depuis les appels de fonds (pas le champ budgetUtilise désynchronisé)
       const utilise = c.appelsDeFonds.reduce((sum: number, a) => sum + (Number(a.montant) || 0), 0);
-      const solde = budget - utilise;
+      const solde = Math.max(0, budget - utilise);
       const taux = budget > 0 ? Math.round((utilise / budget) * 100) : 0;
       return {
         id: c.id,

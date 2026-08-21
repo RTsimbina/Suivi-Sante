@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ societes });
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }
 
@@ -32,13 +32,13 @@ export async function POST(request: NextRequest) {
     const { nom } = body;
 
     if (!nom || typeof nom !== "string" || nom.trim().length < 2) {
-      return NextResponse.json({ error: "Nom de société requis (min 2 caractères)" }, { status: 400 });
+      return NextResponse.json({ erreur: "Nom de société requis (min 2 caractères)" }, { status: 400 });
     }
 
     // Vérifier doublon
     const existing = await db.societe.findFirst({ where: { nom: nom.trim() } });
     if (existing) {
-      return NextResponse.json({ error: "Une société avec ce nom existe déjà" }, { status: 409 });
+      return NextResponse.json({ erreur: "Une société avec ce nom existe déjà" }, { status: 409 });
     }
 
     const societe = await db.societe.create({
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ societe }, { status: 201 });
   } catch (error) {
     console.error("Erreur création société:", error);
-    return NextResponse.json({ error: "Erreur lors de la création" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de la création" }, { status: 500 });
   }
 }
 
@@ -70,14 +70,13 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "ID de société requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "ID de société requis" }, { status: 400 });
     }
 
     // Vérifier s'il y a des dossiers liés
     const dossierCount = await db.dossier.count({ where: { societeId: id } });
     if (dossierCount > 0) {
-      return NextResponse.json(
-        { error: `Impossible de supprimer : ${dossierCount} dossier(s) lié(s)` },
+      return NextResponse.json({ erreur: `Impossible de supprimer : ${dossierCount} dossier(s) lié(s)` },
         { status: 409 }
       );
     }
@@ -104,6 +103,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Erreur suppression société:", error);
-    return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur lors de la suppression" }, { status: 500 });
   }
 }

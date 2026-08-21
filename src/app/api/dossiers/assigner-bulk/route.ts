@@ -21,15 +21,15 @@ export async function POST(request: NextRequest) {
     };
 
     if (!Array.isArray(dossierIds) || dossierIds.length === 0) {
-      return NextResponse.json({ error: 'La liste des dossiers est vide.' }, { status: 400 });
+      return NextResponse.json({ erreur: 'La liste des dossiers est vide.' }, { status: 400 });
     }
 
     if (!['ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'].includes(champ)) {
-      return NextResponse.json({ error: 'Champ invalide. Utilisez ACCUEIL, TECHNIQUE ou COMPTABILITE.' }, { status: 400 });
+      return NextResponse.json({ erreur: 'Champ invalide. Utilisez ACCUEIL, TECHNIQUE ou COMPTABILITE.' }, { status: 400 });
     }
 
     if (!gestionnaireId || typeof gestionnaireId !== 'string') {
-      return NextResponse.json({ error: "L'identifiant du gestionnaire est requis." }, { status: 400 });
+      return NextResponse.json({ erreur: "L'identifiant du gestionnaire est requis." }, { status: 400 });
     }
 
     // Limiter à 200 dossiers par requête
@@ -42,12 +42,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!gestionnaire) {
-      return NextResponse.json({ error: 'Gestionnaire introuvable.' }, { status: 404 });
+      return NextResponse.json({ erreur: 'Gestionnaire introuvable.' }, { status: 404 });
     }
 
     if (gestionnaire.service !== champ) {
-      return NextResponse.json(
-        { error: `Ce gestionnaire appartient au service ${gestionnaire.service}, pas à ${champ}.` },
+      return NextResponse.json({ erreur: `Ce gestionnaire appartient au service ${gestionnaire.service}, pas à ${champ}.` },
         { status: 400 }
       );
     }
@@ -104,6 +103,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Erreur assignation en masse:', error);
-    return NextResponse.json({ error: 'Erreur lors de l\'assignation en masse.' }, { status: 500 });
+    return NextResponse.json({ erreur: 'Erreur lors de l\'assignation en masse.' }, { status: 500 });
   }
 }

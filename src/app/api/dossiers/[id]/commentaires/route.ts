@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
     return NextResponse.json(commentaires);
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }
 
@@ -36,13 +36,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { contenu, prive } = body;
 
     if (!contenu || typeof contenu !== "string" || !contenu.trim()) {
-      return NextResponse.json({ error: "Le contenu est requis" }, { status: 400 });
+      return NextResponse.json({ erreur: "Le contenu est requis" }, { status: 400 });
     }
 
     // Vérifier que le dossier existe
     const dossier = await db.dossier.findUnique({ where: { id } });
     if (!dossier) {
-      return NextResponse.json({ error: "Dossier introuvable" }, { status: 404 });
+      return NextResponse.json({ erreur: "Dossier introuvable" }, { status: 404 });
     }
 
     // Seuls les rôles internes peuvent créer des commentaires privés
@@ -66,6 +66,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json(commentaire, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

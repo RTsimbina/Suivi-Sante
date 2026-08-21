@@ -25,7 +25,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 const ROLE_TRANSITIONS: Record<string, string[]> = {
   'RECU_EN_ANALYSE': ['ADMINISTRATEUR', 'ACCUEIL'],
-  'RECU_REJETE': ['ADMINISTRATEUR', 'TECHNIQUE'],
+  'RECU_REJETE': ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'],
   'EN_ANALYSE_VALIDE': ['ADMINISTRATEUR', 'TECHNIQUE'],
   'EN_ANALYSE_REJETE': ['ADMINISTRATEUR', 'TECHNIQUE'],
   'VALIDE_EN_COMPTABILITE': ['ADMINISTRATEUR', 'TECHNIQUE'],
@@ -71,29 +71,26 @@ export async function PATCH(
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Dossier introuvable" }, { status: 404 });
+      return NextResponse.json({ erreur: "Dossier introuvable" }, { status: 404 });
     }
 
     // ─── Partie 1 : Changement de statut ─────────────────────────────────
     if (statut) {
       if (!VALID_STATUTS.includes(statut)) {
-        return NextResponse.json(
-          { error: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
+        return NextResponse.json({ erreur: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
           { status: 400 }
         );
       }
 
       if (existing.statut === statut) {
-        return NextResponse.json(
-          { error: `Le dossier est déjà dans le statut "${statut}"` },
+        return NextResponse.json({ erreur: `Le dossier est déjà dans le statut "${statut}"` },
           { status: 400 }
         );
       }
 
       const allowed = VALID_TRANSITIONS[existing.statut] || [];
       if (!allowed.includes(statut)) {
-        return NextResponse.json(
-          { error: `Transition non autorisée de "${existing.statut}" vers "${statut}"` },
+        return NextResponse.json({ erreur: `Transition non autorisée de "${existing.statut}" vers "${statut}"` },
           { status: 400 }
         );
       }
@@ -102,8 +99,7 @@ export async function PATCH(
       const allowedRoles = ROLE_TRANSITIONS[transitionKey];
 
       if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
-        return NextResponse.json(
-          { error: `Le rôle '${userRole}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
+        return NextResponse.json({ erreur: `Le rôle '${userRole}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
           { status: 403 }
         );
       }
@@ -124,9 +120,7 @@ export async function PATCH(
           // Bloquer si plafond épuisé
           if (!plafondResult.autorise &&
               ['ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'PRESTATAIRE_INACTIF'].includes(plafondResult.raison)) {
-            return NextResponse.json(
-              {
-                error: `Transition bloquée : ${plafondResult.message}`,
+            return NextResponse.json({ erreur: `Transition bloquée : ${plafondResult.message}`,
                 plafondAtteint: true,
                 plafondDetails: plafondResult.details,
                 raison: plafondResult.raison,
@@ -173,7 +167,29 @@ export async function PATCH(
     }
 
     // Champs financiers et administratifs
-    if (montantValide !== undefined) updateData.montantValide = montantValide || null;
+    if (montantValide !== undefined) {
+      const newMontantValide = montantValide || null;
+      // Re-vérifier le plafond si le montant validé change et que le dossier est validé
+      if (newMontantValide !== null && newMontantValide !== existing.montantValide
+          && ['VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'].includes(existing.statut)
+          && existing.assureId) {
+        const plafondRecheck = await verifierPlafondAnnuel({
+          assureId: existing.assureId,
+          societeId: existing.societeId,
+          typeActe: existing.typeDossier,
+          montantDemande: newMontantValide,
+          excludeDossierId: id,
+        });
+        if (!plafondRecheck.autorise &&
+            ['PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT'].includes(plafondRecheck.raison)) {
+          return NextResponse.json(
+            { erreur: `Modification bloquée : ${plafondRecheck.message}`, plafondAtteint: true, plafondDetails: plafondRecheck.details },
+            { status: 422 }
+          );
+        }
+      }
+      updateData.montantValide = newMontantValide;
+    }
     if (ticketModerateur !== undefined) updateData.ticketModerateur = ticketModerateur || null;
     if (nSS !== undefined) updateData.nSS = nSS || null;
     if (dateSoins !== undefined) updateData.dateSoins = dateSoins ? new Date(dateSoins) : null;
@@ -188,8 +204,7 @@ export async function PATCH(
 
     // Si ni statut ni gestionnaire ni autre champ à modifier
     if (!statut && Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: "Aucune modification demandée" },
+      return NextResponse.json({ erreur: "Aucune modification demandée" },
         { status: 400 }
       );
     }
@@ -243,8 +258,7 @@ export async function PATCH(
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating dossier:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la mise à jour du dossier" },
+    return NextResponse.json({ erreur: "Erreur lors de la mise à jour du dossier" },
       { status: 500 }
     );
   }

@@ -83,7 +83,7 @@ async function main() {
     { email: 'accueil@suivisante.mg', nom: 'Ravao Andrianjaka', password: passwordHash, role: 'ACCUEIL' },
     { email: 'technique@suivisante.mg', nom: 'Jean-Pierre Rakoto', password: passwordHash, role: 'TECHNIQUE' },
     { email: 'compta@suivisante.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
-    { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'UTILISATEUR' },
+    { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'SANTE' },
     { email: 'sante@suivisante.mg', nom: 'Dr. Nahitra Raza', password: passwordHash, role: 'SANTE' },
   ];
 
@@ -260,7 +260,7 @@ async function main() {
 
   const utilisateursList = await db.utilisateur.findMany();
   const accueilUser = utilisateursList.find(u => u.role === 'ACCUEIL')!;
-  const utilisateurDemo = utilisateursList.find(u => u.role === 'UTILISATEUR')!;
+  const utilisateurDemo = utilisateursList.find(u => u.email === 'utilisateur@suivisante.mg')!;
 
   const prestataireIds = Object.values(prestatairesMap);
   const allAssureIds = Object.values(assuresBySociete).flat();

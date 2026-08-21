@@ -51,7 +51,7 @@ const ROLES = [
   { value: 'TECHNIQUE', label: 'Service Technique', color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
   { value: 'COMPTABILITE', label: 'Comptabilite', color: 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300' },
   { value: 'SANTE', label: 'Controle Sante', color: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300' },
-  { value: 'PORTEAIL_CLIENT', label: 'Portail Client', color: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' },
+  { value: 'PORTAIL_CLIENT', label: 'Portail Client', color: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' },
   { value: 'CONTACT_ENTREPRISE', label: 'Contact Entreprise', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' },
 ];
 
@@ -539,14 +539,14 @@ export default function UtilisateursView() {
                   {ROLES.map(r => (
                     <SelectItem key={r.value} value={r.value}>
                       <span className="flex items-center gap-2">
-                        <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-blue-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTEAIL_CLIENT' ? 'bg-violet-500' : 'bg-indigo-500')} />
+                        <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-blue-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-violet-500' : 'bg-indigo-500')} />
                         {r.label}
                       </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {formData.role === 'PORTEAIL_CLIENT' && (
+              {formData.role === 'PORTAIL_CLIENT' && (
                 <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                   <Info className="h-3 w-3" />
                   L'e-mail doit correspondre a un assure existant dans la base.

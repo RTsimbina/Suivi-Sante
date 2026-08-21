@@ -18,14 +18,14 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get('hub.challenge');
 
   if (!MESSENGER_VERIFY_TOKEN) {
-    return NextResponse.json({ error: 'MESSENGER_VERIFY_TOKEN non configuré' }, { status: 500 });
+    return NextResponse.json({ erreur: 'MESSENGER_VERIFY_TOKEN non configuré' }, { status: 500 });
   }
 
   if (mode === 'subscribe' && token === MESSENGER_VERIFY_TOKEN && challenge) {
     console.log('[MESSENGER] Webhook vérifié avec succès');
     return new NextResponse(challenge, { status: 200 });
   }
-  return NextResponse.json({ error: 'Échec de la vérification' }, { status: 403 });
+  return NextResponse.json({ erreur: 'Échec de la vérification' }, { status: 403 });
 }
 
 // POST: Réception des messages Messenger (HMAC-SHA256 obligatoire si secret configuré)
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   // ── Rate limit ──
   const ip = getClientIp(request.headers);
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
+    return NextResponse.json({ erreur: 'Too Many Requests' }, { status: 429 });
   }
 
   // ── Lire le body brut pour la vérification HMAC ──
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   try {
     body = JSON.parse(new TextDecoder().decode(rawBody));
   } catch {
-    return NextResponse.json({ error: 'JSON invalide' }, { status: 400 });
+    return NextResponse.json({ erreur: 'JSON invalide' }, { status: 400 });
   }
 
   try {
@@ -103,6 +103,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'processed' });
   } catch (error) {
     console.error('[MESSENGER] Erreur:', error);
-    return NextResponse.json({ error: 'Erreur de traitement' }, { status: 500 });
+    return NextResponse.json({ erreur: 'Erreur de traitement' }, { status: 500 });
   }
 }

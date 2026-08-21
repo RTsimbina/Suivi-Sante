@@ -1,7 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Sécurité : masquer les infos sensibles, ne pas exposer la DB URL
+  const { searchParams } = new URL(request.url);
+  const internal = searchParams.get('internal') === 'true';
+  if (!internal) {
+    return NextResponse.json({ status: 'ok', message: 'Service opérationnel' });
+  }
   const checks: { name: string; ok: boolean; detail?: string }[] = [];
 
   // 1. Variables d'environnement
@@ -13,7 +19,7 @@ export async function GET() {
     name: 'DATABASE_URL',
     ok: hasDbUrl,
     detail: hasDbUrl
-      ? `${process.env.DATABASE_URL!.slice(0, 40)}...`
+      ? 'Configuree'
       : 'MANQUANTE — ajoutez-la dans Vercel → Settings → Environment Variables',
   });
   checks.push({
