@@ -403,6 +403,20 @@ export async function DELETE(request: NextRequest) {
 
     await db.utilisateur.delete({ where: { id } });
 
+    // Audit log
+    try {
+      await db.historiqueParametre.create({
+        data: {
+          entite: 'Utilisateur',
+          entiteId: id,
+          champ: 'SUPPRESSION',
+          ancienneValeur: `${existing.nom} (${existing.email}), Role: ${existing.role}`,
+          nouvelleValeur: null,
+          modifiePar: 'SYSTEM',
+        },
+      });
+    } catch { /* ne pas bloquer */ }
+
     return NextResponse.json({
       message: `Utilisateur ${existing.nom} (${existing.email}) supprime.`,
     });

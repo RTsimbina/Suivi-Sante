@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hash } from 'bcryptjs';
@@ -523,7 +524,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get('token');
 
-  if (!token || token !== process.env.SETUP_TOKEN) {
+  if (!token || !process.env.SETUP_TOKEN || !timingSafeEqual(Buffer.from(token), Buffer.from(process.env.SETUP_TOKEN))) {
     return NextResponse.json({ erreur: 'Token de setup invalide' }, { status: 403 });
   }
 

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyMeta,
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ erreur: 'WHATSAPP_VERIFY_TOKEN non configuré' }, { status: 500 });
   }
 
-  if (mode === 'subscribe' && token === WHATSAPP_VERIFY_TOKEN && challenge) {
+  if (mode === 'subscribe' && token && timingSafeEqual(Buffer.from(token), Buffer.from(WHATSAPP_VERIFY_TOKEN)) && challenge) {
     console.log('[WHATSAPP] Webhook vérifié avec succès');
     return new NextResponse(challenge, { status: 200 });
   }

@@ -22,8 +22,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       include: { auteur: { select: { id: true, nom: true, role: true } } },
     });
     return NextResponse.json(commentaires);
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[COMMENTAIRES] Erreur GET:', error);
+    return NextResponse.json({ erreur: "Erreur lors du chargement des commentaires." }, { status: 500 });
   }
 }
 
@@ -65,7 +66,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     return NextResponse.json(commentaire, { status: 201 });
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[COMMENTAIRES] Erreur POST:', error);
+    return NextResponse.json({ erreur: "Erreur lors de la creation du commentaire." }, { status: 500 });
   }
 }

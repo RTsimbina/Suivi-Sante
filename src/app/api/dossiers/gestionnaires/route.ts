@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
     const where = service ? { service } : {};
     const gestionnaires = await db.gestionnaire.findMany({ where, orderBy: { nom: "asc" } });
     return NextResponse.json(gestionnaires);
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[DOSSIERS_GESTIONNAIRES] Erreur:', error);
+    return NextResponse.json({ erreur: "Erreur lors de l'opération." }, { status: 500 });
   }
 }

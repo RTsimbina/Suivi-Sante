@@ -39,7 +39,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     return NextResponse.json({ ...dossier, historiqueParsed });
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[DOSSIER_DETAIL] Erreur:', error);
+    return NextResponse.json({ erreur: "Erreur lors du chargement du dossier." }, { status: 500 });
   }
 }

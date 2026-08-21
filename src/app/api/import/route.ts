@@ -333,7 +333,8 @@ export async function GET(request: NextRequest) {
       include: { _count: { select: { dossiers: true } } },
     });
     return NextResponse.json({ historiques });
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[IMPORT] Erreur GET historiques:', error);
+    return NextResponse.json({ erreur: "Erreur lors du chargement des historiques." }, { status: 500 });
   }
 }

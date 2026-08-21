@@ -16,8 +16,9 @@ export async function GET(request: NextRequest) {
       },
     });
     return NextResponse.json({ societes });
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[SOCIETES] Erreur:', error);
+    return NextResponse.json({ erreur: "Erreur lors de l'opération." }, { status: 500 });
   }
 }
 

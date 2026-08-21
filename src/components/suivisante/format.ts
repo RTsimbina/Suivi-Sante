@@ -11,8 +11,11 @@ export function formatMontantCourt(montant: number | undefined | null): string {
   return new Intl.NumberFormat('fr-FR').format(n) + ' Ar';
 }
 
-export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(date));
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return '—';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
 }
 
 export function statutLabel(statut: string): string {

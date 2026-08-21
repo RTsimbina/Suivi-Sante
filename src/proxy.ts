@@ -46,7 +46,7 @@ export default async function proxy(request: NextRequest) {
   // CSP restrictive : autorise uniquement les sources nécessaires
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // unsafe-inline/eval requis par Next.js runtime
+    "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

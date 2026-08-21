@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ baremes });
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[BAREMES] Erreur:', error);
+    return NextResponse.json({ erreur: "Erreur lors de l'opération." }, { status: 500 });
   }
 }
 

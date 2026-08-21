@@ -21,8 +21,17 @@ export async function POST(request: NextRequest) {
     const query = identifiant.trim();
 
     // ── 1. Trouver l'assuré par NSS, nom, ou email ──
+    // Filtrer par societe si l'utilisateur n'est pas admin
+    const userRole = request.headers.get('x-user-role');
+    const userSocieteId = request.headers.get('x-user-societeid');
+    const societeFilter: Record<string, unknown> = {};
+    if (userRole !== 'ADMINISTRATEUR' && userSocieteId) {
+      societeFilter.societeId = userSocieteId;
+    }
+
     const assure = await db.assure.findFirst({
       where: {
+        ...societeFilter,
         OR: [
           { id: { equals: query } },
           { nSS: { equals: query, mode: 'insensitive' } },
@@ -208,8 +217,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const searchRole = request.headers.get('x-user-role');
+    const searchSocieteId = request.headers.get('x-user-societeid');
+    const searchFilter: Record<string, unknown> = {};
+    if (searchRole !== 'ADMINISTRATEUR' && searchSocieteId) {
+      searchFilter.societeId = searchSocieteId;
+    }
+
     const resultats = await db.assure.findMany({
       where: {
+        ...searchFilter,
         OR: [
           { id: { contains: q } },
           { nSS: { contains: q, mode: 'insensitive' } },
@@ -229,7 +246,8 @@ export async function GET(request: NextRequest) {
     });
 
     return Response.json({ resultats });
-  } catch {
+  } catch (error) {
+    console.error('[SANTÉ] Erreur recherche assurés:', error);
     return Response.json({ resultats: [] });
   } finally {
     await db.$disconnect();

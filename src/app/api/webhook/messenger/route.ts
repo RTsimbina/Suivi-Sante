@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyMeta,
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ erreur: 'MESSENGER_VERIFY_TOKEN non configuré' }, { status: 500 });
   }
 
-  if (mode === 'subscribe' && token === MESSENGER_VERIFY_TOKEN && challenge) {
+  if (mode === 'subscribe' && token && timingSafeEqual(Buffer.from(token), Buffer.from(MESSENGER_VERIFY_TOKEN)) && challenge) {
     console.log('[MESSENGER] Webhook vérifié avec succès');
     return new NextResponse(challenge, { status: 200 });
   }

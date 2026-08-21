@@ -309,7 +309,21 @@ export async function PUT(request: NextRequest) {
       }
       updateData.typeBeneficiaire = typeBeneficiaire;
     }
-    if (assurePrincipalId !== undefined) updateData.assurePrincipalId = assurePrincipalId || null;
+    if (assurePrincipalId !== undefined) {
+      if (assurePrincipalId) {
+        const principal = await db.assure.findUnique({ where: { id: assurePrincipalId } });
+        if (!principal) {
+          return NextResponse.json({ erreur: 'Assuré principal introuvable.' }, { status: 404 });
+        }
+        if (principal.typeBeneficiaire !== 'ASSURE') {
+          return NextResponse.json({ erreur: "L'assuré référencé n'est pas un assuré principal." }, { status: 400 });
+        }
+        if (principal.societeId !== (existing.societeId)) {
+          return NextResponse.json({ erreur: "L'assuré principal n'appartient pas à la même société." }, { status: 400 });
+        }
+      }
+      updateData.assurePrincipalId = assurePrincipalId || null;
+    }
     if (codeFamille !== undefined) updateData.codeFamille = codeFamille ? String(codeFamille).trim() : null;
     if (dateNaissance !== undefined) updateData.dateNaissance = dateNaissance ? new Date(dateNaissance) : null;
     if (sexe !== undefined) updateData.sexe = sexe || null;

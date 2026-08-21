@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
     if (authError) return authError;
     const societes = await db.societe.findMany({ orderBy: { nom: "asc" } });
     return NextResponse.json(societes);
-  } catch {
-    return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
+  } catch (error) {
+    console.error('[DOSSIERS_SOCIETES] Erreur:', error);
+    return NextResponse.json({ erreur: "Erreur lors de l'opération." }, { status: 500 });
   }
 }

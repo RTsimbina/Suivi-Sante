@@ -42,8 +42,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       createdAt: contrat.createdAt.toISOString(),
       updatedAt: contrat.updatedAt.toISOString(),
     });
-  } catch {
-    return NextResponse.json({ erreur: 'Erreur.' }, { status: 500 });
+  } catch (error) {
+    console.error('[CONTRAT] Erreur GET:', error);
+    return NextResponse.json({ erreur: 'Erreur lors du chargement du contrat.' }, { status: 500 });
   }
 }
 
@@ -174,7 +175,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     });
 
     return NextResponse.json({ message: 'Contrat supprimé.' });
-  } catch {
+  } catch (error) {
+    console.error('[CONTRAT] Erreur DELETE:', error);
     return NextResponse.json({ erreur: 'Erreur lors de la suppression.' }, { status: 500 });
   }
 }

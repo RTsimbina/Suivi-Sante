@@ -71,6 +71,21 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await genererRapportMensuel(data);
 
     if (destinataires && destinataires.length > 0) {
+      // Valider les adresses email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidEmails = destinataires.filter((e: string) => !emailRegex.test(e));
+      if (invalidEmails.length > 0) {
+        return NextResponse.json(
+          { erreur: `Adresses email invalides : ${invalidEmails.join(', ')}` },
+          { status: 400 }
+        );
+      }
+      if (destinataires.length > 20) {
+        return NextResponse.json(
+          { erreur: 'Maximum 20 destinataires autorises.' },
+          { status: 400 }
+        );
+      }
       const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
       try {
         await envoyerEmail({
