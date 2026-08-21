@@ -264,48 +264,32 @@ export default function SanteView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result?.assure.id]);
 
-  // Recharger quand les filtres changent
-  useEffect(() => {
-    if (!result?.assure.id) return;
-    setActesPage(1);
-    fetchActes(result.assure.id, 1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtreType, filtreStatut, filtreDateDebut, filtreDateFin]);
-
-  // Recharger quand la page change
+  // Recharger quand la page change (pagination)
   useEffect(() => {
     if (!result?.assure.id) return;
     fetchActes(result.assure.id, actesPage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actesPage]);
 
-  // Recherche avec debounce
-  useEffect(() => {
-    if (!result?.assure.id) return;
-    if (filtreSearch.length === 0 || filtreSearch.length >= 2) {
-      const timer = setTimeout(() => {
-        setActesPage(1);
-        fetchActes(result.assure.id, 1);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtreSearch]);
-
-  // Appliquer les filtres (handler pour bouton Rechercher)
+  // Appliquer les filtres (uniquement via le bouton Rechercher)
   const handleAppliquerFiltres = () => {
     if (!result?.assure.id) return;
     setActesPage(1);
     fetchActes(result.assure.id, 1);
   };
 
-  // Réinitialiser les filtres
+  // Réinitialiser les filtres et relancer la recherche
   const handleResetFiltres = () => {
     setFiltreType('');
     setFiltreStatut('');
     setFiltreDateDebut(`${new Date().getFullYear()}-01-01`);
     setFiltreDateFin(`${new Date().getFullYear()}-12-31`);
     setFiltreSearch('');
+    // Relancer après reset
+    if (result?.assure.id) {
+      setActesPage(1);
+      setTimeout(() => fetchActes(result.assure.id, 1), 0);
+    }
   };
 
   // Gestion des lignes de simulation multi-actes
@@ -662,6 +646,17 @@ export default function SanteView() {
                         />
                       </div>
                     </div>
+                  </div>
+                  {/* Bouton Rechercher */}
+                  <div className="flex items-center justify-end pt-1">
+                    <Button
+                      onClick={handleAppliquerFiltres}
+                      disabled={actesLoading || !result?.assure.id}
+                      className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs px-4"
+                    >
+                      {actesLoading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1.5" />}
+                      Rechercher
+                    </Button>
                   </div>
                 </div>
               )}
