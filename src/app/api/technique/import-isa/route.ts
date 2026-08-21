@@ -30,9 +30,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
     }
 
-    if (!file.name.endsWith(".xlsx")) {
+    const ALLOWED_MIME = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!ext.endsWith('.xlsx') || !ALLOWED_MIME.includes(file.type)) {
       return NextResponse.json(
-        { erreur: "Format de fichier invalide. Seuls les fichiers .xlsx sont acceptés." },
+        { erreur: "Format de fichier invalide. Seuls les fichiers .xlsx sont acceptes." },
         { status: 400 }
       );
     }
@@ -122,9 +127,17 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Mise à jour du statut : RECU → EN_ANALYSE
+      // Mise a jour du statut : RECU → EN_ANALYSE
       if (existingDossier.statut === "RECU") {
         updateData.statut = "EN_ANALYSE";
+      }
+
+      // Assigner le gestionnaire technique si le dossier n'en a pas
+      if (!existingDossier.gestionnaireTechniqueId) {
+        const userId = request.headers.get('x-user-id');
+        if (userId) {
+          updateData.gestionnaireTechniqueId = userId;
+        }
       }
 
       // Vérifier qu'il y a des données à mettre à jour
@@ -157,6 +170,14 @@ export async function POST(request: NextRequest) {
             });
 
             if (!plafondResult.autorise) {
+              // Bloquer l'import si le prestataire est inactif
+              if (plafondResult.raison === 'PRESTATAIRE_INACTIF') {
+                nbErreurs++;
+                const message = `[PLAFOND] ${plafondResult.message}`;
+                erreursDetail.push({ ligne: ligneNum, numeroDossier, message });
+                importDossiers.push({ numeroLigne: ligneNum, statutImport: 'ERREUR', erreur: message, donnees });
+                continue;
+              }
               nbAvertissementsPlafond++;
               erreursDetail.push({
                 ligne: ligneNum,

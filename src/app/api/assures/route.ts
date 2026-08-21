@@ -299,7 +299,16 @@ export async function PUT(request: NextRequest) {
     if (prenom !== undefined) updateData.prenom = prenom ? prenom.trim() : null;
     if (nSS !== undefined) updateData.nSS = nSS ? nSS.trim() : null;
     if (matricule !== undefined) updateData.matricule = matricule ? matricule.trim() : null;
-    if (typeBeneficiaire !== undefined) updateData.typeBeneficiaire = typeBeneficiaire;
+    if (typeBeneficiaire !== undefined) {
+      const validTypes = ['ASSURE', 'CONJOINT', 'ENFANT'];
+      if (!validTypes.includes(typeBeneficiaire)) {
+        return NextResponse.json(
+          { erreur: `Type de beneficiaire invalide. Valeurs autorisees : ${validTypes.join(', ')}` },
+          { status: 400 }
+        );
+      }
+      updateData.typeBeneficiaire = typeBeneficiaire;
+    }
     if (assurePrincipalId !== undefined) updateData.assurePrincipalId = assurePrincipalId || null;
     if (codeFamille !== undefined) updateData.codeFamille = codeFamille ? String(codeFamille).trim() : null;
     if (dateNaissance !== undefined) updateData.dateNaissance = dateNaissance ? new Date(dateNaissance) : null;

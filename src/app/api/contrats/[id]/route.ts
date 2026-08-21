@@ -94,6 +94,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (dateFin) {
       const d = new Date(dateFin);
       if (d.getTime() !== existing.dateFin.getTime()) {
+        // Verifier la coherence avec dateDebut
+        const debutRef = updateData.dateDebut || existing.dateDebut;
+        if (d <= debutRef) {
+          return NextResponse.json({ erreur: 'La date de fin doit etre posterieure a la date de debut.' }, { status: 400 });
+        }
         updateData.dateFin = d;
         changes.push({ champ: 'dateFin', ancienneValeur: existing.dateFin.toISOString(), nouvelleValeur: d.toISOString() });
       }

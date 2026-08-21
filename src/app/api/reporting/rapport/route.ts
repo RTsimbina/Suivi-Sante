@@ -13,10 +13,15 @@ const MOIS_NOMS = [
 ];
 
 async function buildReportData(mois: number, annee: number): Promise<ReportData> {
+  // Filtrer les donnees par la periode demandee (mois/annee)
+  const startDate = new Date(annee, mois - 1, 1);
+  const endDate = new Date(annee, mois, 1); // premier jour du mois suivant
+  const periodeFilter = { dateReception: { gte: startDate, lt: endDate } };
+
   const [statuts, sums, parSociete, volumeMensuel, delaiMoyenGlobal] = await Promise.all([
-    getStatutCounts(),
-    getTotalSums(),
-    getSocieteBreakdown(),
+    getStatutCounts(periodeFilter),
+    getTotalSums(periodeFilter),
+    getSocieteBreakdown(periodeFilter),
     getMonthlyVolume(annee),
     getAvgDelaiPaiement(),
   ]);
@@ -29,7 +34,7 @@ async function buildReportData(mois: number, annee: number): Promise<ReportData>
     periode: `${MOIS_NOMS[mois - 1]} ${annee}`,
     direction: {
       totalRecus: c("RECU"),
-      totalTraites: c("VALIDE") + c("REJETE") + c("PAYE"),
+      totalTraites: c("VALIDE") + c("PAYE"),
       totalPayes: c("PAYE"),
       totalRejetes,
       delaiMoyenGlobal,

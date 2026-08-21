@@ -90,9 +90,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Fichier requis.' }, { status: 400 });
     }
 
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+    const ALLOWED_MIME = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if ((!ext.endsWith('.xlsx') && !ext.endsWith('.xls')) || !ALLOWED_MIME.includes(file.type)) {
       return NextResponse.json(
-        { erreur: 'Format invalide. Seuls les fichiers .xlsx et .xls sont acceptés.' },
+        { erreur: 'Format invalide. Seuls les fichiers .xlsx et .xls sont acceptes.' },
         { status: 400 },
       );
     }

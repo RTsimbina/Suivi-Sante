@@ -16,10 +16,11 @@ const MS_DAY = 86_400_000;
    1. Status counts  (1 groupBy)
    ────────────────────────────────────────────────────────────── */
 
-export async function getStatutCounts(): Promise<Record<string, number>> {
+export async function getStatutCounts(where?: Prisma.DossierWhereInput): Promise<Record<string, number>> {
   const rows = await db.dossier.groupBy({
     by: ["statut"],
     _count: { statut: true },
+    where,
   });
   const map: Record<string, number> = {};
   for (const r of rows) map[r.statut] = r._count.statut;

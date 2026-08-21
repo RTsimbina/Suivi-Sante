@@ -6,6 +6,11 @@ import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "EN_PAIEMENT", "PAYE", "REJETE"];
+const ALLOWED_MIME_TYPES = [
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+];
+const ALLOWED_EXTENSIONS = [".xlsx", ".xls"];
 
 interface Anomalie {
   ligne: number;
@@ -26,6 +31,13 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
+    }
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { erreur: "Format invalide. Seuls les fichiers .xlsx et .xls sont acceptes." },
+        { status: 400 }
+      );
     }
     if (!["ISA", "SAGE", "EXCEL"].includes(source)) {
       return NextResponse.json({ erreur: "Source invalide (ISA, SAGE ou EXCEL)" }, { status: 400 });
@@ -54,6 +66,14 @@ export async function POST(request: NextRequest) {
       const societeNom = String(row["Societe"] || row["societe"] || row["Entreprise"] || "").trim();
       const typeDossier = String(row["TypeDossier"] || row["typeDossier"] || row["Type"] || "").trim();
       const montantReclame = parseFloat(String(row["MontantReclame"] || row["montantReclame"] || row["Montant"] || "0"));
+
+      // Valider montant negatif
+      if (!isNaN(montantReclame) && montantReclame < 0) {
+        anomalies.push({ ligne: ligneNum, type: "erreur", champ: "MontantReclame", message: `Montant negatif interdit: ${montantReclame}`, donnees: row });
+        nbErreurs++;
+        importDossiers.push({ numeroLigne: ligneNum, statutImport: "ERREUR", erreur: "Montant negatif interdit", donnees });
+        continue;
+      }
 
       // Catégorie du dossier : depuis Excel ou paramètre du formulaire
       const VALID_CATEGORIES = ["REMBOURSEMENT_ASSURE", "REGLEMENT_PRESTATAIRE"];
@@ -158,13 +178,22 @@ export async function POST(request: NextRequest) {
             numeroDossier,
             dateReception,
             beneficiaire,
-            typeDossier: typeDossier || "CONSULTATION",
+            typeDossier: typeDossier || undefined,
             categorieDossier: catDossier || null,
             societe: societe ? { connect: { id: societe.id } } : undefined,
             montantReclame: montantReclame || 0,
             statut: "RECU",
             source,
           };
+
+          // Avertissement si typeDossier manquant (ne pas setter par defaut)
+          if (!typeDossier) {
+            anomalies.push({
+              ligne: ligneNum, type: "avertissement", champ: "TypeDossier",
+              message: "Type de dossier manquant. Le dossier sera cree sans type. Corrigez-le manuellement.",
+              donnees: row,
+            });
+          }
 
           // Ajouter les données spécifiques ISA/SAGE si présentes
           if (source === "ISA" && (updateData as Record<string, unknown>).montantValide) {
@@ -186,11 +215,22 @@ export async function POST(request: NextRequest) {
               const plafondResult = await verifierPlafondAnnuel({
                 assureId: assureIdImport,
                 societeId: societe.id,
-                typeActe: typeDossier || "CONSULTATION",
+                typeActe: typeDossier || 'CONSULTATION',
                 montantDemande: montantReclame,
               });
 
               if (!plafondResult.autorise) {
+                // Bloquer si le prestataire est inactif
+                if (plafondResult.raison === 'PRESTATAIRE_INACTIF') {
+                  nbErreurs++;
+                  anomalies.push({
+                    ligne: ligneNum, type: "erreur", champ: "PLAFOND",
+                    message: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
+                    donnees: row,
+                  });
+                  importDossiers.push({ numeroLigne: ligneNum, statutImport: "ERREUR", erreur: "Prestataire inactif", donnees });
+                  continue;
+                }
                 nbAvertissementsPlafond++;
                 anomalies.push({
                   ligne: ligneNum, type: "avertissement", champ: "PLAFOND",

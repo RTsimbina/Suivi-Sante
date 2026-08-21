@@ -49,9 +49,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
     }
 
+    const ALLOWED_MIME = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
     const allowedExts = [".xlsx", ".xls"];
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!allowedExts.includes(ext)) {
+    if (!allowedExts.includes(ext) || !ALLOWED_MIME.includes(file.type)) {
       return NextResponse.json({ erreur: "Format de fichier invalide. Utilisez .xlsx ou .xls" }, { status: 400 });
     }
 

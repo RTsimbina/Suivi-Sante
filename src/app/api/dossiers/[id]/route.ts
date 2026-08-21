@@ -75,6 +75,9 @@ export async function PATCH(
     }
 
     // ─── Partie 1 : Changement de statut ─────────────────────────────────
+    const updateData: Record<string, unknown> = {};
+    const assignComments: string[] = [];
+
     if (statut) {
       if (!VALID_STATUTS.includes(statut)) {
         return NextResponse.json({ erreur: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
@@ -128,13 +131,16 @@ export async function PATCH(
               { status: 422 }
             );
           }
+
+          // Auto-calcul du ticket modérateur depuis les details du plafond
+          if (plafondResult.details && !existing.ticketModerateur) {
+            updateData.ticketModerateur = plafondResult.details.ticketModerateur || null;
+          }
         }
       }
     }
 
     // ─── Partie 2 : Champs modifiables ────────────────────────────────────
-    const updateData: Record<string, unknown> = {};
-    const assignComments: string[] = [];
 
     // Gestionnaires
     if (gestionnaireAccueilId !== undefined) {
@@ -190,7 +196,17 @@ export async function PATCH(
       }
       updateData.montantValide = newMontantValide;
     }
-    if (ticketModerateur !== undefined) updateData.ticketModerateur = ticketModerateur || null;
+    if (ticketModerateur !== undefined) {
+      // Verifier que le ticket modérateur est positif et ne depasse pas le montant reclame
+      const tm = ticketModerateur || 0;
+      if (tm < 0) {
+        return NextResponse.json({ erreur: "Le ticket modérateur ne peut pas etre negatif." }, { status: 400 });
+      }
+      if (existing.montantReclame && tm > existing.montantReclame) {
+        return NextResponse.json({ erreur: "Le ticket modérateur ne peut pas depasser le montant reclame." }, { status: 400 });
+      }
+      updateData.ticketModerateur = ticketModerateur || null;
+    }
     if (nSS !== undefined) updateData.nSS = nSS || null;
     if (dateSoins !== undefined) updateData.dateSoins = dateSoins ? new Date(dateSoins) : null;
     if (moyenPaiement !== undefined) updateData.moyenPaiement = moyenPaiement || null;
@@ -200,6 +216,10 @@ export async function PATCH(
     // Auto-set dateTraitementTechnique si transition vers EN_ANALYSE
     if (statut === 'EN_ANALYSE' && !existing.dateTraitementTechnique) {
       updateData.dateTraitementTechnique = new Date();
+    }
+    // Auto-set dateReceptionDecompte si transition vers EN_COMPTABILITE
+    if (statut === 'EN_COMPTABILITE' && !existing.dateReceptionDecompte) {
+      updateData.dateReceptionDecompte = new Date();
     }
 
     // Si ni statut ni gestionnaire ni autre champ à modifier

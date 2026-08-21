@@ -27,12 +27,16 @@ export async function GET(request: NextRequest) {
     const emptyMonthly: { mois: string; nbDossiers: number }[] = [];
     const emptyProductivite: { gestionnaireNom: string; service: string; nbDossiers: number; montantTraite: number; tempsMoyenTraitement: number }[] = [];
 
+    const currentYear = new Date().getFullYear();
+    const yearParam = request.nextUrl.searchParams.get('annee');
+    const annee = yearParam ? parseInt(yearParam, 10) : currentYear;
+
     const [statuts, sums, parSociete, volumeMensuel, delaiPaiement, delaiTransfert, delaiAnalyse, productivite] =
       await Promise.all([
         safe("getStatutCounts", () => getStatutCounts(), emptyStatuts),
         safe("getTotalSums", () => getTotalSums(), emptySums),
         safe("getSocieteBreakdown", () => getSocieteBreakdown(), emptySociete),
-        safe("getMonthlyVolume", () => getMonthlyVolume(2026), emptyMonthly),
+        safe("getMonthlyVolume", () => getMonthlyVolume(annee), emptyMonthly),
         safe("getAvgDelaiPaiement", () => getAvgDelaiPaiement(), 0),
         safe("getAvgDelaiTransfert", () => getAvgDelaiTransfert(), 0),
         safe("getAvgDelaiAnalyse", () => getAvgDelaiAnalyse(), 0),
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     const c = (s: string) => statuts[s] || 0;
     const totalRecus = c("RECU");
-    const totalTraites = c("VALIDE") + c("REJETE") + c("PAYE");
+    const totalTraites = c("VALIDE") + c("PAYE");
     const totalPayes = c("PAYE");
     const totalRejetes = c("REJETE");
     const tauxRejet = sums.total > 0 ? round2((totalRejetes / sums.total) * 100) : 0;

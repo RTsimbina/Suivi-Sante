@@ -64,6 +64,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Valider la coherence des dates
+    const debut = new Date(dateDebut);
+    const fin = new Date(dateFin);
+    if (fin <= debut) {
+      return NextResponse.json(
+        { erreur: "La date de fin doit etre posterieure a la date de debut." },
+        { status: 400 }
+      );
+    }
+
     // Vérifier la société
     const societe = await db.societe.findUnique({ where: { id: societeId } });
     if (!societe) {

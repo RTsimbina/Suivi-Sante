@@ -128,6 +128,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Valider les montants
+    if (montantReclame !== undefined && montantReclame < 0) {
+      return NextResponse.json({ erreur: "Le montant reclame ne peut pas etre negatif." }, { status: 400 });
+    }
+    if (montantValide !== undefined && montantValide < 0) {
+      return NextResponse.json({ erreur: "Le montant valide ne peut pas etre negatif." }, { status: 400 });
+    }
+
     // Check for duplicate numeroDossier
     const existing = await db.dossier.findUnique({
       where: { numeroDossier },

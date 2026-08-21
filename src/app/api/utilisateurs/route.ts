@@ -3,6 +3,11 @@ import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 
+// ─── Politique de mot de passe ─────────────────────────────────────────────
+const MIN_PASSWORD_LENGTH = 8;
+const PASSWORD_COMPLEXITY_REGEX = /[a-zA-Z]/;
+const PASSWORD_NUMBER_REGEX = /[0-9]/;
+
 // ─── Rôles disponibles pour la création d'utilisateurs ───────────────────────
 const VALID_ROLES = [
   'ADMINISTRATEUR',
@@ -129,10 +134,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Valider la longueur du mot de passe
-    if (password.length < 6) {
+    // Valider la longueur et la complexité du mot de passe
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { erreur: 'Le mot de passe doit contenir au moins 6 caracteres.' },
+        { erreur: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caracteres.` },
+        { status: 400 }
+      );
+    }
+    if (!PASSWORD_COMPLEXITY_REGEX.test(password) || !PASSWORD_NUMBER_REGEX.test(password)) {
+      return NextResponse.json(
+        { erreur: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' },
         { status: 400 }
       );
     }
@@ -260,9 +271,15 @@ export async function PUT(request: NextRequest) {
     }
 
     if (password !== undefined && password !== '') {
-      if (password.length < 6) {
+      if (password.length < MIN_PASSWORD_LENGTH) {
         return NextResponse.json(
-          { erreur: 'Le mot de passe doit contenir au moins 6 caracteres.' },
+          { erreur: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caracteres.` },
+          { status: 400 }
+        );
+      }
+      if (!PASSWORD_COMPLEXITY_REGEX.test(password) || !PASSWORD_NUMBER_REGEX.test(password)) {
+        return NextResponse.json(
+          { erreur: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' },
           { status: 400 }
         );
       }

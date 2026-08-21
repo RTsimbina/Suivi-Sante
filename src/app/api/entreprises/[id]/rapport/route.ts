@@ -78,7 +78,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       periode: `${MOIS_NOMS[mois - 1]} ${annee} — ${societe.nom}`,
       direction: {
         totalRecus: sums._count,
-        totalTraites: (statutMap["VALIDE"] || 0) + totalRejetes + (statutMap["PAYE"] || 0),
+        totalTraites: (statutMap["VALIDE"] || 0) + (statutMap["PAYE"] || 0),
         totalPayes: statutMap["PAYE"] || 0,
         totalRejetes,
         delaiMoyenGlobal: 0,
