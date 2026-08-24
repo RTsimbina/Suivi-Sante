@@ -198,6 +198,9 @@ export const API_PERMISSIONS: Record<
   '/api/sante/simuler-acte': {
     roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE'],
   },
+  '/api/sante/actes-assure': {
+    roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+  },
   '/api/profil': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
   },

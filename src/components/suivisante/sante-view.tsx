@@ -249,8 +249,8 @@ export default function SanteView() {
         setActesPagination(data.pagination);
         if (data.filtres) setActesFiltres(data.filtres);
       }
-    } catch {
-      /* silent */
+    } catch (err) {
+      console.error('[ACTES] Erreur chargement actes:', err);
     } finally {
       setActesLoading(false);
     }
