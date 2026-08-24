@@ -384,8 +384,13 @@ export default function SocietesView({ userRole }: Props) {
         a.download = `rapport-${selectedSociete?.nom || 'societe'}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('[RAPPORT PDF] Erreur serveur:', res.status, err);
       }
-    } catch { /* silent */ } finally {
+    } catch (err) {
+      console.error('[RAPPORT PDF] Erreur:', err);
+    } finally {
       setRapportLoading(false);
     }
   };

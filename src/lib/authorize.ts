@@ -218,7 +218,7 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR'],
   },
   '/api/entreprises': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   '/api/reception/courriels': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],
