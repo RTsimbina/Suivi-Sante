@@ -44,9 +44,10 @@ export default async function proxy(request: NextRequest) {
   // Empêcher l'indexation par les moteurs de recherche (outil interne)
   securityHeaders.set('X-Robots-Tag', 'noindex, nofollow');
   // CSP restrictive : autorise uniquement les sources nécessaires
+  // unsafe-inline/eval sont requis par le runtime Next.js (hydratation, next-themes)
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

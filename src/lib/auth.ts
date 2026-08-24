@@ -286,16 +286,16 @@ export const authOptions: NextAuthOptions = {
     callbackUrl: {
       name: `${process.env.NODE_ENV === 'production' ? '__Secure-' : ''}next-auth.callback-url`,
       options: {
-        httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
       },
     },
     csrfToken: {
+      // ⚠️ httpOnly:false est OBLIGATOIRE — NextAuth lit ce cookie côté client
+      //    pour l'inclure dans le corps du formulaire de login (protection CSRF).
       name: `${process.env.NODE_ENV === 'production' ? '__Host-' : ''}next-auth.csrf-token`,
       options: {
-        httpOnly: true,
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
