@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Tests automatiques (vitest + TypeScript + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Tests unitaires (Vitest)
+        run: npm run test
+
+      - name: Vérification TypeScript
+        run: npx tsc --noEmit
+
+      - name: Build (sans base de données — le build ne doit jamais la contacter)
+        run: npm run build
+        env:
+          # URL volontairement factice : si le build tente un accès base, il échoue.
+          DATABASE_URL: postgresql://build-isolation:5432/no_db?sslmode=disable&connection_limit=1

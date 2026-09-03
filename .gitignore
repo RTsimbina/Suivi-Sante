@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# sauvegardes de base de données (scripts/backup-db.sh) — ne jamais commiter
+/backups/
+
 
 # typescript
 *.tsbuildinfo

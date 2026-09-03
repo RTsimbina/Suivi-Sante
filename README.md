@@ -37,8 +37,31 @@ Développeur → modification de prisma/schema.prisma → npm run db:migrate (cr
 
 ## Processus de déploiement (production)
 
+> Procédure complète : **docs/procedure-deploiement.md** · Checklist de tests : **docs/checklist-deploiement.md**
+
 1. **Appliquer les migrations en attente** : `DATABASE_URL="..." npm run db:migrate:deploy`
 2. **Déployer l'application** : le build (`npm run build`) n'a plus besoin d'un accès à la base.
+
+**Pipeline recommandé (sauvegarde obligatoire avant migration) :**
+
+```bash
+PROD_DATABASE_URL="postgresql://..." npm run deploy:prod
+```
+
+Le script enchaîne : tests automatiques → état des migrations → **sauvegarde vérifiée de la base**
+(`pg_dump`, rétention 10) → confirmation humaine → `prisma migrate deploy` → vérification →
+build sans accès base → rappel de la checklist de fonctionnement.
+
+Outils associés :
+
+| Commande | Rôle |
+|---|---|
+| `npm run db:backup` | Sauvegarde vérifiée de la base (`backups/`, horodatée) |
+| `npm run db:restore` | Restauration d'urgence (destructive, confirmation requise) |
+| `npm run deploy:prod` | Pipeline production complet (tests + sauvegarde + validation + migration + build) |
+
+La CI (`.github/workflows/ci.yml`) exécute les tests automatiques (Vitest, TypeScript, build
+sans base) à chaque push et pull request.
 
 ### Adoption de la chaîne de migrations sur une base existante
 
