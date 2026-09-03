@@ -1,26 +1,18 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { simulerActeSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   const authError = await checkAuth(request);
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { assureId, typeActe, montantDemande, prestataireId } = body as {
-      assureId?: string;
-      typeActe?: string;
-      montantDemande?: number;
-      prestataireId?: string;
-    };
-
-    if (!assureId || !typeActe || !montantDemande || montantDemande <= 0) {
-      return Response.json(
-        { erreur: "Paramètres manquants : assureId, typeActe, montantDemande requis." },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (montant > 0, identifiants) ─────────────
+    const parsed = await parseJsonBody(request, simulerActeSchema);
+    if (!parsed.success) return parsed.response;
+    const { assureId, typeActe, montantDemande, prestataireId } = parsed.data;
 
     // Récupérer l'assuré
     const assure = await db.assure.findUnique({

@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import nodemailer from 'nodemailer';
 import { invalidateCache, interpreterErreurSMTP } from '@/lib/email';
 import { encrypt } from '@/lib/crypto';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { emailConfigSchema, emailConfigTestSchema } from '@/lib/validation';
 
 const ENCRYPTION_KEY = process.env.SERVER_ENCRYPTION_KEY || '';
 
@@ -44,21 +46,14 @@ export async function PUT(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, emailRapportDestinataire, actif } = body;
-
-    // Validations
-    if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
-      return NextResponse.json(
-        { erreur: 'Les champs Hôte, Utilisateur, Mot de passe et Expéditeur sont obligatoires.' },
-        { status: 400 }
-      );
-    }
-
-    const port = Number(smtpPort) || 587;
+    // ─── Validation Zod centralisée (hôte/utilisateur/expéditeur requis, ────
+    //     email expéditeur, port 1-65535) ─────────────────────────────────
+    const parsed = await parseJsonBody(request, emailConfigSchema);
+    if (!parsed.success) return parsed.response;
+    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, emailRapportDestinataire, actif } = parsed.data;
 
     // Chiffrer le mot de passe avant stockage (AES-256-GCM)
-    const encryptedPass = encrypt(String(smtpPass), ENCRYPTION_KEY);
+    const encryptedPass = encrypt(smtpPass, ENCRYPTION_KEY);
 
     // Upsert : chercher une config existante, sinon en créer une nouvelle
     const existante = await db.configurationEmail.findFirst({ orderBy: { createdAt: 'desc' } });
@@ -69,18 +64,18 @@ export async function PUT(request: NextRequest) {
         where: { id: existante.id },
         data: {
           smtpHost,
-          smtpPort: port,
+          smtpPort,
           smtpUser,
           smtpPass: encryptedPass, // chiffré — jamais en clair en BDD
           smtpFrom,
-          emailRapportDestinataire: emailRapportDestinataire || null,
+          emailRapportDestinataire: emailRapportDestinataire ?? null,
           actif: actif !== false,
         },
         select: { id: true, smtpHost: true, smtpPort: true, smtpUser: true, smtpFrom: true, emailRapportDestinataire: true, actif: true, updatedAt: true },
       });
     } else {
       config = await db.configurationEmail.create({
-        data: { smtpHost, smtpPort: port, smtpUser, smtpPass: encryptedPass, smtpFrom, emailRapportDestinataire: emailRapportDestinataire || null },
+        data: { smtpHost, smtpPort, smtpUser, smtpPass: encryptedPass, smtpFrom, emailRapportDestinataire: emailRapportDestinataire ?? null },
         select: { id: true, smtpHost: true, smtpPort: true, smtpUser: true, smtpFrom: true, emailRapportDestinataire: true, actif: true, createdAt: true },
       });
     }
@@ -121,23 +116,16 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom } = body;
-
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      return NextResponse.json(
-        { erreur: 'Hôte, Utilisateur et Mot de passe sont requis pour le test.' },
-        { status: 400 }
-      );
-    }
-
-    const port = Number(smtpPort) || 587;
+    // ─── Validation Zod centralisée (test SMTP) ─────────────────────────────
+    const parsed = await parseJsonBody(request, emailConfigTestSchema);
+    if (!parsed.success) return parsed.response;
+    const { smtpHost, smtpPort, smtpUser, smtpPass } = parsed.data;
 
     const transporter = nodemailer.createTransport({
       host: smtpHost,
-      port,
-      secure: port === 465,
-      requireTLS: port === 587,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      requireTLS: smtpPort === 587,
       auth: { user: smtpUser, pass: smtpPass },
       tls: { rejectUnauthorized: false },
     });

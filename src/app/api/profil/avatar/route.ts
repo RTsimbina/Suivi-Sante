@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
-
-const AVATAR_OPTIONS = [
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-] as const;
+import { parseJsonBody } from '@/lib/validation/parse';
+import { avatarUpdateSchema } from '@/lib/validation';
 
 // PATCH /api/profil/avatar
 // Corps : { avatar: "A" | "B" | ... | "H" | null }
@@ -18,15 +16,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
     }
 
-    const { avatar } = (await request.json()) as { avatar?: string | null };
-
-    // Valider la valeur
-    if (avatar !== null && !AVATAR_OPTIONS.includes(avatar as typeof AVATAR_OPTIONS[number])) {
-      return NextResponse.json(
-        { erreur: 'Avatar invalide. Valeurs autorisées : A-H ou null' },
-        { status: 400 },
-      );
-    }
+    // ─── Validation Zod centralisée (avatar ∈ [A-H] | null) ────────────────
+    const parsed = await parseJsonBody(request, avatarUpdateSchema);
+    if (!parsed.success) return parsed.response;
+    const { avatar } = parsed.data;
 
     // Récupérer l'ancien avatar pour l'historique
     const user = await db.utilisateur.findUnique({

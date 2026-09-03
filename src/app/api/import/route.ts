@@ -4,13 +4,14 @@ import { checkAuth } from "@/lib/authorize";
 import { readExcelRows } from "@/lib/excel";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { parseFormData } from "@/lib/validation/parse";
+import { importDossiersSchema } from "@/lib/validation";
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "EN_PAIEMENT", "PAYE", "REJETE"];
 const ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
 ];
-const ALLOWED_EXTENSIONS = [".xlsx", ".xls"];
 
 interface Anomalie {
   ligne: number;
@@ -24,23 +25,20 @@ export async function POST(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const source = (formData.get("source") as string) || "EXCEL";
-    const categorieDossier = (formData.get("categorie") as string) || "";
 
-    if (!file) {
-      return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
-    }
-    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIME_TYPES.includes(file.type)) {
+    // ─── Validation Zod du formulaire (fichier .xlsx/.xls ≤ 15 Mo, ──────────
+    //     source ∈ [ISA, SAGE, EXCEL], categorie ∈ enum) ────────────────────
+    const parsed = await parseFormData(request, importDossiersSchema);
+    if (!parsed.success) return parsed.response;
+    const file = parsed.data.file;
+    const source = parsed.data.source;
+    const categorieDossier = parsed.data.categorie ?? "";
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       return NextResponse.json(
         { erreur: "Format invalide. Seuls les fichiers .xlsx et .xls sont acceptes." },
         { status: 400 }
       );
-    }
-    if (!["ISA", "SAGE", "EXCEL"].includes(source)) {
-      return NextResponse.json({ erreur: "Source invalide (ISA, SAGE ou EXCEL)" }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());

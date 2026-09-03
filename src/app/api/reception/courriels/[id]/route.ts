@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-
-const VALID_STATUTS = ["RECU", "TRAITE", "REJETE"];
+import { parseJsonBody } from "@/lib/validation/parse";
+import { courrielUpdateSchema } from "@/lib/validation";
 
 export async function PATCH(
   request: NextRequest,
@@ -13,9 +13,12 @@ export async function PATCH(
     if (authError) return authError;
 
     const { id } = await params;
-    const body = await request.json();
 
-    // Vérifier que le courriel existe
+    // ─── Validation Zod centralisée (whitelist, statut enum, montant ≥ 0) ───
+    // FIX audit : le montant n'était pas contrôlé ici (contrairement au POST).
+    const parsed = await parseJsonBody(request, courrielUpdateSchema);
+    if (!parsed.success) return parsed.response;
+
     const existing = await db.courriel.findUnique({
       where: { id },
       include: { societe: true, dossier: true },
@@ -38,15 +41,7 @@ export async function PATCH(
       dateSoins,
       prestataire,
       objet,
-    } = body;
-
-    // Validation du statut
-    if (statut && !VALID_STATUTS.includes(statut)) {
-      return NextResponse.json(
-        { erreur: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
 
     // Vérifier que le dossier existe si dossierId est fourni
     if (dossierId) {
@@ -73,14 +68,14 @@ export async function PATCH(
     // Si le statut passe à TRAITE ou REJETE, renseigner dateTraitement et traitePar
     const updateData: Record<string, unknown> = {};
     if (statut) updateData.statut = statut;
-    if (observations !== undefined) updateData.observations = observations?.trim() || null;
-    if (dossierId !== undefined) updateData.dossierId = dossierId || null;
-    if (societeId !== undefined) updateData.societeId = societeId || null;
-    if (beneficiaire !== undefined) updateData.beneficiaire = beneficiaire?.trim() || null;
+    if (observations !== undefined) updateData.observations = observations ?? null;
+    if (dossierId !== undefined) updateData.dossierId = dossierId ?? null;
+    if (societeId !== undefined) updateData.societeId = societeId ?? null;
+    if (beneficiaire !== undefined) updateData.beneficiaire = beneficiaire ?? null;
     if (montant !== undefined) updateData.montant = montant ?? null;
-    if (dateSoins !== undefined) updateData.dateSoins = dateSoins ? new Date(dateSoins) : null;
-    if (prestataire !== undefined) updateData.prestataire = prestataire?.trim() || null;
-    if (objet !== undefined) updateData.objet = objet?.trim() || null;
+    if (dateSoins !== undefined) updateData.dateSoins = dateSoins ?? null;
+    if (prestataire !== undefined) updateData.prestataire = prestataire ?? null;
+    if (objet !== undefined) updateData.objet = objet ?? null;
 
     if (statut && (statut === "TRAITE" || statut === "REJETE")) {
       const userName = request.headers.get("x-user-name") || "Système";

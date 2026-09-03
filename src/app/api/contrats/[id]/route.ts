@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { contratUpdateSchema } from '@/lib/validation';
 
 // ─── GET : Un contrat par ID ───────────────────────────────────────────────
 
@@ -57,54 +59,51 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
 
-    const body = await request.json();
-    const { reference, budgetAnnuel, dateDebut, dateFin, statut } = body;
+    // ─── Validation Zod centralisée (whitelist + montants + enums) ──────────
+    const parsed = await parseJsonBody(request, contratUpdateSchema);
+    if (!parsed.success) return parsed.response;
+    const { reference, budgetAnnuel, dateDebut, dateFin, statut } = parsed.data;
 
     const existing = await db.contrat.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ erreur: 'Contrat introuvable.' }, { status: 404 });
     }
 
-    const validStatuts = ['ACTIF', 'EXPIRE', 'SUSPENDU'];
-
     // Préparer les données de mise à jour et collecter les changements pour l'audit
     const updateData: Record<string, unknown> = {};
     const changes: { champ: string; ancienneValeur: unknown; nouvelleValeur: unknown }[] = [];
 
-    if (reference) {
-      const trimmed = reference.trim();
-      if (trimmed !== existing.reference) {
-        updateData.reference = trimmed;
-        changes.push({ champ: 'reference', ancienneValeur: existing.reference, nouvelleValeur: trimmed });
+    if (reference !== undefined) {
+      if (reference !== existing.reference) {
+        updateData.reference = reference;
+        changes.push({ champ: 'reference', ancienneValeur: existing.reference, nouvelleValeur: reference });
       }
     }
     if (budgetAnnuel !== undefined) {
-      const numBudget = Number(budgetAnnuel);
-      if (String(numBudget) !== String(Number(existing.budgetAnnuel))) {
-        updateData.budgetAnnuel = numBudget;
-        changes.push({ champ: 'budgetAnnuel', ancienneValeur: existing.budgetAnnuel, nouvelleValeur: numBudget });
+      if (budgetAnnuel !== existing.budgetAnnuel) {
+        updateData.budgetAnnuel = budgetAnnuel;
+        changes.push({ champ: 'budgetAnnuel', ancienneValeur: existing.budgetAnnuel, nouvelleValeur: budgetAnnuel });
       }
     }
-    if (dateDebut) {
-      const d = new Date(dateDebut);
-      if (d.getTime() !== existing.dateDebut.getTime()) {
-        updateData.dateDebut = d;
-        changes.push({ champ: 'dateDebut', ancienneValeur: existing.dateDebut.toISOString(), nouvelleValeur: d.toISOString() });
+    if (dateDebut !== undefined) {
+      if (dateDebut.getTime() !== existing.dateDebut.getTime()) {
+        updateData.dateDebut = dateDebut;
+        changes.push({ champ: 'dateDebut', ancienneValeur: existing.dateDebut.toISOString(), nouvelleValeur: dateDebut.toISOString() });
       }
     }
-    if (dateFin) {
-      const d = new Date(dateFin);
-      if (d.getTime() !== existing.dateFin.getTime()) {
-        // Verifier la coherence avec dateDebut
+    if (dateFin !== undefined) {
+      if (dateFin.getTime() !== existing.dateFin.getTime()) {
+        // Verifier la coherence avec dateDebut (y compris si seule dateFin change)
         const debutRef = updateData.dateDebut || existing.dateDebut;
-        if (d <= debutRef) {
+        if (dateFin <= debutRef) {
           return NextResponse.json({ erreur: 'La date de fin doit etre posterieure a la date de debut.' }, { status: 400 });
         }
-        updateData.dateFin = d;
-        changes.push({ champ: 'dateFin', ancienneValeur: existing.dateFin.toISOString(), nouvelleValeur: d.toISOString() });
+        updateData.dateFin = dateFin;
+        changes.push({ champ: 'dateFin', ancienneValeur: existing.dateFin.toISOString(), nouvelleValeur: dateFin.toISOString() });
       }
     }
-    if (statut && validStatuts.includes(statut)) {
+    // Le schéma Zod garantit que statut ∈ [ACTIF, EXPIRE, SUSPENDU]
+    if (statut !== undefined) {
       if (statut !== existing.statut) {
         updateData.statut = statut;
         changes.push({ champ: 'statut', ancienneValeur: existing.statut, nouvelleValeur: statut });

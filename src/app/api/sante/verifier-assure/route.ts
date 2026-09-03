@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { verifierAssureSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   // Vérification auth
@@ -8,17 +10,15 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const body = await request.json();
-    const { identifiant } = body as { identifiant?: string };
-
-    if (!identifiant || identifiant.trim().length === 0) {
+    // ─── Validation Zod centralisée (identifiant requis) ────────────────────
+    const parsed = await parseJsonBody(request, verifierAssureSchema);
+    if (!parsed.success) {
       return Response.json(
         { erreur: "Veuillez fournir un identifiant (N° SS, nom ou email de l'assuré)." },
         { status: 400 }
       );
     }
-
-    const query = identifiant.trim();
+    const query = parsed.data.identifiant;
 
     // ── 1. Trouver l'assuré par NSS, nom, ou email ──
     // Filtrer par societe si l'utilisateur n'est pas admin

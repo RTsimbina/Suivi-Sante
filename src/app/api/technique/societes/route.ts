@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { PARENT_TYPES, ALL_SOUS_TYPES } from '@/lib/prestations';
-
-// Types pour la validation
-interface BaremeInput {
-  prestation: string;
-  tauxCouverture: number;
-  plafond: number;
-  description?: string;
-  active?: boolean;
-}
-
-const PRESTATIONS_VALIDES = [...ALL_SOUS_TYPES];
+import { parseJsonBody } from '@/lib/validation/parse';
+import { societeTechniqueCreateSchema } from '@/lib/validation';
 
 // ─── GET : Lister toutes les sociétés ─────────────────────────────────────────
 
@@ -66,51 +56,14 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = body as {
-      nom: string;
-      adresse?: string;
-      telephone?: string;
-      email?: string;
-      nif?: string;
-      contactPrincipal?: string;
-      baremes?: BaremeInput[];
-    };
+    // ─── Validation Zod centralisée (nom requis, barèmes : enum prestation,
+    //     taux 0-100, plafond > 0) ────────────────────────────────────────────
+    const parsed = await parseJsonBody(request, societeTechniqueCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = parsed.data;
 
-    // Validation du nom
-    if (!nom || typeof nom !== 'string' || nom.trim().length === 0) {
-      return NextResponse.json(
-        { erreur: 'Le nom de la société est obligatoire.' },
-        { status: 400 }
-      );
-    }
-
-    // Validation des barèmes si fournis
-    if (baremes && Array.isArray(baremes)) {
-      for (const b of baremes) {
-        if (!b.prestation || (!PRESTATIONS_VALIDES.includes(b.prestation) && !PARENT_TYPES.includes(b.prestation))) {
-          return NextResponse.json(
-            {
-              erreur: `Prestation invalide : "${b.prestation}". Valeurs autorisées : ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(', ')}.`,
-            },
-            { status: 400 }
-          );
-        }
-        if (typeof b.tauxCouverture !== 'number' || b.tauxCouverture < 0 || b.tauxCouverture > 100) {
-          return NextResponse.json(
-            { erreur: `Le taux de couverture pour "${b.prestation}" doit être un nombre entre 0 et 100.` },
-            { status: 400 }
-          );
-        }
-        if (typeof b.plafond !== 'number' || b.plafond < 0) {
-          return NextResponse.json(
-            { erreur: `Le plafond pour "${b.prestation}" doit être un nombre positif.` },
-            { status: 400 }
-          );
-        }
-      }
-
-      // Vérifier les doublons de prestation dans le tableau
+    // Vérifier les doublons de prestation dans le tableau
+    if (baremes && baremes.length > 0) {
       const prestations = baremes.map((b) => b.prestation);
       const doublons = prestations.filter((p, i) => prestations.indexOf(p) !== i);
       if (doublons.length > 0) {
@@ -124,12 +77,12 @@ export async function POST(request: NextRequest) {
     // Créer la société avec ses barèmes
     const societe = await db.societe.create({
       data: {
-        nom: nom.trim(),
-        ...(adresse ? { adresse: adresse.trim() } : {}),
-        ...(telephone ? { telephone: telephone.trim() } : {}),
-        ...(email ? { email: email.trim() } : {}),
-        ...(nif ? { nif: nif.trim() } : {}),
-        ...(contactPrincipal ? { contactPrincipal: contactPrincipal.trim() } : {}),
+        nom,
+        ...(adresse ? { adresse } : {}),
+        ...(telephone ? { telephone } : {}),
+        ...(email ? { email } : {}),
+        ...(nif ? { nif } : {}),
+        ...(contactPrincipal ? { contactPrincipal } : {}),
         baremes: baremes && baremes.length > 0
           ? {
               create: baremes.map((b) => ({

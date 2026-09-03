@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/authorize";
 import { genererRapportMensuel, type ReportData } from "@/lib/generate-report";
 import { envoyerEmail } from "@/lib/email";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { rapportMensuelSchema } from "@/lib/validation";
 import {
   getStatutCounts, getTotalSums, getSocieteBreakdown, getMonthlyVolume,
   getAvgDelaiPaiement, round2,
@@ -53,39 +55,16 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { mois, annee, destinataires } = body as {
-      mois: number;
-      annee: number;
-      destinataires?: string[];
-    };
-
-    if (!mois || !annee || mois < 1 || mois > 12) {
-      return NextResponse.json(
-        { erreur: "Paramètres mois et annee requis (mois: 1-12)" },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (mois 1-12, année, emails destinataires) ─
+    const parsed = await parseJsonBody(request, rapportMensuelSchema);
+    if (!parsed.success) return parsed.response;
+    const { mois, annee, destinataires } = parsed.data;
 
     const data = await buildReportData(mois, annee);
     const pdfBuffer = await genererRapportMensuel(data);
 
     if (destinataires && destinataires.length > 0) {
-      // Valider les adresses email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const invalidEmails = destinataires.filter((e: string) => !emailRegex.test(e));
-      if (invalidEmails.length > 0) {
-        return NextResponse.json(
-          { erreur: `Adresses email invalides : ${invalidEmails.join(', ')}` },
-          { status: 400 }
-        );
-      }
-      if (destinataires.length > 20) {
-        return NextResponse.json(
-          { erreur: 'Maximum 20 destinataires autorises.' },
-          { status: 400 }
-        );
-      }
+      // Emails validés et limités à 20 par le schéma Zod
       const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
       try {
         await envoyerEmail({

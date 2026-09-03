@@ -3,27 +3,17 @@ import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { checkAuth } from "@/lib/authorize";
 import { getPrestationLabel } from "@/lib/prestations";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { portailSearchSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
-    const body = await request.json();
-    const { query } = body;
-
-    if (!query || typeof query !== "string") {
-      return NextResponse.json({ erreur: "Le champ 'query' est requis" },
-        { status: 400 }
-      );
-    }
-
-    const q = query.trim();
-
-    if (q.length < 2) {
-      return NextResponse.json({ erreur: "La recherche doit contenir au moins 2 caractères" },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (query ≥ 2 caractères) ──────────────────
+    const parsed = await parseJsonBody(request, portailSearchSchema);
+    if (!parsed.success) return parsed.response;
+    const q = parsed.data.query;
 
     // Recherche par numéro de dossier exact ou partiel, ou bénéficiaire
     const where: Prisma.DossierWhereInput = {

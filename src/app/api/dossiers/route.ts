@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { dossierCreateSchema } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   try {
@@ -99,8 +101,10 @@ export async function POST(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
-    const body = await request.json();
 
+    // ─── Validation Zod centralisée (type, champs requis, montants, enums) ──
+    const parsed = await parseJsonBody(request, dossierCreateSchema);
+    if (!parsed.success) return parsed.response;
     const {
       numeroDossier,
       dateReception,
@@ -119,22 +123,7 @@ export async function POST(request: NextRequest) {
       source,
       montantValide,
       ticketModerateur,
-    } = body;
-
-    // Validate required fields
-    if (!numeroDossier || !dateReception || !societeId || !beneficiaire || !typeDossier) {
-      return NextResponse.json({ erreur: "Les champs obligatoires sont manquants: numeroDossier, dateReception, societeId, beneficiaire, typeDossier" },
-        { status: 400 }
-      );
-    }
-
-    // Valider les montants
-    if (montantReclame !== undefined && montantReclame < 0) {
-      return NextResponse.json({ erreur: "Le montant reclame ne peut pas etre negatif." }, { status: 400 });
-    }
-    if (montantValide !== undefined && montantValide < 0) {
-      return NextResponse.json({ erreur: "Le montant valide ne peut pas etre negatif." }, { status: 400 });
-    }
+    } = parsed.data;
 
     // Check for duplicate numeroDossier
     const existing = await db.dossier.findUnique({
@@ -231,22 +220,22 @@ export async function POST(request: NextRequest) {
       return tx.dossier.create({
       data: {
         numeroDossier,
-        dateReception: new Date(dateReception),
+        dateReception,
         societeId,
         beneficiaire,
         typeDossier,
-        categorieDossier: categorieDossier && ["REMBOURSEMENT_ASSURE", "REGLEMENT_PRESTATAIRE"].includes(categorieDossier) ? categorieDossier : null,
-        gestionnaireAccueilId: gestionnaireAccueilId || null,
+        categorieDossier: categorieDossier ?? null,
+        gestionnaireAccueilId: gestionnaireAccueilId ?? null,
         createurId: userId,
-        montantReclame: montantReclame || 0,
-        assureId: assureId || null,
-        nSS: nSS || null,
-        prestataireId: prestataireId || null,
-        dateSoins: dateSoins ? new Date(dateSoins) : null,
-        moyenPaiement: moyenPaiement || null,
-        observations: observations || null,
+        montantReclame,
+        assureId: assureId ?? null,
+        nSS: nSS ?? null,
+        prestataireId: prestataireId ?? null,
+        dateSoins: dateSoins ?? null,
+        moyenPaiement: moyenPaiement ?? null,
+        observations: observations ?? null,
         statut: "RECU",
-        source: source || "MANUEL",
+        source,
         montantValide: finalMontantValide,
         ticketModerateur: finalTicketModerateur,
         historique: JSON.stringify(historiqueEntries),

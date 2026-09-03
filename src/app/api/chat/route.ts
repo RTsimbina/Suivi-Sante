@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/authorize";
 import { callLLM } from "@/lib/llm";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { chatSchema } from "@/lib/validation";
 import {
   getStatutCounts, getTotalSums, getSocieteBreakdown, getAvgDelaiPaiement, round2,
 } from "@/lib/kpi-queries";
@@ -74,15 +76,10 @@ export async function POST(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
-    const body = await request.json();
-    const { question } = body;
-
-    if (!question || typeof question !== "string") {
-      return NextResponse.json(
-        { erreur: "Le champ 'question' est requis" },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (question requise) ──────────────────────
+    const parsed = await parseJsonBody(request, chatSchema);
+    if (!parsed.success) return parsed.response;
+    const { question } = parsed.data;
 
     const context = await buildKpiContext();
 

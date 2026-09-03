@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { appelFondsCreateSchema } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,12 +37,14 @@ export async function POST(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
-    const body = await request.json();
-    const { contratId, montant, dateAppel, observations } = body;
 
-    if (!contratId || !montant || !dateAppel) {
-      return NextResponse.json({ erreur: "contratId, montant et dateAppel sont requis" }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée ────────────────────────────────────────
+    // FIX audit majeur : le montant n'était jamais contrôlé — un montant
+    // négatif était accepté et diminuait le budget utilisé du contrat.
+    // montantPositif garantit maintenant un nombre > 0 (montant strictement positif).
+    const parsed = await parseJsonBody(request, appelFondsCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { contratId, montant, dateAppel, observations } = parsed.data;
 
     const contrat = await db.contrat.findUnique({ where: { id: contratId } });
     if (!contrat) {
@@ -50,9 +54,9 @@ export async function POST(request: NextRequest) {
     const appel = await db.appelDeFonds.create({
       data: {
         contratId,
-        montant: parseFloat(montant),
-        dateAppel: new Date(dateAppel),
-        observations: observations || null,
+        montant,
+        dateAppel,
+        observations: observations ?? null,
         statut: "EN_ATTENTE",
       },
       include: { contrat: { include: { societe: true } } },
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Synchroniser le budgetUtilise du contrat (champ cache)
     await db.contrat.update({
       where: { id: contratId },
-      data: { budgetUtilise: { increment: parseFloat(montant) } },
+      data: { budgetUtilise: { increment: montant } },
     });
 
     return NextResponse.json(appel, { status: 201 });

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { lockoutCheckSchema } from "@/lib/validation";
 
 // ── C-04 : Cette route est dorénavant sous /api/session/ (protégé par le middleware JWT) ──
 // Ancien emplacement : /api/auth/check-lockout (contournait le middleware car sous /api/auth/)
@@ -6,23 +8,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
-    if (!email) {
+    // ─── Validation Zod centralisée (format email, ≤ 254 caractères) ────────
+    const parsed = await parseJsonBody(request, lockoutCheckSchema);
+    if (!parsed.success) {
       // Toujours retourner la même réponse pour éviter l'énumération
       return NextResponse.json({ locked: false, remainingMs: 0 }, { status: 200 });
     }
-
-    const emailStr = String(email).toLowerCase().trim();
-
-    // Vérifier la longueur raisonnable pour éviter l'abus
-    if (emailStr.length > 254) {
-      return NextResponse.json({ locked: false, remainingMs: 0 }, { status: 200 });
-    }
-
-    // Vérifier le format email basique
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
-      return NextResponse.json({ locked: false, remainingMs: 0 }, { status: 200 });
-    }
+    const emailStr = parsed.data.email.toLowerCase();
 
     // Importer dynamiquement pour éviter les dépendances circulaires
     const { isLockedOut } = await import("@/lib/auth");

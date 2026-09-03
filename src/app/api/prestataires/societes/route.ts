@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { liaisonPrestataireSocieteSchema, liaisonPatchSchema } from '@/lib/validation';
 
 // ─── Helper : synchroniser PrestataireSociete depuis les dossiers ─────────────
 async function syncFromDossiers(): Promise<number> {
@@ -183,12 +185,11 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
-    const body = await request.json();
-    const { prestataireId, societeId } = body as { prestataireId?: string; societeId?: string };
 
-    if (!prestataireId || !societeId) {
-      return NextResponse.json({ erreur: 'prestataireId et societeId requis.' }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (identifiants requis) ───────────────────
+    const parsed = await parseJsonBody(request, liaisonPrestataireSocieteSchema);
+    if (!parsed.success) return parsed.response;
+    const { prestataireId, societeId } = parsed.data;
 
     const [prestataire, societe] = await Promise.all([
       db.prestataire.findUnique({ where: { id: prestataireId } }),
@@ -225,12 +226,11 @@ export async function PATCH(request: NextRequest) {
     if (authError) return authError;
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
-    const body = await request.json();
-    const { id, actif } = body as { id?: string; actif?: boolean };
 
-    if (!id || actif === undefined) {
-      return NextResponse.json({ erreur: 'id et actif requis.' }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (id requis, actif booléen) ──────────────
+    const parsed = await parseJsonBody(request, liaisonPatchSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, actif } = parsed.data;
 
     const existing = await db.prestataireSociete.findUnique({
       where: { id },

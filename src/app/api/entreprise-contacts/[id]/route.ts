@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { contactEntrepriseUpdateSchema } from "@/lib/validation";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
-    const body = await request.json();
+    // ─── Validation Zod centralisée ─────────────────────────────────────────
+    // FIX audit : PUT sans aucune validation — un nom absent provoquait une
+    // erreur 500 Prisma. Désormais : 400 « Données invalides » avec détail.
+    const parsed = await parseJsonBody(request, contactEntrepriseUpdateSchema);
+    if (!parsed.success) return parsed.response;
+    const { nom, prenom, fonction, telephone, email, actif } = parsed.data;
     const contact = await db.entrepriseContact.update({
       where: { id },
       data: {
-        nom: body.nom,
-        prenom: body.prenom || null,
-        fonction: body.fonction || null,
-        telephone: body.telephone || null,
-        email: body.email || null,
-        actif: body.actif !== undefined ? body.actif : undefined,
+        nom,
+        prenom: prenom ?? null,
+        fonction: fonction ?? null,
+        telephone: telephone ?? null,
+        email: email ?? null,
+        ...(actif !== undefined ? { actif } : {}),
       },
     });
     return NextResponse.json(contact);

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { Prisma } from "@prisma/client";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { courrielCreateSchema } from "@/lib/validation";
 
 const VALID_TYPES = ["FACTURE_PRESTATAIRE", "DOSSIER_REMBOURSEMENT"];
 const VALID_STATUTS = ["RECU", "TRAITE", "REJETE"];
@@ -78,7 +80,9 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
+    // ─── Validation Zod centralisée (enum type, montant ≥ 0, dates) ────────
+    const parsed = await parseJsonBody(request, courrielCreateSchema);
+    if (!parsed.success) return parsed.response;
     const {
       type,
       expediteur,
@@ -89,36 +93,7 @@ export async function POST(request: NextRequest) {
       dateCourriel,
       dateSoins,
       prestataire,
-    } = body;
-
-    // Validations
-    if (!type || !VALID_TYPES.includes(type)) {
-      return NextResponse.json(
-        { erreur: `Type invalide. Valeurs autorisées : ${VALID_TYPES.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (!expediteur || !expediteur.trim()) {
-      return NextResponse.json(
-        { erreur: "L'expéditeur est obligatoire." },
-        { status: 400 }
-      );
-    }
-
-    if (!objet || !objet.trim()) {
-      return NextResponse.json(
-        { erreur: "L'objet du courriel est obligatoire." },
-        { status: 400 }
-      );
-    }
-
-    if (montant !== undefined && montant !== null && (typeof montant !== "number" || montant < 0)) {
-      return NextResponse.json(
-        { erreur: "Le montant doit être un nombre positif." },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
 
     // Vérifier que la société existe si societeId est fourni
     if (societeId) {
@@ -134,14 +109,14 @@ export async function POST(request: NextRequest) {
     const courriel = await db.courriel.create({
       data: {
         type,
-        expediteur: expediteur.trim(),
-        objet: objet.trim(),
-        societeId: societeId || null,
-        beneficiaire: beneficiaire?.trim() || null,
+        expediteur,
+        objet,
+        societeId: societeId ?? null,
+        beneficiaire: beneficiaire ?? null,
         montant: montant ?? null,
-        dateCourriel: dateCourriel ? new Date(dateCourriel) : new Date(),
-        dateSoins: dateSoins ? new Date(dateSoins) : null,
-        prestataire: prestataire?.trim() || null,
+        dateCourriel: dateCourriel ?? new Date(),
+        dateSoins: dateSoins ?? null,
+        prestataire: prestataire ?? null,
       },
       include: {
         societe: { select: { id: true, nom: true } },

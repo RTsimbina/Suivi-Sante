@@ -2,39 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hash } from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-const MIN_PASSWORD_LENGTH = 8;
+import { parseJsonBody } from '@/lib/validation/parse';
+import { resetPasswordSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, newPassword } = await request.json();
-
-    if (!token || !newPassword) {
+    // ─── Validation Zod centralisée (token requis, politique mot de passe) ──
+    const parsed = await parseJsonBody(request, resetPasswordSchema);
+    if (!parsed.success) {
       return NextResponse.json(
-        { message: 'Token et nouveau mot de passe requis.' },
+        { message: 'Token et nouveau mot de passe requis (min. 8 caractères, une lettre et un chiffre).' },
         { status: 400 }
       );
     }
-
-    // Valider le nouveau mot de passe
-    if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
-      return NextResponse.json(
-        { message: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.` },
-        { status: 400 }
-      );
-    }
-
-    // Vérifier la complexité minimale
-    const hasLetter = /[a-zA-Z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword);
-
-    if (!hasLetter || !hasNumber) {
-      return NextResponse.json(
-        { message: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' },
-        { status: 400 }
-      );
-    }
+    const { token, newPassword } = parsed.data;
 
     // Vérifier et décoder le token JWT
     const secret = process.env.NEXTAUTH_SECRET;

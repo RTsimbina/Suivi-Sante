@@ -3,18 +3,8 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 import { Prisma } from '@prisma/client';
-import { PARENT_TYPES, ALL_SOUS_TYPES } from '@/lib/prestations';
-
-// Types
-interface BaremeInput {
-  prestation: string;
-  tauxCouverture: number;
-  plafond: number;
-  description?: string;
-  active?: boolean;
-}
-
-const PRESTATIONS_VALIDES = [...ALL_SOUS_TYPES];
+import { parseJsonBody } from '@/lib/validation/parse';
+import { societeTechniqueUpdateSchema } from '@/lib/validation';
 
 // ─── GET : Récupérer une société avec ses barèmes ─────────────────────────────
 
@@ -65,16 +55,11 @@ export async function PUT(
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const { id } = await params;
-    const body = await request.json();
-    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = body as {
-      nom?: string;
-      adresse?: string;
-      telephone?: string;
-      email?: string;
-      nif?: string;
-      contactPrincipal?: string;
-      baremes?: BaremeInput[];
-    };
+
+    // ─── Validation Zod centralisée (whitelist, barèmes : enum, taux, plafond) ─
+    const parsed = await parseJsonBody(request, societeTechniqueUpdateSchema);
+    if (!parsed.success) return parsed.response;
+    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = parsed.data;
 
     // Vérifier que la société existe
     const existing = await db.societe.findUnique({
@@ -89,42 +74,9 @@ export async function PUT(
       );
     }
 
-    // Validation du nom si fourni
-    if (nom !== undefined) {
-      if (typeof nom !== 'string' || nom.trim().length === 0) {
-        return NextResponse.json(
-          { erreur: 'Le nom de la société ne peut pas être vide.' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Validation des barèmes si fournis
-    if (baremes && Array.isArray(baremes)) {
-      for (const b of baremes) {
-        if (!b.prestation || (!PRESTATIONS_VALIDES.includes(b.prestation) && !PARENT_TYPES.includes(b.prestation))) {
-          return NextResponse.json(
-            {
-              erreur: `Prestation invalide : "${b.prestation}". Valeurs autorisées : ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(', ')}.`,
-            },
-            { status: 400 }
-          );
-        }
-        if (typeof b.tauxCouverture !== 'number' || b.tauxCouverture < 0 || b.tauxCouverture > 100) {
-          return NextResponse.json(
-            { erreur: `Le taux de couverture pour "${b.prestation}" doit être un nombre entre 0 et 100.` },
-            { status: 400 }
-          );
-        }
-        if (typeof b.plafond !== 'number' || b.plafond < 0) {
-          return NextResponse.json(
-            { erreur: `Le plafond pour "${b.prestation}" doit être un nombre positif.` },
-            { status: 400 }
-          );
-        }
-      }
-
-      // Vérifier les doublons de prestation dans le tableau
+    // Vérifier les doublons de prestation dans le tableau (les types, taux et
+    // plafonds sont déjà garantis par le schéma Zod)
+    if (baremes && baremes.length > 0) {
       const prestations = baremes.map((b) => b.prestation);
       const doublons = prestations.filter((p, i) => prestations.indexOf(p) !== i);
       if (doublons.length > 0) {
@@ -226,12 +178,12 @@ export async function PUT(
       return tx.societe.update({
         where: { id },
         data: {
-          ...(nom ? { nom: nom.trim() } : {}),
-          ...(adresse !== undefined ? { adresse: adresse?.trim() || null } : {}),
-          ...(telephone !== undefined ? { telephone: telephone?.trim() || null } : {}),
-          ...(email !== undefined ? { email: email?.trim() || null } : {}),
-          ...(nif !== undefined ? { nif: nif?.trim() || null } : {}),
-          ...(contactPrincipal !== undefined ? { contactPrincipal: contactPrincipal?.trim() || null } : {}),
+          ...(nom !== undefined ? { nom } : {}),
+          ...(adresse !== undefined ? { adresse: adresse ?? null } : {}),
+          ...(telephone !== undefined ? { telephone: telephone ?? null } : {}),
+          ...(email !== undefined ? { email: email ?? null } : {}),
+          ...(nif !== undefined ? { nif: nif ?? null } : {}),
+          ...(contactPrincipal !== undefined ? { contactPrincipal: contactPrincipal ?? null } : {}),
         },
         include: {
           baremes: { orderBy: { prestation: 'asc' } },
@@ -241,10 +193,10 @@ export async function PUT(
     });
 
     // Audit log : modifications de la société elle-même
-    if (nom && nom.trim() !== existing.nom) {
+    if (nom !== undefined && nom !== existing.nom) {
       await logParametreChange({
         entite: 'Societe', entiteId: id, champ: 'nom',
-        ancienneValeur: existing.nom, nouvelleValeur: nom.trim(),
+        ancienneValeur: existing.nom, nouvelleValeur: nom,
         modifiePar: userName, modifieParId: userId, objet: existing.nom, societeId: id, request,
       });
     }

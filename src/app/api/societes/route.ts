@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { societeCreateSchema } from "@/lib/validation";
 
 // GET — Lister toutes les sociétés
 export async function GET(request: NextRequest) {
@@ -29,28 +31,27 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
-    const body = await request.json();
-    const { nom } = body;
 
-    if (!nom || typeof nom !== "string" || nom.trim().length < 2) {
-      return NextResponse.json({ erreur: "Nom de société requis (min 2 caractères)" }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (nom ≥ 2 caractères) ───────────────────
+    const parsed = await parseJsonBody(request, societeCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const nom = parsed.data.nom;
 
     // Vérifier doublon
-    const existing = await db.societe.findFirst({ where: { nom: nom.trim() } });
+    const existing = await db.societe.findFirst({ where: { nom } });
     if (existing) {
       return NextResponse.json({ erreur: "Une société avec ce nom existe déjà" }, { status: 409 });
     }
 
     const societe = await db.societe.create({
-      data: { nom: nom.trim() },
+      data: { nom },
     });
 
     // Audit log : création
     await logParametreChange({
       entite: 'Societe', entiteId: societe.id, champ: 'CREATION',
-      ancienneValeur: null, nouvelleValeur: nom.trim(),
-      modifiePar: userName, modifieParId: userId, objet: nom.trim(), request,
+      ancienneValeur: null, nouvelleValeur: nom,
+      modifiePar: userName, modifieParId: userId, objet: nom, request,
     });
 
     return NextResponse.json({ societe }, { status: 201 });

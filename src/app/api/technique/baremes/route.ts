@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { verifierPlafondAnnuel, type PlafondCheckResult } from '@/lib/plafond-check';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { techniqueBaremeSchema } from '@/lib/validation';
 
 // ─── POST : Calculer le ticket modérateur + vérification plafond annuel ──────
 
@@ -10,42 +12,16 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
+    // ─── Validation Zod centralisée (identifiants, montant > 0) ─────────────
+    const parsed = await parseJsonBody(request, techniqueBaremeSchema);
+    if (!parsed.success) return parsed.response;
     const {
       societeId,
       prestation,
       montantReclame,
       assureId,
       prestataireId,
-    } = body as {
-      societeId: string;
-      prestation: string;
-      montantReclame: number;
-      assureId?: string;
-      prestataireId?: string;
-    };
-
-    // Validations
-    if (!societeId || typeof societeId !== 'string') {
-      return NextResponse.json(
-        { erreur: "L'identifiant de la société est obligatoire." },
-        { status: 400 }
-      );
-    }
-
-    if (!prestation || typeof prestation !== 'string') {
-      return NextResponse.json(
-        { erreur: 'La prestation est obligatoire.' },
-        { status: 400 }
-      );
-    }
-
-    if (typeof montantReclame !== 'number' || montantReclame <= 0) {
-      return NextResponse.json(
-        { erreur: 'Le montant réclamé doit être un nombre positif.' },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
 
     // Récupérer la société avec ses barèmes
     const societe = await db.societe.findUnique({

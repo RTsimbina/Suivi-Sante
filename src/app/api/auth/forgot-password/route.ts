@@ -2,29 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import jwt from 'jsonwebtoken';
 import { envoyerEmail, smtpEstConfigureAsync } from '@/lib/email';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { forgotPasswordSchema } from '@/lib/validation';
 
 // Durée de validité du token de réinitialisation : 30 minutes
 const RESET_TOKEN_EXPIRY = '30m';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
-
-    if (!email || typeof email !== 'string') {
+    // ─── Validation Zod centralisée (format email) ─────────────────────────
+    const parsed = await parseJsonBody(request, forgotPasswordSchema);
+    if (!parsed.success) {
       return NextResponse.json(
         { message: 'Adresse e-mail requise.' },
         { status: 400 }
       );
     }
-
-    const emailTrimmed = email.toLowerCase().trim();
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
-      return NextResponse.json(
-        { message: 'Format d\'e-mail invalide.' },
-        { status: 400 }
-      );
-    }
+    const emailTrimmed = parsed.data.email.toLowerCase();
 
     // Vérifier que l'utilisateur existe et est actif
     const user = await db.utilisateur.findUnique({

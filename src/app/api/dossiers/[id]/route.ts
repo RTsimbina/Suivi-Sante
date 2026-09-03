@@ -2,16 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
-
-const VALID_STATUTS = [
-  "RECU",
-  "EN_ANALYSE",
-  "VALIDE",
-  "EN_COMPTABILITE",
-  "EN_PAIEMENT",
-  "PAYE",
-  "REJETE",
-];
+import { parseJsonBody } from "@/lib/validation/parse";
+import { dossierUpdateSchema } from "@/lib/validation";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   RECU: ["EN_ANALYSE", "REJETE"],
@@ -48,7 +40,11 @@ export async function PATCH(
     const userRole = request.headers.get('x-user-role');
     const userId = request.headers.get('x-user-id');
 
-    const body = await request.json();
+    // ─── Validation Zod centralisée (whitelist stricte des champs PATCH) ────
+    // Tout champ non déclaré (ex : montantReclame, numeroDossier, historique)
+    // est supprimé avant traitement.
+    const parsed = await parseJsonBody(request, dossierUpdateSchema);
+    if (!parsed.success) return parsed.response;
     const {
       statut,
       gestionnaireAccueilId,
@@ -63,7 +59,7 @@ export async function PATCH(
       moyenPaiement,
       observations,
       motifRejet,
-    } = body;
+    } = parsed.data;
 
     const existing = await db.dossier.findUnique({
       where: { id },
@@ -79,12 +75,7 @@ export async function PATCH(
     const assignComments: string[] = [];
 
     if (statut) {
-      if (!VALID_STATUTS.includes(statut)) {
-        return NextResponse.json({ erreur: `Statut invalide. Valeurs autorisées : ${VALID_STATUTS.join(", ")}` },
-          { status: 400 }
-        );
-      }
-
+      // Le schéma Zod garantit déjà que statut ∈ VALID_STATUTS.
       if (existing.statut === statut) {
         return NextResponse.json({ erreur: `Le dossier est déjà dans le statut "${statut}"` },
           { status: 400 }
@@ -197,18 +188,16 @@ export async function PATCH(
       updateData.montantValide = newMontantValide;
     }
     if (ticketModerateur !== undefined) {
-      // Verifier que le ticket modérateur est positif et ne depasse pas le montant reclame
-      const tm = ticketModerateur || 0;
-      if (tm < 0) {
-        return NextResponse.json({ erreur: "Le ticket modérateur ne peut pas etre negatif." }, { status: 400 });
-      }
+      // Verifier que le ticket modérateur ne depasse pas le montant reclame
+      // (la non-négativité et le type number sont garantis par le schéma Zod).
+      const tm = ticketModerateur ?? 0;
       if (existing.montantReclame && tm > existing.montantReclame) {
         return NextResponse.json({ erreur: "Le ticket modérateur ne peut pas depasser le montant reclame." }, { status: 400 });
       }
       updateData.ticketModerateur = ticketModerateur || null;
     }
     if (nSS !== undefined) updateData.nSS = nSS || null;
-    if (dateSoins !== undefined) updateData.dateSoins = dateSoins ? new Date(dateSoins) : null;
+    if (dateSoins !== undefined) updateData.dateSoins = dateSoins ?? null;
     if (moyenPaiement !== undefined) updateData.moyenPaiement = moyenPaiement || null;
     if (observations !== undefined) updateData.observations = observations || null;
     if (motifRejet !== undefined) updateData.motifRejet = motifRejet || null;

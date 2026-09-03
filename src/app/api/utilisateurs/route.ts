@@ -2,22 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-
-// ─── Politique de mot de passe ─────────────────────────────────────────────
-const MIN_PASSWORD_LENGTH = 8;
-const PASSWORD_COMPLEXITY_REGEX = /[a-zA-Z]/;
-const PASSWORD_NUMBER_REGEX = /[0-9]/;
-
-// ─── Rôles disponibles pour la création d'utilisateurs ───────────────────────
-const VALID_ROLES = [
-  'ADMINISTRATEUR',
-  'ACCUEIL',
-  'TECHNIQUE',
-  'COMPTABILITE',
-  'SANTE',
-  'PORTAIL_CLIENT',
-  'CONTACT_ENTREPRISE',
-] as const;
+import { parseJsonBody } from '@/lib/validation/parse';
+import {
+  utilisateurCreateSchema,
+  utilisateurUpdateSchema,
+  utilisateurPatchSchema,
+} from '@/lib/validation';
 
 const ROLE_LABELS: Record<string, string> = {
   ADMINISTRATEUR: 'Administrateur',
@@ -103,50 +93,12 @@ export async function POST(request: NextRequest) {
   if (auth) return auth;
 
   try {
-    const body = await request.json();
-    const { email, nom, password, role } = body;
-
-    // Validations
-    if (!email || !nom || !password || !role) {
-      return NextResponse.json(
-        { erreur: 'Tous les champs sont obligatoires (email, nom, mot de passe, role).' },
-        { status: 400 }
-      );
-    }
-
-    const emailTrimmed = email.toLowerCase().trim();
-    const nomTrimmed = nom.trim();
-
-    // Valider le format email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailTrimmed)) {
-      return NextResponse.json(
-        { erreur: 'Format d\'adresse e-mail invalide.' },
-        { status: 400 }
-      );
-    }
-
-    // Valider le role
-    if (!VALID_ROLES.includes(role)) {
-      return NextResponse.json(
-        { erreur: `Role invalide. Roles autorises : ${VALID_ROLES.join(', ')}` },
-        { status: 400 }
-      );
-    }
-
-    // Valider la longueur et la complexité du mot de passe
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      return NextResponse.json(
-        { erreur: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caracteres.` },
-        { status: 400 }
-      );
-    }
-    if (!PASSWORD_COMPLEXITY_REGEX.test(password) || !PASSWORD_NUMBER_REGEX.test(password)) {
-      return NextResponse.json(
-        { erreur: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (email, mot de passe, rôle) ─────────────
+    const parsed = await parseJsonBody(request, utilisateurCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { nom, password, role } = parsed.data;
+    const emailTrimmed = parsed.data.email.toLowerCase();
+    const nomTrimmed = nom;
 
     // Verifier l'unicite de l'email
     const existing = await db.utilisateur.findUnique({
@@ -201,15 +153,10 @@ export async function PUT(request: NextRequest) {
   if (auth) return auth;
 
   try {
-    const body = await request.json();
-    const { id, email, nom, role, password } = body;
-
-    if (!id) {
-      return NextResponse.json(
-        { erreur: 'Identifiant utilisateur requis.' },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (whitelist, email, mot de passe, rôle) ──
+    const parsed = await parseJsonBody(request, utilisateurUpdateSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, email, nom, role, password } = parsed.data;
 
     // Verifier que l'utilisateur existe
     const existing = await db.utilisateur.findUnique({
@@ -222,30 +169,16 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Construire les donnees de mise a jour
+    // Construire les donnees de mise a jour (règles déjà validées par Zod)
     const data: Record<string, unknown> = {};
 
     if (nom !== undefined) {
-      const nomTrimmed = nom.trim();
-      if (!nomTrimmed) {
-        return NextResponse.json(
-          { erreur: 'Le nom ne peut pas etre vide.' },
-          { status: 400 }
-        );
-      }
-      data.nom = nomTrimmed;
+      data.nom = nom;
     }
 
     if (email !== undefined) {
-      const emailTrimmed = email.toLowerCase().trim();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailTrimmed)) {
-        return NextResponse.json(
-          { erreur: 'Format d\'e-mail invalide.' },
-          { status: 400 }
-        );
-      }
-      // Verifier l'unicite si l'email change
+      const emailTrimmed = email.toLowerCase();
+      // Verifier l'unicité si l'email change
       if (emailTrimmed !== existing.email) {
         const duplicate = await db.utilisateur.findUnique({
           where: { email: emailTrimmed },
@@ -260,29 +193,12 @@ export async function PUT(request: NextRequest) {
       data.email = emailTrimmed;
     }
 
+    // Le schéma Zod garantit role ∈ ROLES_UTILISATEUR
     if (role !== undefined) {
-      if (!VALID_ROLES.includes(role)) {
-        return NextResponse.json(
-          { erreur: `Role invalide. Roles autorises : ${VALID_ROLES.join(', ')}` },
-          { status: 400 }
-        );
-      }
       data.role = role;
     }
 
-    if (password !== undefined && password !== '') {
-      if (password.length < MIN_PASSWORD_LENGTH) {
-        return NextResponse.json(
-          { erreur: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caracteres.` },
-          { status: 400 }
-        );
-      }
-      if (!PASSWORD_COMPLEXITY_REGEX.test(password) || !PASSWORD_NUMBER_REGEX.test(password)) {
-        return NextResponse.json(
-          { erreur: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' },
-          { status: 400 }
-        );
-      }
+    if (password !== undefined) {
       data.password = await hash(password, 12);
     }
 
@@ -320,15 +236,12 @@ export async function PATCH(request: NextRequest) {
   if (auth) return auth;
 
   try {
-    const body = await request.json();
-    const { id, actif } = body;
-
-    if (!id || actif === undefined) {
-      return NextResponse.json(
-        { erreur: 'Identifiant et statut actif requis.' },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée ─────────────────────────────────────────
+    // FIX audit : pas de typeof sur `actif` — une chaîne "false" (truthy)
+    // était envoyée telle quelle à Prisma. Le schéma garantit un booléen.
+    const parsed = await parseJsonBody(request, utilisateurPatchSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, actif } = parsed.data;
 
     const existing = await db.utilisateur.findUnique({ where: { id } });
     if (!existing) {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { commentaireCreateSchema } from "@/lib/validation";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -33,12 +35,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const authError = await checkAuth(request);
     if (authError) return authError;
     const { id } = await params;
-    const body = await request.json();
-    const { contenu, prive } = body;
 
-    if (!contenu || typeof contenu !== "string" || !contenu.trim()) {
-      return NextResponse.json({ erreur: "Le contenu est requis" }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (contenu requis, prive booléen) ─────────
+    const parsed = await parseJsonBody(request, commentaireCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { contenu, prive } = parsed.data;
 
     // Vérifier que le dossier existe
     const dossier = await db.dossier.findUnique({ where: { id } });
@@ -58,8 +59,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const commentaire = await db.commentaire.create({
       data: {
         dossierId: id,
-        contenu: contenu.trim(),
-        prive: prive === true,
+        contenu,
+        prive,
         auteurId: userId,
       },
       include: { auteur: { select: { id: true, nom: true, role: true } } },

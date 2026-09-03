@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { assignerBulkSchema } from '@/lib/validation';
 
 /**
  * POST /api/dossiers/assigner-bulk
@@ -13,24 +15,10 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { dossierIds, champ, gestionnaireId } = body as {
-      dossierIds: string[];
-      champ: 'ACCUEIL' | 'TECHNIQUE' | 'COMPTABILITE';
-      gestionnaireId: string;
-    };
-
-    if (!Array.isArray(dossierIds) || dossierIds.length === 0) {
-      return NextResponse.json({ erreur: 'La liste des dossiers est vide.' }, { status: 400 });
-    }
-
-    if (!['ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'].includes(champ)) {
-      return NextResponse.json({ erreur: 'Champ invalide. Utilisez ACCUEIL, TECHNIQUE ou COMPTABILITE.' }, { status: 400 });
-    }
-
-    if (!gestionnaireId || typeof gestionnaireId !== 'string') {
-      return NextResponse.json({ erreur: "L'identifiant du gestionnaire est requis." }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (liste, enum, identifiants) ─────────────
+    const parsed = await parseJsonBody(request, assignerBulkSchema);
+    if (!parsed.success) return parsed.response;
+    const { dossierIds, champ, gestionnaireId } = parsed.data;
 
     // Limiter à 200 dossiers par requête
     const ids = dossierIds.slice(0, 200);

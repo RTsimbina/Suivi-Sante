@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { assureCreateSchema, assureUpdateSchema } from '@/lib/validation';
 
 // ─── GET : Lister les assurés (avec filtres famille) ──────────────────────────
 
@@ -107,30 +109,16 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
+    // ─── Validation Zod centralisée ─────────────────────────────────────────
+    // typeBeneficiaire ∈ [ASSURE, CONJOINT, ENFANT], sexe ∈ [M, F],
+    // barème ∈ [0, 1], dates valides — règles définies une seule fois.
+    const parsed = await parseJsonBody(request, assureCreateSchema);
+    if (!parsed.success) return parsed.response;
     const {
       societeId, nom, prenom, nSS, matricule, typeBeneficiaire,
       assurePrincipalId, codeFamille, dateNaissance, sexe,
       dateEffet, bareme, telephone, email, adresse, actif,
-    } = body;
-
-    // Validations
-    if (!societeId || !nom) {
-      return NextResponse.json(
-        { erreur: 'La société et le nom sont obligatoires.' },
-        { status: 400 }
-      );
-    }
-
-    // Valider le type de bénéficiaire
-    const validTypes = ['ASSURE', 'CONJOINT', 'ENFANT'];
-    const tType = typeBeneficiaire || 'ASSURE';
-    if (!validTypes.includes(tType)) {
-      return NextResponse.json(
-        { erreur: `Type de bénéficiaire invalide. Valeurs autorisées : ${validTypes.join(', ')}` },
-        { status: 400 }
-      );
-    }
+    } = parsed.data;
 
     // Vérifier la société
     const societe = await db.societe.findUnique({ where: { id: societeId } });
@@ -164,7 +152,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier l'assuré principal si c'est un ayant droit
-    if (tType !== 'ASSURE' && assurePrincipalId) {
+    if (typeBeneficiaire !== 'ASSURE' && assurePrincipalId) {
       const principal = await db.assure.findUnique({ where: { id: assurePrincipalId } });
       if (!principal) {
         return NextResponse.json(
@@ -183,20 +171,20 @@ export async function POST(request: NextRequest) {
     const assure = await db.assure.create({
       data: {
         societeId,
-        nom: nom.trim(),
-        prenom: prenom ? prenom.trim() : null,
-        nSS: nSS ? nSS.trim() : null,
-        matricule: matricule ? matricule.trim() : null,
-        typeBeneficiaire: tType,
-        assurePrincipalId: tType !== 'ASSURE' ? (assurePrincipalId || null) : null,
-        codeFamille: codeFamille ? String(codeFamille).trim() : null,
-        dateNaissance: dateNaissance ? new Date(dateNaissance) : null,
-        sexe: sexe || null,
-        dateEffet: dateEffet ? new Date(dateEffet) : null,
-        bareme: bareme !== undefined && bareme !== null ? parseFloat(bareme) : null,
-        telephone: telephone || null,
-        email: email ? email.toLowerCase().trim() : null,
-        adresse: adresse || null,
+        nom,
+        prenom: prenom ?? null,
+        nSS: nSS ?? null,
+        matricule: matricule ?? null,
+        typeBeneficiaire,
+        assurePrincipalId: typeBeneficiaire !== 'ASSURE' ? (assurePrincipalId ?? null) : null,
+        codeFamille: codeFamille ?? null,
+        dateNaissance: dateNaissance ?? null,
+        sexe: sexe ?? null,
+        dateEffet: dateEffet ?? null,
+        bareme: bareme ?? null,
+        telephone: telephone ?? null,
+        email: email ? email.toLowerCase() : null,
+        adresse: adresse ?? null,
         actif: actif !== false,
       },
       include: {
@@ -238,16 +226,14 @@ export async function PUT(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
+    // ─── Validation Zod centralisée (whitelist + enums + dates + barème) ────
+    const parsed = await parseJsonBody(request, assureUpdateSchema);
+    if (!parsed.success) return parsed.response;
     const {
       id, nom, prenom, nSS, matricule, typeBeneficiaire,
       assurePrincipalId, codeFamille, dateNaissance, sexe,
       dateEffet, bareme, telephone, email, adresse, societeId, actif,
-    } = body;
-
-    if (!id) {
-      return NextResponse.json({ erreur: "L'id est requis." }, { status: 400 });
-    }
+    } = parsed.data;
 
     const existing = await db.assure.findUnique({ where: { id } });
     if (!existing) {
@@ -295,18 +281,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateData: Record<string, unknown> = {};
-    if (nom) updateData.nom = nom.trim();
-    if (prenom !== undefined) updateData.prenom = prenom ? prenom.trim() : null;
-    if (nSS !== undefined) updateData.nSS = nSS ? nSS.trim() : null;
-    if (matricule !== undefined) updateData.matricule = matricule ? matricule.trim() : null;
+    if (nom !== undefined) updateData.nom = nom;
+    if (prenom !== undefined) updateData.prenom = prenom ?? null;
+    if (nSS !== undefined) updateData.nSS = nSS ?? null;
+    if (matricule !== undefined) updateData.matricule = matricule ?? null;
+    // Le schéma Zod garantit typeBeneficiaire ∈ [ASSURE, CONJOINT, ENFANT]
     if (typeBeneficiaire !== undefined) {
-      const validTypes = ['ASSURE', 'CONJOINT', 'ENFANT'];
-      if (!validTypes.includes(typeBeneficiaire)) {
-        return NextResponse.json(
-          { erreur: `Type de beneficiaire invalide. Valeurs autorisees : ${validTypes.join(', ')}` },
-          { status: 400 }
-        );
-      }
       updateData.typeBeneficiaire = typeBeneficiaire;
     }
     if (assurePrincipalId !== undefined) {
@@ -324,16 +304,17 @@ export async function PUT(request: NextRequest) {
       }
       updateData.assurePrincipalId = assurePrincipalId || null;
     }
-    if (codeFamille !== undefined) updateData.codeFamille = codeFamille ? String(codeFamille).trim() : null;
-    if (dateNaissance !== undefined) updateData.dateNaissance = dateNaissance ? new Date(dateNaissance) : null;
-    if (sexe !== undefined) updateData.sexe = sexe || null;
-    if (dateEffet !== undefined) updateData.dateEffet = dateEffet ? new Date(dateEffet) : null;
-    if (bareme !== undefined) updateData.bareme = bareme !== null ? parseFloat(bareme) : null;
-    if (telephone !== undefined) updateData.telephone = telephone || null;
-    if (email !== undefined) updateData.email = email ? email.toLowerCase().trim() : null;
-    if (adresse !== undefined) updateData.adresse = adresse || null;
-    if (societeId) updateData.societeId = societeId;
-    if (typeof actif === 'boolean') updateData.actif = actif;
+    if (codeFamille !== undefined) updateData.codeFamille = codeFamille ?? null;
+    if (dateNaissance !== undefined) updateData.dateNaissance = dateNaissance ?? null;
+    if (sexe !== undefined) updateData.sexe = sexe ?? null;
+    if (dateEffet !== undefined) updateData.dateEffet = dateEffet ?? null;
+    if (bareme !== undefined) updateData.bareme = bareme ?? null;
+    if (telephone !== undefined) updateData.telephone = telephone ?? null;
+    if (email !== undefined) updateData.email = email ? email.toLowerCase() : null;
+    if (adresse !== undefined) updateData.adresse = adresse ?? null;
+    if (societeId !== undefined) updateData.societeId = societeId;
+    // Le schéma Zod garantit un booléen
+    if (actif !== undefined) updateData.actif = actif;
 
     const updated = await db.assure.update({
       where: { id },

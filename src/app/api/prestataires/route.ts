@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-
-const TYPES_PRESTATAIRE = [
-  'HOPITAL', 'CLINIQUE', 'PHARMACIE', 'CABINET_MEDICAL',
-  'LABORATOIRE', 'DENTAIRE', 'OPTICIEN', 'AUTRE',
-];
+import { parseJsonBody } from '@/lib/validation/parse';
+import { prestataireCreateSchema, prestataireUpdateSchema } from '@/lib/validation';
 
 // ─── GET : Lister tous les prestataires ────────────────────────────────────────
 
@@ -67,34 +64,21 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { nom, type, telephone, email, adresse, nif, statut, rib, actif } = body;
-
-    // Validations
-    if (!nom || !type) {
-      return NextResponse.json(
-        { erreur: 'Le nom et le type du prestataire sont obligatoires.' },
-        { status: 400 }
-      );
-    }
-
-    if (!TYPES_PRESTATAIRE.includes(type)) {
-      return NextResponse.json(
-        { erreur: `Type invalide. Valeurs autorisées : ${TYPES_PRESTATAIRE.join(', ')}.` },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (nom, type ∈ enum) ──────────────────────
+    const parsed = await parseJsonBody(request, prestataireCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { nom, type, telephone, email, adresse, nif, statut, rib, actif } = parsed.data;
 
     const prestataire = await db.prestataire.create({
       data: {
-        nom: nom.trim(),
+        nom,
         type,
-        telephone: telephone || null,
-        email: email ? email.toLowerCase().trim() : null,
-        adresse: adresse || null,
-        nif: nif ? nif.trim() : null,
-        statut: statut || null,
-        rib: rib ? rib.trim() : null,
+        telephone: telephone ?? null,
+        email: email ? email.toLowerCase() : null,
+        adresse: adresse ?? null,
+        nif: nif ?? null,
+        statut: statut ?? null,
+        rib: rib ?? null,
         actif: actif !== false,
       },
       include: {
@@ -122,35 +106,27 @@ export async function PUT(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { id, nom, type, telephone, email, adresse, nif, statut, rib, actif } = body;
-
-    if (!id) {
-      return NextResponse.json({ erreur: "L'id est requis." }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (whitelist, enum type, booléen actif) ───
+    const parsed = await parseJsonBody(request, prestataireUpdateSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, nom, type, telephone, email, adresse, nif, statut, rib, actif } = parsed.data;
 
     const existing = await db.prestataire.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ erreur: 'Prestataire introuvable.' }, { status: 404 });
     }
 
-    if (type && !TYPES_PRESTATAIRE.includes(type)) {
-      return NextResponse.json(
-        { erreur: `Type invalide. Valeurs autorisées : ${TYPES_PRESTATAIRE.join(', ')}.` },
-        { status: 400 }
-      );
-    }
-
     const updateData: Record<string, unknown> = {};
-    if (nom) updateData.nom = nom.trim();
-    if (type) updateData.type = type;
-    if (telephone !== undefined) updateData.telephone = telephone || null;
-    if (email !== undefined) updateData.email = email ? email.toLowerCase().trim() : null;
-    if (adresse !== undefined) updateData.adresse = adresse || null;
-    if (nif !== undefined) updateData.nif = nif ? nif.trim() : null;
-    if (statut !== undefined) updateData.statut = statut || null;
-    if (rib !== undefined) updateData.rib = rib ? rib.trim() : null;
-    if (typeof actif === 'boolean') updateData.actif = actif;
+    if (nom !== undefined) updateData.nom = nom;
+    if (type !== undefined) updateData.type = type;
+    if (telephone !== undefined) updateData.telephone = telephone ?? null;
+    if (email !== undefined) updateData.email = email ? email.toLowerCase() : null;
+    if (adresse !== undefined) updateData.adresse = adresse ?? null;
+    if (nif !== undefined) updateData.nif = nif ?? null;
+    if (statut !== undefined) updateData.statut = statut ?? null;
+    if (rib !== undefined) updateData.rib = rib ?? null;
+    // Le schéma Zod garantit un booléen (avant : typeof vérifié ici)
+    if (actif !== undefined) updateData.actif = actif;
 
     const updated = await db.prestataire.update({
       where: { id },

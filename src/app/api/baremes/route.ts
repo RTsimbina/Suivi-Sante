@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
-import { PARENT_TYPES, ALL_SOUS_TYPES } from "@/lib/prestations";
-
-const PRESTATIONS_VALIDES = [...ALL_SOUS_TYPES];
+import { parseJsonBody } from "@/lib/validation/parse";
+import { baremeCreateSchema, baremePatchSchema } from "@/lib/validation";
 
 // GET — Lister les barèmes (optionnel: filtrer par societeId)
 export async function GET(request: NextRequest) {
@@ -37,21 +36,11 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
-    const body = await request.json();
-    const { societeId, prestation, tauxCouverture, plafond, description } = body;
 
-    if (!societeId || !prestation) {
-      return NextResponse.json({ erreur: "societeId et prestation requis" }, { status: 400 });
-    }
-    if (!PRESTATIONS_VALIDES.includes(prestation) && !PARENT_TYPES.includes(prestation)) {
-      return NextResponse.json({ erreur: `Prestation invalide. Valeurs: ${[...PRESTATIONS_VALIDES, ...PARENT_TYPES].join(", ")}` }, { status: 400 });
-    }
-    if (tauxCouverture === undefined || tauxCouverture < 0 || tauxCouverture > 100) {
-      return NextResponse.json({ erreur: "tauxCouverture doit être entre 0 et 100" }, { status: 400 });
-    }
-    if (plafond === undefined || plafond <= 0) {
-      return NextResponse.json({ erreur: "plafond doit être un montant positif" }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (enum prestation, taux 0-100, plafond>0) ─
+    const parsed = await parseJsonBody(request, baremeCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { societeId, prestation, tauxCouverture, plafond, description } = parsed.data;
 
     // Récupérer l'ancien barème s'il existe (pour l'audit)
     const existing = await db.bareme.findUnique({
@@ -122,19 +111,20 @@ export async function PATCH(request: NextRequest) {
     if (authError) return authError;
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
-    const body = await request.json();
-    const { id, active } = body;
 
-    if (!id) {
-      return NextResponse.json({ erreur: "ID du barème requis" }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (id requis, active booléen strict) ──────
+    // FIX audit : la chaîne "false" (truthy) activait le barème au lieu de
+    // le désactiver. Le schéma garantit un vrai booléen.
+    const parsed = await parseJsonBody(request, baremePatchSchema);
+    if (!parsed.success) return parsed.response;
+    const { id, active } = parsed.data;
 
     // Récupérer l'ancien barème pour l'audit
     const existing = await db.bareme.findUnique({ where: { id }, include: { societe: { select: { id: true, nom: true } } } });
 
     const bareme = await db.bareme.update({
       where: { id },
-      data: { active: active !== undefined ? active : false },
+      data: { active },
     });
 
     // Audit log

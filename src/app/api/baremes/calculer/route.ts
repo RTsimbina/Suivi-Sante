@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { parseJsonBody } from "@/lib/validation/parse";
+import { baremeCalculerSchema } from "@/lib/validation";
 
 /**
  * Calcule le ticket modérateur selon le barème d'une société.
@@ -23,18 +25,10 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { societeId, prestation, montantReclame } = body;
-
-    if (!societeId || !prestation || !montantReclame) {
-      return NextResponse.json({ erreur: "societeId, prestation et montantReclame sont requis" },
-        { status: 400 }
-      );
-    }
-
-    if (montantReclame <= 0) {
-      return NextResponse.json({ erreur: "Le montant doit être positif" }, { status: 400 });
-    }
+    // ─── Validation Zod centralisée (montant > 0, enum prestation) ──────────
+    const parsed = await parseJsonBody(request, baremeCalculerSchema);
+    if (!parsed.success) return parsed.response;
+    const { societeId, prestation, montantReclame } = parsed.data;
 
     // Récupérer le barème avec le nom de la société
     const bareme = await db.bareme.findUnique({

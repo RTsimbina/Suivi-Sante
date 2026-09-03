@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { parseJsonBody } from '@/lib/validation/parse';
+import { contratCreateSchema } from '@/lib/validation';
 
 // ─── GET : Liste des contrats ──────────────────────────────────────────────
 
@@ -54,25 +56,10 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const body = await request.json();
-    const { societeId, reference, budgetAnnuel, dateDebut, dateFin, statut } = body;
-
-    if (!societeId || !reference || !budgetAnnuel || !dateDebut || !dateFin) {
-      return NextResponse.json(
-        { erreur: 'Champs obligatoires : societeId, reference, budgetAnnuel, dateDebut, dateFin.' },
-        { status: 400 }
-      );
-    }
-
-    // Valider la coherence des dates
-    const debut = new Date(dateDebut);
-    const fin = new Date(dateFin);
-    if (fin <= debut) {
-      return NextResponse.json(
-        { erreur: "La date de fin doit etre posterieure a la date de debut." },
-        { status: 400 }
-      );
-    }
+    // ─── Validation Zod centralisée (montant positif, dates, enum statut) ──
+    const parsed = await parseJsonBody(request, contratCreateSchema);
+    if (!parsed.success) return parsed.response;
+    const { societeId, reference, budgetAnnuel, dateDebut, dateFin, statut } = parsed.data;
 
     // Vérifier la société
     const societe = await db.societe.findUnique({ where: { id: societeId } });
@@ -80,17 +67,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Société introuvable.' }, { status: 404 });
     }
 
-    const validStatuts = ['ACTIF', 'EXPIRE', 'SUSPENDU'];
-    const contratStatut = validStatuts.includes(statut) ? statut : 'ACTIF';
-
     const contrat = await db.contrat.create({
       data: {
         societeId,
-        reference: reference.trim(),
-        budgetAnnuel: Number(budgetAnnuel),
-        dateDebut: new Date(dateDebut),
-        dateFin: new Date(dateFin),
-        statut: contratStatut,
+        reference,
+        budgetAnnuel,
+        dateDebut,
+        dateFin,
+        statut,
       },
       include: {
         societe: { select: { id: true, nom: true } },

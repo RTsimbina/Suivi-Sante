@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { compare, hash } from 'bcryptjs';
 import { db } from '@/lib/db';
-
-const MIN_PASSWORD_LENGTH = 8;
+import { parseJsonBody } from '@/lib/validation/parse';
+import { changerMotDePasseSchema } from '@/lib/validation';
 
 // POST /api/profil/changer-mot-de-passe
 // Exige : ancienMotDePasse, nouveauMotDePasse
@@ -18,21 +18,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
     }
 
-    const { ancienMotDePasse, nouveauMotDePasse } = (await request.json()) as {
-      ancienMotDePasse?: string;
-      nouveauMotDePasse?: string;
-    };
+    // ─── Validation Zod centralisée (politique mot de passe partagée) ───────
+    const parsed = await parseJsonBody(request, changerMotDePasseSchema);
+    if (!parsed.success) return parsed.response;
+    const { ancienMotDePasse, nouveauMotDePasse } = parsed.data;
 
-    // Validations
-    if (!ancienMotDePasse || !nouveauMotDePasse) {
-      return NextResponse.json({ erreur: 'Champs requis manquants' }, { status: 400 });
-    }
-    if (nouveauMotDePasse.length < MIN_PASSWORD_LENGTH) {
-      return NextResponse.json({ erreur: `Le nouveau mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères` }, { status: 400 });
-    }
-    if (!/[a-zA-Z]/.test(nouveauMotDePasse) || !/[0-9]/.test(nouveauMotDePasse)) {
-      return NextResponse.json({ erreur: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' }, { status: 400 });
-    }
+    // Règle métier locale : le nouveau doit différer de l'ancien
     if (ancienMotDePasse === nouveauMotDePasse) {
       return NextResponse.json({ erreur: 'Le nouveau mot de passe doit être différent de l\'ancien' }, { status: 400 });
     }

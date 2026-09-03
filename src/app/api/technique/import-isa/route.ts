@@ -3,6 +3,8 @@ import { checkAuth } from "@/lib/authorize";
 import { db } from "@/lib/db";
 import { readExcelRows } from "@/lib/excel";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { parseFormData } from "@/lib/validation/parse";
+import { importFichierSeulSchema } from "@/lib/validation";
 
 /**
  * Recherche une valeur dans un objet de ligne Excel en ignorant la casse.
@@ -23,19 +25,15 @@ export async function POST(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-
-    if (!file) {
-      return NextResponse.json({ erreur: "Fichier requis" }, { status: 400 });
-    }
+    // ─── Validation Zod du formulaire (fichier Excel requis, taille, ext.) ──
+    const parsed = await parseFormData(request, importFichierSeulSchema);
+    if (!parsed.success) return parsed.response;
+    const file = parsed.data.file;
 
     const ALLOWED_MIME = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
     ];
-    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    if (!ext.endsWith('.xlsx') || !ALLOWED_MIME.includes(file.type)) {
+    if (!ALLOWED_MIME.includes(file.type)) {
       return NextResponse.json(
         { erreur: "Format de fichier invalide. Seuls les fichiers .xlsx sont acceptes." },
         { status: 400 }
