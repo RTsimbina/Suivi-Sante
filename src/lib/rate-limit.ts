@@ -205,7 +205,14 @@ async function pgLimit(
   await pgCleanup();
   const row = rows[0];
   const count = Number(row?.count ?? 1);
-  const resetSeconds = Math.max(0, Number(row?.resetSeconds ?? windowSeconds));
+  // ⚠️ La colonne TIMESTAMPTZ(3) arrondit expiresAt à la milliseconde : cet
+  // arrondi peut dépasser la fenêtre de ~1 ms et CEILING renvoyer alors
+  // windowSeconds + 1. On borne resetSeconds par la fenêtre configurée
+  // (contrat de l'API : la fenêtre ne peut pas durer plus longtemps qu'elle).
+  const resetSeconds = Math.min(
+    windowSeconds,
+    Math.max(0, Number(row?.resetSeconds ?? windowSeconds)),
+  );
   return {
     allowed: count <= limit,
     count,
