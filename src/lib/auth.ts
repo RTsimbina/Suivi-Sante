@@ -11,18 +11,21 @@ import {
   resetLoginCounters,
   normalizeEmail,
 } from '@/lib/login-policy';
+import {
+  isLockedOut,
+  recordFailedAttempt,
+  resetAttempts,
+  MAX_ATTEMPTS,
+} from '@/lib/account-lockout';
 
-// ─── Protection anti brute-force (persistée en base de données) ───────────
-// Remplace l'ancien Map local qui était vulnérable en environnement serverless :
-// chaque instance isolée avait sa propre mémoire, permettant de contourner le lockout.
-//
-// ⚠️  Toutes les fonctions lockout utilisent $queryRaw / $executeRaw pour
-//     ne PAS dépendre du schéma Prisma. Ainsi, si les colonnes failedAttempts
-//     et lockoutUntil n'existent pas encore en DB (migration non appliquée),
-//     le lockout est simplement désactivé au lieu de casser tout le login.
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+// ─── Verrouillage par compte (PostgreSQL, ATOMIQUE) ────────────────────────
+// Les fonctions isLockedOut / recordFailedAttempt / resetAttempts vivent dans
+// src/lib/account-lockout.ts : l'incrément du compteur d'échecs y est réalisé
+// PAR LA BASE dans un seul UPDATE (SET "failedAttempts" = "failedAttempts" + 1
+// + déclenchement du verrou + RETURNING) — opération atomique : aucun
+// incrément n'est perdu entre instances simultanées (correction n°3).
+// Résilient : si les colonnes lockout ne sont pas encore migrées, le
+// verrouillage est simplement désactivé au lieu de casser tout le login.
 
 // ─── Rate limiting distribué (stockage partagé Redis/Postgres) ────────────
 // Remplace l'ancien Map en mémoire du processus : en serverless, chaque
@@ -34,84 +37,6 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 // dans src/lib/login-policy.ts : la clé utilisée correspond exactement à la
 // politique de sécurité définie.
 
-
-interface LockRow {
-  lockoutuntil: Date | null;
-  failedattempts: number;
-}
-
-async function isLockedOut(email: string): Promise<{ locked: boolean; remainingMs: number }> {
-  try {
-    const rows: LockRow[] = await db.$queryRaw`
-      SELECT "lockoutUntil", "failedAttempts"
-      FROM "Utilisateur" WHERE "email" = ${email} LIMIT 1
-    `;
-    const row = rows[0];
-    if (!row || !row.lockoutuntil) {
-      return { locked: false, remainingMs: 0 };
-    }
-    const now = Date.now();
-    if (now < row.lockoutuntil.getTime()) {
-      return { locked: true, remainingMs: row.lockoutuntil.getTime() - now };
-    }
-    // Verrouillage expiré → réinitialiser
-    await db.$executeRaw`
-      UPDATE "Utilisateur" SET "failedAttempts" = 0, "lockoutUntil" = NULL
-      WHERE "email" = ${email}
-    `;
-    return { locked: false, remainingMs: 0 };
-  } catch {
-    // Colonnes manquantes → pas de lockout
-    return { locked: false, remainingMs: 0 };
-  }
-}
-
-async function recordFailedAttempt(email: string): Promise<{ locked: boolean; remainingMs: number }> {
-  try {
-    const rows: LockRow[] = await db.$queryRaw`
-      SELECT "lockoutUntil", "failedAttempts"
-      FROM "Utilisateur" WHERE "email" = ${email} LIMIT 1
-    `;
-    const row = rows[0];
-    if (!row) return { locked: false, remainingMs: 0 };
-
-    const now = new Date();
-    if (row.lockoutuntil && now < row.lockoutuntil) {
-      return { locked: true, remainingMs: row.lockoutuntil.getTime() - now.getTime() };
-    }
-
-    const expired = row.lockoutuntil && now >= row.lockoutuntil;
-    const newCount = expired ? 1 : (row.failedattempts || 0) + 1;
-
-    if (newCount >= MAX_ATTEMPTS) {
-      const lockedUntil = new Date(now.getTime() + LOCKOUT_DURATION_MS);
-      await db.$executeRaw`
-        UPDATE "Utilisateur" SET "failedAttempts" = ${newCount}, "lockoutUntil" = ${lockedUntil}
-        WHERE "email" = ${email}
-      `;
-      return { locked: true, remainingMs: LOCKOUT_DURATION_MS };
-    }
-
-    await db.$executeRaw`
-      UPDATE "Utilisateur" SET "failedAttempts" = ${newCount}
-      WHERE "email" = ${email}
-    `;
-    return { locked: false, remainingMs: 0 };
-  } catch {
-    return { locked: false, remainingMs: 0 };
-  }
-}
-
-async function resetAttempts(email: string) {
-  try {
-    await db.$executeRaw`
-      UPDATE "Utilisateur" SET "failedAttempts" = 0, "lockoutUntil" = NULL
-      WHERE "email" = ${email}
-    `;
-  } catch {
-    // Silencieux
-  }
-}
 
 // ─── Recherche utilisateur en SQL brut ────────────────────────────────────
 // On sélectionne uniquement les colonnes d'origine (sans failedAttempts/
@@ -324,7 +249,7 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export { isLockedOut, MAX_ATTEMPTS };
+export { isLockedOut, MAX_ATTEMPTS } from '@/lib/account-lockout';
 
 // ─── Timing-safe string comparison ──────────────────────────────────
 export function safeCompare(a: string, b: string): boolean {
