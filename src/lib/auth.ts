@@ -4,6 +4,13 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
+import {
+  checkRateLimit,
+  getRateLimitStatus,
+  resetRateLimit,
+  getClientIp,
+  intFromEnv,
+} from '@/lib/rate-limit';
 
 // ─── Protection anti brute-force (persistée en base de données) ───────────
 // Remplace l'ancien Map local qui était vulnérable en environnement serverless :
@@ -17,24 +24,22 @@ import { db } from '@/lib/db';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
-// ─── Rate limiting global IP (léger, sans dépendance externe) ─────────────
-const loginAttemptsByIp = new Map<string, { count: number; resetAt: number }>();
-const IP_MAX_ATTEMPTS_PER_MINUTE = 20;
+// ─── Rate limiting distribué (stockage partagé Redis) ─────────────────────
+// Remplace l'ancien Map en mémoire du processus : en serverless, chaque
+// instance avait son propre compteur et pouvait être contournée.
+// Les compteurs sont désormais partagés entre TOUTES les instances via Redis
+// (opération atomique INCR + EXPIRE, voir src/lib/rate-limit.ts) et survivent
+// aux redémarrages d'instances. Sans Redis configuré, bascule automatique en
+// mémoire locale (développement mono-instance).
 
-function checkGlobalIpRateLimit(email: string): boolean {
-  // On utilise l'email comme proxy d'IP rate limiting (puisque le login est par email)
-  // En serverless, il n'y a pas de mémoire partagée entre instances,
-  // mais cela ralentit au moins les tentatives dans une même instance.
-  const key = email.toLowerCase().trim();
-  const now = Date.now();
-  const entry = loginAttemptsByIp.get(key);
-  if (!entry || now > entry.resetAt) {
-    loginAttemptsByIp.set(key, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= IP_MAX_ATTEMPTS_PER_MINUTE;
-}
+// Tentatives ÉCHOUÉES par adresse e-mail : 5 / 15 minutes (cohérent avec le
+// verrouillage par compte en base). Réinitialisé après une connexion réussie.
+const LOGIN_EMAIL_LIMIT = intFromEnv('LOGIN_EMAIL_LIMIT', 5);
+const LOGIN_EMAIL_WINDOW_SECONDS = intFromEnv('LOGIN_EMAIL_WINDOW_SECONDS', 15 * 60);
+// Tentatives par adresse IP (tous comptes confondus) : bloque le brute-force
+// distribué sur plusieurs comptes depuis une même source.
+const LOGIN_IP_LIMIT = intFromEnv('LOGIN_IP_LIMIT', 30);
+const LOGIN_IP_WINDOW_SECONDS = intFromEnv('LOGIN_IP_WINDOW_SECONDS', 15 * 60);
 
 
 interface LockRow {
@@ -115,6 +120,26 @@ async function resetAttempts(email: string) {
   }
 }
 
+/**
+ * Incrémente le compteur distribué des échecs par e-mail (Redis partagé).
+ * Appelé uniquement sur échec d'authentification : au-delà de
+ * LOGIN_EMAIL_LIMIT échecs en LOGIN_EMAIL_WINDOW_SECONDS, toute nouvelle
+ * tentative sur ce compte est bloquée par la vérification (2) de authorize(),
+ * indépendamment du verrouillage en base de données.
+ */
+async function recordFailedLoginAttempt(email: string): Promise<void> {
+  const result = await checkRateLimit({
+    key: `login:email:${email}`,
+    limit: LOGIN_EMAIL_LIMIT,
+    windowSeconds: LOGIN_EMAIL_WINDOW_SECONDS,
+  });
+  if (!result.allowed) {
+    console.warn(
+      `[AUTH] Compteur d'échecs email saturé: ${email} (${result.count}/${LOGIN_EMAIL_LIMIT})`,
+    );
+  }
+}
+
 // ─── Recherche utilisateur en SQL brut ────────────────────────────────────
 // On sélectionne uniquement les colonnes d'origine (sans failedAttempts/
 // lockoutUntil) pour que le login fonctionne même si la migration lockout
@@ -158,16 +183,35 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Adresse e-mail', type: 'email' },
         password: { label: 'Mot de passe', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
         const email = credentials.email.toLowerCase().trim();
+        const ip = getClientIp((req as { headers?: unknown } | undefined)?.headers);
 
-        // Rate limiting global (anti-brute force distribué)
-        if (!checkGlobalIpRateLimit(email)) {
-          console.warn(`Rate limit global atteint pour: ${email}`);
+        // 1) Rate limiting distribué par IP — compte TOUTES les tentatives.
+        //    Compteur partagé entre toutes les instances (Redis, INCR+EXPIRE atomique).
+        const ipLimit = await checkRateLimit({
+          key: `login:ip:${ip}`,
+          limit: LOGIN_IP_LIMIT,
+          windowSeconds: LOGIN_IP_WINDOW_SECONDS,
+        });
+        if (!ipLimit.allowed) {
+          console.warn(
+            `[AUTH] Rate limit IP atteint: ${ip} (${ipLimit.count}/${LOGIN_IP_LIMIT}, reset dans ${ipLimit.resetSeconds}s)`,
+          );
+          return null;
+        }
+
+        // 2) Rate limiting distribué par e-mail — lecture seule ici (l'incrément
+        //    n'a lieu que sur ÉCHEC, pour ne pas pénaliser les connexions légitimes).
+        const emailStatus = await getRateLimitStatus(`login:email:${email}`);
+        if (emailStatus.count >= LOGIN_EMAIL_LIMIT) {
+          console.warn(
+            `[AUTH] Rate limit email atteint: ${email} (${emailStatus.count}/${LOGIN_EMAIL_LIMIT}, reset dans ${emailStatus.resetSeconds}s)`,
+          );
           return null;
         }
 
@@ -182,7 +226,7 @@ export const authOptions: NextAuthOptions = {
         const user = await findUserByEmail(email);
 
         if (!user || !user.actif) {
-          await recordFailedAttempt(email);
+          await recordFailedLoginAttempt(email);
           return null;
         }
 
@@ -192,11 +236,15 @@ export const authOptions: NextAuthOptions = {
           if (attemptResult.locked) {
             console.warn(`Compte ${email} verrouillé après ${MAX_ATTEMPTS} tentatives échouées`);
           }
+          await recordFailedLoginAttempt(email);
           return null;
         }
 
         // Réinitialiser les tentatives après succès
         await resetAttempts(email);
+        // Réinitialiser aussi le compteur Redis des échecs par e-mail
+        // (le compteur par IP est conservé : il ne compte que la fenêtre courante).
+        await resetRateLimit(`login:email:${email}`);
 
         // Récupérer les identifiants de portail pour les rôles externes
         let assureId: string | undefined;

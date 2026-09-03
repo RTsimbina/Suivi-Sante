@@ -9,6 +9,11 @@
  */
 
 import { NextResponse } from 'next/server';
+import {
+  checkRateLimit as checkSharedRateLimit,
+  getClientIp,
+  intFromEnv,
+} from './rate-limit';
 
 // ─── Helpers crypto ───────────────────────────────────────────────────────────
 
@@ -88,24 +93,25 @@ export function webhookUnauthorized(reason: string) {
   );
 }
 
-// ─── Rate limiter (par IP, en mémoire) ────────────────────────────────────────
+// ─── Rate limiter (par IP, stockage partagé Redis) ────────────────────────────
+// Remplace l'ancien Map en mémoire du processus : les compteurs sont désormais
+// partagés entre toutes les instances serverless (opération atomique
+// INCR + EXPIRE dans Redis). Sans Redis configuré, bascule automatique en
+// mémoire locale (développement mono-instance).
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 30;
-const RATE_WINDOW = 60_000;
+const WEBHOOK_IP_LIMIT = intFromEnv('WEBHOOK_IP_LIMIT', 30);
+const WEBHOOK_IP_WINDOW_SECONDS = intFromEnv('WEBHOOK_IP_WINDOW_SECONDS', 60);
 
-export function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const rec = rateLimitMap.get(ip);
-  if (!rec || now > rec.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
-    return true;
-  }
-  rec.count++;
-  return rec.count <= RATE_LIMIT;
+export async function checkRateLimit(ip: string): Promise<boolean> {
+  const result = await checkSharedRateLimit({
+    key: `webhook:ip:${ip}`,
+    limit: WEBHOOK_IP_LIMIT,
+    windowSeconds: WEBHOOK_IP_WINDOW_SECONDS,
+  });
+  return result.allowed;
 }
 
-export function getClientIp(headers: Headers): string {
-  const xff = headers.get('x-forwarded-for');
-  return xff ? xff.split(',')[0].trim() : headers.get('x-real-ip') || 'unknown';
-}
+// getClientIp est désormais implémenté dans rate-limit.ts (accepte aussi bien
+// des Headers fetch que le Record d'en-têtes NextAuth) ; on le ré-exporte ici
+// pour ne pas casser les imports existants des routes webhook.
+export { getClientIp };
