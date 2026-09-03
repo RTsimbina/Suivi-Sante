@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "npx prisma db push 2>&1 && next build",
+    "build": "prisma generate && next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "test": "vitest run",
@@ -12,8 +12,11 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status",
     "db:reset": "prisma migrate reset",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:baseline": "bash scripts/baseline-production-db.sh",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -105,5 +108,8 @@
     "js-yaml": "^4.3.1",
     "prismjs": "^1.30.0",
     "uuid": "^11.1.1"
+  },
+  "allowScripts": {
+    "@embedded-postgres/linux-x64@18.4.0-beta.17": true
   }
 }

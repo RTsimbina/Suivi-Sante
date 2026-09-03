@@ -462,7 +462,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
           <div>
             <p className="text-xs font-medium text-red-700 dark:text-red-300">Erreur de chargement</p>
             <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{fetchError}</p>
-            <p className="text-[10px] text-red-500 dark:text-red-500 mt-1">La table PrestataireSociete doit être créée en base de données. Vérifiez que le déploiement inclut « prisma db push ».</p>
+            <p className="text-[10px] text-red-500 dark:text-red-500 mt-1">La table PrestataireSociete doit être créée en base de données. Vérifiez que la migration a été appliquée (npm run db:migrate:deploy).</p>
           </div>
         </div>
       )}

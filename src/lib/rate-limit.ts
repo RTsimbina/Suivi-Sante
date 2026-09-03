@@ -131,10 +131,10 @@ let pgOps = 0;
 
 /**
  * Crée la table des compteurs au premier appel de chaque processus (idempotent).
- * La table est aussi déclarée dans schema.prisma : `prisma db push` la crée au
- * déploiement ; cette création dynamique garantit que le limiteur fonctionne
- * même si la migration n'a pas encore été appliquée (même philosophie que le
- * verrouillage par compte dans auth.ts).
+ * La table est aussi déclarée dans schema.prisma : `prisma migrate deploy` la
+ * crée au déploiement ; cette création dynamique garantit que le limiteur
+ * fonctionne même si la migration n'a pas encore été appliquée (même
+ * philosophie que le verrouillage par compte dans auth.ts).
  */
 async function ensurePgTable(): Promise<void> {
   if (pgTableReady) return;
