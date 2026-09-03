@@ -353,3 +353,17 @@ model HistoriqueParametre {
   @@index([societeId])
   @@index([module])
 }
+
+// ─── Compteurs du rate limiting distribué (src/lib/rate-limit.ts) ───────────
+// Une ligne = une clé de limitation (ex: "login:ip:1.2.3.4", "login:email:user@x.com").
+// Le compteur est incrémenté de façon ATOMIQUE via INSERT … ON CONFLICT DO UPDATE :
+// si la fenêtre (expiresAt) est expirée il repart à 1, sinon il s'incrémente.
+// Les lignes expirées sont purgées périodiquement (voir pgCleanup).
+// La table est aussi créée automatiquement au premier appel si absente.
+model RateLimitCounter {
+  key       String   @id                        // Clé complète du compteur
+  count     Int      @default(0)                // Nombre d'opérations dans la fenêtre courante
+  expiresAt DateTime                            // Fin de la fenêtre courante (INCR + EXPIRE)
+
+  @@index([expiresAt])
+}

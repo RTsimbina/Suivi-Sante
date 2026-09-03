@@ -30,18 +30,27 @@ const windowSeconds = Number(arg("window", "900"));
 const ops = Number(arg("ops", "1"));
 
 if (arg("no-redis", "0") === "1") {
+  // Simule un environnement SANS stockage partagé : le module doit basculer
+  // sur le compteur mémoire local (auto → mémoire).
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  delete process.env.DATABASE_URL;
+  delete process.env.RATE_LIMIT_BACKEND;
 }
 
 const rateLimit = await import(
   new URL("../src/lib/rate-limit.ts", import.meta.url).href
 );
 
+// Préfixe des lignes de résultats : permet à l'orchestrateur d'ignorer les
+// sorties non-JSON éventuelles (ex: logs d'erreur Prisma sur stdout).
+const TAG = "##RL##";
+
 for (let i = 1; i <= ops; i++) {
   if (mode === "check") {
     const r = await rateLimit.checkRateLimit({ key, limit, windowSeconds });
     console.log(
+      TAG +
       JSON.stringify({
         i,
         allowed: r.allowed,
@@ -50,17 +59,18 @@ for (let i = 1; i <= ops; i++) {
         resetSeconds: r.resetSeconds,
         backend: r.backend,
         redisError: r.redisError ?? null,
+        dbError: r.dbError ?? null,
       }),
     );
   } else if (mode === "status") {
     const s = await rateLimit.getRateLimitStatus(key);
-    console.log(JSON.stringify({ i, mode: "status", count: s.count, resetSeconds: s.resetSeconds, backend: s.backend }));
+    console.log(TAG + JSON.stringify({ i, mode: "status", count: s.count, resetSeconds: s.resetSeconds, backend: s.backend }));
   }
 }
 
 if (mode === "reset") {
   await rateLimit.resetRateLimit(key);
-  console.log(JSON.stringify({ mode: "reset", ok: true }));
+  console.log(TAG + JSON.stringify({ mode: "reset", ok: true }));
 }
 
 process.exit(0);
