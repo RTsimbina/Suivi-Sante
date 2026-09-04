@@ -189,6 +189,9 @@ export const API_PERMISSIONS: Record<
       POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
     },
   },
+  '/api/mail/dns-check': {
+    roles: ['ADMINISTRATEUR'], // GET = statut SPF / DKIM / DMARC du domaine
+  },
   '/api/alertes': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },

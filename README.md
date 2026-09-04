@@ -78,6 +78,23 @@ ensuite la migration `20260904000000_baseline_postgresql` comme déjà appliqué
 (`prisma migrate resolve --applied`), puis affiche l'état final. Les migrations
 **futures**, elles, seront appliquées réellement par `npm run db:migrate:deploy`.
 
+## Service de messagerie centralisé
+
+La plateforme envoie ses e-mails (réinitialisation de mot de passe, rapports
+mensuels, notifications, tests) via un **service centralisé** : file
+d'attente en base (`CourrielSortant`), worker avec réclamation atomique
+(`FOR UPDATE SKIP LOCKED`), retries à backoff exponentiel, quotas et
+anti-abus, journal complet — remise finale par le relais SMTP du domaine
+d'expédition (Brevo / SMTP2GO…), jamais via les API Gmail/Yahoo/Outlook.
+
+- Architecture, domaine d'envoi et procédure SPF / DKIM / DMARC :
+  **[docs/MESSAGERIE.md](docs/MESSAGERIE.md)**
+- API : `POST /api/mail/send` (envoi), `GET /api/mail` (logs & suivi),
+  `POST /api/mail/process` (worker : cron, clé API ou admin),
+  `GET /api/mail/dns-check` (statut SPF / DKIM / DMARC)
+- UI : page **Configuration → Service de messagerie centralisé** — monitoring
+  24 h, statut du domaine, e-mail de test, traitement manuel de la file
+
 ## Scripts utilitaires
 
 | Commande | Rôle |

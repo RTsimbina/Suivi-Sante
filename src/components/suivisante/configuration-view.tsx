@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import MailServiceCard from '@/components/suivisante/mail-service-card';
 
 interface BotStatus {
   nom: string;
@@ -545,6 +546,11 @@ export default function ConfigurationView() {
           </div>
         </CardContent>
       </Card>
+
+      <Separator />
+
+      {/* Service de messagerie centralisé — monitoring, SPF/DKIM/DMARC, e-mail de test */}
+      <MailServiceCard />
 
       <Separator />
 

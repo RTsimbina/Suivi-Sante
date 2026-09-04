@@ -207,6 +207,35 @@ curl "https://votre-domaine/api/mail?statut=ECHEC&limite=50"
 # → { stats: { enAttente, enCours, envoyes24h, echecs24h, parStatut }, envois: [...] }
 ```
 
+### `GET /api/mail/dns-check` — statut SPF / DKIM / DMARC (ADMINISTRATEUR)
+
+Interroge le DNS public pour vérifier que le domaine d'expédition publie bien
+les enregistrements d'authentification attendus par Gmail / Yahoo / Outlook
+(plan §18-20). Le domaine est déduit de `MAIL_FROM_EMAIL` ou de l'expéditeur
+configuré ; le sélecteur DKIM vient de `MAIL_DKIM_SELECTOR` (défaut `mail`).
+
+```bash
+curl "https://votre-domaine/api/mail/dns-check"
+# → {
+#     "domaine": "votre-domaine.com", "selecteurDkim": "mail",
+#     "spf":   { "statut": "PASS", "enregistrement": "v=spf1 include:... ~all" },
+#     "dkim":  { "statut": "PASS", "enregistrement": "v=DKIM1; k=rsa; p=..." },
+#     "dmarc": { "statut": "PASS", "enregistrement": "v=DMARC1; p=none; rua=..." },
+#     "notes": [ ... ]
+#   }
+```
+
+Statuts possibles par enregistrement : `PASS` (publié), `ABSENT` (à publier —
+les valeurs exactes sont fournies par votre relais), `ERREUR` (résolution DNS).
+Les avertissements (SPF sans `~all`, DMARC en `p=none`, absence de `rua=`)
+guident la montée en sévérité progressive recommandée au plan : commencer en
+observation (`p=none`), puis `p=quarantine`, enfin `p=reject`.
+
+La même vérification est disponible en un clic dans la page **Configuration →
+Service de messagerie centralisé** (bouton « Revérifier »), avec un e-mail de
+test (`POST /api/mail/send`, template `test`) pour valider la réception réelle :
+Gmail → ⋮ → *Afficher l'original* → `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`.
+
 ### `POST /api/mail/process` — traiter la file
 
 Canaux : session ADMINISTRATEUR/TECHNIQUE, `Bearer $MAIL_API_KEY`, ou
