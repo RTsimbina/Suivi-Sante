@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { API_PERMISSIONS } from '@/lib/authorize';
+import { enTeteEgalSecret } from '@/lib/mail/api-auth';
 import type { RoleType } from '@/lib/auth-context';
 
 // ─── Routes publiquement accessibles (pas de token requis) ─────────────────
@@ -77,6 +78,21 @@ export default async function proxy(request: NextRequest) {
   // 3. Autoriser les API publiques (auth, webhooks, etc.)
   if (PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
     return response;
+  }
+
+  // 3bis. Service de messagerie — appels machine (sans session NextAuth).
+  // Les routes /api/mail/send et /api/mail/process acceptent aussi une clé API
+  // (Bearer MAIL_API_KEY) ou le secret du cron Vercel (Bearer CRON_SECRET),
+  // vérifié en durée constante ici pour franchir le gate de session.
+  // Sans Bearer valide : suite normale (session requise).
+  if (pathname.startsWith('/api/mail/send') || pathname.startsWith('/api/mail/process')) {
+    const authHeader = request.headers.get('authorization');
+    const machineOk =
+      (await enTeteEgalSecret(authHeader, 'MAIL_API_KEY')) ||
+      (await enTeteEgalSecret(authHeader, 'CRON_SECRET'));
+    if (machineOk) {
+      return NextResponse.next({ headers: securityHeaders });
+    }
   }
 
   // ─── À partir d'ici, tout nécessite une authentification ────────────────

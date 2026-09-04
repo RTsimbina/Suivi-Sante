@@ -170,6 +170,25 @@ export const API_PERMISSIONS: Record<
   '/api/email-config': {
     roles: ['ADMINISTRATEUR'],
   },
+  // ─── Service de messagerie centralisé ────────────────────────────────────
+  '/api/mail': {
+    roles: ['ADMINISTRATEUR'], // GET = logs et suivi des envois
+    methods: {
+      GET: ['ADMINISTRATEUR'],
+    },
+  },
+  '/api/mail/send': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    },
+  },
+  '/api/mail/process': {
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    },
+  },
   '/api/alertes': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },

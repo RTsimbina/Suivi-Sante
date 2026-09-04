@@ -367,3 +367,50 @@ model RateLimitCounter {
 
   @@index([expiresAt])
 }
+
+/// File d'attente et journal centralisé des e-mails sortants (service de messagerie).
+/// Chaque ligne = un message à envoyer, avec son statut, ses tentatives et son suivi.
+model CourrielSortant {
+  id          String   @id @default(cuid())
+  // Destinataires (JSON : { to: [], cc: [], bcc: [] })
+  destinataires         Json
+  /// Premier destinataire normalisé — sert au rate-limiting et aux recherches
+  destinatairePrincipal String
+  sujet       String
+  /// Nom du template utilisé (reinitialisation-mdp, notification, test, rapport-mensuel...) ou null si HTML brut
+  template    String?
+  /// Données du template (JSON) — pour audit et re-génération éventuelle
+  donnees     Json?
+  /// Contenus bruts (prioritaires sur le template s'ils sont définis)
+  texte       String?
+  html        String?
+  /// Pièces jointes : [{ nom, contenuBase64, contentType }]
+  piecesJointes Json?
+  /// EN_ATTENTE | EN_COURS | ENVOYE | ECHEC
+  statut      String   @default("EN_ATTENTE")
+  tentatives  Int      @default(0)
+  maxTentatives Int    @default(5)
+  /// Date à partir de laquelle le message peut être retraité (backoff exponentiel)
+  prochaineTentative DateTime?
+  derniereErreur String?
+  /// Message-ID renvoyé par le serveur SMTP (traçabilité bout en bout)
+  messageId   String?
+  /// 1 = urgente ... 9 = basse (ordre de traitement)
+  priorite    Int      @default(5)
+  /// Catégorie fonctionnelle : RESET_MDP | RAPPORT_MENSUEL | RAPPORT_PDF | TEST | NOTIFICATION
+  categorie   String?
+  /// Origine de la demande : route ou module appelant (audit)
+  source      String?
+  /// Identité de l'appelant : id utilisateur ou "api-key"
+  sourceId    String?
+  /// Expéditeur personnalisé éventuel ("Nom <adresse>") et Reply-To
+  fromPersonnalise String?
+  replyTo     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  envoyeLe    DateTime?
+
+  @@index([statut, prochaineTentative])
+  @@index([destinatairePrincipal, createdAt])
+  @@index([categorie])
+}

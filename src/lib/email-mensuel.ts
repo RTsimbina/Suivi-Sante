@@ -1,5 +1,6 @@
 import { db } from './db';
-import { envoyerEmail, getEmailRapportDestinataire } from './email';
+import { getEmailRapportDestinataire } from './email';
+import { envoyerCourriel, envoyerEmailTest } from '@/lib/mail';
 import { getPrestationLabel } from './prestations';
 
 // ─── Type pour un expéditeur Comptabilité ──────────────────────────────────
@@ -437,7 +438,8 @@ export async function envoyerRapportMensuel(): Promise<{
       const emailBccAdmin = await getEmailRapportDestinataire();
       const bcc = emailBccAdmin ? [emailBccAdmin] : undefined;
 
-      await envoyerEmail({
+      // Envoi via le service de messagerie centralisé (file + retry + suivi)
+      const resultat = await envoyerCourriel({
         destinataires,
         sujet: `Suivi Santé — Rapport Mensuel ${periode} — ${societe.nom}`,
         texte: `Bonjour,\n\nVeuillez trouver ci-joint le rapport mensuel de gestion des dossiers de santé pour ${societe.nom} — ${periode}.\n\nCordialement,\n${comptable.nom}\nService Comptabilité — Suivi Santé`,
@@ -445,7 +447,19 @@ export async function envoyerRapportMensuel(): Promise<{
         fromPersonnalise,
         replyTo: comptable.email,
         bcc,
+        categorie: 'RAPPORT_MENSUEL',
+        priorite: 4,
+        source: 'email-mensuel',
+        sourceId: comptable.email,
+        traiter: true, // livraison immédiate attendue dans le flux cron
       });
+      if (!resultat.accepte) {
+        throw new Error(resultat.motif || 'Envoi refusé par le service de messagerie');
+      }
+      if (resultat.envoi?.livraison && !resultat.envoi.livraison.ok) {
+        // Erreur SMTP : le message est conservé en file (retries automatiques)
+        throw new Error(resultat.envoi.livraison.erreur || 'Livraison SMTP échouée');
+      }
 
       envoyes.push({ societe: societe.nom, destinataires, expediteur: fromPersonnalise });
       console.log(`[EMAIL MENSUEL] Rapport envoyé pour ${societe.nom} → ${destinataires.join(', ')} (par ${comptable.nom})`);
@@ -463,30 +477,13 @@ export async function envoyerRapportMensuel(): Promise<{
 
 export async function envoyerTestEmail(destinataire: string): Promise<{ ok: boolean; erreur?: string }> {
   try {
-    const html = genererHTMLRapportSociete({
-      societeNom: 'Société Test',
-      periode: `${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
-      totalDossiers: 0,
-      parStatut: [],
-      montantReclame: 0,
-      montantPaye: 0,
-      montantEnCours: 0,
-      delaiMoyen: 0,
-      topPrestations: [],
-      parAssure: [],
-      appelsFonds: [],
-      fondsDisponibles: 0,
-      budgetUtilise: 0,
-      budgetTotal: 0,
-    });
-
-    await envoyerEmail({
-      destinataires: [destinataire],
-      sujet: 'Suivi Santé — Email de test',
-      texte: 'Ceci est un email de test depuis la plateforme Suivi Santé.',
-      html: html.replace('Société Test', 'Email de Test — Suivi Santé'),
-    });
-
+    const resultat = await envoyerEmailTest(destinataire);
+    if (!resultat.accepte) {
+      return { ok: false, erreur: resultat.motif };
+    }
+    if (resultat.envoi?.livraison && !resultat.envoi.livraison.ok) {
+      return { ok: false, erreur: resultat.envoi.livraison.erreur };
+    }
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

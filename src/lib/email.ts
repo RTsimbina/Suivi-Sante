@@ -156,10 +156,17 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
       requireTLS: config.port === 587,
       auth: { user: config.user, pass: config.pass },
       tls: getTlsOptions(config.port),
+      // Timeouts bornés — indispensable en environnement serverless (Vercel)
+      connectionTimeout: 10_000,   // connexion TCP
+      greetingTimeout: 10_000,     // bannière SMTP du serveur
+      socketTimeout: 20_000,       // inactivité pendant l'échange
     });
   }
   return _transporter;
 }
+
+// Exposé au moteur de livraison centralisé (src/lib/mail/delivery.ts)
+export { getTransporter };
 
 // ─── Récupérer le destinataire des rapports ──────────────────────────────────
 
@@ -178,6 +185,13 @@ interface EmailAttachment {
 
 // ─── Envoi d'email ──────────────────────────────────────────────────────────
 
+/**
+ * ⚠️ DÉPRÉCIÉ — envoi SMTP direct, sans file d'attente, sans retry, sans suivi.
+ * Utiliser le service centralisé : `envoyerCourriel()` (src/lib/mail/index.ts),
+ * qui ajoute validation, anti-abus, rate-limiting, file persistante, retries
+ * et journalisation. Cette fonction reste exportée pour compatibilité
+ * transitoire ; les appelants existants sont migrés progressivement.
+ */
 export async function envoyerEmail(opts: {
   destinataires: string[];
   sujet: string;

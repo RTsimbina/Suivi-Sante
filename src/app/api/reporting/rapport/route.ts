@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAuth } from "@/lib/authorize";
 import { genererRapportMensuel, type ReportData } from "@/lib/generate-report";
-import { envoyerEmail } from "@/lib/email";
+import { envoyerCourriel } from "@/lib/mail";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { rapportMensuelSchema } from "@/lib/validation";
 import {
@@ -66,15 +66,25 @@ export async function POST(request: NextRequest) {
     if (destinataires && destinataires.length > 0) {
       // Emails validés et limités à 20 par le schéma Zod
       const filename = `rapport-suivi-sante-${annee}-${String(mois).padStart(2, "0")}.pdf`;
-      try {
-        await envoyerEmail({
-          destinataires,
-          sujet: `Suivi Santé — Rapport Mensuel ${data.periode}`,
-          texte: `Veuillez trouver ci-joint le rapport mensuel Suivi Santé pour la période ${data.periode}.`,
-          attachments: [{ filename, content: pdfBuffer, contentType: "application/pdf" }],
-        });
-      } catch (emailError) {
-        console.error("[REPORT] Erreur envoi email:", emailError);
+      // Envoi via le service de messagerie centralisé (file d'attente + retry + suivi)
+      const resultatEnvoi = await envoyerCourriel({
+        destinataires,
+        sujet: `Suivi Santé — Rapport Mensuel ${data.periode}`,
+        texte: `Veuillez trouver ci-joint le rapport mensuel Suivi Santé pour la période ${data.periode}.`,
+        piecesJointes: [{
+          nom: filename,
+          contenuBase64: Buffer.from(pdfBuffer).toString("base64"),
+          contentType: "application/pdf",
+        }],
+        categorie: "RAPPORT_PDF",
+        priorite: 4,
+        source: "reporting/rapport",
+        traiter: true,
+      });
+      if (!resultatEnvoi.accepte) {
+        console.error("[REPORT] Envoi refusé par le service de messagerie:", resultatEnvoi.motif);
+      } else if (resultatEnvoi.envoi?.livraison && !resultatEnvoi.envoi.livraison.ok) {
+        console.warn("[REPORT] Livraison différée (restée en file):", resultatEnvoi.envoi.livraison.erreur);
       }
     }
 

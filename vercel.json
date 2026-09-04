@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/rapport-mensuel",
       "schedule": "0 4 1 * *"
+    },
+    {
+      "path": "/api/mail/process",
+      "schedule": "0 5 * * *"
     }
   ]
 }
