@@ -8,9 +8,11 @@
  * (métadonnées uniquement — les corps HTML/texte ne sont jamais exposés).
  *
  * Paramètres de requête :
- *   statut    EN_ATTENTE | EN_COURS | ENVOYE | ECHEC (optionnel)
- *   categorie filtre par catégorie fonctionnelle (optionnel)
- *   limite    1..100 (défaut 25)
+ *   statut     EN_ATTENTE | EN_COURS | ENVOYE | ECHEC (optionnel)
+ *   categorie  filtre par catégorie fonctionnelle (optionnel)
+ *   limite     1..100 (défaut 25)
+ *   evenements id d'un message → retourne uniquement sa timeline d'événements
+ *              (MISE_EN_FILE → EN_COURS → ENVOYE / RETRY / ECHEC / RECUPERE)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,6 +24,18 @@ export async function GET(request: NextRequest) {
   const statut = params.get('statut') || undefined;
   const categorie = params.get('categorie') || undefined;
   const limite = Math.min(Math.max(Number(params.get('limite')) || 25, 1), 100);
+
+  // ── Timeline d'un message (historique des transitions, journal CourrielEvenement)
+  const idEvenements = params.get('evenements');
+  if (idEvenements) {
+    const evenements = await db.courrielEvenement.findMany({
+      where: { courrielId: idEvenements },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      select: { id: true, type: true, fournisseur: true, message: true, createdAt: true },
+    });
+    return NextResponse.json({ evenements });
+  }
 
   const [stats, envois] = await Promise.all([
     statistiquesFile(),

@@ -207,6 +207,22 @@ curl "https://votre-domaine/api/mail?statut=ECHEC&limite=50"
 # → { stats: { enAttente, enCours, envoyes24h, echecs24h, parStatut }, envois: [...] }
 ```
 
+### Timeline d'un message — `GET /api/mail?evenements=<id>`
+
+Chaque transition de statut est journalisée dans la table `CourrielEvenement`
+(rôle de la table `email_events` du plan, §10) : `MISE_EN_FILE`, `EN_COURS`,
+`ENVOYE`, `RETRY`, `ECHEC`, `RECUPERE` — horodatés, avec le Message-ID ou
+l'erreur SMTP associée. La journalisation est « best-effort » : une panne du
+journal n'interrompt jamais un envoi.
+
+```bash
+curl "https://votre-domaine/api/mail?evenements=clxxx..."
+# → { evenements: [ { type: "MISE_EN_FILE", createdAt, message }, { type: "EN_COURS" }, { type: "ENVOYE", message: "Message-ID : <...>" } ] }
+```
+
+La purge d'un message (ENVOYE > 90 j / ECHEC > 180 j) supprime automatiquement
+son historique d'événements (cascade PostgreSQL).
+
 ### `GET /api/mail/dns-check` — statut SPF / DKIM / DMARC (ADMINISTRATEUR)
 
 Interroge le DNS public pour vérifier que le domaine d'expédition publie bien

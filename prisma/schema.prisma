@@ -410,7 +410,32 @@ model CourrielSortant {
   updatedAt   DateTime @updatedAt
   envoyeLe    DateTime?
 
+  /// Historique horodaté des transitions de statut de ce message
+  evenements  CourrielEvenement[]
+
   @@index([statut, prochaineTentative])
   @@index([destinatairePrincipal, createdAt])
   @@index([categorie])
+}
+
+/// Journal d'événements du cycle de vie de chaque e-mail (rôle de la table
+/// `email_events` du plan de mise en œuvre). Une ligne par transition :
+/// MISE_EN_FILE, EN_COURS, ENVOYE, RETRY, ECHEC, RECUPERE — horodatée,
+/// avec le Message-ID ou l'erreur SMTP associée. Alimente l'audit et le
+/// suivi de délivrabilité sans écraser l'état courant du message.
+model CourrielEvenement {
+  id         String   @id @default(cuid())
+  /// Message concerné — la purge d'un message purge son historique (cascade)
+  courriel   CourrielSortant @relation(fields: [courrielId], references: [id], onDelete: Cascade)
+  courrielId String
+  /// Type d'événement (voir TYPES_EVENEMENT dans src/lib/mail/queue.ts)
+  type       String
+  /// Relais/fournisseur impliqué (brevo, smtp2go…) — extension multi-fournisseurs
+  fournisseur String?
+  /// Détail lisible : Message-ID, erreur SMTP tronquée, date de la prochaine tentative…
+  message    String?
+  createdAt  DateTime @default(now())
+
+  @@index([courrielId, createdAt])
+  @@index([type, createdAt])
 }

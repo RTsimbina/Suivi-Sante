@@ -34,6 +34,41 @@ export const STATUTS = {
   ECHEC: 'ECHEC',
 } as const;
 
+/** Types d'événements journalisés dans CourrielEvenement (historique du cycle de vie). */
+export const TYPES_EVENEMENT = {
+  MISE_EN_FILE: 'MISE_EN_FILE', // admis par le service, inséré dans la file
+  EN_COURS: 'EN_COURS',         // réclamé par un worker (claim atomique)
+  ENVOYE: 'ENVOYE',             // remis au relais SMTP (Message-ID obtenu)
+  RETRY: 'RETRY',               // erreur temporaire → nouvelle tentative programmée
+  ECHEC: 'ECHEC',               // erreur permanente ou max de tentatives atteint
+  RECUPERE: 'RECUPERE',         // orphelin EN_COURS remis EN_ATTENTE (crash worker)
+} as const;
+
+/**
+ * Journalise un événement du cycle de vie d'un message (table CourrielEvenement).
+ * Best-effort par conception : une panne du journal ne doit JAMAIS interrompre
+ * le pipeline d'envoi (l'état courant reste porté par CourrielSortant.statut).
+ */
+async function journaliserEvenement(
+  courrielId: string,
+  type: string,
+  opts: { fournisseur?: string; message?: string } = {},
+): Promise<void> {
+  try {
+    await db.courrielEvenement.create({
+      data: {
+        courrielId,
+        type,
+        fournisseur: opts.fournisseur ?? null,
+        message: opts.message?.slice(0, 900) ?? null,
+      },
+      select: { id: true },
+    });
+  } catch {
+    // Le journal est secondaire : on n'échoue jamais pour lui.
+  }
+}
+
 /**
  * Calcule la date de la prochaine tentative après l'échec n.
  * Retourne null si le nombre maximal de tentatives est dépassé (→ ECHEC).
@@ -95,6 +130,10 @@ export async function mettreEnFile(d: DemandeEnFile): Promise<ResultatEnFile> {
     select: { id: true },
   });
 
+  await journaliserEvenement(msg.id, TYPES_EVENEMENT.MISE_EN_FILE, {
+    message: `Sujet : ${d.sujet} — destinataire principal : ${d.destinatairePrincipal}`,
+  });
+
   if (d.traiter) {
     const r = await traiterFile({ limite: 1 });
     if (r.idsTraites.includes(msg.id)) {
@@ -121,35 +160,37 @@ export async function mettreEnFile(d: DemandeEnFile): Promise<ResultatEnFile> {
 
 /**
  * Réclame jusqu'à `limite` messages prêts : EN_ATTENTE, dont la prochaine
- * tentative (backoff) est échue. SKIP LOCKED garantit l'exclusivité entre
- * workers concurrents. Fallback optimiste si la requête native échoue.
+ * tentative (backoff) est échue.
+ *
+ * Sûreté multi-instances : l'UPDATE ... RETURNING est UNE SEULE instruction
+ * atomique — deux workers concurrents ne peuvent jamais réclamer le même
+ * message (la sous-requête FOR UPDATE SKIP LOCKED verrouille les lignes
+ * candidats, et le WHERE sur le statut re-sécurise la transition).
+ * Fallback optimiste id par id (clause WHERE sur statut) pour les
+ * environnements non-PostgreSQL.
  */
 async function reclamerMessages(limite: number): Promise<string[]> {
   try {
     const rows = await db.$queryRaw<{ id: string }[]>(
-      Prisma.sql`SELECT "id" FROM "CourrielSortant"
-                WHERE "statut" = ${STATUTS.EN_ATTENTE}
-                  AND ("prochaineTentative" IS NULL OR "prochaineTentative" <= now())
-                ORDER BY "priorite" ASC, "createdAt" ASC
-                LIMIT ${limite}
-                FOR UPDATE SKIP LOCKED`
+      Prisma.sql`UPDATE "CourrielSortant"
+                SET "statut" = ${STATUTS.EN_COURS}, "updatedAt" = now()
+                WHERE "id" IN (
+                  SELECT "id" FROM "CourrielSortant"
+                  WHERE "statut" = ${STATUTS.EN_ATTENTE}
+                    AND ("prochaineTentative" IS NULL OR "prochaineTentative" <= now())
+                  ORDER BY "priorite" ASC, "createdAt" ASC
+                  LIMIT ${limite}
+                  FOR UPDATE SKIP LOCKED
+                )
+                RETURNING "id"`
     );
-    const ids = rows.map((r) => r.id);
-    if (ids.length === 0) return [];
-    // Marque EN_COURS — la clause WHERE sur statut re-sécurise le claim
-    const res = await db.courrielSortant.updateMany({
-      where: { id: { in: ids }, statut: STATUTS.EN_ATTENTE },
-      data: { statut: STATUTS.EN_COURS, updatedAt: new Date() },
-    });
-    if (res.count === ids.length) return ids;
-    // Concurrence détectée : on re-sélectionne ce que l'on a réellement obtenu
-    const conserves = await db.courrielSortant.findMany({
-      where: { id: { in: ids }, statut: STATUTS.EN_COURS },
-      select: { id: true },
-    });
-    return conserves.map((c) => c.id);
+    // RETURNING renvoie EXACTEMENT les lignes que CE worker a réclamées —
+    // aucune ambiguïté possible avec un autre worker.
+    return rows.map((r) => r.id);
   } catch {
-    // Environnement non-PostgreSQL (ou table absente en dev) : fallback optimiste
+    // Fallback optimiste (non-PostgreSQL) : réclamation id par id, garantie
+    // par la clause WHERE sur le statut (un message déjà réclamé n'est plus
+    // EN_ATTENTE → count 0 → le worker concurrent le laisse).
     const candidats = await db.courrielSortant.findMany({
       where: {
         statut: STATUTS.EN_ATTENTE,
@@ -194,6 +235,10 @@ export async function traiterFile(opts: { limite?: number } = {}): Promise<Resul
   const ids = await reclamerMessages(limite);
   if (ids.length === 0) return result;
 
+  for (const id of ids) {
+    await journaliserEvenement(id, TYPES_EVENEMENT.EN_COURS);
+  }
+
   const messages = await db.courrielSortant.findMany({ where: { id: { in: ids } } });
   result.idsTraites = messages.map((m) => m.id);
 
@@ -223,6 +268,9 @@ export async function traiterFile(opts: { limite?: number } = {}): Promise<Resul
             updatedAt: new Date(),
           },
         });
+        await journaliserEvenement(msg.id, TYPES_EVENEMENT.ENVOYE, {
+          message: livraison.messageId ? `Message-ID : ${livraison.messageId}` : undefined,
+        });
         result.envoyes++;
       } else {
         const tentative = msg.tentatives + 1;
@@ -240,6 +288,9 @@ export async function traiterFile(opts: { limite?: number } = {}): Promise<Resul
             },
           });
           result.retriesProgrammes++;
+          await journaliserEvenement(msg.id, TYPES_EVENEMENT.RETRY, {
+            message: `Tentative ${tentative} — nouvelle tentative à ${prochaine.toISOString()} — ${livraison.erreur ?? 'erreur temporaire'}`,
+          });
           result.erreurs.push({ id: msg.id, erreur: `Retry programmé : ${livraison.erreur}` });
         } else {
           await db.courrielSortant.update({
@@ -253,6 +304,9 @@ export async function traiterFile(opts: { limite?: number } = {}): Promise<Resul
             },
           });
           result.echecsDefinitifs++;
+          await journaliserEvenement(msg.id, TYPES_EVENEMENT.ECHEC, {
+            message: `Tentative ${tentative} — ${livraison.erreur ?? 'erreur permanente'}`,
+          });
           result.erreurs.push({ id: msg.id, erreur: `Échec définitif : ${livraison.erreur}` });
         }
       }
@@ -271,6 +325,9 @@ export async function traiterFile(opts: { limite?: number } = {}): Promise<Resul
           updatedAt: new Date(),
         },
       }).catch(() => undefined);
+      await journaliserEvenement(msg.id, prochaine ? TYPES_EVENEMENT.RETRY : TYPES_EVENEMENT.ECHEC, {
+        message: `Erreur interne (tentative ${tentative}) : ${msgErreur}`,
+      }).catch(() => undefined);
       result.echecsDefinitifs++;
       result.erreurs.push({ id: msg.id, erreur: `Erreur interne : ${msgErreur}` });
     }
@@ -287,10 +344,20 @@ export async function traiterFile(opts: { limite?: number } = {}): Promise<Resul
  */
 export async function recupererOrphelins(): Promise<number> {
   const seuil = new Date(Date.now() - 15 * 60 * 1000);
-  const res = await db.courrielSortant.updateMany({
+  const orphelins = await db.courrielSortant.findMany({
     where: { statut: STATUTS.EN_COURS, updatedAt: { lt: seuil } },
+    select: { id: true },
+  });
+  if (orphelins.length === 0) return 0;
+  const res = await db.courrielSortant.updateMany({
+    where: { id: { in: orphelins.map((o) => o.id) }, statut: STATUTS.EN_COURS, updatedAt: { lt: seuil } },
     data: { statut: STATUTS.EN_ATTENTE, updatedAt: new Date() },
   });
+  for (const o of orphelins) {
+    await journaliserEvenement(o.id, TYPES_EVENEMENT.RECUPERE, {
+      message: 'Message resté EN_COURS plus de 15 min (crash d\'instance) — remis en file',
+    });
+  }
   return res.count;
 }
 
