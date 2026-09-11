@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSociete,
+} from '@/lib/data-isolation';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { contratCreateSchema } from '@/lib/validation';
 
@@ -11,7 +16,14 @@ export async function GET(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : uniquement les contrats de LEUR société (JWT).
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
     const contrats = await db.contrat.findMany({
+      where: avecPerimetreSociete({}, perimetre),
       include: {
         societe: { select: { id: true, nom: true } },
         appelsDeFonds: { select: { montant: true, statut: true } },

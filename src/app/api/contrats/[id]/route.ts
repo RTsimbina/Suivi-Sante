@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+} from '@/lib/data-isolation';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { contratUpdateSchema } from '@/lib/validation';
@@ -13,8 +17,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (authError) return authError;
     const { id } = await params;
 
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : le contrat doit appartenir à LEUR société (JWT).
+    // Hors périmètre → 404 (ne pas révéler l'existence du contrat).
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
     const contrat = await db.contrat.findUnique({
-      where: { id },
+      where:
+        perimetre.restricted && perimetre.societeId
+          ? { id, societeId: perimetre.societeId }
+          : { id },
       include: {
         societe: { select: { id: true, nom: true } },
         appelsDeFonds: { select: { montant: true, statut: true }, orderBy: { createdAt: 'desc' } },

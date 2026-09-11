@@ -1,112 +1,136 @@
 /**
- * ─── Isolation des données (RLS applicatif) ───────────────────────────────
- * 
- * Ce module centralise toutes les règles d'isolation des données au niveau
- * applicatif, simulant un Row-Level Security (RLS) comme on l'aurait avec
- * PostgreSQL. Chaque requête Prisma doit passer par ces filtres pour
- * garantir que :
- * 
- * 1. Un SANTE ne voit que les dossiers de sa société (societeId)
- * 2. Les commentaires privés ne sont visibles que par l'équipe interne
- * 3. Les justificatifs suivent la même règle de société
- * 4. Les KPIs et analyses IA respectent le périmètre de l'utilisateur
- * 
- * Prêt pour une future migration PostgreSQL + Supabase avec RLS natif.
+ * ─── Isolation des données par société (RLS applicatif) ───────────────────
+ *
+ * POINT CENTRAL du périmètre société : toute route API qui lit des données
+ * rattachées à une Societe (dossiers, contrats, assurés, sociétés, suivi,
+ * commentaires) doit passer par les fonctions de ce module.
+ *
+ * CHAÎNE DE CONFIANCE — le navigateur n'est JAMAIS la source du périmètre :
+ *
+ *   1. Login (src/lib/auth.ts) : le societeId est résolu CÔTÉ SERVEUR
+ *        PORTAIL_CLIENT      → Assure rattaché à l'e-mail du compte
+ *        CONTACT_ENTREPRISE  → EntrepriseContact rattaché à l'e-mail du compte
+ *   2. JWT signé (8 h) : token.societeId — non modifiable par le client
+ *   3. Middleware (src/proxy.ts) : header x-user-societeid ÉCRASÉ depuis le JWT
+ *      (toute valeur envoyée par le navigateur est écrasée, donc non falsifiable)
+ *   4. Handler : request.headers.get('x-user-societeid') = SEULE source admise.
+ *      Un ?societeId=... transmis par le client ne peut que RESTREINDRE
+ *      davantage le périmètre (intersection), jamais l'élargir.
+ *
+ * RÈGLES :
+ *   - Rôles internes (ADMINISTRATEUR, ACCUEIL, TECHNIQUE, COMPTABILITE, SANTE)
+ *     → périmètre GLOBAL (outillage interne : toutes les sociétés).
+ *   - Rôles externes (PORTAIL_CLIENT, CONTACT_ENTREPRISE)
+ *     → périmètre FORCÉ sur leur société. FAIL-CLOSED : un compte externe
+ *       sans société rattachée est refusé (403), jamais servi avec une liste
+ *       vide silencieuse qui masquerait un compte mal provisionné.
+ *   - Accès unitaires hors périmètre → 404 (jamais 403) : ne pas révéler
+ *     l'existence d'un dossier/contrat d'une autre société.
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import type { Prisma } from "@prisma/client";
+/** Rôles internes : périmètre global (toutes les sociétés). */
+export const INTERNAL_ROLES = [
+  'ADMINISTRATEUR',
+  'ACCUEIL',
+  'TECHNIQUE',
+  'COMPTABILITE',
+  'SANTE',
+] as const;
 
-/** Rôles internes ayant accès à toutes les données */
-const INTERNAL_ROLES = ["ADMINISTRATEUR", "ACCUEIL", "TECHNIQUE", "COMPTABILITE", "SANTE"];
+/** Rôles externes : périmètre forcé sur la société rattachée au compte. */
+export const EXTERNAL_ROLES = ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'] as const;
 
-/** Rôles pouvant voir les commentaires privés */
-const PRIVATE_COMMENT_ROLES = ["ADMINISTRATEUR", "TECHNIQUE", "COMPTABILITE"];
+/** Message renvoyé à un compte externe sans société rattachée (fail-closed). */
+export const ERREUR_SANS_SOCIETE =
+  "Ce compte n'est rattaché à aucune société. Contactez l'administrateur.";
+
+/** Périmètre de société d'un utilisateur authentifié. */
+export interface PerimetreSociete {
+  /** true → les requêtes DOIVENT être filtrées par societeId */
+  restricted: boolean;
+  /** société imposée si restricted ; null pour les rôles internes */
+  societeId: string | null;
+  /** présent quand un rôle externe n'est rattaché à aucune société → 403 */
+  refusal: string | null;
+}
 
 /**
- * Retourne le filtre Prisma à appliquer sur les dossiers pour un rôle/utilisateur donné.
- * - ADMINISTRATEUR, ACCUEIL, TECHNIQUE, COMPTABILITE : pas de filtre (voient tout)
- * - SANTE : filtre par societeId lié au compte utilisateur
+ * Résout le périmètre depuis l'identité SERVEUR (rôle + societeId du JWT).
+ * - Rôle externe + société    → restreint à cette société
+ * - Rôle externe sans société → refus (fail-closed)
+ * - Rôle interne              → périmètre global (un header societeId
+ *                               résiduel est ignoré : il ne fait pas foi)
+ * - Rôle inconnu              → refus par défaut (défense en profondeur)
  */
-export function getDossierIsolationFilter(
+export function resoudrePerimetre(
   userRole: string,
-  userId: string,
-  userSocieteId: string | null
-): Prisma.DossierWhereInput {
-  if (INTERNAL_ROLES.includes(userRole)) {
-    return {}; // Pas de restriction pour les rôles internes
+  societeIdServeur: string | null | undefined
+): PerimetreSociete {
+  const role = (userRole || '').trim();
+
+  if ((EXTERNAL_ROLES as readonly string[]).includes(role)) {
+    const societeId = (societeIdServeur || '').trim();
+    if (!societeId) {
+      return { restricted: true, societeId: null, refusal: ERREUR_SANS_SOCIETE };
+    }
+    return { restricted: true, societeId, refusal: null };
   }
 
-  // Fallback : rôle externe → uniquement ses dossiers créés
-  return { createurId: userId };
-}
-
-/**
- * Filtre les commentaires privés selon le rôle.
- * Les rôles ADMIN, TECHNIQUE et COMPTABILITE voient tout.
- * Les autres ne voient que les commentaires publics.
- */
-export function getCommentaireIsolationFilter(userRole: string): Prisma.CommentaireWhereInput {
-  if (PRIVATE_COMMENT_ROLES.includes(userRole)) {
-    return {}; // Voit tous les commentaires
+  if ((INTERNAL_ROLES as readonly string[]).includes(role)) {
+    return { restricted: false, societeId: null, refusal: null };
   }
-  return { prive: false }; // Ne voit que les commentaires publics
+
+  // Rôle non répertorié : fail-closed. En pratique le middleware ne laisse
+  // passer que les rôles déclarés dans API_PERMISSIONS, mais on ne prend
+  // aucun risque si un nouveau rôle apparaît sans passer ici.
+  return { restricted: true, societeId: null, refusal: ERREUR_SANS_SOCIETE };
 }
 
 /**
- * Retourne true si le rôle peut voir les analyses IA complètes (toutes sociétés).
- * Sinon, les analyses seront limitées à la société de l'utilisateur.
+ * Extrait le périmètre depuis les headers injectés par le middleware
+ * (x-user-role / x-user-societeid — écrasés depuis le JWT signé, donc
+ * non falsifiables par le navigateur).
  */
-export function canSeeAllSocietes(userRole: string): boolean {
-  return INTERNAL_ROLES.includes(userRole);
+export function perimetreDepuisHeaders(headers: Headers): PerimetreSociete {
+  return resoudrePerimetre(
+    headers.get('x-user-role') || '',
+    headers.get('x-user-societeid')
+  );
 }
 
 /**
- * Retourne le filtre pour les justificatifs (même logique que les dossiers).
+ * À appeler juste après checkAuth : renvoie une Response 403 si le périmètre
+ * est invalide (rôle externe sans société, rôle inconnu), sinon null.
  */
-export function getJustificatifIsolationFilter(
-  userRole: string,
-  userId: string,
-  userSocieteId: string | null
-): Prisma.JustificatifWhereInput {
-  if (INTERNAL_ROLES.includes(userRole)) {
-    return {};
+export function refuserHorsPerimetre(perimetre: PerimetreSociete): Response | null {
+  if (perimetre.refusal) {
+    return Response.json({ erreur: perimetre.refusal }, { status: 403 });
   }
-  return { uploadedBy: userId };
+  return null;
 }
 
 /**
- * Enrichit un where existant avec les filtres d'isolation.
- * Fusionne intelligemment avec un AND si le where contient déjà des conditions.
+ * Fusionne le périmètre dans un where Prisma existant en ÉCRASANT tout
+ * societeId transmis par le client (query/body). À utiliser sur les tables
+ * portant une colonne societeId (Dossier, Contrat, Assure).
+ *
+ * No-op pour les rôles internes : le filtre client éventuel est conservé.
+ * Pré-condition : refuserHorsPerimetre a déjà été appelé (pas de refusal).
  */
-export function withIsolation<T extends Record<string, unknown>>(
-  baseWhere: T,
-  isolationFilter: Prisma.DossierWhereInput
-): Prisma.DossierWhereInput {
-  const hasConditions = Object.keys(baseWhere).length > 0;
-  if (!hasConditions) return isolationFilter;
-  
-  const hasIsolation = Object.keys(isolationFilter).length > 0;
-  if (!hasIsolation) return baseWhere as Prisma.DossierWhereInput;
-
-  return {
-    AND: [baseWhere as Prisma.DossierWhereInput, isolationFilter],
-  };
+export function avecPerimetreSociete<T>(where: T, perimetre: PerimetreSociete): T {
+  if (!perimetre.restricted || !perimetre.societeId) return where;
+  return { ...(where as Record<string, unknown>), societeId: perimetre.societeId } as T;
 }
 
 /**
- * Récupère le societeId d'un utilisateur à partir de la DB.
- * Utilisé par les API routes pour construire les filtres d'isolation.
+ * Variante pour la table Societe elle-même : le périmètre filtre sur `id`
+ * (un contact d'entreprise ne liste que SA société, pas un filtre societeId).
  */
-export async function getUserSocieteId(userId: string): Promise<string | null> {
-  try {
-    const { db } = await import("@/lib/db");
-    const user = await db.utilisateur.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-    return null; // Utilisateur model doesn't have societeId; use dossier.createurId fallback
-  } catch {
-    return null;
-  }
+export function avecPerimetreSocieteCourante<T>(
+  where: T,
+  perimetre: PerimetreSociete
+): T {
+  if (!perimetre.restricted || !perimetre.societeId) return where;
+  return { ...(where as Record<string, unknown>), id: perimetre.societeId } as T;
 }

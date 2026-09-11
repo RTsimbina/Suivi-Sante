@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+} from "@/lib/data-isolation";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { commentaireCreateSchema } from "@/lib/validation";
 
@@ -11,7 +15,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const userRole = request.headers.get('x-user-role') || '';
 
-    // ─── Isolation : les commentaires privés ne sont visibles que par l'équipe interne ───
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : le dossier parent doit appartenir à LEUR société (JWT).
+    // Hors périmètre → 404 (ne pas révéler l'existence du dossier ni de ses
+    // commentaires).
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
+    const dossierAutorise = await db.dossier.findUnique({
+      where:
+        perimetre.restricted && perimetre.societeId
+          ? { id, societeId: perimetre.societeId }
+          : { id },
+      select: { id: true },
+    });
+    if (!dossierAutorise) {
+      return NextResponse.json({ erreur: "Dossier introuvable" }, { status: 404 });
+    }
+
+    // ─── Commentaires privés : visibles seulement par l'équipe interne ────
     const whereCommentaire: Record<string, unknown> = { dossierId: id };
     const INTERNAL = ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'];
     if (!INTERNAL.includes(userRole)) {

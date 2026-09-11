@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSocieteCourante,
+} from "@/lib/data-isolation";
 import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { societeCreateSchema } from "@/lib/validation";
 
-// GET — Lister toutes les sociétés
+// GET — Lister les sociétés
+// Rôles externes (CONTACT_ENTREPRISE) : uniquement LEUR société (JWT).
 export async function GET(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
     const societes = await db.societe.findMany({
+      where: avecPerimetreSocieteCourante({}, perimetre),
       orderBy: { nom: "asc" },
       include: {
         _count: { select: { dossiers: true, contrats: true, baremes: true } },

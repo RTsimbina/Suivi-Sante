@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSociete,
+} from '@/lib/data-isolation';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { assureCreateSchema, assureUpdateSchema } from '@/lib/validation';
 
@@ -10,6 +15,13 @@ export async function GET(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
+
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : périmètre société FORCÉ depuis le JWT — tout
+    // ?societeId client est ignoré (écrasé). Fail-closed si compte sans société.
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
 
     const { searchParams } = request.nextUrl;
     const search = searchParams.get('search') || '';
@@ -40,7 +52,8 @@ export async function GET(request: NextRequest) {
 
     const [assures, total] = await Promise.all([
       db.assure.findMany({
-        where,
+        // Fusion du périmètre : écrase tout societeId client pour les rôles restreints
+        where: avecPerimetreSociete(where, perimetre),
         include: {
           societe: { select: { id: true, nom: true } },
           _count: { select: { dossiers: true } },
@@ -49,7 +62,7 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
       }),
-      db.assure.count({ where }),
+      db.assure.count({ where: avecPerimetreSociete(where, perimetre) }),
     ]);
 
     // Si avecAyantsDroit, charger les ayants droit pour les assurés principaux de cette page
@@ -60,7 +73,11 @@ export async function GET(request: NextRequest) {
         .map((a) => a.id);
       if (principalIds.length > 0) {
         const ayantsDroit = await db.assure.findMany({
-          where: { assurePrincipalId: { in: principalIds } },
+          // Défense en profondeur : les ayants droit restent dans le périmètre
+          where: avecPerimetreSociete(
+            { assurePrincipalId: { in: principalIds } },
+            perimetre
+          ),
           include: {
             societe: { select: { id: true, nom: true } },
             _count: { select: { dossiers: true } },
@@ -77,10 +94,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Comptes par type
+    // Comptes par type — DANS le périmètre (le groupBy était global : fuite de statistiques)
     const statsTypes = await db.assure.groupBy({
       by: ['typeBeneficiaire'],
       _count: true,
+      where: avecPerimetreSociete({}, perimetre),
     });
     const countsByType: Record<string, number> = {};
     for (const st of statsTypes) {

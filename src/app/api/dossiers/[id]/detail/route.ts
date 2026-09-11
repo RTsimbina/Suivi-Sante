@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+} from "@/lib/data-isolation";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -8,8 +12,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (authError) return authError;
     const { id } = await params;
 
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : le dossier doit appartenir à LEUR société (JWT).
+    // Hors périmètre → 404 (ne pas révéler l'existence du dossier).
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
     const dossier = await db.dossier.findUnique({
-      where: { id },
+      where:
+        perimetre.restricted && perimetre.societeId
+          ? { id, societeId: perimetre.societeId }
+          : { id },
       include: {
         societe: true,
         assure: true,

@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { checkAuth } from "@/lib/authorize";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSociete,
+  avecPerimetreSocieteCourante,
+} from "@/lib/data-isolation";
 import { ALL_SOUS_TYPES, PARENT_TYPES } from "@/lib/prestations";
 
 function diffDays(a: Date, b: Date): number {
@@ -23,10 +29,21 @@ export async function GET(request: NextRequest) {
     if (authError) return authError;
     const { searchParams } = new URL(request.url);
 
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : périmètre société FORCÉ depuis le JWT, sur tous les
+    // modes (options / suggest / recherche). Fail-closed si compte sans société.
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
     // --- Mode options : retourne les listes pour les dropdowns ---
     if (searchParams.get("mode") === "options") {
       const [societes, statuts, types] = await Promise.all([
-        db.societe.findMany({ select: { id: true, nom: true }, orderBy: { nom: "asc" } }),
+        db.societe.findMany({
+          where: avecPerimetreSocieteCourante({}, perimetre),
+          select: { id: true, nom: true },
+          orderBy: { nom: "asc" },
+        }),
         Promise.resolve(VALID_STATUTS),
         Promise.resolve(VALID_TYPES),
       ]);
@@ -38,13 +55,17 @@ export async function GET(request: NextRequest) {
       const term = (searchParams.get("term") || "").trim();
       if (!term || term.length < 1) return NextResponse.json({ suggestions: [] });
       const results = await db.dossier.findMany({
-        where: {
-          OR: [
-            { numeroDossier: { contains: term } },
-            { beneficiaire: { contains: term } },
-            { societe: { nom: { contains: term } } },
-          ],
-        },
+        // Rôles externes : suggestion restreinte à leur société
+        where: avecPerimetreSociete(
+          {
+            OR: [
+              { numeroDossier: { contains: term } },
+              { beneficiaire: { contains: term } },
+              { societe: { nom: { contains: term } } },
+            ],
+          },
+          perimetre
+        ),
         select: {
           id: true,
           numeroDossier: true,
@@ -116,8 +137,13 @@ export async function GET(request: NextRequest) {
       andConditions.push({ typeDossier: type });
     }
 
-    if (societeId) {
-      andConditions.push({ societeId });
+    // Rôles externes : le societeId SERVEUR écrase celui du client
+    const societeIdEffectif = perimetre.restricted
+      ? perimetre.societeId
+      : societeId;
+
+    if (societeIdEffectif) {
+      andConditions.push({ societeId: societeIdEffectif });
     }
 
     const where: Prisma.DossierWhereInput = { AND: andConditions };
@@ -258,7 +284,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       query: queries,
-      filters: { statut: statut || null, type: type || null, societeId: societeId || null },
+      filters: { statut: statut || null, type: type || null, societeId: societeIdEffectif || null },
       results: enriched,
       total: enriched.length,
     });

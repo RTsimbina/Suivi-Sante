@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSociete,
+} from "@/lib/data-isolation";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
 import { parseJsonBody } from "@/lib/validation/parse";
@@ -21,12 +26,14 @@ export async function GET(request: NextRequest) {
       Math.max(1, parseInt(searchParams.get("limit") || "20", 10))
     );
 
-    const userRole = request.headers.get('x-user-role') || '';
-    const userId = request.headers.get('x-user-id') || '';
+    // ─── Isolation des données (RLS applicatif, voir data-isolation.ts) ────
+    // Rôles externes : périmètre société FORCÉ depuis le JWT — tout
+    // ?societeId client est ignoré (écrasé). Fail-closed si compte sans société.
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
 
     const where: Prisma.DossierWhereInput = {};
-
-    // ─── Isolation des données ───
 
     // Filter by statut (supports comma-separated: "VALIDE,REJETE")
     if (statut) {
@@ -64,9 +71,12 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
+    // Fusion du périmètre : écrase tout societeId client pour les rôles restreints
+    const whereFiltre = avecPerimetreSociete(where, perimetre);
+
     const [dossiers, total] = await Promise.all([
       db.dossier.findMany({
-        where,
+        where: whereFiltre,
         include: {
           societe: true,
           gestionnaireAccueil: true,
@@ -77,7 +87,7 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      db.dossier.count({ where }),
+      db.dossier.count({ where: whereFiltre }),
     ]);
 
     return NextResponse.json({
