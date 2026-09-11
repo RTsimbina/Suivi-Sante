@@ -1,6 +1,7 @@
 import { db } from './db';
 import { callLLM } from './llm';
 import { getPrestationLabel, getParentType } from './prestations';
+import { enNombre, sommer, moins, minDecimal, appliquerTaux, formaterAr, formaterNombre, superieurA, inferieurA } from './money';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type CanalBot = 'WHATSAPP' | 'TELEGRAM' | 'MESSENGER';
@@ -33,33 +34,89 @@ export async function sauvegarderMessage(msg: MessageBotIncoming, reponse: strin
 // ─── Identification et sessions ─────────────────────────────────────────────
 
 // En mémoire : association ID expéditeur (téléphone/chatId) → assure vérifié
-const botSessions = new Map<string, { assureId: string; assureNom: string; societeId: string; verifieA: Date }>();
-const SESSION_TTL = 4 * 60 * 60 * 1000; // 4h
+// ─── REMPLACÉ (plan P3 Vague 1) : sessions persistées en BASE (table BotSession).
+// L'ancienne Map du processus était perdue sur serverless : requête 1 → instance A,
+// requête 2 → instance B (session inconnue), ou redémarrage → session perdue.
+// En base, toutes les instances partagent l'état, avec TTL explicite (4h)
+// et purge opportuniste des lignes expirées.
+const SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4h
 
-async function identifierExpediteur(msg: MessageBotIncoming): Promise<{ assureId: string; assureNom: string; societeId: string } | null> {
-  const cached = botSessions.get(msg.expeditieurId);
-  if (cached && (Date.now() - cached.verifieA.getTime()) < SESSION_TTL) {
-    return { assureId: cached.assureId, assureNom: cached.assureNom, societeId: cached.societeId };
+export interface SessionBot {
+  assureId: string;
+  assureNom: string;
+  societeId: string;
+}
+
+/** Purge opportuniste des sessions expirées (fire-and-forget, jamais bloquante). */
+function purgerSessionsExpirees(): void {
+  db.botSession.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    .catch(e => console.error('[BOT] Erreur purge sessions:', e));
+}
+
+/** Lit la session d'un expéditeur si elle existe et n'est pas expirée (TTL 4h). */
+async function lireSession(expeditieurId: string): Promise<SessionBot | null> {
+  const s = await db.botSession.findUnique({ where: { expeditieurId } });
+  if (!s) return null;
+  if (s.expiresAt.getTime() <= Date.now()) {
+    await db.botSession.deleteMany({ where: { expeditieurId } });
+    return null;
   }
+  return { assureId: s.assureId, assureNom: s.assureNom, societeId: s.societeId };
+}
+
+/** Écrit (upsert) la session d'un expéditeur avec TTL 4h. */
+async function ecrireSession(
+  canal: CanalBot,
+  expeditieurId: string,
+  session: SessionBot,
+): Promise<void> {
+  const maintenant = new Date();
+  const expiresAt = new Date(maintenant.getTime() + SESSION_TTL_MS);
+  await db.botSession.upsert({
+    where: { expeditieurId },
+    update: {
+      canal,
+      assureId: session.assureId,
+      assureNom: session.assureNom,
+      societeId: session.societeId,
+      verifieA: maintenant,
+      expiresAt,
+    },
+    create: {
+      expeditieurId,
+      canal,
+      assureId: session.assureId,
+      assureNom: session.assureNom,
+      societeId: session.societeId,
+      verifieA: maintenant,
+      expiresAt,
+    },
+  });
+  purgerSessionsExpirees();
+}
+
+async function identifierExpediteur(msg: MessageBotIncoming): Promise<SessionBot | null> {
+  const cached = await lireSession(msg.expeditieurId);
+  if (cached) return cached;
   const assure = await db.assure.findFirst({
     where: { telephone: { contains: msg.expeditieurId.replace(/[^\d+]/g, '') }, actif: true },
     include: { societe: { select: { id: true, nom: true } } },
   });
   if (assure) {
-    const session = { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId, verifieA: new Date() };
-    botSessions.set(msg.expeditieurId, session);
+    const session = { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId };
+    await ecrireSession(msg.canal, msg.expeditieurId, session);
     return session;
   }
   return null;
 }
 
-async function verifierNSS(nss: string, expediteurId: string): Promise<string> {
+async function verifierNSS(nss: string, canal: CanalBot, expediteurId: string): Promise<string> {
   const assure = await db.assure.findFirst({
     where: { nSS: nss.trim(), actif: true },
     include: { societe: { select: { id: true, nom: true } } },
   });
   if (!assure) return 'Numero de securite sociale non reconnu. Verifiez et reessayez.';
-  botSessions.set(expediteurId, { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId, verifieA: new Date() });
+  await ecrireSession(canal, expediteurId, { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId });
   return `Identite confirmée. Bienvenue ${assure.prenom || ''} ${assure.nom} (${assure.societe.nom}).\n\nVous pouvez maintenant consulter la situation de vos dossiers avec :\n• /mesdossiers — Voir tous vos dossiers\n• /dossier [numéro] — Suivre un dossier précis`;
 }
 
@@ -86,7 +143,7 @@ async function mesDossiers(assureId: string, assureNom: string): Promise<string>
   const lignes = dossiers.map(d => {
     let ligne = `- ${d.numeroDossier} : ${STATUT_LABELS[d.statut] || d.statut}`;
     if (d.statut === 'PAYE' && d.montantPaye && d.datePaiement) {
-      ligne += ` — Payé ${d.montantPaye.toLocaleString('fr-FR')} Ar le ${d.datePaiement.toLocaleDateString('fr-FR')}`;
+      ligne += ` — Payé ${formaterNombre(d.montantPaye)} Ar le ${d.datePaiement.toLocaleDateString('fr-FR')}`;
     } else if (d.statut === 'REJETE' && d.motifRejet) {
       ligne += ` — Motif : ${d.motifRejet}`;
     } else if (d.statut === 'EN_PAIEMENT') {
@@ -102,8 +159,8 @@ async function mesDossiers(assureId: string, assureNom: string): Promise<string>
 async function suiviDossier(numero: string, expediteurId: string): Promise<string> {
   const q = numero.trim().toUpperCase();
 
-  // L'expéditeur DOIT être identifié pour consulter un dossier
-  const session = botSessions.get(expediteurId);
+  // L'expéditeur DOIT être identifié pour consulter un dossier (session en DB)
+  const session = await lireSession(expediteurId);
   if (!session) {
     return 'Vous devez d\'abord vous identifier pour consulter un dossier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
   }
@@ -124,7 +181,7 @@ async function suiviDossier(numero: string, expediteurId: string): Promise<strin
   reponse += `Statut : ${STATUT_LABELS[dossier.statut] || dossier.statut}\n`;
 
   if (dossier.statut === 'PAYE' && dossier.montantPaye) {
-    reponse += `Montant payé : ${dossier.montantPaye.toLocaleString('fr-FR')} Ar\n`;
+    reponse += `Montant payé : ${formaterNombre(dossier.montantPaye)} Ar\n`;
     if (dossier.datePaiement) {
       reponse += `Date de paiement : ${dossier.datePaiement.toLocaleDateString('fr-FR')}\n`;
     }
@@ -150,8 +207,8 @@ async function suiviDossier(numero: string, expediteurId: string): Promise<strin
 async function expliquerCalcul(numero: string, expediteurId: string): Promise<string> {
   const q = numero.trim().toUpperCase();
 
-  // L'expéditeur DOIT être identifié
-  const session = botSessions.get(expediteurId);
+  // L'expéditeur DOIT être identifié (session en DB)
+  const session = await lireSession(expediteurId);
   if (!session) {
     return 'Vous devez d\'abord vous identifier pour consulter le détail d\'un dossier.\nEnvoyez : /verifier [votre numéro de sécurité sociale]';
   }
@@ -194,8 +251,7 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
   }
 
   // Construction de l'explication du calcul
-  const fmt = (n: number | null | undefined) =>
-    n != null ? `${n.toLocaleString('fr-FR')} Ar` : 'Non déterminé';
+  const fmt = (n: Parameters<typeof formaterNombre>[0]) => formaterNombre(n);
 
   let reponse = `Dossier ${dossier.numeroDossier}\n`;
   reponse += `Type : ${getPrestationLabel(dossier.typeDossier)}\n`;
@@ -209,9 +265,9 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
   // 2. Montant validé par l'analyse technique
   if (dossier.montantValide != null) {
     reponse += `\nMontant validé (après analyse) : ${fmt(dossier.montantValide)}`;
-    if (dossier.montantReclame > 0 && dossier.montantValide !== dossier.montantReclame) {
-      const diff = dossier.montantReclame - dossier.montantValide;
-      reponse += `  (soit ${diff.toLocaleString('fr-FR')} Ar de moins que le montant réclamé)`;
+    if (superieurA(dossier.montantReclame, 0) && !dossier.montantValide.equals(dossier.montantReclame)) {
+      const diff = moins(dossier.montantReclame, dossier.montantValide) ?? 0;
+      reponse += `  (soit ${fmt(diff)} Ar de moins que le montant réclamé)`;
     }
   }
 
@@ -224,16 +280,16 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
     reponse += `\n  Taux de couverture : ${bareme.tauxCouverture}%`;
     reponse += `\n  Plafond : ${fmt(bareme.plafond)}`;
 
-    // 4. Explication du calcul étape par étape
+    // 4. Explication du calcul étape par étape (Decimal exact — plan P3)
     const baseCalcul = dossier.montantValide ?? dossier.montantReclame;
-    const montantPlafonne = Math.min(baseCalcul, bareme.plafond);
-    const montantCouvert = montantPlafonne * (bareme.tauxCouverture / 100);
-    const ticketModCalcule = montantPlafonne - montantCouvert;
+    const montantPlafonne = minDecimal(baseCalcul, bareme.plafond);
+    const montantCouvert = montantPlafonne !== null ? (appliquerTaux(montantPlafonne, bareme.tauxCouverture) ?? 0) : 0;
+    const ticketModCalcule = montantPlafonne !== null ? (moins(montantPlafonne, montantCouvert) ?? 0) : 0;
 
     reponse += '\n─────────────────────';
     reponse += '\nDétail du calcul :';
     reponse += `\n  1. Base de calcul : ${fmt(baseCalcul)}`;
-    if (baseCalcul > bareme.plafond) {
+    if (inferieurA(bareme.plafond, baseCalcul)) {
       reponse += `\n  2. Application du plafond (${fmt(bareme.plafond)}) : ${fmt(montantPlafonne)}`;
     }
     reponse += `\n  3. Taux couvert (${bareme.tauxCouverture}%) : ${fmt(montantCouvert)}`;
@@ -335,7 +391,7 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
   // ─── Commande /verifier [NSS] ─────────────────────────────────────────
   if (lowerText.startsWith('/verifier ')) {
     const nss = texte.slice('/verifier '.length).trim();
-    return await verifierNSS(nss, msg.expeditieurId);
+    return await verifierNSS(nss, msg.canal, msg.expeditieurId);
   }
 
   // ─── Commande /mesdossiers ────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { getParentType } from '@/lib/prestations';
+import { enNombre, minDecimal, appliquerTaux, moins, superieurA } from '@/lib/money';
 
 /**
  * GET /api/technique/exclusions
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
       if (!baremesBySociete[b.societeId]) baremesBySociete[b.societeId] = {};
       baremesBySociete[b.societeId][b.prestation] = {
         tauxCouverture: b.tauxCouverture,
-        plafond: b.plafond,
+        plafond: enNombre(b.plafond) ?? 0,
       };
     }
 
@@ -93,19 +94,19 @@ export async function GET(request: NextRequest) {
           beneficiaire: d.beneficiaire,
           societeNom: d.societe?.nom || '—',
           typeDossier: d.typeDossier,
-          montantReclame: d.montantReclame,
-          montantValide: d.montantValide,
+          montantReclame: enNombre(d.montantReclame) ?? 0,
+          montantValide: enNombre(d.montantValide),
           montantTheorique: 0,
           plafondApplique: null,
           tauxCouverture: null,
-          ticketModerateur: d.ticketModerateur,
+          ticketModerateur: enNombre(d.ticketModerateur),
           statut: d.statut,
           motifRejet: d.motifRejet,
           typeEcart: 'rejete',
-          ecart: d.montantReclame,
+          ecart: enNombre(d.montantReclame) ?? 0,
           pourcentageCouvert: 0,
         });
-        totalMontantNonCouvert += d.montantReclame;
+        totalMontantNonCouvert += enNombre(d.montantReclame) ?? 0;
         continue;
       }
 
@@ -121,33 +122,34 @@ export async function GET(request: NextRequest) {
           beneficiaire: d.beneficiaire,
           societeNom: d.societe?.nom || '—',
           typeDossier: d.typeDossier,
-          montantReclame: d.montantReclame,
-          montantValide: d.montantValide,
+          montantReclame: enNombre(d.montantReclame) ?? 0,
+          montantValide: enNombre(d.montantValide),
           montantTheorique: 0,
           plafondApplique: null,
           tauxCouverture: 0,
-          ticketModerateur: d.ticketModerateur,
+          ticketModerateur: enNombre(d.ticketModerateur),
           statut: d.statut,
           motifRejet: 'Aucun barème défini pour cette prestation',
           typeEcart: 'exclusion',
-          ecart: d.montantReclame,
+          ecart: enNombre(d.montantReclame) ?? 0,
           pourcentageCouvert: 0,
         });
-        totalMontantNonCouvert += d.montantReclame;
+        totalMontantNonCouvert += enNombre(d.montantReclame) ?? 0;
         continue;
       }
 
-      // Calculer le montant théorique couvert par le barème
-      const montantCouvert = Math.min(d.montantReclame, bareme.plafond);
-      const montantTheorique = Math.round(montantCouvert * (bareme.tauxCouverture / 100) * 100) / 100;
-      const ecart = Math.round((d.montantReclame - montantTheorique) * 100) / 100;
-      const pourcentageCouvert = d.montantReclame > 0
-        ? Math.round((montantTheorique / d.montantReclame) * 1000) / 10
+      // Calculer le montant théorique couvert par le barème (Decimal exact — plan P3)
+      const montantCouvert = minDecimal(d.montantReclame, bareme.plafond) ?? 0;
+      const montantTheorique = enNombre(appliquerTaux(montantCouvert, bareme.tauxCouverture)) ?? 0;
+      const montantReclameNombre = enNombre(d.montantReclame) ?? 0;
+      const ecart = enNombre(moins(d.montantReclame, montantTheorique)) ?? 0;
+      const pourcentageCouvert = superieurA(d.montantReclame, 0)
+        ? Math.round((montantTheorique / montantReclameNombre) * 1000) / 10
         : 0;
 
       // Dépassement de plafond : le montant réclamé dépasse le plafond
       // OU le montant théorique est significativement inférieur au réclamé (> 5% d'écart)
-      const isDepassement = d.montantReclame > bareme.plafond || pourcentageCouvert < 95;
+      const isDepassement = superieurA(d.montantReclame, bareme.plafond) || pourcentageCouvert < 95;
 
       if (isDepassement) {
         exclusions.push({
@@ -156,12 +158,12 @@ export async function GET(request: NextRequest) {
           beneficiaire: d.beneficiaire,
           societeNom: d.societe?.nom || '—',
           typeDossier: d.typeDossier,
-          montantReclame: d.montantReclame,
-          montantValide: d.montantValide,
+          montantReclame: enNombre(d.montantReclame) ?? 0,
+          montantValide: enNombre(d.montantValide),
           montantTheorique,
           plafondApplique: bareme.plafond,
           tauxCouverture: bareme.tauxCouverture,
-          ticketModerateur: d.ticketModerateur,
+          ticketModerateur: enNombre(d.ticketModerateur),
           statut: d.statut,
           motifRejet: null,
           typeEcart: 'depassement',

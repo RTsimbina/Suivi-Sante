@@ -9,15 +9,18 @@ import {
   avecPerimetreSocieteCourante,
 } from "@/lib/data-isolation";
 import { ALL_SOUS_TYPES, PARENT_TYPES } from "@/lib/prestations";
+import { enNombre, moins, superieurA } from "@/lib/money";
 
 function diffDays(a: Date, b: Date): number {
   const ms = Math.abs(a.getTime() - b.getTime());
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
-function round2(n: number | null | undefined): number {
-  if (n === null || n === undefined || isNaN(n)) return 0;
-  return Math.round(n * 100) / 100;
+// Accepte Decimal (lectures Prisma) et number — conversion affichage uniquement.
+function round2(n: number | Prisma.Decimal | null | undefined): number {
+  const v = enNombre(n);
+  if (v === null || isNaN(v)) return 0;
+  return Math.round(v * 100) / 100;
 }
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "REJETE", "EN_PAIEMENT", "PAYE"];
@@ -246,8 +249,10 @@ export async function GET(request: NextRequest) {
       const paiement = {
         montantReclame: round2(d.montantReclame),
         montantValide: round2(d.montantValide),
-        ecartMontant: d.montantValide ? round2(d.montantReclame - d.montantValide) : null,
-        tauxEcart: d.montantValide && d.montantReclame > 0 ? round2(((d.montantReclame - d.montantValide) / d.montantReclame) * 100) : null,
+        ecartMontant: d.montantValide ? round2(moins(d.montantReclame, d.montantValide)) : null,
+        tauxEcart: d.montantValide && superieurA(d.montantReclame, 0)
+          ? round2(moins(d.montantReclame, d.montantValide)!.div(d.montantReclame).mul(100))
+          : null,
         ticketModerateur: round2(d.ticketModerateur),
         partPatient: round2(d.partPatient),
         partEntreprise: round2(d.partEntreprise),

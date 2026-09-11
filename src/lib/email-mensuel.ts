@@ -2,6 +2,7 @@ import { db } from './db';
 import { getEmailRapportDestinataire } from './email';
 import { envoyerCourriel, envoyerEmailTest } from '@/lib/mail';
 import { getPrestationLabel } from './prestations';
+import { enNombre, sommer } from './money';
 
 // ─── Type pour un expéditeur Comptabilité ──────────────────────────────────
 interface ExpediteurComptable {
@@ -361,11 +362,13 @@ export async function envoyerRapportMensuel(): Promise<{
         .map(([statut, count]) => ({ statut, count }))
         .sort((a, b) => b.count - a.count);
 
-      const montantReclame = dossiers.reduce((s, d) => s + d.montantReclame, 0);
-      const montantPaye = dossiers.reduce((s, d) => s + (d.montantPaye || 0), 0);
-      const montantEnCours = dossiers
-        .filter(d => d.statut === 'EN_PAIEMENT' || d.statut === 'EN_COMPTABILITE')
-        .reduce((s, d) => s + (d.montantValide || d.montantReclame), 0);
+      const montantReclame = enNombre(sommer(dossiers.map(d => d.montantReclame))) ?? 0;
+      const montantPaye = enNombre(sommer(dossiers.map(d => d.montantPaye))) ?? 0;
+      const montantEnCours = enNombre(sommer(
+        dossiers
+          .filter(d => d.statut === 'EN_PAIEMENT' || d.statut === 'EN_COMPTABILITE')
+          .map(d => d.montantValide ?? d.montantReclame)
+      )) ?? 0;
 
       // Délai moyen
       const payes = dossiers.filter(d => d.datePaiement && d.dateReception);
@@ -378,7 +381,7 @@ export async function envoyerRapportMensuel(): Promise<{
       for (const d of dossiers) {
         const existing = prestationMap.get(d.typeDossier) || { count: 0, montant: 0 };
         existing.count++;
-        existing.montant += d.montantReclame;
+        existing.montant += enNombre(d.montantReclame) ?? 0;
         prestationMap.set(d.typeDossier, existing);
       }
       const topPrestations = Array.from(prestationMap.entries())
@@ -392,8 +395,8 @@ export async function envoyerRapportMensuel(): Promise<{
         const key = d.beneficiaire;
         const existing = assureMap.get(key) || { nom: key, nbDossiers: 0, montantReclame: 0, montantPaye: 0 };
         existing.nbDossiers++;
-        existing.montantReclame += d.montantReclame;
-        existing.montantPaye += d.montantPaye || 0;
+        existing.montantReclame += enNombre(d.montantReclame) ?? 0;
+        existing.montantPaye += enNombre(d.montantPaye) ?? 0;
         assureMap.set(key, existing);
       }
       const parAssure = Array.from(assureMap.values()).sort((a, b) => b.montantReclame - a.montantReclame);
@@ -403,14 +406,14 @@ export async function envoyerRapportMensuel(): Promise<{
         where: { societeId: societe.id },
         include: { appelsDeFonds: { select: { montant: true, reference: true, statut: true, datePaiement: true } } },
       });
-      const budgetTotal = tousContrats.reduce((s, c) => s + c.budgetAnnuel, 0);
-      const budgetUtilise = tousContrats.reduce((s, c) => {
-        return s + c.appelsDeFonds.reduce((a: number, f) => a + (Number(f.montant) || 0), 0);
-      }, 0);
+      const budgetTotal = enNombre(sommer(tousContrats.map(c => c.budgetAnnuel))) ?? 0;
+      const budgetUtilise = enNombre(sommer(
+        tousContrats.flatMap(c => c.appelsDeFonds.map(f => f.montant))
+      )) ?? 0;
       const fondsDisponibles = budgetTotal - budgetUtilise;
       const appelsFonds = tousContrats.flatMap(c => c.appelsDeFonds).map(af => ({
         reference: af.reference,
-        montant: af.montant,
+        montant: enNombre(af.montant) ?? 0,
         statut: af.statut,
         datePaiement: af.datePaiement ? af.datePaiement.toLocaleDateString('fr-FR') : null,
       }));

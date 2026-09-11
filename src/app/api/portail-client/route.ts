@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
+import { enNombre, sommer } from '@/lib/money';
 
 // ─── GET : Données du portail client ──────────────────────────────────────
 // Renvoie les données filtrées selon le rôle externe connecté :
@@ -153,12 +154,12 @@ export async function GET(request: NextRequest) {
         where: { societeId: assure.societeId, active: true },
       });
 
-      // Stats rapides
+      // Stats rapides — sommes EXACTES en Decimal (plan P3)
       const totalDossiers = dossiers.length;
-      const totalReclame = dossiers.reduce((s, d) => s + d.montantReclame, 0);
-      const totalPaye = dossiers
-        .filter(d => d.statut === 'PAYE')
-        .reduce((s, d) => s + (d.montantPaye || 0), 0);
+      const totalReclame = enNombre(sommer(dossiers.map(d => d.montantReclame))) ?? 0;
+      const totalPaye = enNombre(sommer(
+        dossiers.filter(d => d.statut === 'PAYE').map(d => d.montantPaye)
+      )) ?? 0;
       const enCours = dossiers.filter(d => !['PAYE', 'REJETE'].includes(d.statut)).length;
       const rejetes = dossiers.filter(d => d.statut === 'REJETE').length;
 
@@ -283,8 +284,10 @@ export async function GET(request: NextRequest) {
       const totalAssures = assures.filter(a => a.typeBeneficiaire === 'ASSURE').length;
       const totalAyantsDroit = assures.filter(a => a.typeBeneficiaire !== 'ASSURE').length;
       const totalDossiers = dossiers.length;
-      const totalReclame = dossiers.reduce((s, d) => s + d.montantReclame, 0);
-      const totalPaye = dossiers.filter(d => d.statut === 'PAYE').reduce((s, d) => s + (d.montantPaye || 0), 0);
+      const totalReclame = enNombre(sommer(dossiers.map(d => d.montantReclame))) ?? 0;
+      const totalPaye = enNombre(sommer(
+        dossiers.filter(d => d.statut === 'PAYE').map(d => d.montantPaye)
+      )) ?? 0;
       const enCours = dossiers.filter(d => !['PAYE', 'REJETE'].includes(d.statut)).length;
       const rejetes = dossiers.filter(d => d.statut === 'REJETE').length;
 

@@ -3,6 +3,7 @@ import { checkAuth } from "@/lib/authorize";
 import { db } from "@/lib/db";
 import { readExcelRows } from "@/lib/excel";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { enNombre } from "@/lib/money";
 import { parseFormData } from "@/lib/validation/parse";
 import { importFichierSeulSchema } from "@/lib/validation";
 
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
               assureId: existingDossier.assureId,
               societeId: existingDossier.societeId,
               typeActe: existingDossier.typeDossier,
-              montantDemande: existingDossier.montantReclame,
+              montantDemande: enNombre(existingDossier.montantReclame) ?? 0,
               excludeDossierId: existingDossier.id,
             });
 

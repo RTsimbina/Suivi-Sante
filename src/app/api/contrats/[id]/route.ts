@@ -6,6 +6,7 @@ import {
   refuserHorsPerimetre,
 } from '@/lib/data-isolation';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
+import { egaux, enNombre } from '@/lib/money';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { contratUpdateSchema } from '@/lib/validation';
 
@@ -94,9 +95,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
     if (budgetAnnuel !== undefined) {
-      if (budgetAnnuel !== existing.budgetAnnuel) {
+      // Comparaison exacte Decimal (plan P3) — l'ancien !== comparait un objet
+      // Decimal à un number → l'audit change loggait un changement même à valeur égale.
+      if (!egaux(budgetAnnuel, existing.budgetAnnuel)) {
         updateData.budgetAnnuel = budgetAnnuel;
-        changes.push({ champ: 'budgetAnnuel', ancienneValeur: existing.budgetAnnuel, nouvelleValeur: budgetAnnuel });
+        changes.push({ champ: 'budgetAnnuel', ancienneValeur: enNombre(existing.budgetAnnuel), nouvelleValeur: budgetAnnuel });
       }
     }
     if (dateDebut !== undefined) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { enNombre, egaux, superieurA } from "@/lib/money";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { dossierUpdateSchema } from "@/lib/validation";
 
@@ -106,7 +107,7 @@ export async function PATCH(
             assureId: dossierAssureId,
             societeId: existing.societeId,
             typeActe: existing.typeDossier,
-            montantDemande: existing.montantReclame,
+            montantDemande: enNombre(existing.montantReclame) ?? 0,
             prestataireId: prestataireId || existing.prestataireId || undefined,
             excludeDossierId: id,
           });
@@ -167,7 +168,7 @@ export async function PATCH(
     if (montantValide !== undefined) {
       const newMontantValide = montantValide || null;
       // Re-vérifier le plafond si le montant validé change et que le dossier est validé
-      if (newMontantValide !== null && newMontantValide !== existing.montantValide
+      if (newMontantValide !== null && !egaux(newMontantValide, existing.montantValide)
           && ['VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'].includes(existing.statut)
           && existing.assureId) {
         const plafondRecheck = await verifierPlafondAnnuel({
@@ -191,7 +192,9 @@ export async function PATCH(
       // Verifier que le ticket modérateur ne depasse pas le montant reclame
       // (la non-négativité et le type number sont garantis par le schéma Zod).
       const tm = ticketModerateur ?? 0;
-      if (existing.montantReclame && tm > existing.montantReclame) {
+      // Comparaison exacte Decimal (plan P3) — isZero car un objet Decimal
+      // est toujours truthy, contrairement au number 0 de l'ancien schéma.
+      if (!existing.montantReclame.isZero() && superieurA(tm, existing.montantReclame)) {
         return NextResponse.json({ erreur: "Le ticket modérateur ne peut pas depasser le montant reclame." }, { status: 400 });
       }
       updateData.ticketModerateur = ticketModerateur || null;

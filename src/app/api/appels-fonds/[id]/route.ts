@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { appelFondsUpdateSchema } from "@/lib/validation";
+import { egaux, moins } from "@/lib/money";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Erreur sentinelle : appel introuvable (dans la transaction)
@@ -47,11 +48,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // Si le montant est modifié, recalculer le budgetUtilise du contrat
       // (type number et non-négativité garantis par le schéma Zod)
-      if (montant !== undefined && existing.montant !== montant) {
+      // Comparaison EXACTE (plan P3) : l'ancien `existing.montant !== montant`
+      // comparait un objet Decimal à un number → toujours vrai, le diff de
+      // budget était appliqué même sans changement de montant.
+      if (montant !== undefined && !egaux(existing.montant, montant)) {
         updateData.montant = montant;
 
         // Ajuster le budgetUtilise : soustraire l'ancien, ajouter le nouveau
-        const diff = montant - existing.montant;
+        // (diff en Decimal exact — Prisma accepte un Decimal en increment)
+        const diff = moins(montant, existing.montant) ?? 0;
         await tx.contrat.update({
           where: { id: existing.contratId },
           data: { budgetUtilise: { increment: diff } },

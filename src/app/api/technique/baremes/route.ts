@@ -4,6 +4,7 @@ import { checkAuth } from '@/lib/authorize';
 import { verifierPlafondAnnuel, type PlafondCheckResult } from '@/lib/plafond-check';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { techniqueBaremeSchema } from '@/lib/validation';
+import { Decimal, enNombre, superieurA, minDecimal, appliquerTaux, moins, formaterNombre } from '@/lib/money';
 
 // ─── POST : Calculer le ticket modérateur + vérification plafond annuel ──────
 
@@ -71,7 +72,8 @@ export async function POST(request: NextRequest) {
 
     // ─── Vérification du plafond annuel (si assureId fourni) ────────────────
     let plafondCheck: PlafondCheckResult | null = null;
-    let montantCouvertFinal = Math.min(montantReclame, bareme.plafond);
+    // montantCouvertFinal reste en Decimal jusqu'aux conversions d'affichage
+    let montantCouvertFinal: Decimal | number = minDecimal(montantReclame, bareme.plafond) ?? montantReclame;
 
     if (assureId) {
       try {
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
 
         // Si le plafond annuel est vérifié, utiliser le montant couvert
         // qui tient compte du reliquat réel (et non juste le plafond du barème)
-        if (plafondCheck.details.montantCouvert !== undefined) {
+        if (plafondCheck.details.montantCouvert != null) {
           montantCouvertFinal = plafondCheck.details.montantCouvert;
         }
       } catch (err) {
@@ -94,12 +96,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calcul du ticket modérateur
-    const montantRembourse = montantCouvertFinal * (bareme.tauxCouverture / 100);
-    const ticketModerateur = montantReclame - montantRembourse;
+    // Calcul du ticket modérateur (Decimal exact — plan P3)
+    const montantCouvertDecimal = minDecimal(montantCouvertFinal, bareme.plafond) ?? new Decimal(0);
+    const montantRembourse = appliquerTaux(montantCouvertDecimal, bareme.tauxCouverture) ?? new Decimal(0);
+    const ticketModerateur = moins(montantReclame, montantRembourse) ?? new Decimal(0);
 
     // Construction de l'explication en français
-    const plafondAtteint = montantReclame > bareme.plafond;
+    const plafondAtteint = superieurA(montantReclame, bareme.plafond);
     const plafondAnnuelAtteint = plafondCheck ? !plafondCheck.autorise : false;
     let explication: string;
 
@@ -109,17 +112,17 @@ export async function POST(request: NextRequest) {
     } else if (plafondAtteint) {
       explication = [
         `Pour la prestation "${prestation}" de la société "${societe.nom}" :`,
-        `Le montant réclamé (${montantReclame.toLocaleString('fr-FR')} FCFA) dépasse le plafond de ${bareme.plafond.toLocaleString('fr-FR')} FCFA.`,
-        `Le montant couvert est donc plafonné à ${montantCouvertFinal.toLocaleString('fr-FR')} FCFA.`,
-        `Avec un taux de couverture de ${bareme.tauxCouverture}%, le montant remboursé est de ${montantRembourse.toLocaleString('fr-FR')} FCFA.`,
-        `Le ticket modérateur à la charge du bénéficiaire est de ${ticketModerateur.toLocaleString('fr-FR')} FCFA.`,
+        `Le montant réclamé (${formaterNombre(montantReclame)} FCFA) dépasse le plafond de ${formaterNombre(bareme.plafond)} FCFA.`,
+        `Le montant couvert est donc plafonné à ${formaterNombre(montantCouvertFinal)} FCFA.`,
+        `Avec un taux de couverture de ${bareme.tauxCouverture}%, le montant remboursé est de ${formaterNombre(montantRembourse)} FCFA.`,
+        `Le ticket modérateur à la charge du bénéficiaire est de ${formaterNombre(ticketModerateur)} FCFA.`,
       ].join(' ');
     } else {
       explication = [
         `Pour la prestation "${prestation}" de la société "${societe.nom}" :`,
-        `Le montant réclamé (${montantReclame.toLocaleString('fr-FR')} FCFA) est dans la limite du plafond de ${bareme.plafond.toLocaleString('fr-FR')} FCFA.`,
-        `Avec un taux de couverture de ${bareme.tauxCouverture}%, le montant remboursé est de ${montantRembourse.toLocaleString('fr-FR')} FCFA.`,
-        `Le ticket modérateur à la charge du bénéficiaire est de ${ticketModerateur.toLocaleString('fr-FR')} FCFA.`,
+        `Le montant réclamé (${formaterNombre(montantReclame)} FCFA) est dans la limite du plafond de ${formaterNombre(bareme.plafond)} FCFA.`,
+        `Avec un taux de couverture de ${bareme.tauxCouverture}%, le montant remboursé est de ${formaterNombre(montantRembourse)} FCFA.`,
+        `Le ticket modérateur à la charge du bénéficiaire est de ${formaterNombre(ticketModerateur)} FCFA.`,
       ].join(' ');
     }
 
@@ -140,10 +143,10 @@ export async function POST(request: NextRequest) {
       calcul: {
         montantReclame,
         plafondAtteint: plafondAtteint || plafondAnnuelAtteint,
-        montantCouvert: montantCouvertFinal,
+        montantCouvert: enNombre(montantCouvertFinal),
         tauxCouverture: bareme.tauxCouverture,
-        montantRembourse: Math.round(montantRembourse * 100) / 100,
-        ticketModerateur: Math.round(ticketModerateur * 100) / 100,
+        montantRembourse: Math.round(enNombre(montantRembourse) ?? 0),
+        ticketModerateur: Math.round(enNombre(ticketModerateur) ?? 0),
       },
       explication,
     };

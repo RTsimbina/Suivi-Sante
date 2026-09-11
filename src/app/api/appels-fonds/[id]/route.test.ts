@@ -8,6 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 
 // ─── Mocks de modules (hoistés) ──────────────────────────────────────────────
 
@@ -90,10 +91,16 @@ describe('PATCH /api/appels-fonds/[id]', () => {
     const res = await PATCH(requetePatch({ montant: 120000 }), CONTEXTE);
 
     expect(res.status).toBe(200);
+    // Le diff est calculé en Decimal exact (plan P3) — Prisma accepte un
+    // Decimal en increment. On compare numériquement (12.30 ≡ "12.3").
     expect(txMocks.contratUpdate).toHaveBeenCalledWith({
       where: { id: 'clx-contrat-1' },
-      data: { budgetUtilise: { increment: 20000 } },
+      data: { budgetUtilise: { increment: expect.objectContaining({
+        toString: expect.any(Function),
+      }) } },
     });
+    const incrementArg = txMocks.contratUpdate.mock.calls[0][0].data.budgetUtilise.increment;
+    expect(new Prisma.Decimal(incrementArg).toNumber()).toBe(20000);
     expect(txMocks.appelUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'appel-1' },

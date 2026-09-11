@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
+import { enNombre } from '@/lib/money';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { liaisonPrestataireSocieteSchema, liaisonPatchSchema } from '@/lib/validation';
 
@@ -111,7 +112,7 @@ async function getDossierStats(): Promise<Map<string, { nbDossiers: number; mont
       if (stat.prestataireId && stat.societeId) {
         statsMap.set(`${stat.prestataireId}|${stat.societeId}`, {
           nbDossiers: stat._count,
-          montantTotal: stat._sum.montantReclame ?? 0,
+          montantTotal: enNombre(stat._sum.montantReclame) ?? 0,
         });
       }
     }

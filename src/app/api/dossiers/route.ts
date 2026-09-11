@@ -8,6 +8,7 @@ import {
 } from "@/lib/data-isolation";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
+import { sommer, superieurOuEgal, enNombre, appliquerTaux, moins } from "@/lib/money";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { dossierCreateSchema } from "@/lib/validation";
 import {
@@ -191,13 +192,14 @@ export async function POST(request: NextRequest) {
     let finalMontantValide = montantValide || null;
     let finalTicketModerateur = ticketModerateur || null;
 
-    if (plafondResult && plafondResult.details.montantCouvert !== undefined) {
+    if (plafondResult && plafondResult.details.montantCouvert != null) {
       // Utiliser le montant couvert par le plafond (qui tient compte du reliquat)
-      // et le taux de couverture du barème
+      // et le taux de couverture du barème — calcul en Decimal exact (plan P3)
       const taux = plafondResult.details.tauxCouverture || 0;
       const montantCouvert = plafondResult.details.montantCouvert;
-      finalMontantValide = Math.round(montantCouvert * (taux / 100) * 100) / 100;
-      finalTicketModerateur = Math.round((montantCouvert - finalMontantValide) * 100) / 100;
+      const montantValideDecimal = appliquerTaux(montantCouvert, taux);
+      finalMontantValide = enNombre(montantValideDecimal) ?? 0;
+      finalTicketModerateur = enNombre(moins(montantCouvert, finalMontantValide)) ?? 0;
     }
 
     // Transaction : numéro de dossier généré côté serveur, verrou FOR UPDATE
@@ -232,8 +234,8 @@ export async function POST(request: NextRequest) {
             },
             select: { montantValide: true, montantPaye: true, montantReclame: true },
           });
-          const consomme = plafondTx.reduce((s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame), 0);
-          if (baremeTx && consomme >= baremeTx.plafond) {
+          const consomme = sommer(plafondTx.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame));
+          if (baremeTx && superieurOuEgal(consomme, baremeTx.plafond)) {
             throw new Error(`PLAFOND_ATTEINT_TRANSACTION: Plafond ${typeDossier} atteint lors de la création`);
           }
         }

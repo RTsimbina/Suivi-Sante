@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { readExcelRows } from "@/lib/excel";
+import { enNombre, superieurA } from "@/lib/money";
 import { parseFormData } from "@/lib/validation/parse";
 import { importFichierSeulSchema } from "@/lib/validation";
 
@@ -336,12 +337,12 @@ export async function POST(request: NextRequest) {
 
       // Validation: montant payé ne doit pas dépasser le montant validé
       if (montantPaye !== undefined && existing.montantValide !== null && existing.montantValide !== undefined) {
-        if (montantPaye > existing.montantValide * 1.05) { // Tolérance 5%
+        if (superieurA(montantPaye, existing.montantValide.mul(1.05))) { // Tolérance 5% (comparaison exacte — plan P3)
           anomalies.push({
             ligne: ligneNum,
             type: "avertissement",
             champ: "MontantPaye",
-            message: `Montant payé (${montantPaye.toLocaleString("fr-FR")} Ar) dépasse le montant validé (${existing.montantValide.toLocaleString("fr-FR")} Ar) de plus de 5%`,
+            message: `Montant payé (${montantPaye.toLocaleString("fr-FR")} Ar) dépasse le montant validé (${enNombre(existing.montantValide)?.toLocaleString("fr-FR")} Ar) de plus de 5%`,
           });
           // On n'empêche pas l'import mais on alerte
         }

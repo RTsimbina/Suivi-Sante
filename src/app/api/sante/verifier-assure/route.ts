@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { verifierAssureSchema } from '@/lib/validation';
+import { enNombre, sommer, Decimal, appliquerTaux, reliquat as calculerReliquat } from '@/lib/money';
 
 export async function POST(request: NextRequest) {
   // Vérification auth
@@ -59,8 +60,8 @@ export async function POST(request: NextRequest) {
       where: { societeId: assure.societeId, active: true },
     });
 
-    // Plafond annuel global = somme de tous les plafonds de prestation
-    const plafondAnnuelGlobal = baremes.reduce((sum, b) => sum + b.plafond, 0);
+    // Plafond annuel global = somme EXACTE des plafonds de prestation (plan P3)
+    const plafondAnnuelGlobal = sommer(baremes.map(b => b.plafond));
 
     // ── 4. Calculer la consommation annuelle de l'assuré ──
     const debutAnnee = new Date(new Date().getFullYear(), 0, 1);
@@ -76,15 +77,15 @@ export async function POST(request: NextRequest) {
       orderBy: { dateReception: 'desc' },
     });
 
-    // Montant total consommé (montantPaye si payé, sinon montantValide, sinon montantReclame)
-    const totalConsomme = dossiersAnnee.reduce((sum, d) => {
-      return sum + (d.montantPaye ?? d.montantValide ?? d.montantReclame);
-    }, 0);
+    // Montant total consommé (montantPaye si payé, sinon montantValide, sinon montantReclame) — somme exacte
+    const totalConsomme = sommer(
+      dossiersAnnee.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
+    );
 
-    // Taux de consommation global
-    const tauxConsommationGlobal = plafondAnnuelGlobal > 0
-      ? (totalConsomme / plafondAnnuelGlobal) * 100
-      : 0;
+    // Taux de consommation global (Decimal exact, converti pour affichage)
+    const tauxConsommationGlobal = plafondAnnuelGlobal.isZero()
+      ? 0
+      : enNombre(totalConsomme.mul(100).div(plafondAnnuelGlobal)) ?? 0;
 
     // ── 5. Consommation par type d'acte ──
     const consommationParActe: Record<string, {
@@ -97,10 +98,12 @@ export async function POST(request: NextRequest) {
 
     for (const b of baremes) {
       const dossiersType = dossiersAnnee.filter(d => d.typeDossier === b.prestation);
-      const consomme = dossiersType.reduce((s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame), 0);
+      const consomme = enNombre(sommer(
+        dossiersType.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
+      )) ?? 0;
       consommationParActe[b.prestation] = {
         consomme,
-        plafond: b.plafond,
+        plafond: enNombre(b.plafond) ?? 0,
         tauxCouverture: b.tauxCouverture,
         nbActes: dossiersType.length,
         description: b.description || '',
@@ -150,8 +153,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── 7. Calcul du reliquat global ──
-    const reliquatGlobal = Math.max(0, plafondAnnuelGlobal - totalConsomme);
+    // ── 7. Calcul du reliquat global (Decimal exact — plan P3) ──
+    const reliquatGlobal = calculerReliquat(plafondAnnuelGlobal, totalConsomme) ?? new Decimal(0);
 
     // ── 8. Retourner le résultat complet ──
     return Response.json({
@@ -172,12 +175,12 @@ export async function POST(request: NextRequest) {
         nom: assure.societe.nom,
       },
       plafonds: {
-        annuelGlobal: plafondAnnuelGlobal,
-        totalConsomme,
-        reliquatGlobal,
+        annuelGlobal: enNombre(plafondAnnuelGlobal) ?? 0,
+        totalConsomme: enNombre(totalConsomme) ?? 0,
+        reliquatGlobal: enNombre(reliquatGlobal) ?? 0,
         tauxConsommationGlobal: Math.round(tauxConsommationGlobal * 100) / 100,
-        seuil70: plafondAnnuelGlobal * 0.7,
-        seuil100: plafondAnnuelGlobal,
+        seuil70: enNombre(appliquerTaux(plafondAnnuelGlobal, 70)) ?? 0,
+        seuil100: enNombre(plafondAnnuelGlobal) ?? 0,
       },
       consommationParActe,
       dossiersRecent: dossiersAnnee.slice(0, 20).map(d => ({

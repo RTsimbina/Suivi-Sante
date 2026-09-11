@@ -14,6 +14,13 @@
  */
 
 import { db } from './db';
+import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, plus, reliquat as calculerReliquat, formaterAr, formaterPourcent } from './money';
+
+/** Taux de consommation en % : consommé / plafond × 100 (Decimal exact). */
+function tauxConsommation(consomme: Decimal, plafond: Decimal): Decimal | null {
+  if (plafond.isZero()) return null;
+  return consomme.div(plafond).mul(100);
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,23 +31,23 @@ export interface PlafondCheckResult {
   raison: 'OK' | 'ASSURE_INACTIF' | 'PLAFOND_ACTE_ATTEINT' | 'PLAFOND_GLOBAL_ATTEINT' | 'MONTANT_DEPASSE_RELIQUAT' | 'ACTE_NON_COVERT' | 'PRESTATAIRE_INACTIF';
   /** Message lisible */
   message: string;
-  /** Détails chiffrés */
+  /** Détails chiffrés (null = non calculé / non applicable) */
   details: {
     assureActif?: boolean;
     prestation?: string;
-    plafondActe?: number;
-    consommeActe?: number;
-    reliquatActe?: number;
+    plafondActe?: number | null;
+    consommeActe?: number | null;
+    reliquatActe?: number | null;
     tauxCouverture?: number;
     montantDemande?: number;
-    montantCouvert?: number;
-    partAssureur?: number;
-    partPatient?: number;
-    ticketModerateur?: number;
-    depassementPlafond?: number;
-    plafondGlobal?: number;
-    consommeGlobal?: number;
-    reliquatGlobal?: number;
+    montantCouvert?: number | null;
+    partAssureur?: number | null;
+    partPatient?: number | null;
+    ticketModerateur?: number | null;
+    depassementPlafond?: number | null;
+    plafondGlobal?: number | null;
+    consommeGlobal?: number | null;
+    reliquatGlobal?: number | null;
     nbActesIdentiques?: number;
     prestataireActifPourSociete?: boolean;
   };
@@ -158,46 +165,47 @@ export async function verifierPlafondAnnuel(opts: {
     where: { ...whereBase, typeDossier: typeActe },
     select: { montantPaye: true, montantValide: true, montantReclame: true },
   });
-  const consommeActe = dossiersActe.reduce(
-    (s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame),
-    0
+  // Somme EXACTE en Decimal (plan P3) — l'ancien reduce flottant cumulait
+  // les erreurs d'arrondi IEEE 754 sur la consommation annuelle.
+  const consommeActe = sommer(
+    dossiersActe.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
   );
-  const reliquatActe = Math.max(0, bareme.plafond - consommeActe);
+  // reliquat = max(0, plafond − consommé)
+  const reliquatActe = calculerReliquat(bareme.plafond, consommeActe) ?? new Decimal(0);
 
   // Consommation globale (tous types d'actes)
   const dossiersGlobal = await db.dossier.findMany({
     where: whereBase,
     select: { montantPaye: true, montantValide: true, montantReclame: true },
   });
-  const consommeGlobal = dossiersGlobal.reduce(
-    (s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame),
-    0
+  const consommeGlobal = sommer(
+    dossiersGlobal.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
   );
 
   // Plafond global = somme de tous les barèmes actifs de la société
   const baremes = await db.bareme.findMany({ where: { societeId, active: true } });
-  const plafondGlobal = baremes.reduce((s, b) => s + b.plafond, 0);
-  const reliquatGlobal = Math.max(0, plafondGlobal - consommeGlobal);
+  const plafondGlobal = sommer(baremes.map(b => b.plafond));
+  const reliquatGlobal = calculerReliquat(plafondGlobal, consommeGlobal) ?? new Decimal(0);
 
   // ─── 5. Alertes ──────────────────────────────────────────────────────────
   const alertes: { type: 'info' | 'warning' | 'danger'; message: string }[] = [];
 
-  // 5a. Plafond spécifique atteint → BLOQUANT
-  if (consommeActe >= bareme.plafond) {
+  // 5a. Plafond spécifique atteint → BLOQUANT (comparaison exacte)
+  if (superieurOuEgal(consommeActe, bareme.plafond)) {
     return {
       autorise: false,
       raison: 'PLAFOND_ACTE_ATTEINT',
-      message: `Plafond ${typeActe} déjà atteint (${consommeActe.toLocaleString('fr-FR')} Ar / ${bareme.plafond.toLocaleString('fr-FR')} Ar). Aucun reliquat disponible.`,
+      message: `Plafond ${typeActe} déjà atteint (${formaterAr(consommeActe)} / ${formaterAr(bareme.plafond)}). Aucun reliquat disponible.`,
       details: {
         prestation: typeActe,
-        plafondActe: bareme.plafond,
-        consommeActe,
+        plafondActe: enNombre(bareme.plafond),
+        consommeActe: enNombre(consommeActe),
         reliquatActe: 0,
         nbActesIdentiques: dossiersActe.length,
         tauxCouverture: bareme.tauxCouverture,
-        plafondGlobal,
-        consommeGlobal,
-        reliquatGlobal,
+        plafondGlobal: enNombre(plafondGlobal),
+        consommeGlobal: enNombre(consommeGlobal),
+        reliquatGlobal: enNombre(reliquatGlobal),
       },
       alertes: [{
         type: 'danger',
@@ -206,15 +214,15 @@ export async function verifierPlafondAnnuel(opts: {
     };
   }
 
-  // 5b. Plafond global atteint → BLOQUANT
-  if (consommeGlobal >= plafondGlobal) {
+  // 5b. Plafond global atteint → BLOQUANT (comparaison exacte)
+  if (superieurOuEgal(consommeGlobal, plafondGlobal)) {
     return {
       autorise: false,
       raison: 'PLAFOND_GLOBAL_ATTEINT',
       message: 'Plafond annuel global atteint. Aucun nouvel acte ne peut être pris en charge.',
       details: {
-        plafondGlobal,
-        consommeGlobal,
+        plafondGlobal: enNombre(plafondGlobal),
+        consommeGlobal: enNombre(consommeGlobal),
         reliquatGlobal: 0,
       },
       alertes: [{
@@ -225,59 +233,64 @@ export async function verifierPlafondAnnuel(opts: {
   }
 
   // 5c. Montant demandé dépasse le reliquat acte → bloquant (montant couvert = reliquat)
-  if (montantDemande > reliquatActe) {
+  if (superieurA(montantDemande, reliquatActe)) {
     alertes.push({
       type: 'danger',
-      message: `Le montant demandé (${montantDemande.toLocaleString('fr-FR')} Ar) dépasse le reliquat disponible pour ${typeActe} (${reliquatActe.toLocaleString('fr-FR')} Ar).`,
+      message: `Le montant demandé (${formaterAr(montantDemande)}) dépasse le reliquat disponible pour ${typeActe} (${formaterAr(reliquatActe)}).`,
     });
   }
 
-  // 5d. Plafond global > 70% → avertissement
-  if (plafondGlobal > 0 && (consommeGlobal / plafondGlobal) * 100 >= 70) {
+  // 5d. Plafond global > 70% → avertissement (comparaison exacte)
+  const tauxGlobal = tauxConsommation(consommeGlobal, plafondGlobal);
+  if (tauxGlobal !== null && superieurOuEgal(tauxGlobal, 70)) {
     alertes.push({
       type: 'warning',
-      message: `Plafond global à ${((consommeGlobal / plafondGlobal) * 100).toFixed(1)}%. Approbation spéciale recommandée.`,
+      message: `Plafond global à ${formaterPourcent(consommeGlobal, plafondGlobal)}. Approbation spéciale recommandée.`,
     });
   }
 
   // 5e. Plafond acte > 70% → avertissement
-  if ((consommeActe / bareme.plafond) * 100 >= 70) {
+  const tauxActe = tauxConsommation(consommeActe, bareme.plafond);
+  if (tauxActe !== null && superieurOuEgal(tauxActe, 70)) {
     alertes.push({
       type: 'warning',
-      message: `Plafond ${typeActe} à ${((consommeActe / bareme.plafond) * 100).toFixed(1)}%.`,
+      message: `Plafond ${typeActe} à ${formaterPourcent(consommeActe, bareme.plafond)}.`,
     });
   }
 
-  // ─── 6. Calcul final ─────────────────────────────────────────────────────
-  const montantCouvert = Math.min(montantDemande, reliquatActe);
-  const partAssureur = Math.round(montantCouvert * (bareme.tauxCouverture / 100) * 100) / 100;
+  // ─── 6. Calcul final (Decimal exact, arrondi comptable 2 décimales) ────
+  const montantCouvert = minDecimal(montantDemande, reliquatActe) ?? new Decimal(0);
   // Ticket modérateur = part du patient sur le montant couvert (taux non couvert)
-  const ticketModerateur = Math.round((montantCouvert - partAssureur) * 100) / 100;
+  const partAssureur = appliquerTaux(montantCouvert, bareme.tauxCouverture) ?? new Decimal(0);
+  const ticketModerateur = moins(montantCouvert, partAssureur) ?? new Decimal(0);
   // Dépassement plafond = ce qui dépasse le plafond (à la charge totale du patient)
-  const depassementPlafond = Math.round(Math.max(0, montantDemande - reliquatActe) * 100) / 100;
+  const depassementPlafond = moins(montantDemande, reliquatActe);
+  const depassement = depassementPlafond && depassementPlafond.isNegative() ? new Decimal(0) : (depassementPlafond ?? new Decimal(0));
   // Part patient totale = ticket modérateur + dépassement plafond
-  const partPatient = Math.round((ticketModerateur + depassementPlafond) * 100) / 100;
-  const autorise = montantDemande <= reliquatActe && consommeGlobal < plafondGlobal;
+  const partPatient = plus(ticketModerateur, depassement) ?? new Decimal(0);
+  const autorise = inferieurOuEgal(montantDemande, reliquatActe) && inferieurA(consommeGlobal, plafondGlobal);
 
   return {
     autorise,
     raison: autorise ? 'OK' : 'MONTANT_DEPASSE_RELIQUAT',
     message: autorise
-      ? `Acte couvert. Montant couvert : ${montantCouvert.toLocaleString('fr-FR')} Ar.`
+      ? `Acte couvert. Montant couvert : ${formaterAr(montantCouvert)}.`
       : 'Le montant demandé dépasse le reliquat disponible pour ce type d\'acte.',
     details: {
       prestation: typeActe,
-      plafondActe: bareme.plafond,
-      consommeActe,
-      reliquatActe,
+      plafondActe: enNombre(bareme.plafond),
+      consommeActe: enNombre(consommeActe),
+      reliquatActe: enNombre(reliquatActe),
       tauxCouverture: bareme.tauxCouverture,
       montantDemande,
-      montantCouvert,
-      partAssureur: Math.round(partAssureur),
-      partPatient: Math.round(partPatient),
-      plafondGlobal,
-      consommeGlobal,
-      reliquatGlobal,
+      montantCouvert: enNombre(montantCouvert),
+      partAssureur: Math.round(enNombre(partAssureur) ?? 0),
+      partPatient: Math.round(enNombre(partPatient) ?? 0),
+      ticketModerateur: enNombre(ticketModerateur),
+      depassementPlafond: enNombre(depassement),
+      plafondGlobal: enNombre(plafondGlobal),
+      consommeGlobal: enNombre(consommeGlobal),
+      reliquatGlobal: enNombre(reliquatGlobal),
       nbActesIdentiques: dossiersActe.length,
     },
     alertes,

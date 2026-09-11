@@ -58,8 +58,10 @@ model Contrat {
   societeId       String
   societe         Societe   @relation(fields: [societeId], references: [id])
   reference       String
-  budgetAnnuel    Float
-  budgetUtilise   Float     @default(0)
+  // Montants en Decimal(18,2) — arithmétique exacte (plan P3 : les Float
+  // produisaient des erreurs d'arrondi inacceptables en comptabilité).
+  budgetAnnuel    Decimal   @db.Decimal(18, 2)
+  budgetUtilise   Decimal   @default(0) @db.Decimal(18, 2)
   dateDebut       DateTime
   dateFin         DateTime
   statut          String    @default("ACTIF")
@@ -72,7 +74,7 @@ model AppelDeFonds {
   id            String    @id @default(cuid())
   contratId     String
   contrat       Contrat   @relation(fields: [contratId], references: [id])
-  montant       Float
+  montant       Decimal   @db.Decimal(18, 2)
   dateAppel     DateTime
   datePaiement  DateTime?
   reference     String?
@@ -105,18 +107,19 @@ model Dossier {
   moyenPaiement             String?
   observations              String?
   dateTraitementTechnique   DateTime?
-  montantReclame            Float
-  montantValide             Float?
-  ticketModerateur          Float?
-  partPatient               Float?
-  partEntreprise            Float?
+  // Montants en Decimal(18,2) — voir Contrat (plan P3)
+  montantReclame            Decimal    @db.Decimal(18, 2)
+  montantValide             Decimal?   @db.Decimal(18, 2)
+  ticketModerateur          Decimal?   @db.Decimal(18, 2)
+  partPatient               Decimal?   @db.Decimal(18, 2)
+  partEntreprise            Decimal?   @db.Decimal(18, 2)
   gestionnaireTechniqueId   String?
   gestionnaireTechnique     Gestionnaire? @relation("GestionnaireTechnique", fields: [gestionnaireTechniqueId], references: [id])
   motifRejet                String?
   dateReceptionDecompte     DateTime?
   datePaiement              DateTime?
   referencePaiement         String?
-  montantPaye               Float?
+  montantPaye               Decimal?   @db.Decimal(18, 2)
   gestionnaireComptaId      String?
   gestionnaireCompta        Gestionnaire? @relation("GestionnaireCompta", fields: [gestionnaireComptaId], references: [id])
   statut                    String       @default("RECU")
@@ -171,8 +174,10 @@ model Bareme {
   societeId       String
   societe         Societe  @relation(fields: [societeId], references: [id])
   prestation      String
+  // tauxCouverture est un RATIO (%) — reste en Float. Le plafond est un
+  // MONTANT — Decimal(18,2) (plan P3).
   tauxCouverture  Float
-  plafond         Float
+  plafond         Decimal  @db.Decimal(18, 2)
   description     String?
   active          Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -257,7 +262,7 @@ model Courriel {
   societeId       String?
   societe         Societe?   @relation(fields: [societeId], references: [id])
   beneficiaire    String?
-  montant         Float?
+  montant         Decimal?  @db.Decimal(18, 2)
   dateCourriel    DateTime   @default(now())
   dateSoins       DateTime?
   prestataire     String?
@@ -280,6 +285,25 @@ model MessageBot {
   reponse         String
   lu              Boolean  @default(false)
   createdAt       DateTime   @default(now())
+}
+
+/// Session d'identification du bot (WhatsApp/Telegram/Messenger), stockée en
+/// base : remplace l'ancienne Map en mémoire qui était perdue sur serverless
+/// (instances multiples / redémarrages — plan P3 Vague 1).
+/// Une ligne par expéditeur (numéro téléphone / chatId / senderId).
+/// La liaison se fait par /verifier [NSS] et expire après 4 h.
+model BotSession {
+  expeditieurId  String   @id                // téléphone / chatId / senderId
+  canal          String                      // WHATSAPP | TELEGRAM | MESSENGER
+  assureId       String
+  assureNom      String
+  societeId      String
+  verifieA       DateTime                    // dernière vérification NSS réussie
+  expiresAt      DateTime                    // verifieA + TTL (4 h)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([expiresAt])
 }
 
 model EntrepriseContact {

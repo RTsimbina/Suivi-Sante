@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { checkAuth } from "@/lib/authorize";
 import { getPrestationLabel } from "@/lib/prestations";
+import { enNombre } from "@/lib/money";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { portailSearchSchema } from "@/lib/validation";
 
@@ -52,8 +53,8 @@ export async function POST(request: NextRequest) {
 
 
 
-    const formatMontant = (n: number) =>
-      new Intl.NumberFormat("fr-FR").format(n) + " Ar";
+    const formatMontant = (n: number | Prisma.Decimal | null | undefined) =>
+      new Intl.NumberFormat("fr-FR").format(enNombre(n) ?? 0) + " Ar";
 
     const formatDate = (d: Date) =>
       new Intl.DateTimeFormat("fr-FR", {

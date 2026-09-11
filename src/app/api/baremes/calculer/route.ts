@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { baremeCalculerSchema } from "@/lib/validation";
+import { enNombre, appliquerTaux, moins, inferieurOuEgal, formaterAr, formaterNombre } from "@/lib/money";
 
 /**
  * Calcule le ticket modérateur selon le barème d'une société.
@@ -46,7 +47,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const taux = bareme.tauxCouverture / 100; // ex: 0.90
+    // Calculs en Decimal exact (plan P3) — l'ancien Math.round(x*100)/100
+    // restait soumis aux erreurs IEEE 754 du flottant.
     const plafond = bareme.plafond;
 
     let montantCouvert: number;
@@ -54,18 +56,18 @@ export async function POST(request: NextRequest) {
     let depassementPlafond = 0;
     let details: string;
 
-    if (montantReclame <= plafond) {
+    if (inferieurOuEgal(montantReclame, plafond)) {
       // Dans la limite du plafond
-      montantCouvert = Math.round(montantReclame * taux * 100) / 100;
-      ticketModerateur = Math.round((montantReclame - montantCouvert) * 100) / 100;
-      details = `Montant ${montantReclame.toLocaleString("fr-FR")} Ar ≤ plafond ${plafond.toLocaleString("fr-FR")} Ar. Couverture à ${bareme.tauxCouverture}%.`;
+      montantCouvert = enNombre(appliquerTaux(montantReclame, bareme.tauxCouverture)) ?? 0;
+      ticketModerateur = enNombre(moins(montantReclame, montantCouvert)) ?? 0;
+      details = `Montant ${formaterNombre(montantReclame)} Ar ≤ plafond ${formaterNombre(plafond)} Ar. Couverture à ${bareme.tauxCouverture}%.`;
     } else {
       // Dépassement du plafond
-      const montantCouvertMax = Math.round(plafond * taux * 100) / 100;
+      const montantCouvertMax = enNombre(appliquerTaux(plafond, bareme.tauxCouverture)) ?? 0;
       montantCouvert = montantCouvertMax;
-      ticketModerateur = Math.round((montantReclame - montantCouvert) * 100) / 100;
-      depassementPlafond = Math.round((montantReclame - plafond) * 100) / 100;
-      details = `Montant ${montantReclame.toLocaleString("fr-FR")} Ar > plafond ${plafond.toLocaleString("fr-FR")} Ar. Base de calcul: plafond × ${bareme.tauxCouverture}% = ${montantCouvertMax.toLocaleString("fr-FR")} Ar. Le patient paie la différence.`;
+      ticketModerateur = enNombre(moins(montantReclame, montantCouvert)) ?? 0;
+      depassementPlafond = enNombre(moins(montantReclame, plafond)) ?? 0;
+      details = `Montant ${formaterNombre(montantReclame)} Ar > plafond ${formaterNombre(plafond)} Ar. Base de calcul: plafond × ${bareme.tauxCouverture}% = ${formaterNombre(montantCouvertMax)} Ar. Le patient paie la différence.`;
     }
 
     return NextResponse.json({

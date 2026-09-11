@@ -1,13 +1,18 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { enNombre, sommer, superieurA, inferieurA, moins } from "@/lib/money";
 
 /* ──────────────────────────────────────────────────────────────
    Helpers
    ────────────────────────────────────────────────────────────── */
 
-export function round2(n: number | null | undefined): number {
-  if (n === null || n === undefined || isNaN(n)) return 0;
-  return Math.round(n * 100) / 100;
+// Accepte Decimal (lectures Prisma) et number — conversion affichage.
+// Le calcul autoritaire reste en Decimal (sommer / money), round2 ne sert
+// qu'aux représentations de sortie.
+export function round2(n: number | Prisma.Decimal | null | undefined): number {
+  const v = enNombre(n);
+  if (v === null || isNaN(v)) return 0;
+  return Math.round(v * 100) / 100;
 }
 
 const MS_DAY = 86_400_000;
@@ -75,7 +80,7 @@ export async function getSocieteBreakdown(where?: Prisma.DossierWhereInput) {
       montantReclame: round2(r._sum.montantReclame),
       montantPaye: round2(r._sum.montantPaye),
       coutMoyen:
-        r._count > 0 ? round2((r._sum.montantPaye || 0) / r._count) : 0,
+        r._count > 0 ? round2((enNombre(r._sum.montantPaye) ?? 0) / r._count) : 0,
     }))
     .sort((a, b) => b.nbDossiers - a.nbDossiers);
 }
@@ -247,17 +252,17 @@ export async function getGestionnaireProductivite() {
     }
   }
 
-  // 4. Build result arrays
+  // 4. Build result arrays — _sum converti en number à la frontière (affichage)
   const reception = buildProductiviteFromGroups(
-    accueilGroups.map((r) => ({ gestionnaireId: r.gestionnaireAccueilId, _count: r._count, _sum: r._sum })),
+    accueilGroups.map((r) => ({ gestionnaireId: r.gestionnaireAccueilId, _count: r._count, _sum: { montantValide: enNombre(r._sum.montantValide), montantReclame: enNombre(r._sum.montantReclame) } })),
     'RECEPTION', nomMap,
   );
   const technique = buildProductiviteFromGroups(
-    techniqueGroups.map((r) => ({ gestionnaireId: r.gestionnaireTechniqueId, _count: r._count, _sum: r._sum })),
+    techniqueGroups.map((r) => ({ gestionnaireId: r.gestionnaireTechniqueId, _count: r._count, _sum: { montantValide: enNombre(r._sum.montantValide), montantReclame: enNombre(r._sum.montantReclame) } })),
     'TECHNIQUE', nomMap,
   );
   const compta = buildProductiviteFromGroups(
-    comptaGroups.map((r) => ({ gestionnaireId: r.gestionnaireComptaId, _count: r._count, _sum: r._sum })),
+    comptaGroups.map((r) => ({ gestionnaireId: r.gestionnaireComptaId, _count: r._count, _sum: { montantValide: enNombre(r._sum.montantValide), montantReclame: enNombre(r._sum.montantReclame) } })),
     'COMPTABILITE', nomMap,
   );
 
@@ -426,12 +431,14 @@ export async function findAnomalies() {
   });
 
   for (const d of candidates) {
-    if (d.montantValide && d.montantValide > 0 && d.montantPaye != null) {
-      const ecart = Math.abs(d.montantPaye - d.montantValide) / d.montantValide;
+    if (d.montantValide && superieurA(d.montantValide, 0) && d.montantPaye != null) {
+      // Écart calculé en Decimal exact puis converti pour affichage
+      const diff = moins(d.montantPaye, d.montantValide) ?? new Prisma.Decimal(0);
+      const ecart = diff.abs().div(d.montantValide).toNumber();
       if (ecart > 0.1)
         anomalies.push({
           numeroDossier: d.numeroDossier, typeAnomalie: "ECART_MONTANT",
-          details: `Montant valid\u00e9: ${d.montantValide} Ar, pay\u00e9: ${d.montantPaye} Ar (\u00e9cart ${Math.round(ecart * 100)}%)`,
+          details: `Montant valid\u00e9: ${round2(d.montantValide)} Ar, pay\u00e9: ${round2(d.montantPaye)} Ar (\u00e9cart ${Math.round(ecart * 100)}%)`,
         });
     }
     if (d.statut === "VALIDE" && !d.dateReceptionDecompte && d.dateTraitementTechnique) {
@@ -442,12 +449,12 @@ export async function findAnomalies() {
           details: `Valid\u00e9 depuis ${jours} jours sans d\u00e9compte.`,
         });
     }
-    if (d.montantReclame < 0)
-      anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant r\u00e9clam\u00e9 n\u00e9gatif: ${d.montantReclame} Ar` });
-    if (d.montantValide != null && d.montantValide < 0)
-      anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant valid\u00e9 n\u00e9gatif: ${d.montantValide} Ar` });
-    if (d.montantPaye != null && d.montantPaye < 0)
-      anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant pay\u00e9 n\u00e9gatif: ${d.montantPaye} Ar` });
+    if (inferieurA(d.montantReclame, 0))
+      anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant r\u00e9clam\u00e9 n\u00e9gatif: ${round2(d.montantReclame)} Ar` });
+    if (d.montantValide != null && inferieurA(d.montantValide, 0))
+      anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant valid\u00e9 n\u00e9gatif: ${round2(d.montantValide)} Ar` });
+    if (d.montantPaye != null && inferieurA(d.montantPaye, 0))
+      anomalies.push({ numeroDossier: d.numeroDossier, typeAnomalie: "MONTANT_NEGATIF", details: `Montant pay\u00e9 n\u00e9gatif: ${round2(d.montantPaye)} Ar` });
   }
 
   return anomalies;

@@ -3,6 +3,7 @@ import { checkAuth } from "@/lib/authorize";
 import { db } from "@/lib/db";
 import { genererRapportMensuel, type ReportData } from "@/lib/generate-report";
 import { round2 } from "@/lib/kpi-queries";
+import { enNombre, moins, sommer } from "@/lib/money";
 
 const MOIS_NOMS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
 
@@ -64,12 +65,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }));
 
     const contratsData = societe.contrats.map((c) => {
-      const utilise = c.appelsDeFonds.reduce((s: number, a) => s + (Number(a.montant) || 0), 0);
+      // Sommes EXACTES en Decimal, converties pour le rapport (plan P3)
+      const budgetAnnuel = enNombre(c.budgetAnnuel) ?? 0;
+      const utilise = enNombre(sommer(c.appelsDeFonds.map(a => a.montant))) ?? 0;
       return {
         reference: c.reference,
-        budgetAnnuel: c.budgetAnnuel,
+        budgetAnnuel,
         budgetUtilise: utilise,
-        solde: c.budgetAnnuel - utilise,
+        solde: enNombre(moins(c.budgetAnnuel, utilise)) ?? 0,
         statut: c.statut,
       };
     });
@@ -82,15 +85,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         totalPayes: statutMap["PAYE"] || 0,
         totalRejetes,
         delaiMoyenGlobal: 0,
-        montantTotalReclame: Math.round(sums._sum.montantReclame || 0),
-        montantTotalPaye: Math.round(sums._sum.montantPaye || 0),
+        montantTotalReclame: Math.round(enNombre(sums._sum.montantReclame) ?? 0),
+        montantTotalPaye: Math.round(enNombre(sums._sum.montantPaye) ?? 0),
         tauxRejet: sums._count > 0 ? Math.round((totalRejetes / sums._count) * 100) : 0,
       },
       parSociete: [{
         societeNom: societe.nom,
         nbDossiers: sums._count,
-        montantReclame: Math.round(sums._sum.montantReclame || 0),
-        montantPaye: Math.round(sums._sum.montantPaye || 0),
+        montantReclame: Math.round(enNombre(sums._sum.montantReclame) ?? 0),
+        montantPaye: Math.round(enNombre(sums._sum.montantPaye) ?? 0),
       }],
       volumeMensuel: [],
       dateGeneration: new Date().toLocaleString("fr-FR", { timeZone: "Indian/Antananarivo" }),
