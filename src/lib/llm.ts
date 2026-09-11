@@ -192,22 +192,4 @@ async function callEdenAI(
   }
 }
 
-/**
- * Vérifie si le LLM est configuré.
- */
-export async function verifierLLM(): Promise<{ ok: boolean; erreur?: string }> {
-  // Dev local : essayer le SDK
-  const sdk = await getLocalSDK();
-  if (sdk) return { ok: true };
-
-  // Production : vérifier les env vars
-  const { baseUrl, apiKey } = getConfig();
-  if (!baseUrl || !apiKey) {
-    return {
-      ok: false,
-      erreur: 'LLM non configuré. Ajoutez LLM_BASE_URL et LLM_API_KEY dans les variables d\'environnement (.env).',
-    };
-  }
-
-  return { ok: true };
-}
+// Purge code mort : verifierLLM supprimé (jamais référencé hors de ce module).

@@ -199,12 +199,9 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
 }
 
 /**
- * Enregistre une modification de paramètre (compatibilité arrière).
- * Les anciens appels sans les nouveaux champs continuent de fonctionner.
+ * Purge code mort : logAudit (alias jamais utilisé) supprimé —
+ * utiliser logParametreChange directement.
  */
-export async function logAudit(params: AuditParams): Promise<void> {
-  return logParametreChange(params);
-}
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────
 
@@ -212,7 +209,7 @@ export async function logAudit(params: AuditParams): Promise<void> {
  * Extrait l'ID utilisateur depuis les headers de la requête (x-user-id).
  * Fallback sur "inconnu" si l'header est absent.
  */
-export function getUserIdFromRequest(request: Request): string {
+function getUserIdFromRequest(request: Request): string {
   return request.headers.get('x-user-id') || 'inconnu';
 }
 
@@ -235,42 +232,6 @@ export async function getUserInfoFromRequest(request: Request): Promise<{ nom: s
 }
 
 /**
- * Compare deux objets et retourne la liste des champs modifiés.
- * Utile pour les mises à jour partielles où on veut logger uniquement les champs changés.
+ * Purge code mort : diffFields, AUDIT_ACTIONS, AUDIT_NIVEAUX et AUDIT_MODULES
+ * supprimés — jamais référencés hors de ce module (frontend inclus).
  */
-export function diffFields(
-  oldRecord: Record<string, unknown>,
-  newValues: Record<string, unknown>
-): { champ: string; ancienneValeur: unknown; nouvelleValeur: unknown }[] {
-  const changes: { champ: string; ancienneValeur: unknown; nouvelleValeur: unknown }[] = [];
-
-  for (const [key, newVal] of Object.entries(newValues)) {
-    if (newVal === undefined) continue;
-    const oldVal = oldRecord[key];
-    if (String(oldVal ?? '') !== String(newVal ?? '')) {
-      changes.push({ champ: key, ancienneValeur: oldVal, nouvelleValeur: newVal });
-    }
-  }
-
-  return changes;
-}
-
-// ─── Constantes exportées pour le frontend ──────────────────────────────────
-
-export const AUDIT_ACTIONS: { value: AuditAction; label: string; icon: string }[] = [
-  { value: 'CREATION', label: 'Création', icon: '➕' },
-  { value: 'MODIFICATION', label: 'Modification', icon: '✏️' },
-  { value: 'SUPPRESSION', label: 'Suppression', icon: '🗑' },
-];
-
-export const AUDIT_NIVEAUX: { value: AuditNiveau; label: string; icon: string; color: string }[] = [
-  { value: 'INFO', label: 'Information', icon: '🟢', color: 'emerald' },
-  { value: 'STANDARD', label: 'Modification standard', icon: '🟡', color: 'amber' },
-  { value: 'SENSIBLE', label: 'Modification sensible', icon: '🟠', color: 'orange' },
-  { value: 'CRITIQUE', label: 'Critique', icon: '🔴', color: 'red' },
-];
-
-export const AUDIT_MODULES = Object.entries(ENTITE_MODULE_MAP).map(([key, label]) => ({
-  value: key,
-  label,
-}));

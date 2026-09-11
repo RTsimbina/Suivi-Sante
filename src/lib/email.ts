@@ -84,16 +84,8 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
   return null;
 }
 
-// ─── Vérifie si SMTP est configuré ──────────────────────────────────────────
-
-export function smtpEstConfigure(): boolean {
-  // Check synchrone rapide sur les env vars (pour les cas où la DB n'est pas encore dispo)
-  if (process.env.SMTP_HOST && process.env.SMTP_USER) return true;
-  // Si on a un cache valide, c'est configuré
-  if (_cachedConfig) return true;
-  // Sinon, on ne sait pas — la version async smtpEstConfigureAsync() est plus fiable
-  return false;
-}
+// Purge code mort : smtpEstConfigure (version synchrone) supprimée —
+// smtpEstConfigureAsync() est la seule version fiable (interroge aussi la DB).
 
 /** Version async qui vérifie aussi la DB */
 export async function smtpEstConfigureAsync(): Promise<boolean> {

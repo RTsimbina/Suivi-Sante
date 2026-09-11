@@ -283,26 +283,8 @@ export function envoyerReinitialisationMdp(donnees: {
   });
 }
 
-/** Notification générique (lignes clé/valeur échappées). */
-export function envoyerNotification(donnees: {
-  destinataires: string[];
-  titre: string;
-  lignes?: { libelle: string; valeur: string }[];
-  message?: string;
-  action?: { lien: string; libelle: string };
-  categorie?: string;
-  source?: string;
-  sourceId?: string;
-}): Promise<ResultatCourriel> {
-  return envoyerCourriel({
-    destinataires: donnees.destinataires,
-    template: 'notification',
-    donnees: { titre: donnees.titre, lignes: donnees.lignes ?? [], message: donnees.message, action: donnees.action },
-    categorie: donnees.categorie || 'NOTIFICATION',
-    source: donnees.source,
-    sourceId: donnees.sourceId,
-  });
-}
+// Purge code mort : envoyerNotification supprimé (jamais référencé hors de ce
+// module) — le template 'notification' reste disponible via envoyerCourriel.
 
 /** E-mail de test (page Configuration) — livraison immédiate. */
 export function envoyerEmailTest(destinataire: string, sourceId?: string): Promise<ResultatCourriel> {

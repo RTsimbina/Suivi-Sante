@@ -158,11 +158,5 @@ export async function livrerMessage(msg: MessageLivraison): Promise<ResultatLivr
   }
 }
 
-/**
- * Vérifie que le relais SMTP est joignable ( utilisé par la page Configuration ).
- * Délègue à email.ts pour la compatibilité, mais expose le verdict au service central.
- */
-export async function verifierRelaisSMTP(): Promise<{ ok: boolean; erreur?: string }> {
-  const { verifierSMTP } = await import('../email');
-  return verifierSMTP();
-}
+// Purge code mort : verifierRelaisSMTP supprimé (jamais référencé) —
+// la page Configuration passe déjà directement par verifierSMTP (email.ts).

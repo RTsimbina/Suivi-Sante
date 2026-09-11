@@ -56,10 +56,5 @@ export async function demarrerCronMensuel() {
   console.log('[CRON] Tâche mensuelle activée : envoi rapport le 1er de chaque mois à 07h00 Madagascar');
 }
 
-export function arreterCronMensuel() {
-  if (cronInstance) {
-    cronInstance.stop();
-    cronInstance = null;
-    console.log('[CRON] Tâche mensuelle arrêtée');
-  }
-}
+// Purge code mort : arreterCronMensuel supprimé (jamais référencé — le cron
+// vit pour toute la durée du process dev ; sur Vercel c'est Vercel Cron).

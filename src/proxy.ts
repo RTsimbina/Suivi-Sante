@@ -17,7 +17,6 @@ const PUBLIC_API_PREFIXES = [
   '/api/setup',           // Initialisation DB
   '/api/health',          // Health check
   '/api/session/lockout', // Vérification verrouillage
-  '/api/auth/check-lockout', // Vérification verrouillage (legacy)
 ];
 
 // ─── Middleware principal ───────────────────────────────────────────────────

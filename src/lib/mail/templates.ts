@@ -42,13 +42,14 @@ export function htmlVersTexte(html: string): string {
     .trim();
 }
 
-export const PREFIXE_SUJET = (): string => process.env.MAIL_SUBJECT_PREFIX || 'Suivi Santé';
+// Purge code mort : exports retirés (usage strictement intra-module).
+const PREFIXE_SUJET = (): string => process.env.MAIL_SUBJECT_PREFIX || 'Suivi Santé';
 
 // ─── Layout commun ───────────────────────────────────────────────────────────
 
 const COULEUR_PRIMAIRE = '#059669'; // vert Suivi Santé (cohérent avec l'UI)
 
-export function layoutHtml(titre: string, corpsHtml: string, piedLigne?: string): string {
+function layoutHtml(titre: string, corpsHtml: string, piedLigne?: string): string {
   return `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,-apple-system,Segoe UI,sans-serif;">
@@ -85,7 +86,7 @@ function bouton(lien: string, libelle: string): string {
 
 // ─── Templates ───────────────────────────────────────────────────────────────
 
-export interface ContenuGenere {
+interface ContenuGenere {
   sujet: string;
   texte: string;
   html: string;

@@ -72,7 +72,8 @@ export const appelFondsUpdateSchema = z.object({
 // ─── Barèmes ────────────────────────────────────────────────────────────────
 
 /** Ligne de barème (réutilisée par /api/baremes et /api/technique/societes). */
-export const baremeLigneSchema = z.object({
+// Purge code mort : export retiré (schéma de base utilisé uniquement intra-module).
+const baremeLigneSchema = z.object({
   prestation: prestationBaremeSchema,
   tauxCouverture: tauxCouvertureSchema,
   // FIX incohérence : /api/baremes exigeait > 0, /api/technique/societes

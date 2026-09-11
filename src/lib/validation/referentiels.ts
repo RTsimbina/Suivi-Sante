@@ -98,7 +98,8 @@ export const liaisonPatchSchema = z.object({
 
 // ─── Assurés (/api/assures) ─────────────────────────────────────────────────
 
-export const assureCoreSchema = z.object({
+// Purge code mort : export retiré (schéma de base utilisé uniquement intra-module).
+const assureCoreSchema = z.object({
   societeId: idSchema,
   nom: texteCourt(100, "Le nom de l'assuré"),
   prenom: texteOptionnel(100),

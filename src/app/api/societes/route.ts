@@ -11,7 +11,20 @@ import { parseJsonBody } from "@/lib/validation/parse";
 import { societeCreateSchema } from "@/lib/validation";
 
 // GET — Lister les sociétés
-// Rôles externes (CONTACT_ENTREPRISE) : uniquement LEUR société (JWT).
+//
+// ─── RÈGLE MÉTIER (décision figée par route.test.ts) ────────────────────────
+//   - PORTAIL_CLIENT : volontairement ABSENT d'API_PERMISSIONS → 403. Un
+//     assuré n'a pas besoin de la liste des sociétés : ses données (sa
+//     société, ses contrats, ses dossiers) sont servies par /api/portail-client.
+//   - CONTACT_ENTREPRISE (rôle externe) : where { id: sa société } — résolu
+//     côté serveur depuis le JWT (x-user-societeid injecté par le proxy),
+//     jamais depuis un paramètre navigateur. Un ?societeId=… client ne peut
+//     qu'intersecter, jamais élargir.
+//   - Rôles internes autorisés (ADMINISTRATEUR, ACCUEIL, TECHNIQUE,
+//     COMPTABILITE, SANTE) : where {} — périmètre global selon leurs
+//     permissions (voir API_PERMISSIONS).
+//   - Compte externe sans société rattachée : 403 fail-closed
+//     (refuserHorsPerimetre), jamais une liste vide silencieuse.
 export async function GET(request: NextRequest) {
   try {
     const authError = await checkAuth(request);

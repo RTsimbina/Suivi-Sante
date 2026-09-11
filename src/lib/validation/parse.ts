@@ -13,12 +13,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ZodType, ZodError } from "zod";
 
-export type ParseSuccess<T> = { success: true; data: T };
-export type ParseFailure = { success: false; response: NextResponse };
-export type ParseResult<T> = ParseSuccess<T> | ParseFailure;
+type ParseSuccess<T> = { success: true; data: T };
+type ParseFailure = { success: false; response: NextResponse };
+type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 
 /** Format d'erreur normalisé : { error, details[] } avec statut 400. */
-export function validationErrorResponse(error: ZodError): NextResponse {
+function validationErrorResponse(error: ZodError): NextResponse {
   return NextResponse.json(
     {
       error: "Données invalides",
@@ -93,21 +93,4 @@ export async function parseFormData<T>(
   return { success: true, data: result.data };
 }
 
-/**
- * Valide les paramètres d'URL (?id=..., ?page=...).
- */
-export function parseSearchParams<T>(
-  request: NextRequest,
-  schema: ZodType<T>
-): ParseResult<T> {
-  const { searchParams } = new URL(request.url);
-  const raw: Record<string, string> = {};
-  searchParams.forEach((value, key) => {
-    raw[key] = value;
-  });
-  const result = schema.safeParse(raw);
-  if (!result.success) {
-    return { success: false, response: validationErrorResponse(result.error) };
-  }
-  return { success: true, data: result.data };
-}
+// Purge code mort : parseSearchParams supprimé (jamais référencé hors de ce module).

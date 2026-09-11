@@ -54,26 +54,28 @@ import {
 } from './rate-limit';
 
 // ─── Seuils par niveau (configurables, valeurs par défaut) ───────────────────
+// Purge code mort : exports retirés (constantes utilisées uniquement dans ce
+// module — la politique est exposée via evaluateLoginAttempt / LoginEvaluation).
 
 /** Niveau 1 — échecs par compte : 5 / 15 minutes (cohérent avec le lockout DB). */
-export const LOGIN_EMAIL_LIMIT = intFromEnv('LOGIN_EMAIL_LIMIT', 5);
-export const LOGIN_EMAIL_WINDOW_SECONDS = intFromEnv('LOGIN_EMAIL_WINDOW_SECONDS', 15 * 60);
+const LOGIN_EMAIL_LIMIT = intFromEnv('LOGIN_EMAIL_LIMIT', 5);
+const LOGIN_EMAIL_WINDOW_SECONDS = intFromEnv('LOGIN_EMAIL_WINDOW_SECONDS', 15 * 60);
 
 /** Niveau 2 — toutes tentatives par IP, tous comptes confondus : 30 / 15 minutes. */
-export const LOGIN_IP_LIMIT = intFromEnv('LOGIN_IP_LIMIT', 30);
-export const LOGIN_IP_WINDOW_SECONDS = intFromEnv('LOGIN_IP_WINDOW_SECONDS', 15 * 60);
+const LOGIN_IP_LIMIT = intFromEnv('LOGIN_IP_LIMIT', 30);
+const LOGIN_IP_WINDOW_SECONDS = intFromEnv('LOGIN_IP_WINDOW_SECONDS', 15 * 60);
 
 /** Niveau 3 — échecs par couple IP+compte : 5 / 15 minutes. */
-export const LOGIN_PAIR_LIMIT = intFromEnv('LOGIN_PAIR_LIMIT', 5);
-export const LOGIN_PAIR_WINDOW_SECONDS = intFromEnv('LOGIN_PAIR_WINDOW_SECONDS', 15 * 60);
+const LOGIN_PAIR_LIMIT = intFromEnv('LOGIN_PAIR_LIMIT', 5);
+const LOGIN_PAIR_WINDOW_SECONDS = intFromEnv('LOGIN_PAIR_WINDOW_SECONDS', 15 * 60);
 
 /**
  * Garde-fou global — toutes tentatives confondues : DÉSACTIVÉ par défaut
  * (0). intFromEnv retombe sur la valeur par défaut (0) pour toute valeur
  * non positive, donc LOGIN_GLOBAL_LIMIT="0" ou vide désactivent le niveau.
  */
-export const LOGIN_GLOBAL_LIMIT = intFromEnv('LOGIN_GLOBAL_LIMIT', 0);
-export const LOGIN_GLOBAL_WINDOW_SECONDS = intFromEnv('LOGIN_GLOBAL_WINDOW_SECONDS', 15 * 60);
+const LOGIN_GLOBAL_LIMIT = intFromEnv('LOGIN_GLOBAL_LIMIT', 0);
+const LOGIN_GLOBAL_WINDOW_SECONDS = intFromEnv('LOGIN_GLOBAL_WINDOW_SECONDS', 15 * 60);
 
 // ─── Construction des clés (source de vérité unique de la politique) ─────────
 
@@ -83,12 +85,12 @@ export function normalizeEmail(email: string): string {
 }
 
 /** Niveau 2 : clé de la source réseau. */
-export function loginIpKey(ip: string): string {
+function loginIpKey(ip: string): string {
   return `login:ip:${ip}`;
 }
 
 /** Niveau 1 : clé du compte (e-mail normalisé). */
-export function loginEmailKey(email: string): string {
+function loginEmailKey(email: string): string {
   return `login:email:${normalizeEmail(email)}`;
 }
 
@@ -96,12 +98,12 @@ export function loginEmailKey(email: string): string {
  * Niveau 3 : clé du COUPLE (source réseau, compte cible) — format
  * recommandé pour l'authentification : login:<IP>:<email>.
  */
-export function loginPairKey(ip: string, email: string): string {
+function loginPairKey(ip: string, email: string): string {
   return `login:${ip}:${normalizeEmail(email)}`;
 }
 
 /** Garde-fou : clé globale (toutes tentatives de l'application). */
-export const LOGIN_GLOBAL_KEY = 'login:global';
+const LOGIN_GLOBAL_KEY = 'login:global';
 
 // ─── Évaluation d'une tentative (avant vérification des identifiants) ────────
 

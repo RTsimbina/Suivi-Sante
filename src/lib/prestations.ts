@@ -6,7 +6,8 @@
 
 // ─── Structure hiérarchique ─────────────────────────────────────────────────
 
-export const PRESTATION_HIERARCHY: Record<string, string[]> = {
+// Purge code mort : exports retirés (usage strictement intra-module).
+const PRESTATION_HIERARCHY: Record<string, string[]> = {
   HOSPITALISATION: ['CHIRURGICAL', 'MEDICAL'],
   CONSULTATION: ['SPECIALISE', 'PRE_NATAL', 'SIMPLE'],
   EXAMEN: [],
@@ -49,7 +50,7 @@ export const PARENT_LABELS: Record<string, string> = {
 };
 
 /** Label pour un sous-type complet (ex: HOSPITALISATION_CHIRURGICAL → 'Hospitalisation - Chirurgical') */
-export const SOUS_TYPE_LABELS: Record<string, string> = {};
+const SOUS_TYPE_LABELS: Record<string, string> = {};
 for (const [parent, children] of Object.entries(PRESTATION_HIERARCHY)) {
   if (children.length === 0) {
     SOUS_TYPE_LABELS[parent] = PARENT_LABELS[parent];
@@ -75,11 +76,7 @@ export const PRESTATION_COLORS: Record<string, string> = {
   DENTAIRES: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
 };
 
-/** Couleur pour un sous-type (hérite de son parent) */
-export function getSousTypeColor(sousType: string): string {
-  const parent = getParentType(sousType);
-  return PRESTATION_COLORS[parent] || 'bg-muted text-muted-foreground';
-}
+// Purge code mort : getSousTypeColor supprimé (jamais référencé hors de ce module).
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

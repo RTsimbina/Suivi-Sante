@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "crypto";
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
@@ -264,14 +263,7 @@ export const authOptions: NextAuthOptions = {
 export { isLockedOut, MAX_ATTEMPTS } from '@/lib/account-lockout';
 
 // ─── Timing-safe string comparison ──────────────────────────────────
-export function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-  } catch {
-    return false;
-  }
-}
+// Purge code mort : safeCompare supprimé (jamais référencé hors de ce module).
 
 // Extend NextAuth types
 declare module 'next-auth' {

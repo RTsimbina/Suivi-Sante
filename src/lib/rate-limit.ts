@@ -114,10 +114,7 @@ function getRedisClient(): Redis | null {
   return redisClient;
 }
 
-/** true si un stockage Redis partagé est configuré. */
-export function isRedisRateLimitEnabled(): boolean {
-  return getRedisClient() !== null;
-}
+// Purge code mort : isRedisRateLimitEnabled supprimé (jamais référencé hors de ce module).
 
 // ─── Backend PostgreSQL / Neon (stockage partagé sans infrastructure en plus) ─
 

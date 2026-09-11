@@ -50,7 +50,7 @@ import { intFromEnv } from './rate-limit';
 /** Seuil d'échecs déclenchant le verrouillage (configurable : LOCKOUT_MAX_ATTEMPTS). */
 export const MAX_ATTEMPTS = intFromEnv('LOCKOUT_MAX_ATTEMPTS', 5);
 /** Durée du verrouillage en secondes (configurable : LOCKOUT_DURATION_SECONDS). */
-export const LOCKOUT_DURATION_SECONDS = intFromEnv('LOCKOUT_DURATION_SECONDS', 15 * 60);
+const LOCKOUT_DURATION_SECONDS = intFromEnv('LOCKOUT_DURATION_SECONDS', 15 * 60);
 
 interface LockRow {
   failedattempts: number;

@@ -9,7 +9,8 @@ import { categorieDossierSchema } from "./common";
 
 const TAILLE_MAX = 15 * 1024 * 1024; // 15 Mo
 
-export const fichierExcelSchema = z
+// Purge code mort : export retiré (schéma de base utilisé uniquement intra-module).
+const fichierExcelSchema = z
   .instanceof(File, { message: "Un fichier Excel (.xlsx / .xls) est requis" })
   .refine((f) => f.size > 0, "Le fichier est vide")
   .refine((f) => f.size <= TAILLE_MAX, "Le fichier dépasse la taille maximale de 15 Mo")
