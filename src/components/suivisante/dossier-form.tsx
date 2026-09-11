@@ -180,13 +180,10 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
     }
     setLoading(true);
     try {
-      // Générer numéro de dossier
-      const count = await fetch('/api/dossiers?limit=1').then(r => r.json());
-      const total = count.pagination?.total || 0;
-      const numeroDossier = `DOS-2026-${String(total + 1).padStart(6, '0')}`;
-
+      // FIX audit P2 : le numéro de dossier est généré CÔTÉ SERVEUR
+      // (POST /api/dossiers — avant : total+1 calculé ici sur la liste,
+      // source de doublons dès deux créations simultanées).
       const postData: Record<string, unknown> = {
-        numeroDossier,
         dateReception: new Date().toISOString().split('T')[0],
         societeId,
         beneficiaire,
@@ -261,7 +258,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
         }
       }
 
-      toast.success(`Dossier ${numeroDossier} créé avec succès`);
+      toast.success(`Dossier ${dossier.numeroDossier} créé avec succès`);
       // Reset
       setBeneficiaire(''); setAssure(''); setNSS(''); setSocieteId(''); setDateSoins('');
       setPrestataire(''); setTypeDossier(''); setCategorieDossier(''); setMontantReclame(''); setMoyenPaiement(''); setObservations('');

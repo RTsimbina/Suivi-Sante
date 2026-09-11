@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Erreur sentinelle : contrat introuvable (dans la transaction)
+  class ContratIntrouvable extends Error {}
+
   try {
     const authError = await checkAuth(request);
     if (authError) return authError;
@@ -46,30 +49,39 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const { contratId, montant, dateAppel, observations } = parsed.data;
 
-    const contrat = await db.contrat.findUnique({ where: { id: contratId } });
-    if (!contrat) {
-      return NextResponse.json({ erreur: "Contrat introuvable" }, { status: 404 });
-    }
+    // FIX audit P2 : création de l'appel ET synchronisation du budgetUtilise
+    // dans UNE SEULE transaction — avant, un échec entre les deux écrivait
+    // un appel sans budget synchronisé (budgetUtilise faux → plafonds faux).
+    const appel = await db.$transaction(async (tx) => {
+      const contrat = await tx.contrat.findUnique({ where: { id: contratId } });
+      if (!contrat) throw new ContratIntrouvable();
 
-    const appel = await db.appelDeFonds.create({
-      data: {
-        contratId,
-        montant,
-        dateAppel,
-        observations: observations ?? null,
-        statut: "EN_ATTENTE",
-      },
-      include: { contrat: { include: { societe: true } } },
-    });
+      const nouvelAppel = await tx.appelDeFonds.create({
+        data: {
+          contratId,
+          montant,
+          dateAppel,
+          observations: observations ?? null,
+          statut: "EN_ATTENTE",
+        },
+        include: { contrat: { include: { societe: true } } },
+      });
 
-    // Synchroniser le budgetUtilise du contrat (champ cache)
-    await db.contrat.update({
-      where: { id: contratId },
-      data: { budgetUtilise: { increment: montant } },
+      // Synchroniser le budgetUtilise du contrat (champ cache) — même transaction
+      await tx.contrat.update({
+        where: { id: contratId },
+        data: { budgetUtilise: { increment: montant } },
+      });
+
+      return nouvelAppel;
     });
 
     return NextResponse.json(appel, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (error instanceof ContratIntrouvable) {
+      return NextResponse.json({ erreur: "Contrat introuvable" }, { status: 404 });
+    }
+    console.error('[APPELS_FONDS] Erreur:', error);
     return NextResponse.json({ erreur: "Erreur" }, { status: 500 });
   }
 }

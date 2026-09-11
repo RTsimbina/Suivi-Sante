@@ -10,6 +10,10 @@ import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { dossierCreateSchema } from "@/lib/validation";
+import {
+  genererNumeroDossier,
+  avecRetryNumeroDossier,
+} from "@/lib/numero-dossier";
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,7 +120,6 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonBody(request, dossierCreateSchema);
     if (!parsed.success) return parsed.response;
     const {
-      numeroDossier,
       dateReception,
       societeId,
       beneficiaire,
@@ -134,17 +137,9 @@ export async function POST(request: NextRequest) {
       montantValide,
       ticketModerateur,
     } = parsed.data;
-
-    // Check for duplicate numeroDossier
-    const existing = await db.dossier.findUnique({
-      where: { numeroDossier },
-    });
-
-    if (existing) {
-      return NextResponse.json({ erreur: "Un dossier avec ce numéro existe déjà" },
-        { status: 409 }
-      );
-    }
+    // numeroDossier du client volontairement ignoré : généré côté serveur
+    // (voir numéro-dossier.ts — avant : total+1 calculé sur la liste du
+    // demandeur, source de doublons dès deux créations simultanées).
 
     // ─── Vérification du plafond annuel ────────────────────────────────────
     // Si un assureId est fourni, vérifier que le plafond n'est pas atteint.
@@ -205,29 +200,48 @@ export async function POST(request: NextRequest) {
       finalTicketModerateur = Math.round((montantCouvert - finalMontantValide) * 100) / 100;
     }
 
-    // Transaction : vérifier le plafond ET créer le dossier de manière atomique
-    // pour éviter les race conditions (deux créations simultanées)
-    const dossier = await db.$transaction(async (tx) => {
-      // Re-vérifier le plafond dans la transaction
-      if (assureId && societeId && typeDossier && montantReclame) {
-        const plafondTx = await tx.dossier.findMany({
-          where: {
-            assureId,
-            societeId,
-            typeDossier,
-            dateReception: { gte: new Date(new Date().getFullYear(), 0, 1), lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59) },
-            statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
-          },
-          select: { montantValide: true, montantPaye: true, montantReclame: true },
-        });
-        const consomme = plafondTx.reduce((s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame), 0);
-        const baremeTx = await tx.bareme.findFirst({ where: { societeId, prestation: typeDossier, active: true } });
-        if (baremeTx && consomme >= baremeTx.plafond) {
-          throw new Error(`PLAFOND_ATTEINT_TRANSACTION: Plafond ${typeDossier} atteint lors de la création`);
-        }
-      }
+    // Transaction : numéro de dossier généré côté serveur, verrou FOR UPDATE
+    // sur le barème (sérialise les créations concurrentes d'un même plafond)
+    // et re-vérification du plafond — le tout ATOMIQUE. En cas de collision
+    // résiduelle de numéro (course inter-transactions, trou de suppression),
+    // avecRetryNumeroDossier rejoue avec un décalage (contrainte UNIQUE = juge).
+    const annee =
+      dateReception instanceof Date
+        ? dateReception.getFullYear()
+        : new Date().getFullYear();
 
-      return tx.dossier.create({
+    const dossier = await avecRetryNumeroDossier((decalage) =>
+      db.$transaction(async (tx) => {
+        // Re-vérifier le plafond dans la transaction
+        if (assureId && societeId && typeDossier && montantReclame) {
+          const baremeTx = await tx.bareme.findFirst({ where: { societeId, prestation: typeDossier, active: true } });
+          if (baremeTx) {
+            // FOR UPDATE : la 2e transaction concurrente attend le commit de
+            // la 1re, puis relit un total consommé à jour (READ COMMITTED)
+            // — avant : deux créations simultanées passaient toutes deux
+            // le contrôle et dépassaient le plafond.
+            await tx.$queryRaw`SELECT "id" FROM "Bareme" WHERE "id" = ${baremeTx.id} FOR UPDATE`;
+          }
+          const plafondTx = await tx.dossier.findMany({
+            where: {
+              assureId,
+              societeId,
+              typeDossier,
+              dateReception: { gte: new Date(new Date().getFullYear(), 0, 1), lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59) },
+              statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
+            },
+            select: { montantValide: true, montantPaye: true, montantReclame: true },
+          });
+          const consomme = plafondTx.reduce((s, d) => s + (d.montantPaye ?? d.montantValide ?? d.montantReclame), 0);
+          if (baremeTx && consomme >= baremeTx.plafond) {
+            throw new Error(`PLAFOND_ATTEINT_TRANSACTION: Plafond ${typeDossier} atteint lors de la création`);
+          }
+        }
+
+        // ─── Numéro de dossier : GÉNÉRÉ CÔTÉ SERVEUR, dans la transaction ──
+        const numeroDossier = await genererNumeroDossier(tx, annee, decalage);
+
+        return tx.dossier.create({
       data: {
         numeroDossier,
         dateReception,
@@ -257,7 +271,7 @@ export async function POST(request: NextRequest) {
         gestionnaireCompta: true,
       },
     });
-    }); // fin $transaction
+    })); // fin avecRetryNumeroDossier($transaction)
 
     // Attraper l'erreur de plafond de la transaction
     const response: Record<string, unknown> = { ...dossier } as Record<string, unknown>;
@@ -267,6 +281,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response, { status: 201 });
   } catch (error) {
+    // Perte de course sur le plafond (re-vérification transactionnelle) :
+    // réponse 422 explicite au lieu d'une 500 générique.
+    if (error instanceof Error && error.message.startsWith('PLAFOND_ATTEINT_TRANSACTION')) {
+      return NextResponse.json(
+        { erreur: error.message.replace('PLAFOND_ATTEINT_TRANSACTION: ', ''), plafondAtteint: true },
+        { status: 422 }
+      );
+    }
     console.error("Error creating dossier:", error);
     return NextResponse.json({ erreur: "Erreur lors de la création du dossier" },
       { status: 500 }

@@ -558,7 +558,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
-              { label: 'Numéro dossier', value: 'DOS-2026-XXXXXX', auto: true },
+              { label: 'Numéro dossier', value: 'Généré par le serveur', auto: true },
               { label: 'Nom bénéficiaire', value: 'Saisie manuelle' },
               { label: 'Société', value: 'Sélection client' },
               { label: 'Date réception', value: 'Date du jour' },

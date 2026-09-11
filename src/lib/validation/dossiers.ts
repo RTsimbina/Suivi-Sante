@@ -18,7 +18,12 @@ import {
 
 /** POST /api/dossiers — création manuelle d'un dossier. */
 export const dossierCreateSchema = z.object({
-  numeroDossier: texteCourt(64, "Le numéro de dossier"),
+  // FIX audit P2 : le numéro est DÉSORMAIS GÉNÉRÉ CÔTÉ SERVEUR
+  // (src/lib/numero-dossier.ts, arbitré par la contrainte UNIQUE).
+  // Le champ reste accepté pour compatibilité mais toute valeur fournie
+  // par le client est IGNORÉE (avant : total+1 calculé sur la liste du
+  // demandeur → doublons dès deux créations simultanées).
+  numeroDossier: texteCourt(64, "Le numéro de dossier").optional(),
   dateReception: dateRequise,
   societeId: idSchema,
   beneficiaire: texteCourt(200, "Le bénéficiaire"),
