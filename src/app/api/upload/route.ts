@@ -2,38 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { getToken } from 'next-auth/jwt';
-
-// ─── Types MIME autorisés ───────────────────────────────────────────────────
-const ALLOWED_TYPES = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-]);
-
-const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp']);
-const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 Mo
-
-function getExtension(filename: string): string {
-  const idx = filename.lastIndexOf('.');
-  return idx >= 0 ? filename.slice(idx).toLowerCase() : '';
-}
-
-function getMimeType(filename: string, fileMime: string): string {
-  // Faire confiance au MIME du fichier si valide, sinon déduire de l'extension
-  if (ALLOWED_TYPES.has(fileMime)) return fileMime;
-  const ext = getExtension(filename);
-  const map: Record<string, string> = {
-    '.pdf': 'application/pdf',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.webp': 'image/webp',
-  };
-  return map[ext] || fileMime;
-}
+import {
+  detecterTypeReel,
+  extensionAutorisee,
+  resoudreMimeType,
+  stockerJustificatif,
+  lireContenuJustificatif,
+  MAX_TAILLE_OCTETS,
+} from '@/lib/storage';
 
 // ─── POST : Upload d'un justificatif ────────────────────────────────────────
+// Plan P3 Vague 1 : validation du CONTENU (magic bytes) + stockage objet
+// (Vercel Blob) dès que BLOB_READ_WRITE_TOKEN est configuré, fallback DB.
 export async function POST(request: NextRequest) {
   // Vérification auth + autorisation
   const authErr = await checkAuth(request);
@@ -62,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérification taille
-    if (file.size > MAX_SIZE_BYTES) {
+    if (file.size > MAX_TAILLE_OCTETS) {
       return NextResponse.json(
         { erreur: `Fichier trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} Mo). Maximum : 10 Mo` },
         { status: 400 }
@@ -70,10 +50,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérification extension
-    const ext = getExtension(file.name);
-    if (!ALLOWED_EXTENSIONS.has(ext)) {
+    if (!extensionAutorisee(file.name)) {
       return NextResponse.json(
-        { erreur: `Extension non autorisée. Extensions acceptées : ${[...ALLOWED_EXTENSIONS].join(', ')}` },
+        { erreur: 'Extension non autorisée. Extensions acceptées : .pdf, .jpg, .jpeg, .png, .webp' },
+        { status: 400 }
+      );
+    }
+
+    // MIME final : déclaré s'il est whitelisté, sinon déduit de l'extension
+    const mimeType = resoudreMimeType(file.name, file.type);
+    if (!mimeType) {
+      return NextResponse.json(
+        { erreur: 'Type de fichier non supporté. Formats acceptés : PDF, JPEG, PNG, WebP' },
+        { status: 400 }
+      );
+    }
+
+    // ─── Validation du CONTENU (magic bytes) — plan P3 ─────────────────────
+    // Le MIME déclaré et l'extension viennent du client et peuvent mentir.
+    // On refuse tout contenu qui n'est pas un vrai PDF/JPEG/PNG/WebP
+    // (ex : script HTML renommé .pdf, polyglottes).
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const typeReel = detecterTypeReel(bytes);
+    if (!typeReel) {
+      return NextResponse.json(
+        { erreur: 'Le contenu du fichier ne correspond à aucun format autorisé (PDF, JPEG, PNG, WebP). Il est peut-être corrompu ou déguisé.' },
+        { status: 400 }
+      );
+    }
+    if (typeReel !== mimeType) {
+      return NextResponse.json(
+        { erreur: `Le contenu du fichier (${typeReel}) ne correspond pas à son format déclaré (${mimeType}).` },
         { status: 400 }
       );
     }
@@ -84,22 +91,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Dossier introuvable' }, { status: 404 });
     }
 
-    // Convertir le fichier en base64 pour le stockage en BDD
-    const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString('base64');
-
     // Récupérer l'utilisateur qui upload
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     const uploadedBy = token?.id || null;
 
-    // Créer l'entrée Justificatif en base
+    // ─── Stockage : objet (Vercel Blob) si configuré, sinon DB (fallback) ──
+    // Plan P3 : les nouveaux justificatifs vont en stockage objet dès que
+    // BLOB_READ_WRITE_TOKEN est défini ; la DB ne conserve que la clé/URL.
+    const resultat = await stockerJustificatif(bytes, {
+      dossierId,
+      nomFichier: file.name,
+      mimeType,
+    });
+
+    // Créer l'entrée Justificatif en base (chemin = clé/URL en mode BLOB,
+    // data URI en mode DB fallback)
     const justificatif = await db.justificatif.create({
       data: {
         dossierId,
         type,
         nomFichier: file.name,
-        chemin: `data:${getMimeType(file.name, file.type)};base64,${base64}`, // préfixe data URI
-        tailleKo: Math.round(file.size / 1024),
+        chemin: resultat.chemin,
+        tailleKo: resultat.tailleKo,
         uploadedBy,
       },
     });
@@ -109,6 +122,7 @@ export async function POST(request: NextRequest) {
       nomFichier: justificatif.nomFichier,
       type: justificatif.type,
       tailleKo: justificatif.tailleKo,
+      stockage: resultat.mode,
     });
   } catch (error) {
     console.error('[UPLOAD] Erreur:', error);
@@ -120,6 +134,9 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── GET : Téléchargement d'un justificatif ─────────────────────────────────
+// Gère les deux modes : data URI (justificatifs historiques) et URL blob
+// (stockage objet — le binaire est proxifié serveur, l'URL du stockage
+// n'est JAMAIS exposée au client).
 export async function GET(request: NextRequest) {
   // Vérification auth + autorisation
   const authErr = await checkAuth(request);
@@ -143,32 +160,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ erreur: 'Justificatif introuvable' }, { status: 404 });
     }
 
-    // Le chemin stocke un data URI complet (data:mime;base64,...)
-    const dataUri = justificatif.chemin;
-    if (!dataUri || !dataUri.startsWith('data:')) {
-      return NextResponse.json({ erreur: 'Fichier corrompu ou format non supporté' }, { status: 500 });
+    let bytes: Buffer<ArrayBuffer>;
+    let mimeType: string | null;
+    try {
+      const contenu = await lireContenuJustificatif(justificatif.chemin);
+      bytes = contenu.bytes;
+      mimeType = contenu.mimeType;
+    } catch (e) {
+      console.error('[UPLOAD] Lecture justificatif:', e);
+      return NextResponse.json({ erreur: 'Fichier inaccessible ou corrompu' }, { status: 500 });
     }
-
-    // Parser le data URI
-    const mimeMatch = dataUri.match(/^data:([^;]+);base64,(.+)$/);
-    if (!mimeMatch) {
-      return NextResponse.json({ erreur: 'Format de fichier invalide' }, { status: 500 });
-    }
-
-    const mimeType = mimeMatch[1];
-    const base64Data = mimeMatch[2];
-    const buffer = Buffer.from(base64Data, 'base64');
 
     // Déterminer le nom de fichier avec le bon Content-Disposition
     const filename = justificatif.nomFichier || 'justificatif';
     const encodedFilename = encodeURIComponent(filename).replace(/['()]/g, escape);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(bytes, {
       status: 200,
       headers: {
-        'Content-Type': mimeType,
+        'Content-Type': mimeType ?? 'application/octet-stream',
         'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
-        'Content-Length': buffer.length.toString(),
+        'Content-Length': bytes.length.toString(),
         'Cache-Control': 'private, max-age=3600',
       },
     });
