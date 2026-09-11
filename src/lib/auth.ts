@@ -137,27 +137,39 @@ export const authOptions: NextAuthOptions = {
         await resetLoginCounters(ip, email);
 
         // Récupérer les identifiants de portail pour les rôles externes
+        // (e-mail nettoyé : la base peut contenir des espaces parasites)
         let assureId: string | undefined;
         let societeId: string | undefined;
+        const emailLiaison = user.email.trim();
 
         if (user.role === 'PORTAIL_CLIENT') {
           // Rechercher l'assuré correspondant à cet e-mail
           const assure = await db.assure.findFirst({
-            where: { email: { equals: user.email, mode: 'insensitive' } },
+            where: { email: { equals: emailLiaison, mode: 'insensitive' } },
             select: { id: true, societeId: true },
           });
           if (assure) {
             assureId = assure.id;
             societeId = assure.societeId ?? undefined;
+          } else {
+            console.warn(
+              `[AUTH] Compte PORTAIL_CLIENT "${user.email}" : aucun Assure en base avec cet e-mail. ` +
+              `Le portail affichera une erreur tant que l'e-mail de l'assuré ne correspond pas.`
+            );
           }
         } else if (user.role === 'CONTACT_ENTREPRISE') {
           // Rechercher le contact d'entreprise correspondant à cet e-mail
           const contact = await db.entrepriseContact.findFirst({
-            where: { email: { equals: user.email, mode: 'insensitive' } },
+            where: { email: { equals: emailLiaison, mode: 'insensitive' } },
             select: { societeId: true },
           });
           if (contact) {
             societeId = contact.societeId ?? undefined;
+          } else {
+            console.warn(
+              `[AUTH] Compte CONTACT_ENTREPRISE "${user.email}" : aucun EntrepriseContact en base ` +
+              `avec cet e-mail. Le portail affichera une erreur tant que l'e-mail du contact ne correspond pas.`
+            );
           }
         }
 

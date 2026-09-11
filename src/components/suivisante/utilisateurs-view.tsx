@@ -34,6 +34,9 @@ interface Utilisateur {
   lockoutUntil: string | null;
   createdAt: string;
   updatedAt: string;
+  // Rôles externes uniquement : true = assuré/contact avec cet e-mail trouvé,
+  // false = liaison manquante (le portail affichera une erreur), null = interne.
+  liaisonExterne?: boolean | null;
 }
 
 interface FormData {
@@ -401,6 +404,14 @@ export default function UtilisateursView() {
                           {isLocked && (
                             <Badge className="ml-1 text-[10px] bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300">
                               <Lock className="h-2.5 w-2.5 mr-0.5" /> Verrouille
+                            </Badge>
+                          )}
+                          {user.liaisonExterne === false && (
+                            <Badge
+                              className="ml-1 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 cursor-help"
+                              title="Aucun assuré / contact d'entreprise n'a cet e-mail : le portail affichera « Aucun assuré lié à votre compte ». Corrigez l'e-mail de l'assuré (ou du contact) ou celui de ce compte."
+                            >
+                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Liaison manquante
                             </Badge>
                           )}
                         </td>

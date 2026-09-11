@@ -19,6 +19,36 @@ const ROLE_LABELS: Record<string, string> = {
   CONTACT_ENTREPRISE: 'Contact Entreprise',
 };
 
+// ─── Validation de la liaison des rôles externes ──────────────────────────────
+// La liaison assuré↔compte (ou contact↔compte) repose sur la correspondance
+// d'e-mail au moment du login : sans Assure/EntrepriseContact portant cet
+// e-mail, le portail affiche « Aucun assuré lié à votre compte ». On refuse
+// donc la création/modification d'un compte externe sans liaison existante
+// (422) au lieu de produire un compte cassé découvrable seulement au login.
+async function liaisonExterneExiste(role: string, email: string): Promise<boolean> {
+  if (role === 'PORTAIL_CLIENT') {
+    const assure = await db.assure.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return !!assure;
+  }
+  if (role === 'CONTACT_ENTREPRISE') {
+    const contact = await db.entrepriseContact.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return !!contact;
+  }
+  return true; // rôles internes : pas de liaison exigée
+}
+
+function erreurLiaisonExterne(role: string, email: string): string {
+  return role === 'PORTAIL_CLIENT'
+    ? `Aucun assuré n'a l'e-mail « ${email} » : ce compte Portail Client afficherait une erreur de liaison. Créez d'abord l'assuré avec cet e-mail (ou corrigez l'e-mail saisi).`
+    : `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Créez d'abord le contact avec cet e-mail (ou corrigez l'e-mail saisi).`;
+}
+
 // ─── GET : Liste des utilisateurs ─────────────────────────────────────────────
 export async function GET(request: NextRequest) {
   const auth = await checkAuth(request);
@@ -68,11 +98,44 @@ export async function GET(request: NextRequest) {
       db.utilisateur.count({ where }),
     ]);
 
-    // Enrichir avec le label de role
-    const enriched = utilisateurs.map(u => ({
-      ...u,
-      roleLabel: ROLE_LABELS[u.role] || u.role,
-    }));
+    // Enrichir avec le label de rôle + l'état de liaison des rôles externes.
+    // Visibilité : un compte PORTAIL_CLIENT / CONTACT_ENTREPRISE sans assuré /
+    // contact portant cet e-mail produit l'erreur « Aucun assuré lié à votre
+    // compte » au portail — on l'affiche AVANT que le client ne se connecte.
+    const emailsExternes = utilisateurs
+      .filter(u => u.role === 'PORTAIL_CLIENT' || u.role === 'CONTACT_ENTREPRISE')
+      .map(u => u.email);
+
+    const assuresParEmail = new Set<string>();
+    const contactsParEmail = new Set<string>();
+    if (emailsExternes.length > 0) {
+      const [assures, contacts] = await Promise.all([
+        db.assure.findMany({
+          where: { email: { in: emailsExternes, mode: 'insensitive' } },
+          select: { email: true },
+        }),
+        db.entrepriseContact.findMany({
+          where: { email: { in: emailsExternes, mode: 'insensitive' } },
+          select: { email: true },
+        }),
+      ]);
+      assures.forEach(a => assuresParEmail.add((a.email ?? '').trim().toLowerCase()));
+      contacts.forEach(c => contactsParEmail.add((c.email ?? '').trim().toLowerCase()));
+    }
+
+    const enriched = utilisateurs.map(u => {
+      let liaisonExterne: boolean | null = null;
+      if (u.role === 'PORTAIL_CLIENT') {
+        liaisonExterne = assuresParEmail.has(u.email.trim().toLowerCase());
+      } else if (u.role === 'CONTACT_ENTREPRISE') {
+        liaisonExterne = contactsParEmail.has(u.email.trim().toLowerCase());
+      }
+      return {
+        ...u,
+        roleLabel: ROLE_LABELS[u.role] || u.role,
+        liaisonExterne,
+      };
+    });
 
     return NextResponse.json({
       utilisateurs: enriched,
@@ -108,6 +171,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { erreur: 'Un compte avec cet e-mail existe deja.' },
         { status: 409 }
+      );
+    }
+
+    // Rôles externes : exiger une liaison assuré/contact sur cet e-mail
+    if ((role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') &&
+        !(await liaisonExterneExiste(role, emailTrimmed))) {
+      return NextResponse.json(
+        { erreur: erreurLiaisonExterne(role, emailTrimmed) },
+        { status: 422 }
       );
     }
 
@@ -196,6 +268,26 @@ export async function PUT(request: NextRequest) {
     // Le schéma Zod garantit role ∈ ROLES_UTILISATEUR
     if (role !== undefined) {
       data.role = role;
+    }
+
+    // Rôles externes : re-valider la liaison si l'e-mail change ou si le rôle
+    // vient de basculer vers un rôle externe (sinon compte externe cassé).
+    const roleFinal = role ?? existing.role;
+    const emailFinal = (data.email as string | undefined) ?? existing.email;
+    const basculeVersExterne =
+      role !== undefined &&
+      (existing.role === 'PORTAIL_CLIENT' || existing.role === 'CONTACT_ENTREPRISE') === false &&
+      (roleFinal === 'PORTAIL_CLIENT' || roleFinal === 'CONTACT_ENTREPRISE');
+    if (
+      (roleFinal === 'PORTAIL_CLIENT' || roleFinal === 'CONTACT_ENTREPRISE') &&
+      (data.email !== undefined || basculeVersExterne)
+    ) {
+      if (!(await liaisonExterneExiste(roleFinal, emailFinal))) {
+        return NextResponse.json(
+          { erreur: erreurLiaisonExterne(roleFinal, emailFinal) },
+          { status: 422 }
+        );
+      }
     }
 
     if (password !== undefined) {

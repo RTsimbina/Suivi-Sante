@@ -8,6 +8,38 @@ import { db } from '@/lib/db';
 //   - CONTACT_ENTREPRISE : données de la société (assurés, contrats, dossiers)
 //   - ADMINISTRATEUR : toutes les données (pour test)
 
+// ─── Résolution de secours des identifiants de portail ────────────────────
+// Le JWT fige assureId/societeId pour toute la session (8 h). Si la liaison
+// (e-mail assuré / contact d'entreprise) a été créée ou corrigée APRÈS la
+// connexion, le token ne la contient pas — et si l'assuré a été supprimé/
+// recréé, le token pointe vers un id mort. Dans ces deux cas, on re-résout
+// DEPUIS LA BASE à partir de l'e-mail authentifié du token (jamais d'entrée
+// client), ce qui auto-répare le compte sans attendre une reconnexion.
+
+async function resoudreAssureParEmail(email: string) {
+  return db.assure.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true, societeId: true },
+  });
+}
+
+async function resoudreSocieteIdParEmailContact(email: string): Promise<string | null> {
+  const contact = await db.entrepriseContact.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { societeId: true },
+  });
+  return contact?.societeId ?? null;
+}
+
+async function chargerAssure(id: string) {
+  return db.assure.findUnique({
+    where: { id },
+    include: {
+      societe: { select: { id: true, nom: true, adresse: true, telephone: true, email: true } },
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = await getToken({
@@ -20,9 +52,10 @@ export async function GET(request: NextRequest) {
     }
 
     const role = token.role as string;
-    const assureId = token.assureId as string | undefined;
-    const societeId = token.societeId as string | undefined;
+    let assureId = token.assureId as string | undefined;
+    let societeId = token.societeId as string | undefined;
     const userId = token.id as string;
+    const emailToken = (token.email as string | undefined)?.trim() ?? '';
 
     // Rôles internes n'ont rien à faire ici
     if (!['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'].includes(role)) {
@@ -31,20 +64,43 @@ export async function GET(request: NextRequest) {
 
     // ─── Mode PORTAIL_CLIENT : vue assuré ───
     if (role === 'PORTAIL_CLIENT') {
+      // Re-résolution par e-mail si le token ne porte pas l'assuré
+      // (session ouverte avant la création/correction de la liaison).
+      if (!assureId && emailToken) {
+        const resolu = await resoudreAssureParEmail(emailToken);
+        if (resolu) {
+          assureId = resolu.id;
+          societeId = resolu.societeId ?? societeId;
+        }
+      }
+
       if (!assureId) {
+        console.error(
+          `[PORTAIL CLIENT] Compte ${emailToken || userId} (rôle ${role}) : aucun Assure en base ` +
+          `avec cet e-mail. Vérifiez l'e-mail de l'assuré côté Assurés/Configuration.`
+        );
         return NextResponse.json(
-          { erreur: 'Aucun assuré lié à votre compte. Contactez votre administrateur.' },
+          {
+            erreur:
+              `Aucun assuré lié à votre compte${emailToken ? ` (e-mail recherché : ${emailToken})` : ''}. ` +
+              `Vérifiez que l'assuré a exactement cet e-mail dans la base ; une fois corrigé, rechargez cette page.`,
+          },
           { status: 403 }
         );
       }
 
       // Récupérer l'assuré avec sa société
-      const assure = await db.assure.findUnique({
-        where: { id: assureId },
-        include: {
-          societe: { select: { id: true, nom: true, adresse: true, telephone: true, email: true } },
-        },
-      });
+      let assure = await chargerAssure(assureId);
+
+      // Id du token périmé (assuré supprimé puis recréé) → re-résolution par e-mail
+      if (!assure && emailToken) {
+        const resolu = await resoudreAssureParEmail(emailToken);
+        if (resolu && resolu.id !== assureId) {
+          assureId = resolu.id;
+          societeId = resolu.societeId ?? societeId;
+          assure = await chargerAssure(assureId);
+        }
+      }
 
       if (!assure) {
         return NextResponse.json({ erreur: 'Assuré introuvable.' }, { status: 404 });
@@ -170,9 +226,22 @@ export async function GET(request: NextRequest) {
 
     // ─── Mode CONTACT_ENTREPRISE : vue entreprise ───
     if (role === 'CONTACT_ENTREPRISE') {
+      // Re-résolution par e-mail du contact si le token ne porte pas la société
+      if (!societeId && emailToken) {
+        societeId = (await resoudreSocieteIdParEmailContact(emailToken)) ?? undefined;
+      }
+
       if (!societeId) {
+        console.error(
+          `[PORTAIL CLIENT] Compte ${emailToken || userId} (rôle ${role}) : aucun EntrepriseContact ` +
+          `avec cet e-mail. Vérifiez l'e-mail du contact côté Configuration.`
+        );
         return NextResponse.json(
-          { erreur: 'Aucune société liée à votre compte. Contactez votre administrateur.' },
+          {
+            erreur:
+              `Aucune société liée à votre compte${emailToken ? ` (e-mail recherché : ${emailToken})` : ''}. ` +
+              `Vérifiez que le contact d'entreprise a exactement cet e-mail dans la base ; une fois corrigé, rechargez cette page.`,
+          },
           { status: 403 }
         );
       }
