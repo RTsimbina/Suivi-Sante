@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
 import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
+import DossierDetail from './dossier-detail';
 
 interface Dossier {
   id: string;
@@ -32,6 +33,9 @@ export default function DossiersView() {
   const [search, setSearch] = useState('');
   const [statutFilter, setStatutFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  // Détail de dossier — le composant DossierDetail (dialog) était orphelin :
+  // aucune ligne du tableau n'ouvrait le détail (détail inatteignable, audit).
+  const [detailDossierId, setDetailDossierId] = useState<string | null>(null);
 
   const fetchDossiers = useCallback(async () => {
     setLoading(true);
@@ -56,6 +60,12 @@ export default function DossiersView() {
 
   const handlePageChange = (newPage: number) => {
     setPagination(p => ({ ...p, page: newPage }));
+  };
+
+  const fermerDetail = () => {
+    setDetailDossierId(null);
+    // Rafraîchir la liste : le détail peut avoir changé le statut du dossier
+    fetchDossiers();
   };
 
   const statuts = ['RECU', 'EN_ANALYSE', 'VALIDE', 'REJETE', 'EN_PAIEMENT', 'PAYE'];
@@ -118,7 +128,12 @@ export default function DossiersView() {
                       {dossiers.length === 0 ? (
                         <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Aucun dossier trouvé</td></tr>
                       ) : dossiers.map((d) => (
-                        <tr key={d.id} className="border-b last:border-0 hover:bg-muted/50">
+                        <tr
+                          key={d.id}
+                          className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                          onClick={() => setDetailDossierId(d.id)}
+                          title="Voir le détail du dossier"
+                        >
                           <td className="py-2 font-mono text-xs font-medium">{d.numeroDossier}</td>
                           <td className="py-2 text-xs">{formatDate(d.dateReception)}</td>
                           <td className="py-2 font-medium">{d.beneficiaire}</td>
@@ -138,6 +153,11 @@ export default function DossiersView() {
           )}
         </CardContent>
       </Card>
+
+      {/* Détail d'un dossier (dialog) — ouvert au clic sur une ligne */}
+      {detailDossierId && (
+        <DossierDetail dossierId={detailDossierId} onClose={fermerDetail} />
+      )}
     </div>
   );
 }

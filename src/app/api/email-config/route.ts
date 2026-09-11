@@ -6,6 +6,7 @@ import { invalidateCache, interpreterErreurSMTP } from '@/lib/email';
 import { encrypt } from '@/lib/crypto';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { emailConfigSchema, emailConfigTestSchema } from '@/lib/validation';
+import { optionsTlsSmtp } from '@/lib/mail/tls';
 
 const ENCRYPTION_KEY = process.env.SERVER_ENCRYPTION_KEY || '';
 
@@ -51,6 +52,17 @@ export async function PUT(request: NextRequest) {
     const parsed = await parseJsonBody(request, emailConfigSchema);
     if (!parsed.success) return parsed.response;
     const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, emailRapportDestinataire, actif } = parsed.data;
+
+    // SERVER_ENCRYPTION_KEY obligatoire : sans elle, encrypt() refuserait de
+    // stocker le mot de passe (fail-closed, voir src/lib/crypto.ts). On le
+    // détecte ici pour renvoyer une erreur claire à l'interface plutôt qu'une
+    // 500 générique.
+    if (!process.env.SERVER_ENCRYPTION_KEY) {
+      return NextResponse.json(
+        { erreur: "SERVER_ENCRYPTION_KEY manquante : définissez cette variable d'environnement (ex: openssl rand -base64 32) avant de sauvegarder la configuration SMTP." },
+        { status: 503 }
+      );
+    }
 
     // Chiffrer le mot de passe avant stockage (AES-256-GCM)
     const encryptedPass = encrypt(smtpPass, ENCRYPTION_KEY);
@@ -127,7 +139,7 @@ export async function POST(request: NextRequest) {
       secure: smtpPort === 465,
       requireTLS: smtpPort === 587,
       auth: { user: smtpUser, pass: smtpPass },
-      tls: { rejectUnauthorized: false },
+      tls: optionsTlsSmtp(), // validation du certificat stricte (plus de rejectUnauthorized: false)
     });
 
     await transporter.verify();

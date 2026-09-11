@@ -12,18 +12,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { envoyerRapportMensuel } from '@/lib/email-mensuel';
 import { smtpEstConfigureAsync } from '@/lib/email';
+import { enTeteEgalSecret } from '@/lib/mail/api-auth';
 
 export const maxDuration = 300; // 5 min max pour l'envoi à toutes les sociétés
 
 export async function GET(request: NextRequest) {
   // ── Vérification du secret Vercel Cron ──────────────────────────────
+  // Défense en profondeur : le middleware (proxy.ts) a déjà validé le Bearer
+  // CRON_SECRET en durée constante ; on re-vérifie ici de la même façon afin
+  // qu'aucun contournement du middleware ne puisse servir cette route.
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
+  const bearerOk = await enTeteEgalSecret(authHeader, 'CRON_SECRET');
 
   // En développement, autoriser sans secret si CRON_SECRET n'est pas défini
   if (process.env.NODE_ENV === 'development' && !cronSecret) {
     console.log('[CRON] Mode développement — authentification ignorée');
-  } else if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  } else if (!bearerOk) {
     console.warn('[CRON] Accès non autorisé — secret invalide ou absent');
     return NextResponse.json(
       { erreur: 'Non autorisé' },

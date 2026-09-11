@@ -95,6 +95,24 @@ export default async function proxy(request: NextRequest) {
     }
   }
 
+  // 3ter. Ordonnanceur Vercel Cron — /api/cron/* est appelé par l'ordonnanceur
+  // Vercel avec `Authorization: Bearer CRON_SECRET` et SANS session NextAuth.
+  // Sans ce passe dédié, ces routes tombaient dans le default-deny des
+  // API_PERMISSIONS (403) : le rapport mensuel ne partait jamais en production.
+  // Sans Bearer valide : 401 immédiat (fail-closed) — ces routes ne sont pas
+  // destinées aux sessions navigateur. Développement local : toléré uniquement
+  // si NODE_ENV=development ET CRON_SECRET non défini (même règle que la route).
+  if (pathname.startsWith('/api/cron/')) {
+    const authHeader = request.headers.get('authorization');
+    const machineOk = await enTeteEgalSecret(authHeader, 'CRON_SECRET');
+    const devSansSecret =
+      process.env.NODE_ENV === 'development' && !process.env.CRON_SECRET;
+    if (!machineOk && !devSansSecret) {
+      return Response.json({ erreur: 'Non autorisé' }, { status: 401 });
+    }
+    return NextResponse.next({ headers: securityHeaders });
+  }
+
   // ─── À partir d'ici, tout nécessite une authentification ────────────────
 
   const token = await getToken({

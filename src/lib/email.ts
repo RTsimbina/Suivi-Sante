@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { db } from './db';
 import { decrypt } from './crypto';
+import { optionsTlsSmtp } from './mail/tls';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,24 +34,37 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
     return _cachedConfig;
   }
 
-  // 2. Essayer la base de données
+  // 2. Lire la base de données. La lecture DB est isolée dans son propre
+  //    try/catch (table absente au premier déploiement) afin qu'une erreur
+  //    de DÉCHIFFREMENT ne soit jamais avalée par le fallback env vars :
+  //    elle doit remonter avec son message actionnable.
+  let config: Awaited<ReturnType<typeof db.configurationEmail.findFirst>> = null;
   try {
-    const config = await db.configurationEmail.findFirst({ where: { actif: true } });
-    if (config) {
-      const ENCRYPTION_KEY = process.env.SERVER_ENCRYPTION_KEY || '';
-      _cachedConfig = {
-        host: config.smtpHost,
-        port: config.smtpPort,
-        user: config.smtpUser,
-        pass: decrypt(config.smtpPass, ENCRYPTION_KEY), // déchiffré
-        from: config.smtpFrom,
-        emailRapportDestinataire: config.emailRapportDestinataire,
-      };
-      _cacheExpiry = Date.now() + CACHE_TTL;
-      return _cachedConfig;
-    }
+    config = await db.configurationEmail.findFirst({ where: { actif: true } });
   } catch {
     // La table n'existe pas encore (premier déploiement) — on continue avec les env vars
+  }
+
+  if (config) {
+    // SERVER_ENCRYPTION_KEY obligatoire : sans elle, decrypt() lèverait de
+    // toute façon une erreur ; on la détecte ici pour un message immédiat.
+    const cleChiffrement = process.env.SERVER_ENCRYPTION_KEY;
+    if (!cleChiffrement) {
+      throw new Error(
+        'SERVER_ENCRYPTION_KEY manquante : le mot de passe SMTP stocké en base est chiffré. ' +
+          'Définissez la variable SERVER_ENCRYPTION_KEY (même valeur que lors de la sauvegarde) puis redéployez.'
+      );
+    }
+    _cachedConfig = {
+      host: config.smtpHost,
+      port: config.smtpPort,
+      user: config.smtpUser,
+      pass: decrypt(config.smtpPass, cleChiffrement), // déchiffré (peut lever si clé incorrecte)
+      from: config.smtpFrom,
+      emailRapportDestinataire: config.emailRapportDestinataire,
+    };
+    _cacheExpiry = Date.now() + CACHE_TTL;
+    return _cachedConfig;
   }
 
   // 3. Fallback sur les variables d'environnement
@@ -83,8 +97,19 @@ export function smtpEstConfigure(): boolean {
 
 /** Version async qui vérifie aussi la DB */
 export async function smtpEstConfigureAsync(): Promise<boolean> {
-  const config = await getSmtpConfig();
-  return !!config;
+  try {
+    const config = await getSmtpConfig();
+    return !!config;
+  } catch (e: unknown) {
+    // Configuration illisible (SERVER_ENCRYPTION_KEY absente ou incorrecte) :
+    // journaliser la cause exacte plutôt que de répondre « non configuré »
+    // sans explication (crons, rapports mensuels).
+    console.error(
+      '[EMAIL] Configuration SMTP illisible :',
+      e instanceof Error ? e.message : e
+    );
+    return false;
+  }
 }
 
 /** Retourne la config SMTP (sans le mot de passe en clair) pour l'UI */
@@ -138,11 +163,12 @@ export async function getSmtpConfigForUI(): Promise<{
 
 let _transporter: nodemailer.Transporter | null = null;
 
-/** Options TLS optimisées pour Microsoft 365, Gmail, et autres fournisseurs modernes */
-function getTlsOptions(port: number) {
-  if (port === 465) return { rejectUnauthorized: false };
-  // Port 587 (STARTTLS) — compatible Microsoft 365
-  return { rejectUnauthorized: false };
+/**
+ * TLS strict — la validation du certificat serveur n'est plus désactivée
+ * (ancien : rejectUnauthorized: false, voir src/lib/mail/tls.ts).
+ */
+function getTlsOptions() {
+  return optionsTlsSmtp();
 }
 
 async function getTransporter(): Promise<nodemailer.Transporter> {
@@ -155,7 +181,7 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
       secure: config.port === 465,
       requireTLS: config.port === 587,
       auth: { user: config.user, pass: config.pass },
-      tls: getTlsOptions(config.port),
+      tls: getTlsOptions(),
       // Timeouts bornés — indispensable en environnement serverless (Vercel)
       connectionTimeout: 10_000,   // connexion TCP
       greetingTimeout: 10_000,     // bannière SMTP du serveur
@@ -247,26 +273,28 @@ export async function envoyerEmail(opts: {
 // ─── Vérification de la connexion SMTP ─────────────────────────────────────
 
 export async function verifierSMTP(): Promise<{ ok: boolean; erreur?: string }> {
-  const config = await getSmtpConfig();
-  if (!config) {
-    return {
-      ok: false,
-      erreur: 'SMTP non configure. Configurez-le depuis la page Configuration ou ajoutez SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS dans .env.',
-    };
-  }
-
   try {
+    const config = await getSmtpConfig();
+    if (!config) {
+      return {
+        ok: false,
+        erreur: 'SMTP non configure. Configurez-le depuis la page Configuration ou ajoutez SMTP_HOST, SMTP_PORT, SMTP_USER et SMTP_PASS dans .env.',
+      };
+    }
+
     const transporter = nodemailer.createTransport({
       host: config.host,
       port: config.port,
       secure: config.port === 465,
       requireTLS: config.port === 587,
       auth: { user: config.user, pass: config.pass },
-      tls: getTlsOptions(config.port),
+      tls: getTlsOptions(),
     });
     await transporter.verify();
     return { ok: true };
   } catch (e: unknown) {
+    // Attrape aussi les erreurs de configuration (SERVER_ENCRYPTION_KEY) :
+    // l'appelant reçoit toujours { ok: false, erreur } au lieu d'une 500 brute.
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, erreur: interpreterErreurSMTP(msg) };
   }
@@ -333,9 +361,15 @@ export function interpreterErreurSMTP(rawMsg: string): string {
     ].join('\n');
   }
 
-  // Certificat SSL/TLS
+  // Certificat SSL/TLS (validation stricte activée, voir src/lib/mail/tls.ts)
   if (msg.includes('self signed certificate') || msg.includes('unable to verify')) {
     return 'Erreur de certificat SSL/TLS. Le serveur SMTP utilise un certificat auto-signé. Contactez votre administrateur réseau.';
+  }
+
+  // Erreurs de configuration serveur (clé de chiffrement) : messages déjà
+  // actionnables — ne pas les déguiser en « erreur de connexion SMTP ».
+  if (msg.toLowerCase().includes('server_encryption_key') || msg.includes('Déchiffrement impossible')) {
+    return rawMsg;
   }
 
   // Erreur générique

@@ -2,10 +2,18 @@
  * Utilitaire de chiffrement symétrique pour les secrets stockés en BDD.
  * Utilise AES-256-GCM (Node.js crypto natif).
  *
- * L'alternative au stockage en clair dans ConfigurationEmail.smtpPass.
+ * Alternative au stockage en clair dans ConfigurationEmail.smtpPass.
  * La clé de chiffrement est tirée de SERVER_ENCRYPTION_KEY (env var).
- * Si la clé n'est pas définie, le texte est retourné tel quel (fallback).
+ *
+ * ⚠️ FAIL-CLOSED : SERVER_ENCRYPTION_KEY est OBLIGATOIRE. Les anciens
+ * fallbacks silencieux (« pas de clé → texte stocké/retourné tel quel »)
+ * produisaient des mots de passe illisibles à l'envoi (erreurs 535
+ * incompréhensibles) et masquaient une configuration serveur incomplète.
+ * Désormais, toute opération sans clé — ou avec une clé qui ne correspond
+ * pas — lève une erreur explicite et actionnable.
  */
+
+import crypto from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -16,16 +24,21 @@ const AUTH_TAG_LENGTH = 16;
  * Utilise SHA-256 pour obtenir exactement 32 octets.
  */
 function deriveKey(secret: string): Buffer {
-  const crypto = require('crypto');
   return crypto.createHash('sha256').update(secret).digest();
 }
 
 /**
  * Chiffre un texte clair. Retourne : base64(iv + authTag + ciphertext)
+ * @throws si `secret` (SERVER_ENCRYPTION_KEY) est absent — aucun secret
+ *         ne doit jamais être stocké en clair en base.
  */
 export function encrypt(plaintext: string, secret: string): string {
-  if (!secret) return plaintext; // Pas de clé = pas de chiffrement
-  const crypto = require('crypto');
+  if (!secret) {
+    throw new Error(
+      'SERVER_ENCRYPTION_KEY manquante : refus de stocker un secret en clair. ' +
+        'Définissez la variable SERVER_ENCRYPTION_KEY avant de sauvegarder la configuration SMTP.'
+    );
+  }
   const key = deriveKey(secret);
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -41,12 +54,19 @@ export function encrypt(plaintext: string, secret: string): string {
 
 /**
  * Déchiffre un texte chiffré par encrypt().
- * Si le déchiffrement échoue (mauvaise clé, format invalide), retourne le texte tel quel.
+ * @throws si `secret` est absent (SERVER_ENCRYPTION_KEY non configurée) ou si
+ *         le déchiffrement échoue (clé différente de celle du chiffrement,
+ *         donnée corrompue, ancien mot de passe stocké en clair) — avec un
+ *         message actionnable plutôt qu'un mot de passe illisible.
  */
 export function decrypt(encrypted: string, secret: string): string {
-  if (!secret) return encrypted; // Pas de clé = pas de déchiffrement
+  if (!secret) {
+    throw new Error(
+      'SERVER_ENCRYPTION_KEY manquante : impossible de déchiffrer le secret stocké en base. ' +
+        'Définissez SERVER_ENCRYPTION_KEY (même valeur que lors du chiffrement) puis redéployez.'
+    );
+  }
   try {
-    const crypto = require('crypto');
     const key = deriveKey(secret);
     const combined = Buffer.from(encrypted, 'base64');
 
@@ -65,8 +85,13 @@ export function decrypt(encrypted: string, secret: string): string {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch {
-    // Si le déchiffrement échoue, le mot de passe est peut-être en clair (ancien format)
-    return encrypted;
+    // Clé différente de celle du chiffrement, donnée corrompue, ou ancien
+    // mot de passe stocké en clair (format hérité). On échoue bruyamment
+    // avec la marche à suivre, au lieu de renvoyer un garbage silencieux.
+    throw new Error(
+      'Déchiffrement impossible : SERVER_ENCRYPTION_KEY incorrecte ou donnée non chiffrée. ' +
+        'Re-sauvegardez la configuration SMTP depuis la page Configuration pour la chiffrer avec la clé courante.'
+    );
   }
 }
 

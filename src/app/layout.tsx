@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 
 const geistSans = Geist({
@@ -54,7 +55,11 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        {/* Toaster Radix — notifications du hook useToast() */}
         <Toaster />
+        {/* Toaster sonner — notifications des vues utilisant toast() de 'sonner' ;
+            sans lui, tous ces toasts étaient silencieux (constat audit n°3) */}
+        <SonnerToaster position="top-right" richColors closeButton />
       </body>
     </html>
   );
