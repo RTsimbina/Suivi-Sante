@@ -56,7 +56,7 @@ export function evaluerSpf(enregistrement: string | null): DetailVerification {
     return {
       statut: 'ABSENT',
       erreur:
-        'Aucun enregistrement SPF (v=spf1) à la racine du domaine — publiez la valeur exacte fournie par votre relais (Brevo / SMTP2GO).',
+        'Aucun enregistrement SPF (v=spf1) à la racine du domaine — publiez la valeur exacte fournie par votre relais (Resend / Brevo / SMTP2GO).',
     };
   }
   const avertissements: string[] = [];
@@ -181,7 +181,7 @@ async function verifierDmarc(domaine: string): Promise<DetailVerification> {
 
 /**
  * Vérifie SPF + DKIM + DMARC pour un domaine d'expédition.
- * @param selecteurDkim sélecteur DKIM fourni par le relais (brevo1, mail, s1…)
+ * @param selecteurDkim sélecteur DKIM fourni par le relais (resend, brevo1, mail, s1…)
  */
 export async function verifierDnsDomaine(
   domaine: string,
@@ -201,7 +201,7 @@ export async function verifierDnsDomaine(
     );
   } else {
     notes.push(
-      'Publiez les enregistrements manquants dans le DNS du domaine (valeurs fournies par Brevo / SMTP2GO — ne copiez jamais un exemple générique), attendez la propagation puis relancez la vérification.'
+      'Publiez les enregistrements manquants dans le DNS du domaine (valeurs fournies par votre relais — Resend / Brevo / SMTP2GO — ne copiez jamais un exemple générique), attendez la propagation puis relancez la vérification.'
     );
   }
   notes.push(

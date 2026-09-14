@@ -454,7 +454,7 @@ model CourrielEvenement {
   courrielId String
   /// Type d'événement (voir TYPES_EVENEMENT dans src/lib/mail/queue.ts)
   type       String
-  /// Relais/fournisseur impliqué (brevo, smtp2go…) — extension multi-fournisseurs
+  /// Relais/fournisseur impliqué (resend, brevo, smtp2go…) — extension multi-fournisseurs
   fournisseur String?
   /// Détail lisible : Message-ID, erreur SMTP tronquée, date de la prochaine tentative…
   message    String?

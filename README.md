@@ -85,7 +85,7 @@ mensuels, notifications, tests) via un **service centralisé** : file
 d'attente en base (`CourrielSortant`), worker avec réclamation atomique
 (`FOR UPDATE SKIP LOCKED`), retries à backoff exponentiel, quotas et
 anti-abus, journal complet — remise finale par le relais SMTP du domaine
-d'expédition (Brevo / SMTP2GO…), jamais via les API Gmail/Yahoo/Outlook.
+d'expédition (Resend / Brevo / SMTP2GO…), jamais via les API Gmail/Yahoo/Outlook.
 
 - Architecture, domaine d'envoi et procédure SPF / DKIM / DMARC :
   **[docs/MESSAGERIE.md](docs/MESSAGERIE.md)**

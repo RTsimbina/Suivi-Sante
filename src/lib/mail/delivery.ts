@@ -15,7 +15,7 @@
  *
  * Remarque architecture : la plateforme ne parle JAMAIS directement aux
  * serveurs Gmail/Yahoo/Outlook. Elle parle à SON relais SMTP (fournisseur
- * spécialisé — Brevo, SMTP2GO, Mailgun, SES… — ou serveur de messagerie
+ * spécialisé — Resend, Brevo, SMTP2GO, Mailgun, SES… — ou serveur de messagerie
  * maison), qui résout le DNS/MX du destinataire et fait la remise finale.
  * Les enregistrements SPF/DKIM/DMARC du domaine d'envoi valident cette remise.
  */

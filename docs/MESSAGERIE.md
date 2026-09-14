@@ -102,8 +102,10 @@ vérifier que la plateforme est autorisée à envoyer des e-mails au nom du doma
 
 ### Procédure recommandée
 
-1. **Choisir un relais SMTP spécialisé** (Brevo, SMTP2GO, Mailgun, Amazon SES,
-   Postmark…) — la remise finale à Gmail/Yahoo/Outlook est déléguée à ce fournisseur.
+1. **Choisir un relais SMTP spécialisé** — **Resend (recommandé pour Vercel)**,
+   Brevo, SMTP2GO, Mailgun, Amazon SES, Postmark… — la remise finale à
+   Gmail/Yahoo/Outlook est déléguée à ce fournisseur, qui gère aussi la réputation
+   IP et le traitement des bounces.
 2. **Enregistrer le domaine** (`maplateforme.com`) dans la console du fournisseur.
 3. **Publier les enregistrements** SPF / DKIM / DMARC fournis dans la zone DNS.
    - Démarrer avec `p=none` sur DMARC le temps des tests, puis durcir vers
@@ -114,7 +116,7 @@ vérifier que la plateforme est autorisée à envoyer des e-mails au nom du doma
 
 ```
 SMTP_HOST=smtp-votre-fournisseur.com
-SMTP_PORT=587            # STARTTLS (ou 465 = TLS implicite)
+SMTP_PORT=587            # STARTTLS — jamais 25 (bloqué par Vercel), 465 déconseillé en serverless
 SMTP_USER=votre-utilisateur
 SMTP_PASS=votre-mot-de-passe
 SMTP_FROM=notifications@maplateforme.com
@@ -122,6 +124,69 @@ SMTP_FROM=notifications@maplateforme.com
 
 6. **Vérifier** : page Configuration → test SMTP, puis vérifier l'en-tête reçu dans
    la boîte Gmail (onglet « Original ») : `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`.
+
+### Relais recommandé : Resend (déploiement Vercel)
+
+Resend est le choix de référence pour Suivi-Sante sur Vercel : SMTP simple en
+STARTTLS port 587, délivrabilité gérée (infrastructure Amazon SES), 3 000 e-mails/mois
+gratuits, logs par message dans le dashboard. **Aucune modification de code** : le
+moteur de livraison (`delivery.ts`) parle déjà SMTP à un relais — Resend n'est qu'un
+jeu de variables d'environnement.
+
+**Étape 1 — Compte et domaine**
+
+1. Créer un compte sur [resend.com](https://resend.com), puis générer une clé API
+   (Dashboard → API Keys → `re_…`). Cette clé sert à la fois de `SMTP_PASS` (usage
+   SMTP de la plateforme) et de clé API (usage HTTP, ex. d'autres outils).
+2. Dashboard → **Domains → Add domain** → saisir le domaine d'expédition, idéalement
+   un sous-domaine dédié (ex. `mail.maplateforme.com`) pour isoler la réputation.
+3. Publier dans la zone DNS les 3 enregistrements **exactement comme fournis par
+   Resend** (ne jamais recopier un exemple générique) — structure type :
+
+| Type | Nom (sous le domaine) | Valeur (type) | Rôle |
+|---|---|---|---|
+| TXT | (racine) | `v=spf1 include:amazonses.com ~all` | SPF — serveurs d'émission autorisés |
+| CNAME | `resend._domainkey` | `xxxx.dkim.amazonses.com` | DKIM — clé publique, sélecteur `resend` |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:dmarc@maplateforme.com` | DMARC — commencer en observation |
+
+4. Attendre la propagation (5 min à 24 h) puis cliquer **Verify** dans Resend.
+   Tant que le domaine n'est pas vérifié, Resend reste en **mode test** : il ne
+   délivre qu'vers l'adresse du compte lui-même.
+
+**Étape 2 — Variables d'environnement (Vercel / .env)**
+
+```
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587                        # STARTTLS — Vercel bloque le port 25
+SMTP_USER=resend                     # littéral : toujours « resend »
+SMTP_PASS=re_xxxxxxxxxxxxxxxxxxxxxx  # clé API Resend
+SMTP_FROM=noreply@mail.maplateforme.com
+MAIL_FROM_EMAIL=noreply@mail.maplateforme.com   # domaine lu par /api/mail/dns-check
+MAIL_DKIM_SELECTOR=resend            # Resend publie la clé sur « resend », pas « mail »
+MAIL_CONTACT=support@maplateforme.com
+```
+
+**Étape 3 — Quotas : rester sous la limite gratuite**
+
+Le plan gratuit Resend autorise **100 e-mails/jour** (3 000/mois). Le plafond
+applicatif `MAIL_MAX_GLOBAL_HOUR` (défaut 300/h) cale les rafales, pas le plafond
+journalier du relais : au-delà de 100/jour, Resend rejette en erreur SMTP temporaire,
+que la file absorbe par backoff (1 min → 6 h) avant passage en ECHEC. Recommandations :
+
+- `MAIL_MAX_GLOBAL_HOUR=80` borne le débit horaire et laisse la marge au quota
+  journalier (les rapports mensuels volumineux partent étalés par la file) ;
+- surveiller les quotas sur le dashboard Resend (Logs → bounces / rate limited) ;
+- si le volume croît, passer au plan payant Resend plutôt que de durcir les retries.
+
+**Pièges Resend à connaître**
+
+| Piège | Effet observable | Parade |
+|---|---|---|
+| Sélecteur DKIM non aligné | dns-check affiche DKIM `ABSENT` à tort | `MAIL_DKIM_SELECTOR=resend` |
+| Domaine non Verify | rejet de tout destinataire externe (mode test) | publier les DNS + Verify dans Resend |
+| `SMTP_FROM` hors domaine vérifié | rejet 403 du relais | expéditeur sur le domaine vérifié |
+| Port 25 ou 465 depuis Vercel | connexion rejetée/bloquée | `SMTP_PORT=587` uniquement |
+| > 100 e-mails/jour (gratuit) | erreurs SMTP temporaires en série | file + backoff absorbent ; ajuster `MAIL_MAX_GLOBAL_HOUR` |
 
 > 💡 Astuce : `mail-tester.com` donne une note de délivrabilité et montre quel
 > enregistrement manque. `dig TXT maplateforme.com` / `dig TXT _dmarc.maplateforme.com`
@@ -283,9 +348,13 @@ appel) → purge optionnelle du journal.
 | `MAIL_BLOCKED_DOMAINS` | — | liste noire additionnelle (virgules) |
 | `MAIL_ALLOWED_DOMAINS` | — | si définie, seuls ces domaines sont acceptés |
 | `MAIL_CONTACT` | `support@suivisante.mg` | adresse de contact dans le pied des e-mails |
+| `MAIL_FROM_EMAIL` | — | adresse From lue par `/api/mail/dns-check` (défaut : expéditeur du relais configuré) |
+| `MAIL_DKIM_SELECTOR` | `mail` | sélecteur DKIM vérifié par le dns-check — `resend` avec Resend, `mail`/`brevo1`… selon le relais |
 | `CRON_SECRET` | — | secret Vercel Cron (aussi accepté par le service mail) |
 
-Configuration SMTP relais : voir §2 (page Configuration ou `SMTP_*`).
+Configuration SMTP relais : voir §2 (page Configuration ou `SMTP_*`). Avec
+Resend : `SMTP_HOST=smtp.resend.com`, `SMTP_PORT=587`, `SMTP_USER=resend`,
+`SMTP_PASS=re_…`, `MAIL_DKIM_SELECTOR=resend`.
 
 ---
 
@@ -312,5 +381,12 @@ dans la boîte « Réception courriels » de la plateforme), il faudra en plus :
 1. Enregistrements **MX** pointant vers le serveur de réception (ou service comme
    Cloudflare Email Routing → webhook).
 2. Un pont e-mail → API (`POST /api/reception/courriels`) authentifié.
+
+Deux voies éprouvées pour le pont de réception, sans toucher au service d'envoi :
+
+| Voie | Principe | Effort |
+|---|---|---|
+| **Cloudflare Email Routing** (Email Worker) | Cloudflare reçoit (MX gratuit) et POSTe le message brut à `POST /api/reception/courriels` | Faible |
+| **Récepteur autonome sur Workers** (ex. projet open-source `cloud-mail`) | boîte de réception complète (multi-domaines, pièces jointes R2, webhooks Telegram/HTTP) qui relaie ensuite vers la plateforme | Moyen — aligner la signature du webhook du récepteur avec `src/lib/webhook-verify.ts` avant production |
 
 C'est une évolution indépendante ; le service d'envoi présenté ici n'y touche pas.

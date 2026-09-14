@@ -8,7 +8,8 @@
  *   1. la variable MAIL_FROM_EMAIL si définie ;
  *   2. sinon l'expéditeur configuré (page Configuration ou SMTP_FROM).
  *
- * Le sélecteur DKIM provient de MAIL_DKIM_SELECTOR (défaut « mail »).
+ * Le sélecteur DKIM provient de MAIL_DKIM_SELECTOR (défaut « mail » ;
+ * mettre « resend » avec le relais Resend — voir docs/MESSAGERIE.md §2).
  */
 
 import { NextRequest, NextResponse } from 'next/server';

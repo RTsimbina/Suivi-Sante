@@ -266,8 +266,9 @@ export default function MailServiceCard() {
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Sélecteur DKIM : <span className="font-mono">{dns.selecteurDkim}</span> — modifiable via MAIL_DKIM_SELECTOR.
-                Publiez les enregistrements fournis par votre relais (Brevo / SMTP2GO) dans le DNS du domaine,
+                Sélecteur DKIM : <span className="font-mono">{dns.selecteurDkim}</span> — modifiable via MAIL_DKIM_SELECTOR
+                (Resend : « resend » ; Brevo : « mail » / « brevo1 »).
+                Publiez les enregistrements fournis par votre relais (Resend / Brevo / SMTP2GO) dans le DNS du domaine,
                 idéalement sur un sous-domaine dédié (ex. mail.{dns.domaine}). Voir docs/MESSAGERIE.md.
               </p>
               {dns.notes.map(n => (
