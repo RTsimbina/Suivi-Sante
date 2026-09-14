@@ -1,78 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * API — GET /api/health
+ * ─────────────────────
+ * Sondage de disponibilité, PUBLIC (exempté d'authentification via
+ * proxy.ts → PUBLIC_API_PREFIXES, voir '/api/health').
+ *
+ * Vérifie deux niveaux :
+ *   1. l'application répond (le simple fait de recevoir une réponse) ;
+ *   2. la base de données est joignable (ping `SELECT 1`).
+ *
+ * Codes de retour :
+ *   200 → application OK, base OK
+ *   503 → application répond mais base injoignable (inutilisable)
+ *
+ * Sécurité : la route est publique, elle ne révèle donc AUCUNE information
+ * sensible — pas de version d'application, pas de stack, pas de message
+ * d'erreur brut (un simple 'erreur' suffit au diagnostic « base KO »).
+ *
+ * Appelé par : le workflow GitHub Actions `healthcheck.yml` (toutes les
+ * 30 min, ouvre/ferme une issue [Incident] en cas d'échec), toute sonde
+ * externe (UptimeRobot…), ou un navigateur.
+ *
+ * Coût : 1 connexion + SELECT 1 par sondage (48/jour à 30 min) — négligeable
+ * même sur Neon (serveurless, scale-to-zero : le ping réveille l'instance,
+ * ce qui est voulu : l'app est inutilisable si la base est froide).
+ */
+
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-export async function GET(request: NextRequest) {
-  // Sécurité : masquer les infos sensibles, ne pas exposer la DB URL
-  const { searchParams } = new URL(request.url);
-  const internal = searchParams.get('internal') === 'true';
-  if (!internal) {
-    return NextResponse.json({ status: 'ok', message: 'Service opérationnel' });
-  }
-  const checks: { name: string; ok: boolean; detail?: string }[] = [];
+// Jamais de mise en cache : un sondage doit refléter l'état instantané
+// (sinon une réponse 200 mise en cache masquerait une panne réelle).
+export const dynamic = 'force-dynamic';
 
-  // 1. Variables d'environnement
-  const hasDbUrl = !!process.env.DATABASE_URL;
-  const hasSecret = !!process.env.NEXTAUTH_SECRET;
-  const hasSetupToken = !!process.env.SETUP_TOKEN;
+const entetes = { 'Cache-Control': 'no-store' } as const;
 
-  checks.push({
-    name: 'DATABASE_URL',
-    ok: hasDbUrl,
-    detail: hasDbUrl
-      ? 'Configuree'
-      : 'MANQUANTE — ajoutez-la dans Vercel → Settings → Environment Variables',
-  });
-  checks.push({
-    name: 'NEXTAUTH_SECRET',
-    ok: hasSecret,
-    detail: hasSecret ? 'Configurée' : 'MANQUANTE — requise pour l\'authentification',
-  });
-  checks.push({
-    name: 'SETUP_TOKEN',
-    ok: hasSetupToken,
-    detail: hasSetupToken ? 'Configuré' : 'MANQUANTE — requise pour /api/setup',
-  });
+export async function GET() {
+  const debut = Date.now();
 
-  // 2. Test de connexion BDD
-  if (hasDbUrl) {
-    try {
-      await db.$queryRaw`SELECT 1 as ok`;
-
-      // Vérifier si les tables ont des données
-      const userCount = await db.utilisateur.count();
-
-      checks.push({
-        name: 'Connexion PostgreSQL',
-        ok: true,
-        detail: 'Connexion réussie',
-      });
-      checks.push({
-        name: 'Table Utilisateur',
-        ok: userCount > 0,
-        detail: userCount > 0
-          ? `${userCount} utilisateur(s) trouvé(s)`
-          : 'Table VIDE — appelez /api/setup?token=VOTRE_TOKEN',
-      });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur inconnue';
-      checks.push({
-        name: 'Connexion PostgreSQL',
-        ok: false,
-        detail: msg.slice(0, 200),
-      });
-    }
-  } else {
-    checks.push({
-      name: 'Connexion PostgreSQL',
-      ok: false,
-      detail: 'Impossible de tester — DATABASE_URL manquante',
-    });
+  let baseOk = true;
+  try {
+    await db.$queryRaw`SELECT 1`;
+  } catch {
+    // Détail volontairement avalé : endpoint public, rien ne doit fuir.
+    baseOk = false;
   }
 
-  const allOk = checks.every(c => c.ok);
+  const latenceMs = Date.now() - debut;
 
-  return NextResponse.json({
-    status: allOk ? 'ok' : 'erreur',
-    checks,
-  }, { status: allOk ? 200 : 503 });
+  if (!baseOk) {
+    return NextResponse.json(
+      { status: 'erreur', db: 'erreur' },
+      { status: 503, headers: entetes }
+    );
+  }
+
+  return NextResponse.json(
+    { status: 'ok', db: 'ok', latenceMs },
+    { headers: entetes }
+  );
 }

@@ -1,0 +1,161 @@
+# Mail Test Send — envoi manuel d'un e-mail de test via l'API Suivi-Sante
+# ─────────────────────────────────────────────────────────────────────────────
+# Aucun cron : déclenchement MANUEL uniquement (onglet Actions → Mail Test
+# Send → Run workflow). Sert à valider la chaîne SMTP après un déploiement,
+# un changement de relais (Brevo → Resend…) ou une modification DNS
+# (SPF / DKIM / DMARC), ou pour une démo du rendu du template notification.
+#
+# Endpoint appelé : POST /api/mail/send
+#   - Auth : Bearer MAIL_API_KEY (src/lib/mail/api-auth.ts)
+#   - "traiter": true → livraison immédiate (pas d'attente du cron)
+#   - Réponse attendue : 202 Accepted (mise en file + traitement immédiat)
+#     { ok, id, statut, livraison, message }
+#
+# Secrets requis :
+#   VERCEL_APP_URL  ex. https://suivi-sante.vercel.app (sans / final)
+#   MAIL_API_KEY    clé machine (openssl rand -hex 32), variable Vercel
+#                   MAIL_API_KEY configurée à la même valeur
+
+name: Mail Test Send
+
+on:
+  workflow_dispatch:
+    inputs:
+      destinataire:
+        description: 'Adresse e-mail du destinataire du test'
+        required: true
+        default: 'test@example.com'
+        type: string
+      template:
+        description: 'Modèle de message à envoyer'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test
+          - notification
+
+permissions:
+  contents: read
+
+jobs:
+  envoi:
+    name: Envoyer un e-mail de test
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      # ── 1. Vérifier les secrets ────────────────────────────────────────────
+      # Échec DUR (pas de skip) : c'est une action manuelle, l'opérateur doit
+      # corriger la configuration au lieu d'obtenir un run vert trompeur.
+      - name: Vérifier les secrets
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          MAIL_API_KEY: ${{ secrets.MAIL_API_KEY }}
+        run: |
+          if [ -z "$VERCEL_APP_URL" ] || [ -z "$MAIL_API_KEY" ]; then
+            echo "::error::Secrets VERCEL_APP_URL et/ou MAIL_API_KEY non configurés (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      # ── 2. Construire le corps JSON ───────────────────────────────────────
+      # Deux variantes selon le template choisi :
+      #   test          → message simple
+      #   notification  → titre + tableau de lignes clé/valeur + message
+      # Validation basique du destinataire : évite de poster du JSON cassé.
+      - name: Construire le corps JSON
+        env:
+          DESTINATAIRE: ${{ inputs.destinataire }}
+          TEMPLATE: ${{ inputs.template }}
+          ACTEUR: ${{ github.actor }}
+        run: |
+          if ! echo "${DESTINATAIRE}" | grep -qE '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'; then
+            echo "::error::Adresse destinataire invalide : « ${DESTINATAIRE} »"
+            exit 1
+          fi
+
+          if [ "${TEMPLATE}" = "notification" ]; then
+            cat > /tmp/body.json <<EOF
+          {
+            "destinataires": ["${DESTINATAIRE}"],
+            "template": "notification",
+            "donnees": {
+              "titre": "Test GitHub Actions",
+              "lignes": [
+                { "libelle": "Source", "valeur": "GitHub Actions" },
+                { "libelle": "Workflow", "valeur": "Mail Test Send" },
+                { "libelle": "Déclenché par", "valeur": "${ACTEUR}" },
+                { "libelle": "Date", "valeur": "$(date -u '+%Y-%m-%d %H:%M:%S') UTC" }
+              ],
+              "message": "E-mail de test envoyé depuis GitHub Actions."
+            },
+            "categorie": "TEST_GH_ACTIONS",
+            "traiter": true
+          }
+          EOF
+          else
+            cat > /tmp/body.json <<EOF
+          {
+            "destinataires": ["${DESTINATAIRE}"],
+            "template": "test",
+            "categorie": "TEST_GH_ACTIONS",
+            "traiter": true
+          }
+          EOF
+          fi
+
+          echo "Corps JSON :"
+          cat /tmp/body.json
+
+      # ── 3. Envoyer via /api/mail/send ─────────────────────────────────────
+      # Le service retourne 202 (accepté + traité immédiatement), pas 200.
+      - name: Envoyer via /api/mail/send
+        id: envoi
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          MAIL_API_KEY: ${{ secrets.MAIL_API_KEY }}
+        run: |
+          HTTP_CODE=$(curl -sS -o /tmp/reponse.json -w '%{http_code}' \
+            --max-time 30 \
+            -X POST "${VERCEL_APP_URL}/api/mail/send" \
+            -H "Authorization: Bearer ${MAIL_API_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/body.json)
+
+          echo "Code HTTP : ${HTTP_CODE}"
+          cat /tmp/reponse.json || true
+
+          if [ "${HTTP_CODE}" != "202" ]; then
+            echo "::error::L'endpoint /api/mail/send a répondu HTTP ${HTTP_CODE} (attendu : 202)."
+            echo "  400 → demande invalide · 401/403 → MAIL_API_KEY refusée · 422 → rejet anti-abus · 429 → quota atteint"
+            exit 1
+          fi
+
+          echo "id=$(grep -oP '"id":\s*"\K[^"]+' /tmp/reponse.json || true)"        >> "$GITHUB_OUTPUT"
+          echo "statut=$(grep -oP '"statut":\s*"\K[^"]+' /tmp/reponse.json || true)" >> "$GITHUB_OUTPUT"
+
+      # ── 4. Résumé ──────────────────────────────────────────────────────────
+      - name: Résumé
+        if: steps.envoi.outcome == 'success'
+        env:
+          DESTINATAIRE: ${{ inputs.destinataire }}
+          TEMPLATE: ${{ inputs.template }}
+          ID_MESSAGE: ${{ steps.envoi.outputs.id }}
+          STATUT: ${{ steps.envoi.outputs.statut }}
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+        run: |
+          {
+            echo "### E-mail de test envoyé — $(date -u '+%Y-%m-%d %H:%M') UTC"
+            echo ""
+            echo "| Champ | Valeur |"
+            echo "|-------|--------|"
+            echo "| Destinataire | \`${DESTINATAIRE}\` |"
+            echo "| Template | \`${TEMPLATE}\` |"
+            echo "| ID message | \`${ID_MESSAGE:-?}\` |"
+            echo "| Statut | \`${STATUT:-?}\` |"
+            echo ""
+            echo "#### Prochaines étapes"
+            echo "1. Vérifier la boîte \`${DESTINATAIRE}\` (et les spams)."
+            echo "2. Sur Gmail : **⋮ → Afficher l'original** → vérifier SPF / DKIM / DMARC = **PASS**."
+            echo "3. Consulter la timeline du message : \`${VERCEL_APP_URL}/api/mail?evenements=${ID_MESSAGE}\` (session ADMINISTRATEUR requise)."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,146 @@
+# Healthcheck — surveillance de disponibilité + gestion d'issues d'incident
+# ─────────────────────────────────────────────────────────────────────────────
+# Sondage toutes les 30 minutes de GET /api/health (endpoint public, vérifie
+# l'app ET la base — 503 si la base est injoignable, voir
+# src/app/api/health/route.ts).
+#
+# Comportement :
+#   - HTTP 200        → si des issues [Incident] Healthcheck sont ouvertes,
+#                       elles sont commentées (✅ restauré) puis fermées ;
+#   - HTTP ≠ 200      → ::error:: + exit 1 → l'étape if: failure() s'exécute :
+#                       une issue [Incident] est créée (ou commentée si déjà
+#                       ouverte — jamais de spam d'issues).
+#
+# Panne réseau du runner (DNS, timeout) → curl sans code HTTP → "000" :
+# distingue une panne réseau d'un vrai 5xx dans le titre de l'issue.
+#
+# Complémentarité Vercel : l'intégrité Vercel (déploiements) et les crons
+# Vercel restent actifs ; ce workflow couvre la disponibilité applicative
+# vue de l'extérieur ET la joignabilité de la base (Neon).
+#
+# Secret requis : VERCEL_APP_URL (pas de secret d'auth : /api/health est
+# public et volontairement muet — aucune information sensible exposée).
+
+name: Healthcheck
+
+on:
+  schedule:
+    # Toutes les 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write      # créer / commenter / fermer les issues d'incident
+  contents: read
+
+jobs:
+  healthcheck:
+    name: Sondage /api/health
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      # ── 1. Vérifier les secrets ────────────────────────────────────────────
+      - name: Vérifier les secrets
+        id: secrets
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+        run: |
+          if [ -z "$VERCEL_APP_URL" ]; then
+            echo "::warning::Secret VERCEL_APP_URL non configuré (Settings → Secrets and variables → Actions). Exécution ignorée."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 2. Appeler /api/health ─────────────────────────────────────────────
+      # Timeout 15 s ; seul le code HTTP est capturé (corps ignoré).
+      # Échec réseau curl → HTTP_CODE="000" (panne DNS / réseau / timeout).
+      - name: Appeler /api/health
+        if: steps.secrets.outputs.skip != 'true'
+        id: sonde
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+        run: |
+          HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --max-time 15 \
+            "${VERCEL_APP_URL}/api/health") || HTTP_CODE="000"
+
+          echo "Code HTTP : ${HTTP_CODE}"
+          echo "code=${HTTP_CODE}" >> "$GITHUB_OUTPUT"
+
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::Healthcheck en échec — HTTP ${HTTP_CODE} sur ${VERCEL_APP_URL}/api/health"
+            exit 1
+          fi
+
+      # ── 3. Créer ou commenter l'issue d'incident ──────────────────────────
+      # Une seule issue ouverte par incident : si une issue [Incident]
+      # Healthcheck est déjà ouverte, on y ajoute un commentaire au lieu
+      # d'en créer une nouvelle (pas de spam).
+      - name: Créer ou commenter l'issue d'incident
+        if: failure() && steps.secrets.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          CODE_HTTP: ${{ steps.sonde.outputs.code }}
+        run: |
+          DATE_UTC="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
+          # Les labels doivent exister avant gh issue create (dépôt vierge)
+          gh label create incident   --color D93F0B --description "Incident détecté par la surveillance automatisée" || true
+          gh label create monitoring --color 1D76DB --description "Surveillance automatisée (healthcheck)"           || true
+
+          NUMERO=$(gh issue list \
+            --state open \
+            --search '[Incident] Healthcheck in:title' \
+            --json number --jq '.[].number' | head -n 1)
+
+          if [ -z "${NUMERO}" ]; then
+            gh issue create \
+              --title "[Incident] Healthcheck en échec — HTTP ${CODE_HTTP} — ${DATE_UTC}" \
+              --label "incident,monitoring" \
+              --body "$(cat <<EOF
+          ## Incident Healthcheck
+
+          | Champ | Valeur |
+          |-------|--------|
+          | URL sondée | \`${VERCEL_APP_URL}/api/health\` |
+          | Code HTTP | \`${CODE_HTTP}\` |
+          | Détecté | ${DATE_UTC} |
+          | Run | ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} |
+
+          \`000\` = le runner n'a pas pu joindre l'application (DNS, réseau ou timeout > 15 s).
+          \`503\` = l'application répond mais la base de données est injoignable.
+
+          ### Actions à mener
+          1. Vérifier le déploiement Vercel (dernier build, état du domaine).
+          2. Consulter les logs Vercel (Runtime Logs → erreurs récentes).
+          3. Vérifier \`DATABASE_URL\` côté Vercel et l'état de la base Neon (paused ? quota ?).
+          4. Refaire un run manuel du workflow Healthcheck après correction.
+          EOF
+          )"
+            echo "Issue d'incident créée."
+          else
+            gh issue comment "${NUMERO}" --body "Toujours en échec — HTTP ${CODE_HTTP} à ${DATE_UTC}"
+            echo "Issue #${NUMERO} déjà ouverte — commentaire ajouté."
+          fi
+
+      # ── 4. Fermer les issues d'incident résolues ──────────────────────────
+      # Healthcheck OK + issue(s) [Incident] ouverte(s) → commentaire de
+      # restauration + fermeture (traçabilité complète dans l'issue).
+      - name: Fermer les issues d'incident résolues
+        if: success() && steps.secrets.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DATE_UTC="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
+          for NUMERO in $(gh issue list \
+            --state open \
+            --search '[Incident] Healthcheck in:title' \
+            --json number --jq '.[].number'); do
+            gh issue comment "${NUMERO}" --body "✅ Healthcheck restauré — HTTP 200 à ${DATE_UTC}"
+            gh issue close "${NUMERO}"
+            echo "Issue #${NUMERO} fermée (service restauré)."
+          done

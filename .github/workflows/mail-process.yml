@@ -1,0 +1,116 @@
+# Mail Queue Processor — traitement quotidien de la file d'attente des e-mails
+# ─────────────────────────────────────────────────────────────────────────────
+# Filet de secours au cron Vercel (vercel.json → /api/mail/process, 05:00 UTC) :
+# ce workflow passe une seconde fois dans la journée (17:00 UTC = 20:00 à
+# Antananarivo) pour rattraper les messages restés EN_ATTENTE si l'instance
+# Vercel s'était crashée ou si le cron Vercel avait été raté.
+#
+# Endpoint appelé : POST /api/mail/process
+#   - Auth : Bearer CRON_SECRET (accepté par src/lib/mail/api-auth.ts)
+#   - Body : {"purge": false} → traite la file, sans purger le journal
+#   - Réponse 200 : { ok, orphelinsRecuperes, envoyes, retriesProgrammes,
+#                     echecsDefinitifs, erreurs }
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   VERCEL_APP_URL  ex. https://suivi-sante.vercel.app (sans / final)
+#   CRON_SECRET     même valeur que la variable Vercel (openssl rand -hex 32)
+
+name: Mail Queue Processor
+
+on:
+  schedule:
+    # 17:00 UTC tous les jours (décalé du cron Vercel 05:00 UTC)
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+
+# Un seul traitement à la fois — mais on n'annule JAMAIS une exécution en
+# cours : interrompre un envoi à mi-chemin provoquerait des messages bloqués
+# EN_COURS (récupérés comme orphelins au run suivant) voire des doublons.
+concurrency:
+  group: mail-process
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  process:
+    name: Traiter la file d'attente
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      # ── 1. Vérifier les secrets ────────────────────────────────────────────
+      # Le workflow « passe » sans planter tant que les secrets ne sont pas
+      # configurés (warning visible, étapes suivantes ignorées) : utile pour
+      # pousser ce workflow sur un environnement pas encore provisionné.
+      - name: Vérifier les secrets
+        id: secrets
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$VERCEL_APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::warning::Secrets VERCEL_APP_URL et/ou CRON_SECRET non configurés (Settings → Secrets and variables → Actions). Exécution ignorée."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 2. Appeler /api/mail/process ──────────────────────────────────────
+      # Timeout curl 60 s : la route a maxDuration = 60 s côté Vercel.
+      # Code HTTP capturé + réponse sauvée dans /tmp/reponse.json pour
+      # extraire les compteurs. HTTP ≠ 200 → workflow en échec (visible).
+      - name: Appeler /api/mail/process
+        if: steps.secrets.outputs.skip != 'true'
+        id: appel
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          HTTP_CODE=$(curl -sS -o /tmp/reponse.json -w '%{http_code}' \
+            --max-time 60 \
+            -X POST "${VERCEL_APP_URL}/api/mail/process" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{"purge": false}')
+
+          echo "Code HTTP : ${HTTP_CODE}"
+          cat /tmp/reponse.json || true
+
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::L'endpoint /api/mail/process a répondu HTTP ${HTTP_CODE} (attendu : 200). Vérifier VERCEL_APP_URL / CRON_SECRET / les logs Vercel."
+            exit 1
+          fi
+
+          # Extraction des compteurs (fallback 0 si clé absente : le grep
+          # renvoie exit 1 sans correspondance, ce qui casserait set -e).
+          extraire() {
+            grep -oP "\"$1\":\s*\K[0-9]+" /tmp/reponse.json || echo 0
+          }
+          echo "orphelinsRecuperes=$(extraire orphelinsRecuperes)" >> "$GITHUB_OUTPUT"
+          echo "envoyes=$(extraire envoyes)"                        >> "$GITHUB_OUTPUT"
+          echo "retriesProgrammes=$(extraire retriesProgrammes)"    >> "$GITHUB_OUTPUT"
+          echo "echecsDefinitifs=$(extraire echecsDefinitifs)"      >> "$GITHUB_OUTPUT"
+
+      # ── 3. Résumé (onglet Summary de l'exécution) ─────────────────────────
+      - name: Résumé
+        if: steps.secrets.outputs.skip != 'true'
+        env:
+          ORPHELINS: ${{ steps.appel.outputs.orphelinsRecuperes }}
+          ENVOYES: ${{ steps.appel.outputs.envoyes }}
+          RETRIES: ${{ steps.appel.outputs.retriesProgrammes }}
+          ECHECS: ${{ steps.appel.outputs.echecsDefinitifs }}
+        run: |
+          {
+            echo "### Traitement de la file mail — $(date -u '+%Y-%m-%d %H:%M') UTC"
+            echo ""
+            echo "| Indicateur | Valeur |"
+            echo "|------------|--------|"
+            echo "| Orphelins récupérés | ${ORPHELINS:-?} |"
+            echo "| E-mails envoyés | ${ENVOYES:-?} |"
+            echo "| Retries programmés | ${RETRIES:-?} |"
+            echo "| Échecs définitifs | ${ECHECS:-?} |"
+            echo ""
+            echo "Journal détaillé : \`GET /api/mail\` (session ADMINISTRATEUR requise)."
+          } >> "$GITHUB_STEP_SUMMARY"
