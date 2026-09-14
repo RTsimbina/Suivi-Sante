@@ -592,6 +592,7 @@ function ChatbotTab() {
               onClick={() => handleSend()}
               disabled={isLoading || !input.trim()}
               size="icon"
+              aria-label="Envoyer le message"
               className="h-9 w-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
             >
               <Send className="h-4 w-4" />

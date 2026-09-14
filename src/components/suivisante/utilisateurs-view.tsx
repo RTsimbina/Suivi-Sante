@@ -452,6 +452,7 @@ export default function UtilisateursView() {
                               className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                               onClick={() => openEditDialog(user)}
                               title="Modifier"
+                              aria-label="Modifier l'utilisateur"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -471,6 +472,7 @@ export default function UtilisateursView() {
                                   size="icon"
                                   className="h-7 w-7"
                                   onClick={() => setDeleteConfirm(null)}
+                                  aria-label="Annuler la suppression"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </Button>
@@ -482,6 +484,7 @@ export default function UtilisateursView() {
                                 className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                                 onClick={() => setDeleteConfirm(user.id)}
                                 title="Supprimer"
+                                aria-label="Supprimer l'utilisateur"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>

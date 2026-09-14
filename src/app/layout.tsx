@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
@@ -42,17 +43,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Nonce CSP généré par requête dans src/proxy.ts — transmis à next-thèmes
+  // pour que son script inline (classe de thème avant peinture) soit autorisé
+  // par la CSP sans 'unsafe-inline'. NB : rend toutes les pages dynamiques,
+  // acceptable car l'application est intégralement derrière authentification.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html lang="fr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <Providers>
+        <Providers nonce={nonce}>
           {children}
         </Providers>
         {/* Toaster Radix — notifications du hook useToast() */}

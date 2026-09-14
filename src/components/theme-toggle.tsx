@@ -49,6 +49,7 @@ export function ThemeToggle() {
       className="h-8 gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
       onClick={cycleTheme}
       title={theme === 'dark' ? 'Mode sombre' : theme === 'light' ? 'Mode clair' : 'Système'}
+      aria-label={`Changer de thème (actuel : ${label})`}
     >
       {icon}
       <span className="hidden sm:inline">{label}</span>

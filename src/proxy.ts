@@ -43,22 +43,43 @@ export default async function proxy(request: NextRequest) {
   securityHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   // Empêcher l'indexation par les moteurs de recherche (outil interne)
   securityHeaders.set('X-Robots-Tag', 'noindex, nofollow');
-  // CSP restrictive : autorise uniquement les sources nécessaires
-  // unsafe-inline/eval sont requis par le runtime Next.js (hydratation, next-themes)
+
+  // ─── CSP par nonce (CSP niveau 3) ─────────────────────────────────────────
+  // Un nonce unique est généré pour CHAQUE requête de document. Next.js lit
+  // l'en-tête CSP de la REQUÊTE (ci-dessous via requestHeaders) et applique
+  // automatiquement le nonce à ses scripts inline (payload RSC, hydratation).
+  // 'strict-dynamic' autorise les scripts chargés dynamiquement par un script
+  // de confiance (chunks Next.js) tout en ignorant 'self'/'unsafe-inline'.
+  // 'unsafe-eval' n'est conservé qu'en développement (React Fast Refresh).
+  // Les scripts inline applicatifs (next-themes) reçoivent le nonce via
+  // <ThemeProvider nonce> alimenté par l'en-tête x-nonce (src/app/layout.tsx).
+  // style-src garde 'unsafe-inline' : requis par les attributs style dynamiques
+  // de Radix/Tailwind, sans vecteur XSS significatif (recommandation Next.js).
+  const nonce = btoa(crypto.randomUUID());
+  const isDev = process.env.NODE_ENV !== 'production';
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self'",
+    isDev ? "connect-src 'self' ws: wss:" : "connect-src 'self'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    "object-src 'none'",
+    ...(isDev ? [] : ['upgrade-insecure-requests']),
   ].join('; ');
   securityHeaders.set('Content-Security-Policy', csp);
 
+  // Le CSP + le nonce doivent être visibles de la REQUÊTE pour que le
+  // renderer Next.js extraie le nonce, et de l'app via x-nonce (ThemeProvider).
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('Content-Security-Policy', csp);
+  requestHeaders.set('x-nonce', nonce);
+
   const response = NextResponse.next({
+    request: { headers: requestHeaders },
     headers: securityHeaders,
   });
 

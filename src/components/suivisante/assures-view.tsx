@@ -781,14 +781,14 @@ function AssureFamilyRow({
         {canEdit && (
           <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(principal)}><Pencil className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(principal)} aria-label="Modifier l'assuré"><Pencil className="h-3.5 w-3.5" /></Button>
               {deleteConfirm === principal.id ? (
                 <div className="flex items-center gap-1">
                   <Button variant="destructive" size="sm" className="h-7 text-xs px-2" onClick={() => handleDelete(principal.id)} disabled={saving}>{saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Oui'}</Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(null)}><X className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(null)} aria-label="Annuler la suppression"><X className="h-3.5 w-3.5" /></Button>
                 </div>
               ) : (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => onDelete(principal.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => onDelete(principal.id)} aria-label="Supprimer l'assuré"><Trash2 className="h-3.5 w-3.5" /></Button>
               )}
             </div>
           </td>
@@ -835,8 +835,8 @@ function AssureFamilyRow({
           {canEdit && (
             <td className="px-4 py-2.5 text-right">
               <div className="flex items-center justify-end gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(ad)}><Pencil className="h-3 w-3" /></Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => handleDelete(ad.id)}><Trash2 className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(ad)} aria-label="Modifier l'adresse"><Pencil className="h-3 w-3" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:bg-red-950/40" onClick={() => handleDelete(ad.id)} aria-label="Supprimer l'adresse"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </td>
           )}

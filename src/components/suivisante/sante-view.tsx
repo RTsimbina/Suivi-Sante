@@ -261,14 +261,12 @@ export default function SanteView() {
     if (result?.assure.id) {
       fetchActes(result.assure.id, 1);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result?.assure.id]);
 
   // Recharger quand la page change (pagination)
   useEffect(() => {
     if (!result?.assure.id) return;
     fetchActes(result.assure.id, actesPage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actesPage]);
 
   // Appliquer les filtres (uniquement via le bouton Rechercher)
@@ -729,6 +727,7 @@ export default function SanteView() {
                           variant="outline" size="icon" className="h-7 w-7"
                           disabled={actesPage <= 1}
                           onClick={() => setActesPage(p => p - 1)}
+                          aria-label="Page précédente"
                         >
                           <ChevronLeft className="h-3.5 w-3.5" />
                         </Button>
@@ -759,6 +758,7 @@ export default function SanteView() {
                           variant="outline" size="icon" className="h-7 w-7"
                           disabled={actesPage >= actesPagination.totalPages}
                           onClick={() => setActesPage(p => p + 1)}
+                          aria-label="Page suivante"
                         >
                           <ChevronRight className="h-3.5 w-3.5" />
                         </Button>

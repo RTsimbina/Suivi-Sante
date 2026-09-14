@@ -658,6 +658,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                               className="h-8 w-8"
                               onClick={() => openEditDialog(s)}
                               title="Modifier"
+                              aria-label="Modifier la société"
                             >
                               <Pencil className="h-4 w-4 text-emerald-600" />
                             </Button>
@@ -668,6 +669,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
                               onClick={() => handleDeleteSociete(s.id)}
                               disabled={deletingId === s.id}
                               title="Supprimer"
+                              aria-label="Supprimer la société"
                             >
                               {deletingId === s.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin text-red-500" />

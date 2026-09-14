@@ -616,12 +616,12 @@ export default function ConfigurationView() {
                       {deleteConfirm === msg.id ? (
                         <div className="flex flex-col gap-1 shrink-0">
                           <Button variant="destructive" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleDelete(msg.id)}>Oui</Button>
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1" onClick={() => setDeleteConfirm(null)}>
+                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1" onClick={() => setDeleteConfirm(null)} aria-label="Annuler la suppression">
                             <XCircle className="h-3 w-3" />
                           </Button>
                         </div>
                       ) : (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 shrink-0" onClick={() => setDeleteConfirm(msg.id)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 shrink-0" onClick={() => setDeleteConfirm(msg.id)} aria-label="Supprimer ce message">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}

@@ -48,6 +48,7 @@ export function SharedPagination({ pagination, onPageChange, label, className }:
           className="h-8 w-8"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
+          aria-label="Page précédente"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -57,6 +58,7 @@ export function SharedPagination({ pagination, onPageChange, label, className }:
           className="h-8 w-8"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
+          aria-label="Page suivante"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
