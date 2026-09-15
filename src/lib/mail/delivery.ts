@@ -14,14 +14,17 @@
  *        └─ erreur perm.  → abandon définitif (ECHEC), pas de spam de retries
  *
  * Remarque architecture : la plateforme ne parle JAMAIS directement aux
- * serveurs Gmail/Yahoo/Outlook. Elle parle à SON relais SMTP (fournisseur
- * spécialisé — Resend, Brevo, SMTP2GO, Mailgun, SES… — ou serveur de messagerie
- * maison), qui résout le DNS/MX du destinataire et fait la remise finale.
- * Les enregistrements SPF/DKIM/DMARC du domaine d'envoi valident cette remise.
+ * serveurs Gmail/Yahoo/Outlook. Elle parle à SON relais — Resend (fournisseur
+ * qui gère le mail de la plateforme, via son API HTTPS native, ou via SMTP
+ * 587 en fallback — voir resend.ts) ou un autre relais SMTP (Brevo, SMTP2GO,
+ * Mailgun, SES, serveur maison). Le relais résout le DNS/MX du destinataire
+ * et fait la remise finale. Les enregistrements SPF/DKIM/DMARC du domaine
+ * d'envoi valident cette remise.
  */
 
 import nodemailer from 'nodemailer';
 import { getTransporter, getSmtpConfig } from '../email';
+import { fournisseurActif, envoyerViaResend } from './resend';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -120,11 +123,32 @@ export function classerErreurSMTP(messageBrut: string): { temporaire: boolean } 
 // ─── Livraison effective ─────────────────────────────────────────────────────
 
 /**
- * Envoie UN message via le relais SMTP configuré (ConfigurationEmail ou env).
+ * Envoie UN message via le transport configuré :
+ *   - Resend actif (RESEND_API_KEY) → API HTTPS native (voir resend.ts) ;
+ *   - sinon → relais SMTP (ConfigurationEmail ou env).
  * Ne décide PAS des retries : renvoie seulement le verdict au module file.
  */
 export async function livrerMessage(msg: MessageLivraison): Promise<ResultatLivraison> {
   try {
+    // ── Transport Resend (API native) — prioritaire ──────────────────────
+    if (fournisseurActif() === 'resend') {
+      const fromResend =
+        msg.fromPersonnalise ||
+        process.env.MAIL_FROM_EMAIL ||
+        (await getSmtpConfig())?.from;
+      if (!fromResend) {
+        // Transitoire : le message RESTE en file dès que MAIL_FROM_EMAIL
+        // sera défini (l'expéditeur est requis par l'API Resend).
+        return {
+          ok: false,
+          temporaire: true,
+          erreur: 'Expéditeur (MAIL_FROM_EMAIL) non défini — message conservé en file d\'attente.',
+        };
+      }
+      return await envoyerViaResend({ ...msg, from: fromResend });
+    }
+
+    // ── Transport SMTP (relais générique) — fallback ──────────────────────
     const config = await getSmtpConfig();
     if (!config) {
       // Configuration absente = transitoire : le message RESTE en file et sera

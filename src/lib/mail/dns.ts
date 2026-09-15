@@ -181,11 +181,12 @@ async function verifierDmarc(domaine: string): Promise<DetailVerification> {
 
 /**
  * Vérifie SPF + DKIM + DMARC pour un domaine d'expédition.
- * @param selecteurDkim sélecteur DKIM fourni par le relais (resend, brevo1, mail, s1…)
+ * @param selecteurDkim sélecteur DKIM fourni par le relais — défaut « resend »
+ *   (Resend publie la clé sur resend._domainkey ; Brevo : brevo1/mail, etc.)
  */
 export async function verifierDnsDomaine(
   domaine: string,
-  selecteurDkim: string = process.env.MAIL_DKIM_SELECTOR || 'mail'
+  selecteurDkim: string = process.env.MAIL_DKIM_SELECTOR || 'resend'
 ): Promise<ResultatVerificationDns> {
   const propre = domaine.trim().toLowerCase().replace(/\.$/, '');
   const [spf, dkim, dmarc] = await Promise.all([

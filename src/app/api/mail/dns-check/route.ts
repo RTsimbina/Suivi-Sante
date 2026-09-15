@@ -8,14 +8,16 @@
  *   1. la variable MAIL_FROM_EMAIL si définie ;
  *   2. sinon l'expéditeur configuré (page Configuration ou SMTP_FROM).
  *
- * Le sélecteur DKIM provient de MAIL_DKIM_SELECTOR (défaut « mail » ;
- * mettre « resend » avec le relais Resend — voir docs/MESSAGERIE.md §2).
+ * Le sélecteur DKIM provient de MAIL_DKIM_SELECTOR (défaut « resend » —
+ * sélecteur publié par Resend ; mettre « mail »/« brevo1 » avec un autre
+ * relais — voir docs/MESSAGERIE.md §2).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/lib/authorize';
 import { getSmtpConfigForUI } from '@/lib/email';
 import { verifierDnsDomaine, extraireDomaineFrom } from '@/lib/mail/dns';
+import { fournisseurActif } from '@/lib/mail/resend';
 
 export const maxDuration = 30;
 
@@ -50,7 +52,8 @@ export async function GET(request: NextRequest) {
   // ── Vérification DNS (SPF + DKIM + DMARC en parallèle) ───────────────────
   try {
     const resultat = await verifierDnsDomaine(domaine);
-    return NextResponse.json({ ...resultat, fromEmail: from.trim() });
+    // fournisseur : transport effectif du moteur de livraison (resend | smtp)
+    return NextResponse.json({ ...resultat, fromEmail: from.trim(), fournisseur: fournisseurActif() });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(

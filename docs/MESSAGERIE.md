@@ -61,7 +61,8 @@ Tout le code du service vit dans `src/lib/mail/` :
 | `rate-limit.ts` | Fenêtre glissante 1 h : plafond par destinataire normalisé + plafond global (comptage en base, fiable en serverless) |
 | `queue.ts` | File persistante, claim atomique `FOR UPDATE SKIP LOCKED`, retry avec backoff exponentiel, orphelins, purge, statistiques |
 | `templates.ts` | Layout HTML commun, échappement systématique, version texte alternée |
-| `delivery.ts` | Envoi SMTP via nodemailer, timeouts bornés, classification temporaire/permanente des erreurs |
+| `resend.ts` | Transport Resend — API HTTPS native (SDK `resend`), classification des erreurs, vérification clé + domaines |
+| `delivery.ts` | Moteur de livraison : Resend (API) si la clé est définie, sinon SMTP nodemailer ; classification temporaire/permanente des erreurs |
 | `mail.test.ts` | 52 tests unitaires (vitest) |
 
 ---
@@ -125,13 +126,23 @@ SMTP_FROM=notifications@maplateforme.com
 6. **Vérifier** : page Configuration → test SMTP, puis vérifier l'en-tête reçu dans
    la boîte Gmail (onglet « Original ») : `SPF: PASS`, `DKIM: PASS`, `DMARC: PASS`.
 
-### Relais recommandé : Resend (déploiement Vercel)
+### Relais actif : Resend (déploiement Vercel)
 
-Resend est le choix de référence pour Suivi-Sante sur Vercel : SMTP simple en
-STARTTLS port 587, délivrabilité gérée (infrastructure Amazon SES), 3 000 e-mails/mois
-gratuits, logs par message dans le dashboard. **Aucune modification de code** : le
-moteur de livraison (`delivery.ts`) parle déjà SMTP à un relais — Resend n'est qu'un
-jeu de variables d'environnement.
+Resend gère le mail de la plateforme. Deux voies de livraison, choisies
+automatiquement par `delivery.ts` :
+
+1. **API HTTPS native (voie par défaut)** — dès que `RESEND_API_KEY` est définie,
+   les messages partent via le SDK officiel (`resend`, module `src/lib/mail/resend.ts`) :
+   un simple appel HTTPS `POST /emails`, **aucun port SMTP requis** — la voie la
+   plus fiable sur Vercel (port 25 bloqué, connexions sortantes longues découragées).
+   Les pièces jointes partent en base64 ; CC/BCC/Reply-To sont supportés.
+2. **SMTP `smtp.resend.com:587` (secours)** — forçable avec `MAIL_TRANSPORT=smtp` :
+   utilisateur littéral `resend`, mot de passe = clé API. Utile si l'API est
+   indisponible ou pour un relais alternatif (Brevo, SMTP2GO…).
+
+Forçage : `MAIL_TRANSPORT=resend|smtp|auto` (défaut `auto` = Resend si la clé
+existe, sinon SMTP). Délivrabilité gérée (infrastructure Amazon SES), 3 000
+e-mails/mois gratuits, logs par message dans le dashboard.
 
 **Étape 1 — Compte et domaine**
 
@@ -156,15 +167,22 @@ jeu de variables d'environnement.
 **Étape 2 — Variables d'environnement (Vercel / .env)**
 
 ```
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxx   # API native — voie par défaut
+MAIL_TRANSPORT=auto                        # resend | smtp | auto (défaut)
+MAIL_FROM_EMAIL=noreply@mail.maplateforme.com   # From requis par l'API + domaine lu par /api/mail/dns-check
+MAIL_DKIM_SELECTOR=resend            # Resend publie la clé sur « resend », pas « mail »
+MAIL_CONTACT=support@maplateforme.com
+
+# Secours SMTP (facultatif) — sinon laisser vide :
 SMTP_HOST=smtp.resend.com
 SMTP_PORT=587                        # STARTTLS — Vercel bloque le port 25
 SMTP_USER=resend                     # littéral : toujours « resend »
 SMTP_PASS=re_xxxxxxxxxxxxxxxxxxxxxx  # clé API Resend
 SMTP_FROM=noreply@mail.maplateforme.com
-MAIL_FROM_EMAIL=noreply@mail.maplateforme.com   # domaine lu par /api/mail/dns-check
-MAIL_DKIM_SELECTOR=resend            # Resend publie la clé sur « resend », pas « mail »
-MAIL_CONTACT=support@maplateforme.com
 ```
+
+Ajouter/modifier ces variables sur Vercel → Settings → Environment Variables,
+puis **redéployer** (les variables ne s'appliquent qu'aux nouveaux builds).
 
 **Étape 3 — Quotas : rester sous la limite gratuite**
 
@@ -293,7 +311,9 @@ son historique d'événements (cascade PostgreSQL).
 Interroge le DNS public pour vérifier que le domaine d'expédition publie bien
 les enregistrements d'authentification attendus par Gmail / Yahoo / Outlook
 (plan §18-20). Le domaine est déduit de `MAIL_FROM_EMAIL` ou de l'expéditeur
-configuré ; le sélecteur DKIM vient de `MAIL_DKIM_SELECTOR` (défaut `mail`).
+configuré ; le sélecteur DKIM vient de `MAIL_DKIM_SELECTOR` (défaut `resend`).
+La réponse inclut aussi `fournisseur` (`resend` | `smtp`) — le transport
+effectif affiché dans la page Configuration.
 
 ```bash
 curl "https://votre-domaine/api/mail/dns-check"
@@ -348,8 +368,10 @@ appel) → purge optionnelle du journal.
 | `MAIL_BLOCKED_DOMAINS` | — | liste noire additionnelle (virgules) |
 | `MAIL_ALLOWED_DOMAINS` | — | si définie, seuls ces domaines sont acceptés |
 | `MAIL_CONTACT` | `support@suivisante.mg` | adresse de contact dans le pied des e-mails |
-| `MAIL_FROM_EMAIL` | — | adresse From lue par `/api/mail/dns-check` (défaut : expéditeur du relais configuré) |
-| `MAIL_DKIM_SELECTOR` | `mail` | sélecteur DKIM vérifié par le dns-check — `resend` avec Resend, `mail`/`brevo1`… selon le relais |
+| `MAIL_FROM_EMAIL` | — | adresse From (requis pour l'API Resend) et domaine lu par `/api/mail/dns-check` (défaut : expéditeur du relais configuré) |
+| `MAIL_DKIM_SELECTOR` | `resend` | sélecteur DKIM vérifié par le dns-check — `resend` avec Resend, `mail`/`brevo1`… selon le relais |
+| `RESEND_API_KEY` | — | clé API Resend (`re_…`) : active l'API HTTPS native du moteur de livraison |
+| `MAIL_TRANSPORT` | `auto` | `auto` (Resend si clé, sinon SMTP) · `resend` (forcé) · `smtp` (secours forcé) |
 | `CRON_SECRET` | — | secret Vercel Cron (aussi accepté par le service mail) |
 
 Configuration SMTP relais : voir §2 (page Configuration ou `SMTP_*`). Avec

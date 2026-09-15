@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { db } from './db';
 import { decrypt } from './crypto';
+import { fournisseurActif, verifierResend, envoyerViaResend } from './mail/resend';
 import { optionsTlsSmtp } from './mail/tls';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -225,6 +226,32 @@ export async function envoyerEmail(opts: {
 }): Promise<void> {
   if (opts.destinataires.length === 0) return;
 
+  // ── Transport Resend (API native) — prioritaire quand RESEND_API_KEY est définie
+  if (fournisseurActif() === 'resend') {
+    const config = await getSmtpConfig();
+    const fromResend = opts.fromPersonnalise || process.env.MAIL_FROM_EMAIL || config?.from;
+    if (!fromResend) {
+      throw new Error('Expéditeur absent — définissez MAIL_FROM_EMAIL (ex. noreply@votre-domaine) pour l\'envoi via Resend.');
+    }
+    const resultat = await envoyerViaResend({
+      id: 'envoyerEmail',
+      destinataires: { to: opts.destinataires, cc: [], bcc: opts.bcc ?? [] },
+      sujet: opts.sujet,
+      texte: opts.texte,
+      html: opts.html,
+      from: fromResend,
+      replyTo: opts.replyTo,
+      piecesJointes: opts.attachments?.map((a) => ({
+        nom: a.filename,
+        contenuBase64: a.content.toString('base64'),
+        contentType: a.contentType || 'application/pdf',
+      })),
+    });
+    if (!resultat.ok) throw new Error(resultat.erreur || 'Échec de l\'envoi via Resend.');
+    return;
+  }
+
+  // ── Transport SMTP (relais générique) — fallback
   const config = await getSmtpConfig();
   if (!config) {
     throw new Error('SMTP non configure — configurez-le depuis la page Configuration ou ajoutez les variables d\'environnement');
@@ -265,6 +292,14 @@ export async function envoyerEmail(opts: {
 // ─── Vérification de la connexion SMTP ─────────────────────────────────────
 
 export async function verifierSMTP(): Promise<{ ok: boolean; erreur?: string }> {
+  // ── Transport Resend actif → vérification via l'API (pas de handshake SMTP) :
+  // clé valide + domaines vérifiés. L'expéditeur/SMTP de secours reste testable
+  // en forçant MAIL_TRANSPORT=smtp.
+  if (fournisseurActif() === 'resend') {
+    const r = await verifierResend();
+    return r.ok ? { ok: true } : { ok: false, erreur: r.erreur };
+  }
+
   try {
     const config = await getSmtpConfig();
     if (!config) {

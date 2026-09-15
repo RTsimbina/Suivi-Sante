@@ -41,6 +41,7 @@ interface VerificationDns {
   verifieLe: string;
   notes: string[];
   fromEmail?: string;
+  fournisseur?: 'resend' | 'smtp';
   erreur?: string;
 }
 
@@ -241,6 +242,15 @@ export default function MailServiceCard() {
               <p className="text-xs text-muted-foreground">
                 Domaine : <span className="font-medium text-foreground">{dns.domaine}</span>
                 {dns.fromEmail ? <> — expéditeur : <span className="font-medium text-foreground">{dns.fromEmail}</span></> : null}
+                {dns.fournisseur ? (
+                  <Badge
+                    className={`ml-2 text-[10px] border ${dns.fournisseur === 'resend'
+                      ? 'bg-black text-white border-black dark:bg-white dark:text-black dark:border-white'
+                      : 'bg-gray-100 text-gray-700 border-gray-200'}`}
+                  >
+                    {dns.fournisseur === 'resend' ? 'Resend — API native' : 'Relais SMTP'}
+                  </Badge>
+                ) : null}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {([['SPF', dns.spf], ['DKIM', dns.dkim], ['DMARC', dns.dmarc]] as const).map(([nom, detail]) => (
@@ -267,8 +277,8 @@ export default function MailServiceCard() {
               </div>
               <p className="text-[11px] text-muted-foreground">
                 Sélecteur DKIM : <span className="font-mono">{dns.selecteurDkim}</span> — modifiable via MAIL_DKIM_SELECTOR
-                (Resend : « resend » ; Brevo : « mail » / « brevo1 »).
-                Publiez les enregistrements fournis par votre relais (Resend / Brevo / SMTP2GO) dans le DNS du domaine,
+                (Resend : « resend », valeur par défaut ; Brevo : « mail » / « brevo1 »).
+                Publiez les enregistrements fournis par Resend dans le DNS du domaine,
                 idéalement sur un sous-domaine dédié (ex. mail.{dns.domaine}). Voir docs/MESSAGERIE.md.
               </p>
               {dns.notes.map(n => (
