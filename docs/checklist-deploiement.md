@@ -3,6 +3,39 @@
 > À exécuter **après chaque déploiement** (recette puis production) et après toute migration.
 > Cochez chaque point ; toute case décochée = déploiement à ne pas considérer comme validé.
 
+## 0. Configuration production (Vercel + Resend) — avant le premier déploiement mail
+
+> Détail complet de la procédure Resend : voir `docs/MESSAGERIE.md` §2.
+
+### 0.1 Variables d'environnement Vercel (Project → Settings → Environment Variables)
+
+- [ ] `DATABASE_URL` — chaîne PostgreSQL production (poolé, sslmode=require)
+- [ ] `NEXTAUTH_URL` — URL publique de l'application
+- [ ] `NEXTAUTH_SECRET` — secret de signature des sessions
+- [ ] `RESEND_API_KEY` — clé API Resend (`re_…`, Dashboard Resend → API Keys, « full access »)
+- [ ] `MAIL_FROM_EMAIL` — expéditeur (`noreply@<domaine-vérifié>`, **jamais** gmail.com)
+- [ ] `MAIL_API_KEY` — jeton d'appel machine de `/api/mail/process` (Bearer)
+- [ ] `CRON_SECRET` — même valeur que le secret GitHub (workflow `mail-process.yml` + Vercel Cron)
+- [ ] Optionnel : `MAIL_TRANSPORT=auto` (défaut), plafonds `MAIL_MAX_*`, `EMAIL_RAPPORT_DESTINATAIRE`
+
+### 0.2 Domaine d'expédition Resend (mode production)
+
+- [ ] Domaine ajouté dans Resend → Domains
+- [ ] 3 enregistrements DNS publiés chez le registrar : SPF (TXT), DKIM (`resend._domainkey`, TXT), DMARC (TXT)
+- [ ] Statut du domaine dans Resend → **Verified** (attendre la propagation, puis « Verify »)
+- [ ] Contrôle applicatif : page Configuration → vérification messagerie (`verifierResend()`), et `GET /api/mail/dns-check` → SPF/DKIM/DMARC OK
+
+### 0.3 Réglages Vercel qui cassent les appels automatisés
+
+- [ ] **Attack Challenge Mode désactivé** (Project → Settings → Deployment Protection) — sinon les workflows GitHub (`mail-process.yml`, `healthcheck.yml`) et Vercel Cron reçoivent une page HTML de challenge 429 au lieu de l'API
+- [ ] Vercel Cron actif (`vercel.json`) et `CRON_ENABLED` non désactivé
+
+### 0.4 Validation bout-en-bout du mail
+
+- [ ] Workflow GitHub `mail-test-send.yml` déclenché manuellement → e-mail de test reçu sur la boîte visée
+- [ ] Un message réel passe par la file : statuts visibles dans la vue Messagerie (en file → envoyé, messageId Resend)
+- [ ] En cas d'échec : message d'erreur interprété dans les logs (`interpreterErreurResend`), rien ne part en silence
+
 ## 1. Authentification et accès
 
 - [ ] **Connexion** avec un compte valide (chaque rôle concerné) → accès à l'application
