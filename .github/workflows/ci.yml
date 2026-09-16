@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# Principe du moindre privilège : le CI n'a besoin que de lire le dépôt.
+permissions:
+  contents: read
+
+# Annule les runs obsolètes quand plusieurs pushes arrivent sur la même branche.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     name: Tests automatiques (vitest + TypeScript + build)
