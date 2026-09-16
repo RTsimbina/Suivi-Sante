@@ -69,9 +69,18 @@ jobs:
           AUTH="Authorization: Bearer ${NEON_API_KEY}"
 
           # 1er projet Neon (le compte n'en gère qu'un pour cette application)
-          PROJET=$(curl -sfS --retry 5 --retry-delay 3 --retry-all-errors -H "$AUTH" "$API/projects")
-          PROJECT_ID=$(echo "$PROJET" | jq -r '.projects[0].id')
-          BRANCH_ID=$(echo "$PROJET" | jq -r '.projects[0].default_branch_id // .projects[0].branches[0].id')
+          PROJET=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
+            -H "$AUTH" -H "Accept: application/json" \
+            -w '\n%{http_code}' "$API/projects")
+          CODE_PROJET=$(echo "$PROJET" | tail -n1)
+          if [ "$CODE_PROJET" != "200" ]; then
+            echo "::error::API Neon /projects → HTTP $CODE_PROJET. Réponse :"
+            echo "$PROJET" | head -n -1 | head -c 500
+            echo ""
+            exit 1
+          fi
+          PROJECT_ID=$(echo "$PROJET" | head -n -1 | jq -r '.projects[0].id')
+          BRANCH_ID=$(echo "$PROJET" | head -n -1 | jq -r '.projects[0].default_branch_id // .projects[0].branches[0].id')
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
             echo "::error::Aucun projet Neon accessible avec NEON_API_KEY."
             exit 1
@@ -79,8 +88,18 @@ jobs:
           echo "Projet Neon : $PROJECT_ID / branche : $BRANCH_ID"
 
           # Base + rôle propriétaire de la branche (par défaut : la première)
-          BASE=$(curl -sfS --retry 5 --retry-delay 3 --retry-all-errors -H "$AUTH" "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/databases" | jq -r '.databases[0].name')
-          ROLE=$(curl -sfS --retry 5 --retry-delay 3 --retry-all-errors -H "$AUTH" "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/databases" | jq -r '.databases[0].owner_name')
+          BASES=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
+            -H "$AUTH" -H "Accept: application/json" \
+            -w '\n%{http_code}' "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/databases")
+          CODE_BASES=$(echo "$BASES" | tail -n1)
+          if [ "$CODE_BASES" != "200" ]; then
+            echo "::error::API Neon /databases → HTTP $CODE_BASES. Réponse :"
+            echo "$BASES" | head -n -1 | head -c 500
+            echo ""
+            exit 1
+          fi
+          BASE=$(echo "$BASES" | head -n -1 | jq -r '.databases[0].name')
+          ROLE=$(echo "$BASES" | head -n -1 | jq -r '.databases[0].owner_name')
           if [ -z "$BASE" ] || [ "$BASE" = "null" ]; then
             echo "::error::Aucune base trouvée sur la branche $BRANCH_ID."
             exit 1
@@ -88,9 +107,18 @@ jobs:
           echo "Base : $BASE (rôle : $ROLE)"
 
           # URI de connexion — connexion DIRECTE requise pour les migrations
-          REPONSE=$(curl -sfS --retry 5 --retry-delay 3 --retry-all-errors -H "$AUTH" \
+          REPONSE=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
+            -H "$AUTH" -H "Accept: application/json" \
+            -w '\n%{http_code}' \
             "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/connection_uri?database_name=${BASE}&role_name=${ROLE}")
-          URI=$(echo "$REPONSE" | jq -r '.uri')
+          CODE_URI=$(echo "$REPONSE" | tail -n1)
+          if [ "$CODE_URI" != "200" ]; then
+            echo "::error::API Neon /connection_uri → HTTP $CODE_URI. Réponse :"
+            echo "$REPONSE" | head -n -1 | head -c 300
+            echo ""
+            exit 1
+          fi
+          URI=$(echo "$REPONSE" | head -n -1 | jq -r '.uri')
           if [ -z "$URI" ] || [ "$URI" = "null" ]; then
             echo "::error::L'API Neon n'a pas renvoyé d'URI de connexion."
             exit 1
