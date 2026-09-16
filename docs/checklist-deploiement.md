@@ -87,13 +87,21 @@ Pour chaque entité principale — sociétés, assurés/bénéficiaires, prestat
 
 ## 6. Après une migration de base (en plus des sections ci-dessus)
 
-> **Depuis le 16/09/2026**, le build Vercel applique automatiquement les migrations en attente
-> (`package.json` → `build` : `prisma generate && prisma migrate deploy && next build`).
-> Conditions : `DATABASE_URL` doit être définie dans les variables d'environnement Vercel
-> (Production **et** Preview) — sans elle, le build échoue explicitement, ce qui est voulu.
-> `prisma migrate deploy` est idempotent : sans migration en attente, il ne fait rien.
-> En cas de besoin ponctuel, l'application manuelle reste possible :
-> `DATABASE_URL="postgres://…" npx prisma migrate deploy`.
+> **Depuis le 16/09/2026**, le build Vercel tente d'appliquer les migrations en attente
+> (`build` : `prisma generate && (prisma migrate deploy || …) && next build`) — **sans jamais
+> bloquer le déploiement** en cas d'échec (avertissement dans les logs de build).
+> `DATABASE_URL` doit être définie dans les variables d'environnement Vercel (Production **et**
+> Preview) pour que cette étape fonctionne ; sinon le déploiement continue simplement sans
+> migrer. `prisma migrate deploy` est idempotent : sans migration en attente, il ne fait rien.
+>
+> **Chemin AUTORITAIRE** pour migrer : workflow GitHub **« Migration base de données »**
+> (`.github/workflows/migrate.yml`, bouton *Run workflow*) — utilise le secret `NEON_API_KEY`
+> pour récupérer l'URL de connexion directe Neon et applique les migrations via
+> `prisma migrate deploy`. **Première exécution** (base créée via `db push`, aucune table
+> `_prisma_migrations`) : cocher « adopter_existant » — les migrations déjà matérialisées sont
+> enregistrées comme appliquées, la plus récente est appliquée réellement.
+> Alternative manuelle : `DATABASE_URL="postgres://…" npx prisma migrate deploy` (connexion
+> **directe** Neon, sans `-pooler`).
 
 - [ ] `npm run db:migrate:status` → « Database schema is up to date! »
 - [ ] Toutes les énumérations/statuts affichés correctement (aucun libellé brut)

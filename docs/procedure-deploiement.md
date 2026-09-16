@@ -112,6 +112,7 @@ npm run build                                           # 5. construire (sans ef
 | `npm run db:migrate:status` | État des migrations (recette ou prod selon l'URL fournie) |
 | `npm run db:migrate:deploy` | Application des migrations en attente |
 | `npm run db:baseline` | Adoption one-shot de la chaîne de migrations sur la base Neon existante |
+| Workflow **« Migration base de données »** | Chemin recommandé : applique les migrations via `NEON_API_KEY` (GitHub → Actions → Run workflow ; cocher « adopter_existant » à la première exécution) |
 
 > **Sécurité des URLs** : ne jamais commiter d'URL de base (mot de passe inclus). Toujours passer
 > par des variables d'environnement. Pour Neon, utiliser la connexion **directe** (sans `-pooler`)
