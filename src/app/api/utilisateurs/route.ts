@@ -123,6 +123,14 @@ export async function GET(request: NextRequest) {
     // Visibilité : un compte PORTAIL_CLIENT / CONTACT_ENTREPRISE sans assuré /
     // contact portant cet e-mail produit l'erreur « Aucun assuré lié à votre
     // compte » au portail — on l'affiche AVANT que le client ne se connecte.
+    //
+    // ⚠️ L'enrichissement est BEST-EFFORT : il ne doit JAMAIS faire échouer
+    // la liste. En production (2026-09), le code déployé avant la migration
+    // Prisma « emailContactPrincipal » faisait planter cette requête SQL →
+    // 500 → « Aucun utilisateur trouvé » pour TOUS les comptes. Désormais :
+    // en cas d'erreur ici, la liste est renvoyée quand même, simplement sans
+    // badge de liaison (liaisonExterne = null = inconnu).
+    let erreurBadge = false;
     const emailsExternes = utilisateurs
       .filter(u => u.role === 'PORTAIL_CLIENT' || u.role === 'CONTACT_ENTREPRISE')
       .map(u => u.email);
@@ -131,40 +139,49 @@ export async function GET(request: NextRequest) {
     const contactsParEmail = new Set<string>();
     const societesParEmail = new Set<string>();
     if (emailsExternes.length > 0) {
-      const [assures, contacts, societesLiees] = await Promise.all([
-        db.assure.findMany({
-          where: { email: { in: emailsExternes, mode: 'insensitive' } },
-          select: { email: true },
-        }),
-        db.entrepriseContact.findMany({
-          where: { email: { in: emailsExternes, mode: 'insensitive' } },
-          select: { email: true },
-        }),
-        db.societe.findMany({
-          where: {
-            OR: [
-              { emailContactPrincipal: { in: emailsExternes, mode: 'insensitive' } },
-              { email: { in: emailsExternes, mode: 'insensitive' } },
-            ],
-          },
-          select: { email: true, emailContactPrincipal: true },
-        }),
-      ]);
-      assures.forEach(a => assuresParEmail.add((a.email ?? '').trim().toLowerCase()));
-      contacts.forEach(c => contactsParEmail.add((c.email ?? '').trim().toLowerCase()));
-      societesLiees.forEach(s => {
-        if (s.emailContactPrincipal) societesParEmail.add(s.emailContactPrincipal.trim().toLowerCase());
-        if (s.email) societesParEmail.add(s.email.trim().toLowerCase());
-      });
+      try {
+        const [assures, contacts, societesLiees] = await Promise.all([
+          db.assure.findMany({
+            where: { email: { in: emailsExternes, mode: 'insensitive' } },
+            select: { email: true },
+          }),
+          db.entrepriseContact.findMany({
+            where: { email: { in: emailsExternes, mode: 'insensitive' } },
+            select: { email: true },
+          }),
+          db.societe.findMany({
+            where: {
+              OR: [
+                { emailContactPrincipal: { in: emailsExternes, mode: 'insensitive' } },
+                { email: { in: emailsExternes, mode: 'insensitive' } },
+              ],
+            },
+            select: { email: true, emailContactPrincipal: true },
+          }),
+        ]);
+        assures.forEach(a => assuresParEmail.add((a.email ?? '').trim().toLowerCase()));
+        contacts.forEach(c => contactsParEmail.add((c.email ?? '').trim().toLowerCase()));
+        societesLiees.forEach(s => {
+          if (s.emailContactPrincipal) societesParEmail.add(s.emailContactPrincipal.trim().toLowerCase());
+          if (s.email) societesParEmail.add(s.email.trim().toLowerCase());
+        });
+      } catch (error) {
+        // Migration 20260916120000 non déployée, base indisponible, etc. :
+        // on dégrade le badge, pas la liste.
+        erreurBadge = true;
+        console.error('[UTILISATEURS] Enrichissement liaison indisponible (liste renvoyée sans badge) :', error);
+      }
     }
 
     const enriched = utilisateurs.map(u => {
       let liaisonExterne: boolean | null = null;
-      if (u.role === 'PORTAIL_CLIENT') {
-        liaisonExterne = assuresParEmail.has(u.email.trim().toLowerCase());
-      } else if (u.role === 'CONTACT_ENTREPRISE') {
-        liaisonExterne = contactsParEmail.has(u.email.trim().toLowerCase()) ||
-          societesParEmail.has(u.email.trim().toLowerCase());
+      if (!erreurBadge) {
+        if (u.role === 'PORTAIL_CLIENT') {
+          liaisonExterne = assuresParEmail.has(u.email.trim().toLowerCase());
+        } else if (u.role === 'CONTACT_ENTREPRISE') {
+          liaisonExterne = contactsParEmail.has(u.email.trim().toLowerCase()) ||
+            societesParEmail.has(u.email.trim().toLowerCase());
+        }
       }
       return {
         ...u,

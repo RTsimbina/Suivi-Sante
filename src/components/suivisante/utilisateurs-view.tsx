@@ -146,8 +146,19 @@ export default function UtilisateursView() {
 
       const res = await fetch(`/api/utilisateurs?${params.toString()}`);
       if (res.status === 401 || res.status === 403) return;
-      const data = await res.json();
-      setUtilisateurs(data.utilisateurs || []);
+      // Ne JAMAIS vider la liste sur une erreur serveur : un 500 ici
+      // (« Aucun utilisateur trouvé » pour tous les comptes, sept. 2026)
+      // doit rester visible comme une erreur, pas comme une liste vide.
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(
+          data && typeof data === 'object'
+            ? messageErreur(data as Record<string, unknown>, 'Erreur lors du chargement des utilisateurs')
+            : `Erreur ${res.status} lors du chargement des utilisateurs`
+        );
+        return;
+      }
+      setUtilisateurs(Array.isArray(data?.utilisateurs) ? data.utilisateurs : []);
     } catch {
       toast.error('Erreur de chargement des utilisateurs');
     } finally {

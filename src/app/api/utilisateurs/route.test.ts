@@ -304,4 +304,30 @@ describe('GET /api/utilisateurs — visibilité de la liaison', () => {
     expect(body.utilisateurs[2].liaisonExterne).toBeNull();   // rôle interne
     expect(body.utilisateurs[3].liaisonExterne).toBe(false);  // contact absent
   });
+
+  it('incident 2026-09 : enrichissement en erreur (migration non déployée) → liste renvoyée 200, badges null, JAMAIS de 500', async () => {
+    // Reproduction : en production, le code référençait Societe.emailContactPrincipal
+    // avant que la migration 20260916120000 ne soit appliquée → la requête SQL
+    // « column does not exist » rejetait → 500 → « Aucun utilisateur trouvé »
+    // pour TOUS les comptes. La liste doit survivre à l'échec du badge.
+    dbMocks.utilisateurFindMany.mockResolvedValue([
+      { id: 'u1', email: 'client@exemple.com', nom: 'Client', role: 'PORTAIL_CLIENT', actif: true, avatar: null, dernierLogin: null, failedAttempts: 0, lockoutUntil: null, createdAt: new Date(), updatedAt: new Date() },
+      { id: 'u2', email: 'agent@exemple.com', nom: 'Agent', role: 'ACCUEIL', actif: true, avatar: null, dernierLogin: null, failedAttempts: 0, lockoutUntil: null, createdAt: new Date(), updatedAt: new Date() },
+    ]);
+    dbMocks.utilisateurCount.mockResolvedValue(2);
+    dbMocks.assureFindMany.mockResolvedValue([]);
+    dbMocks.contactFindMany.mockResolvedValue([]);
+    dbMocks.societeFindMany.mockRejectedValue(
+      new Error('La colonne « emailContactPrincipal » n\'existe pas dans « Societe ».')
+    );
+
+    const res = await GET(requeteGet());
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.utilisateurs).toHaveLength(2);           // la liste survit
+    expect(body.pagination.total).toBe(2);
+    expect(body.utilisateurs[0].liaisonExterne).toBeNull(); // badge dégradé (inconnu)
+    expect(body.utilisateurs[0].roleLabel).toBe('Portail Client');
+  });
 });

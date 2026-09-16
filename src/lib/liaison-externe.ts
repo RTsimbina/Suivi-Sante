@@ -40,12 +40,24 @@ export async function resoudreLiaisonContactEntreprise(
   }
 
   // 2) E-mail du contact principal (« Modifier la société »)
-  const societeParPrincipal = await db.societe.findFirst({
-    where: { emailContactPrincipal: parEmail(emailProper) },
-    select: { id: true },
-  });
-  if (societeParPrincipal) {
-    return { societeId: societeParPrincipal.id, source: 'SOCIETE_PRINCIPAL' };
+  // ⚠️ Résilient : si la colonne n'existe pas encore en base (code déployé
+  // avant la migration Prisma 20260916120000), la requête lève une erreur SQL.
+  // On ne la laisse PAS remonter — elle casserait le login, le portail et la
+  // liste des utilisateurs — on passe simplement à la source 3.
+  try {
+    const societeParPrincipal = await db.societe.findFirst({
+      where: { emailContactPrincipal: parEmail(emailProper) },
+      select: { id: true },
+    });
+    if (societeParPrincipal) {
+      return { societeId: societeParPrincipal.id, source: 'SOCIETE_PRINCIPAL' };
+    }
+  } catch (error) {
+    console.warn(
+      '[LIAISON] Source « emailContactPrincipal » indisponible ' +
+      '(migration 20260916120000 déployée ?) — passage à la source « Societe.email » :',
+      error instanceof Error ? error.message : error
+    );
   }
 
   // 3) E-mail général de la société (flux historique)

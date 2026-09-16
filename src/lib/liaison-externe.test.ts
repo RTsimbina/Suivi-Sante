@@ -68,6 +68,21 @@ describe('resoudreLiaisonContactEntreprise', () => {
     expect(r).toEqual({ societeId: 'soc-3', source: 'SOCIETE_EMAIL' });
   });
 
+  it('résilient : source « emailContactPrincipal » en erreur (migration 20260916120000 non déployée) → bascule sur Societe.email au lieu de planter', async () => {
+    // Reproduction de l'incident de production du 16/09/2026 : le code
+    // déployé avant la migration faisait lever « column does not exist »
+    // dans login (auth.ts), le portail et la liste des utilisateurs.
+    dbMocks.contactFindFirst.mockResolvedValue(null);
+    dbMocks.societeFindFirst
+      .mockRejectedValueOnce(new Error('column "emailContactPrincipal" does not exist'))
+      .mockResolvedValueOnce({ id: 'soc-3' });  // email général
+
+    const r = await resoudreLiaisonContactEntreprise('principal@societe.mg');
+
+    expect(r).toEqual({ societeId: 'soc-3', source: 'SOCIETE_EMAIL' });
+    expect(dbMocks.societeFindFirst).toHaveBeenCalledTimes(2);
+  });
+
   it('null quand aucune source ne correspond (fail-closed)', async () => {
     const r = await resoudreLiaisonContactEntreprise('inconnu@ailleurs.mg');
     expect(r).toBeNull();
