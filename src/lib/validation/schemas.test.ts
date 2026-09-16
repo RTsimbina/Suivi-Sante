@@ -214,6 +214,16 @@ describe("utilisateurCreateSchema", () => {
     });
     expect(r.success).toBe(false);
   });
+
+  it("societeId : accepté (liaison Contact Entreprise une étape), absent ou chaîne vide tolérés", () => {
+    const base = { email: "a@b.com", nom: "X", password: "motdepasse1", role: "CONTACT_ENTREPRISE" as const };
+    expect(utilisateurCreateSchema.safeParse({ ...base, societeId: "cm3societe1" }).success).toBe(true);
+    expect(utilisateurCreateSchema.safeParse(base).success).toBe(true);
+    // "" (sélecteur non renseigné côté UI) → undefined, pas un 400
+    const vide = utilisateurCreateSchema.safeParse({ ...base, societeId: "" });
+    expect(vide.success).toBe(true);
+    if (vide.success) expect(vide.data.societeId).toBeUndefined();
+  });
 });
 
 describe("utilisateurPatchSchema", () => {

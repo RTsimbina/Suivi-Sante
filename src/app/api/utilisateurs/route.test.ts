@@ -22,6 +22,8 @@ const dbMocks = vi.hoisted(() => ({
   assureFindMany: vi.fn(),
   contactFindFirst: vi.fn(),
   contactFindMany: vi.fn(),
+  contactCreate: vi.fn(),
+  societeFindUnique: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -40,6 +42,10 @@ vi.mock('@/lib/db', () => ({
     entrepriseContact: {
       findFirst: dbMocks.contactFindFirst,
       findMany: dbMocks.contactFindMany,
+      create: dbMocks.contactCreate,
+    },
+    societe: {
+      findUnique: dbMocks.societeFindUnique,
     },
   },
 }));
@@ -91,6 +97,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.utilisateurFindUnique.mockResolvedValue(null); // e-mail disponible
   dbMocks.utilisateurCreate.mockResolvedValue(UTILISATEUR_CREE);
+  dbMocks.societeFindUnique.mockResolvedValue({ id: 's1' }); // société existante
+  dbMocks.contactCreate.mockResolvedValue({ id: 'c1' });
 });
 
 describe('POST /api/utilisateurs — liaison des rôles externes', () => {
@@ -127,6 +135,61 @@ describe('POST /api/utilisateurs — liaison des rôles externes', () => {
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.erreur).toContain('contact d\'entreprise');
+    expect(dbMocks.utilisateurCreate).not.toHaveBeenCalled();
+  });
+
+  it('201 en une étape : CONTACT_ENTREPRISE sans contact + societeId → contact créé puis compte créé', async () => {
+    dbMocks.contactFindFirst.mockResolvedValue(null);
+
+    const res = await POST(requetePost({
+      ...PAYLOAD_PORTAIL,
+      email: 'rep@societe.mg',
+      role: 'CONTACT_ENTREPRISE',
+      societeId: 's1',
+    }));
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.contactCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ societeId: 's1', email: 'rep@societe.mg' }),
+      })
+    );
+    expect(dbMocks.utilisateurCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ role: 'CONTACT_ENTREPRISE' }) })
+    );
+  });
+
+  it('422 en une étape si la société fournie est introuvable (aucun compte créé)', async () => {
+    dbMocks.contactFindFirst.mockResolvedValue(null);
+    dbMocks.societeFindUnique.mockResolvedValue(null);
+
+    const res = await POST(requetePost({
+      ...PAYLOAD_PORTAIL,
+      email: 'rep@societe.mg',
+      role: 'CONTACT_ENTREPRISE',
+      societeId: 's-inexistante',
+    }));
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.erreur).toContain('société');
+    expect(dbMocks.contactCreate).not.toHaveBeenCalled();
+    expect(dbMocks.utilisateurCreate).not.toHaveBeenCalled();
+  });
+
+  it('societeId ignoré quand le contact existe déjà (comportement inchangé)', async () => {
+    dbMocks.contactFindFirst.mockResolvedValue({ id: 'c-existant' });
+
+    const res = await POST(requetePost({
+      ...PAYLOAD_PORTAIL,
+      email: 'contact@entreprise.mg',
+      role: 'CONTACT_ENTREPRISE',
+      societeId: 's1',
+    }));
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.contactCreate).not.toHaveBeenCalled();
+    expect(dbMocks.utilisateurCreate).toHaveBeenCalled();
   });
 
   it('201 pour un rôle interne : aucune liaison exigée', async () => {
@@ -164,6 +227,22 @@ describe('PUT /api/utilisateurs — liaison des rôles externes', () => {
 
     expect(res.status).toBe(422);
     expect(dbMocks.utilisateurUpdate).not.toHaveBeenCalled();
+  });
+
+  it('bascule vers CONTACT_ENTREPRISE + societeId → contact créé en une étape, compte mis à jour', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue(EXISTANT_INTERNE);
+    dbMocks.contactFindFirst.mockResolvedValue(null); // aucun contact avec cet e-mail
+    dbMocks.utilisateurUpdate.mockResolvedValue({ ...EXISTANT_INTERNE, role: 'CONTACT_ENTREPRISE' });
+
+    const res = await PUT(requetePut({ id: 'u1', role: 'CONTACT_ENTREPRISE', societeId: 's1' }));
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.contactCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ societeId: 's1', email: 'agent@exemple.com', nom: 'Agent' }),
+      })
+    );
+    expect(dbMocks.utilisateurUpdate).toHaveBeenCalled();
   });
 
   it('201-compatible : modification sans rapport sur un compte externe non re-bloquée', async () => {

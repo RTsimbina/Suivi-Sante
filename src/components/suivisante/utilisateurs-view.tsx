@@ -44,6 +44,21 @@ interface FormData {
   nom: string;
   password: string;
   role: string;
+  // CONTACT_ENTREPRISE uniquement : société à lier si aucun contact
+  // d'entreprise n'existe encore avec cet e-mail (création en une étape).
+  societeId: string;
+}
+
+// Société (référentiel, pour la liaison des comptes Contact Entreprise)
+interface SocieteRef {
+  id: string;
+  nom: string;
+}
+
+// Résultat de la vérification de liaison en direct (rôles externes)
+interface LiaisonInfo {
+  etat: 'VERIFIE' | 'TROUVE' | 'CREABLE' | 'BLOQUE';
+  detail: string;
 }
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -58,7 +73,7 @@ const ROLES = [
   { value: 'CONTACT_ENTREPRISE', label: 'Contact Entreprise', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' },
 ];
 
-const EMPTY_FORM: FormData = { email: '', nom: '', password: '', role: 'ACCUEIL' };
+const EMPTY_FORM: FormData = { email: '', nom: '', password: '', role: 'ACCUEIL', societeId: '' };
 
 function formatDate(d: string | null): string {
   if (!d) return '—';
@@ -109,6 +124,10 @@ export default function UtilisateursView() {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Liaison CONTACT_ENTREPRISE : référentiel sociétés + vérification en direct
+  const [societes, setSocietes] = useState<SocieteRef[]>([]);
+  const [liaison, setLiaison] = useState<LiaisonInfo | null>(null);
+
   // Suppression
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -138,11 +157,64 @@ export default function UtilisateursView() {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
+  // Référentiel sociétés (chargé une fois, pour la liaison Contact Entreprise)
+  async function ensureSocietes() {
+    if (societes.length > 0) return;
+    try {
+      const res = await fetch('/api/societes');
+      if (res.ok) {
+        const data = await res.json();
+        setSocietes(Array.isArray(data.societes) ? data.societes : []);
+      }
+    } catch { /* silencieux : le sélecteur restera vide */ }
+  }
+
+  // Vérification de liaison en direct pour CONTACT_ENTREPRISE : l'e-mail saisi
+  // correspond-il à un contact d'entreprise existant ? (débounce 400 ms)
+  useEffect(() => {
+    if (!dialogOpen || formData.role !== 'CONTACT_ENTREPRISE') {
+      setLiaison(null);
+      return;
+    }
+    const email = formData.email.trim();
+    if (!email) {
+      setLiaison({ etat: 'VERIFIE', detail: '' });
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/entreprise-contacts');
+        if (!res.ok) {
+          setLiaison(null);
+          return;
+        }
+        const data = await res.json();
+        const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+        const trouve = contacts.find(
+          (c: { email?: string | null }) => (c.email || '').trim().toLowerCase() === email.toLowerCase()
+        );
+        if (trouve) {
+          const nomSociete = trouve.societe?.nom || 'société inconnue';
+          setLiaison({ etat: 'TROUVE', detail: `Contact existant : ${trouve.prenom ? trouve.prenom + ' ' : ''}${trouve.nom} — ${nomSociete}` });
+        } else if (formData.societeId) {
+          setLiaison({ etat: 'CREABLE', detail: "Aucun contact avec cet e-mail : le contact sera créé automatiquement dans la société sélectionnée à l'enregistrement." });
+        } else {
+          setLiaison({ etat: 'BLOQUE', detail: "Aucun contact d'entreprise avec cet e-mail : sélectionnez la société du représentant ci-dessous pour créer la liaison automatiquement." });
+        }
+      } catch {
+        setLiaison(null);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [dialogOpen, formData.role, formData.email, formData.societeId]);
+
   function openCreateDialog() {
     setEditingUser(null);
     setFormData(EMPTY_FORM);
     setShowPassword(false);
+    setLiaison(null);
     setDialogOpen(true);
+    ensureSocietes();
   }
 
   function openEditDialog(user: Utilisateur) {
@@ -152,9 +224,28 @@ export default function UtilisateursView() {
       nom: user.nom,
       password: '',
       role: user.role,
+      societeId: '',
     });
     setShowPassword(false);
+    setLiaison(null);
     setDialogOpen(true);
+    ensureSocietes();
+  }
+
+  /** Message d'erreur lisible : gère {erreur} (routes métier) ET
+   *  {error, details[]} (validation Zod — auparavant avalé par le toast). */
+  function messageErreur(data: Record<string, unknown>, defaut: string): string {
+    if (typeof data?.erreur === 'string' && data.erreur) return data.erreur;
+    if (typeof data?.error === 'string' && data.error) {
+      const details = Array.isArray(data.details) ? data.details : [];
+      const premier = details[0] as { champ?: string; message?: string } | undefined;
+      if (premier?.message) {
+        const champ = premier.champ && premier.champ !== '(racine)' ? `${premier.champ} : ` : '';
+        return `${data.error} — ${champ}${premier.message}`;
+      }
+      return data.error;
+    }
+    return defaut;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -172,6 +263,12 @@ export default function UtilisateursView() {
         role: formData.role,
       };
 
+      // CONTACT_ENTREPRISE : transmettre la société pour la création en une
+      // étape du contact lié (ignoré par l'API si un contact existe déjà).
+      if (formData.role === 'CONTACT_ENTREPRISE' && formData.societeId) {
+        body.societeId = formData.societeId;
+      }
+
       if (isEdit) {
         body.id = editingUser.id;
         if (formData.password) body.password = formData.password;
@@ -188,7 +285,7 @@ export default function UtilisateursView() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.erreur || 'Erreur lors de l\'operation');
+        toast.error(messageErreur(data, "Erreur lors de l'operation"));
         return;
       }
 
@@ -566,13 +663,60 @@ export default function UtilisateursView() {
                   L'e-mail doit correspondre a un assure existant dans la base.
                 </p>
               )}
-              {formData.role === 'CONTACT_ENTREPRISE' && (
+              {formData.role === 'CONTACT_ENTREPRISE' && liaison && liaison.detail && (
+                <p className={cn(
+                  'text-[11px] mt-1 flex items-start gap-1',
+                  liaison.etat === 'TROUVE' && 'text-emerald-600 dark:text-emerald-400',
+                  liaison.etat === 'CREABLE' && 'text-blue-600 dark:text-blue-400',
+                  liaison.etat === 'BLOQUE' && 'text-amber-600 dark:text-amber-400',
+                  liaison.etat === 'VERIFIE' && 'text-muted-foreground',
+                )}>
+                  {liaison.etat === 'TROUVE'
+                    ? <CheckCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                    : liaison.etat === 'BLOQUE'
+                      ? <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      : <Info className="h-3 w-3 mt-0.5 shrink-0" />}
+                  {liaison.detail}
+                </p>
+              )}
+              {formData.role === 'CONTACT_ENTREPRISE' && !liaison && (
                 <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                   <Info className="h-3 w-3" />
                   L'e-mail doit correspondre a un contact d'entreprise existant.
                 </p>
               )}
             </div>
+
+            {/* Société (CONTACT_ENTREPRISE uniquement) : permet la création
+                en une étape du compte + du contact d'entreprise lié */}
+            {formData.role === 'CONTACT_ENTREPRISE' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="user-societe" className="text-sm font-medium">
+                  Societe du representant
+                </Label>
+                <Select
+                  value={formData.societeId || undefined}
+                  onValueChange={v => setFormData(f => ({ ...f, societeId: v }))}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Choisir la société à rattacher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {societes.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">Aucune societe disponible</div>
+                    ) : (
+                      societes.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.nom}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Utilisee pour rattacher le representant a sa societe (contact cree automatiquement si besoin).
+                </p>
+              </div>
+            )}
 
             {/* Mot de passe */}
             <div className="space-y-1.5">
@@ -583,11 +727,11 @@ export default function UtilisateursView() {
                 <Input
                   id="user-password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder={editingUser ? 'Nouveau mot de passe (optionnel)' : 'Minimum 6 caracteres'}
+                  placeholder={editingUser ? 'Nouveau mot de passe (optionnel)' : 'Minimum 8 caracteres, lettres + chiffres'}
                   value={formData.password}
                   onChange={e => setFormData(f => ({ ...f, password: e.target.value }))}
                   required={!editingUser}
-                  minLength={6}
+                  minLength={8}
                   className="h-9 pr-10"
                 />
                 <button
@@ -598,6 +742,12 @@ export default function UtilisateursView() {
                   {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </button>
               </div>
+              {!editingUser && (
+                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Au moins 8 caractères, avec au moins une lettre et un chiffre.
+                </p>
+              )}
             </div>
 
             <DialogFooter className="gap-2 pt-2">

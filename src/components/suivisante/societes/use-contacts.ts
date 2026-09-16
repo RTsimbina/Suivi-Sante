@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 
 import { EntrepriseContact } from './types';
 
@@ -56,6 +57,22 @@ export function useContacts(selectedId: string | null) {
     setContactFormOpen(true);
   };
 
+  /** Message d'erreur lisible : gère {erreur} (routes métier) ET
+   *  {error, details[]} (validation Zod) — avant : échec silencieux. */
+  function messageErreur(data: Record<string, unknown>, defaut: string): string {
+    if (typeof data?.erreur === 'string' && data.erreur) return data.erreur;
+    if (typeof data?.error === 'string' && data.error) {
+      const details = Array.isArray(data.details) ? data.details : [];
+      const premier = details[0] as { champ?: string; message?: string } | undefined;
+      if (premier?.message) {
+        const champ = premier.champ && premier.champ !== '(racine)' ? `${premier.champ} : ` : '';
+        return `${data.error} — ${champ}${premier.message}`;
+      }
+      return data.error;
+    }
+    return defaut;
+  }
+
   const handleSaveContact = async () => {
     if (!cFormNom.trim() || !selectedId) return;
     setContactSaving(true);
@@ -66,10 +83,19 @@ export function useContacts(selectedId: string | null) {
       if (!editingContact) body.societeId = selectedId;
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (res.ok) {
+        toast.success(editingContact ? 'Contact modifie.' : 'Contact ajoute.');
         setContactFormOpen(false);
         fetchContacts(selectedId);
+      } else {
+        // FIX : l'erreur était silencieuse — l'admin croyait le contact cree,
+        // puis la creation du compte echouait avec « aucun contact » (422).
+        let data: Record<string, unknown> = {};
+        try { data = await res.json(); } catch { /* corps non JSON */ }
+        toast.error(messageErreur(data, "Erreur lors de l'enregistrement du contact."));
       }
-    } catch { /* silent */ } finally {
+    } catch {
+      toast.error('Erreur reseau');
+    } finally {
       setContactSaving(false);
     }
   };
@@ -77,8 +103,16 @@ export function useContacts(selectedId: string | null) {
   const handleDeleteContact = async (id: string) => {
     try {
       const res = await fetch(`/api/entreprise-contacts/${id}`, { method: 'DELETE' });
-      if (res.ok && selectedId) fetchContacts(selectedId);
-    } catch { /* silent */ }
+      if (res.ok) {
+        if (selectedId) fetchContacts(selectedId);
+      } else {
+        let data: Record<string, unknown> = {};
+        try { data = await res.json(); } catch { /* corps non JSON */ }
+        toast.error(messageErreur(data, "Erreur lors de la suppression du contact."));
+      }
+    } catch {
+      toast.error('Erreur reseau');
+    }
     setContactDeleteId(null);
   };
 

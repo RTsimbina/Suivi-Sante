@@ -21,11 +21,21 @@ import {
 
 // ─── Utilisateurs (/api/utilisateurs) ───────────────────────────────────────
 
+/** societeId optionnel (rôle CONTACT_ENTREPRISE) : "" côté client = non
+ *  sélectionné → undefined, jamais une chaîne vide rejetée par idSchema. */
+const societeIdOptionnel = z.preprocess(
+  (v) => (v === "" || v === null ? undefined : v),
+  idOptionnel
+);
+
 export const utilisateurCreateSchema = z.object({
   email: emailSchema,
   nom: texteCourt(100, "Le nom"),
   password: motDePasseSchema,
   role: roleUtilisateurSchema,
+  // CONTACT_ENTREPRISE sans contact existant : permet la création en une
+  // étape du compte + du contact d'entreprise lié (société sélectionnée).
+  societeId: societeIdOptionnel,
 });
 
 export const utilisateurUpdateSchema = z.object({
@@ -38,6 +48,8 @@ export const utilisateurUpdateSchema = z.object({
     (v) => (v === "" || v === null ? undefined : v),
     motDePasseSchema.optional()
   ),
+  // Idem création : liaison one-step d'un CONTACT_ENTREPRISE à une société
+  societeId: societeIdOptionnel,
 });
 
 export const utilisateurPatchSchema = z.object({

@@ -46,7 +46,29 @@ async function liaisonExterneExiste(role: string, email: string): Promise<boolea
 function erreurLiaisonExterne(role: string, email: string): string {
   return role === 'PORTAIL_CLIENT'
     ? `Aucun assuré n'a l'e-mail « ${email} » : ce compte Portail Client afficherait une erreur de liaison. Créez d'abord l'assuré avec cet e-mail (ou corrigez l'e-mail saisi).`
-    : `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Créez d'abord le contact avec cet e-mail (ou corrigez l'e-mail saisi).`;
+    : `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Sélectionnez la société du représentant pour créer le contact automatiquement (ou créez d'abord le contact avec cet e-mail dans Sociétés → Contacts).`;
+}
+
+/**
+ * Crée le contact d'entreprise manquant pour un compte CONTACT_ENTREPRISE
+ * (création en une étape : compte + liaison société). Le societeId doit
+ * référencer une société existante — sinon null (→ 422 appelant).
+ * Retourne le contact créé, ou null si la société est introuvable.
+ */
+async function creerContactEntrepriseLiaison(
+  societeId: string,
+  nom: string,
+  email: string
+): Promise<{ id: string } | null> {
+  const societe = await db.societe.findUnique({
+    where: { id: societeId },
+    select: { id: true },
+  });
+  if (!societe) return null;
+  return db.entrepriseContact.create({
+    data: { societeId, nom, email },
+    select: { id: true },
+  });
 }
 
 // ─── GET : Liste des utilisateurs ─────────────────────────────────────────────
@@ -162,6 +184,7 @@ export async function POST(request: NextRequest) {
     const { nom, password, role } = parsed.data;
     const emailTrimmed = parsed.data.email.toLowerCase();
     const nomTrimmed = nom;
+    const societeId = parsed.data.societeId || undefined;
 
     // Verifier l'unicite de l'email
     const existing = await db.utilisateur.findUnique({
@@ -174,13 +197,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rôles externes : exiger une liaison assuré/contact sur cet e-mail
+    // Rôles externes : exiger une liaison assuré/contact sur cet e-mail.
+    // CONTACT_ENTREPRISE : si le contact n'existe pas mais qu'une société est
+    // fournie, création en une étape du contact lié (compte représentant
+    // opérationnel immédiatement — sinon l'admin était bloqué par le 422).
     if ((role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') &&
         !(await liaisonExterneExiste(role, emailTrimmed))) {
-      return NextResponse.json(
-        { erreur: erreurLiaisonExterne(role, emailTrimmed) },
-        { status: 422 }
-      );
+      if (role === 'CONTACT_ENTREPRISE' && societeId) {
+        const contactCree = await creerContactEntrepriseLiaison(societeId, nomTrimmed, emailTrimmed);
+        if (!contactCree) {
+          return NextResponse.json(
+            { erreur: 'La société sélectionnée est introuvable. Vérifiez la sélection et réessayez.' },
+            { status: 422 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { erreur: erreurLiaisonExterne(role, emailTrimmed) },
+          { status: 422 }
+        );
+      }
     }
 
     // Hasher le mot de passe
@@ -229,6 +265,7 @@ export async function PUT(request: NextRequest) {
     const parsed = await parseJsonBody(request, utilisateurUpdateSchema);
     if (!parsed.success) return parsed.response;
     const { id, email, nom, role, password } = parsed.data;
+    const societeId = parsed.data.societeId || undefined;
 
     // Verifier que l'utilisateur existe
     const existing = await db.utilisateur.findUnique({
@@ -283,10 +320,26 @@ export async function PUT(request: NextRequest) {
       (data.email !== undefined || basculeVersExterne)
     ) {
       if (!(await liaisonExterneExiste(roleFinal, emailFinal))) {
-        return NextResponse.json(
-          { erreur: erreurLiaisonExterne(roleFinal, emailFinal) },
-          { status: 422 }
-        );
+        // CONTACT_ENTREPRISE : création en une étape du contact lié si une
+        // société est fournie (sinon l'admin reste bloqué au 422).
+        if (roleFinal === 'CONTACT_ENTREPRISE' && societeId) {
+          const contactCree = await creerContactEntrepriseLiaison(
+            societeId,
+            (data.nom as string | undefined) ?? existing.nom,
+            emailFinal
+          );
+          if (!contactCree) {
+            return NextResponse.json(
+              { erreur: 'La société sélectionnée est introuvable. Vérifiez la sélection et réessayez.' },
+              { status: 422 }
+            );
+          }
+        } else {
+          return NextResponse.json(
+            { erreur: erreurLiaisonExterne(roleFinal, emailFinal) },
+            { status: 422 }
+          );
+        }
       }
     }
 
