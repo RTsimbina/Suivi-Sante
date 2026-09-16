@@ -52,10 +52,21 @@ export function useSocietesList() {
       if (search) params.set('search', search);
       const res = await fetch(`/api/technique/societes?${params}`);
       if (res.status === 401 || res.status === 403) return;
-      const data = await res.json();
+      // Une erreur serveur ne doit jamais ressembler à une liste vide
+      // (incident 2026-09 : 500 silencieux → « aucune liste trouvée »).
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(
+          (data && typeof data.erreur === 'string' && data.erreur) ||
+            `Erreur ${res.status} : impossible de charger les sociétés`
+        );
+        return;
+      }
       const list = Array.isArray(data) ? data : data.societes || [];
       setSocietes(list);
-    } catch { /* silent */ } finally {
+    } catch {
+      toast.error('Erreur réseau : impossible de charger les sociétés');
+    } finally {
       setLoading(false);
     }
   }, [search]);

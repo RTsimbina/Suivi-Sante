@@ -147,4 +147,36 @@ describe('GET /api/societes — règle métier par rôle', () => {
       })
     );
   });
+
+  it('incident 2026-09 : colonne manquante (migration non appliquée) → 500 avec message ACTIONNABLE, pas un 500 générique', async () => {
+    // Reproduction : Prisma sélectionne tous les champs scalaires du schéma,
+    // donc la colonne emailContactPrincipal absente en base fait échouer
+    // TOUT findMany sans select explicite. L'admin doit voir quoi faire.
+    dbMocks.societeFindMany.mockRejectedValue(
+      new Error('Invalid `prisma.societe.findMany()` invocation:\n\ncolumn Societe.emailContactPrincipal does not exist in the current database.')
+    );
+
+    const res = await GET(requeteGet({
+      'x-user-id': 'u1',
+      'x-user-role': 'ADMINISTRATEUR',
+    }));
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.erreur).toContain('migration');
+    expect(body.erreur).toContain('prisma migrate deploy');
+  });
+
+  it('erreur DB non liée à une migration → message générique conservé', async () => {
+    dbMocks.societeFindMany.mockRejectedValue(new Error('Connection terminated unexpectedly'));
+
+    const res = await GET(requeteGet({
+      'x-user-id': 'u1',
+      'x-user-role': 'ADMINISTRATEUR',
+    }));
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.erreur).toBe("Erreur lors de l'opération.");
+  });
 });

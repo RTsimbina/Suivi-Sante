@@ -85,11 +85,19 @@ export function useSocietesBaremes() {
     setSocietesLoading(true);
     try {
       const res = await fetch('/api/technique/societes?withBaremes=true');
-      if (!res.ok) throw new Error('Erreur de chargement');
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Message serveur explicite (ex. migration en attente) — jamais un
+        // 500 muet transformé en liste vide (incident 2026-09).
+        toast.error(
+          (data && typeof data.erreur === 'string' && data.erreur) ||
+            `Impossible de charger les sociétés (erreur ${res.status})`
+        );
+        return;
+      }
       setSocietes(Array.isArray(data) ? data : data.societes ?? []);
     } catch {
-      toast.error('Impossible de charger les sociétés');
+      toast.error('Erreur réseau : impossible de charger les sociétés');
     } finally {
       setSocietesLoading(false);
     }

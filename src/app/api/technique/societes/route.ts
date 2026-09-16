@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { messageErreurBase } from '@/lib/erreur-migration';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { societeTechniqueCreateSchema } from '@/lib/validation';
 
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Erreur lors de la récupération des sociétés :', error);
     return NextResponse.json(
-      { erreur: 'Erreur serveur lors de la récupération des sociétés.' },
+      { erreur: messageErreurBase(error, 'Erreur serveur lors de la récupération des sociétés.') },
       { status: 500 }
     );
   }

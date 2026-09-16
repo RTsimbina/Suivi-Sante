@@ -51,14 +51,23 @@ export function usePrestatairesData() {
     try {
       const res = await fetch('/api/technique/societes');
       if (res.status === 401 || res.status === 403) return;
-      if (res.ok) {
-        const data = await res.json();
-        const list = (Array.isArray(data) ? data : data.societes || []).map(
-          (s: { id: string; nom: string }) => ({ id: s.id, nom: s.nom })
+      // Échec visible via la bannière d'erreur de la vue — jamais une liste
+      // vide silencieuse (incident 2026-09 : 500 → « aucune liste trouvée »).
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setFetchError(
+          (data && typeof data.erreur === 'string' && data.erreur) ||
+            `Erreur ${res.status} : impossible de charger les sociétés`
         );
-        setSocietes(list);
+        return;
       }
-    } catch { /* silent */ }
+      const list = (Array.isArray(data) ? data : data.societes || []).map(
+        (s: { id: string; nom: string }) => ({ id: s.id, nom: s.nom })
+      );
+      setSocietes(list);
+    } catch {
+      setFetchError('Erreur réseau : impossible de charger les sociétés');
+    }
   }, []);
 
   // Référence pour éviter double appel au sync manuel

@@ -87,6 +87,14 @@ Pour chaque entité principale — sociétés, assurés/bénéficiaires, prestat
 
 ## 6. Après une migration de base (en plus des sections ci-dessus)
 
+> **Depuis le 16/09/2026**, le build Vercel applique automatiquement les migrations en attente
+> (`package.json` → `build` : `prisma generate && prisma migrate deploy && next build`).
+> Conditions : `DATABASE_URL` doit être définie dans les variables d'environnement Vercel
+> (Production **et** Preview) — sans elle, le build échoue explicitement, ce qui est voulu.
+> `prisma migrate deploy` est idempotent : sans migration en attente, il ne fait rien.
+> En cas de besoin ponctuel, l'application manuelle reste possible :
+> `DATABASE_URL="postgres://…" npx prisma migrate deploy`.
+
 - [ ] `npm run db:migrate:status` → « Database schema is up to date! »
 - [ ] Toutes les énumérations/statuts affichés correctement (aucun libellé brut)
 - [ ] Historiques et tables enrichies (audit journal) remplissent leurs champs

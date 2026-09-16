@@ -7,6 +7,7 @@ import {
   avecPerimetreSocieteCourante,
 } from "@/lib/data-isolation";
 import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
+import { messageErreurBase } from "@/lib/erreur-migration";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { societeCreateSchema } from "@/lib/validation";
 
@@ -44,7 +45,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ societes });
   } catch (error) {
     console.error('[SOCIETES] Erreur:', error);
-    return NextResponse.json({ erreur: "Erreur lors de l'opération." }, { status: 500 });
+    return NextResponse.json(
+      { erreur: messageErreurBase(error, "Erreur lors de l'opération.") },
+      { status: 500 }
+    );
   }
 }
 
