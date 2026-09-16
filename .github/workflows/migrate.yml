@@ -63,12 +63,23 @@ jobs:
         id: neon
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          # Clé scopée au projet (cf. incident du 16/09 : « not allowed to
-          # perform actions outside the project this key is scoped to ») —
-          # on cible donc le projet directement au lieu de le lister.
+          # SI LE SECRET DATABASE_URL EST DÉFINI → il est utilisé directement
+          # (mot de passe non récupérable via l'API Neon, route supprimée).
+          # Sinon, fallback : construction via l'API Neon (host + rôle ; le
+          # mot de passe manque alors → erreur explicite).
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEON_PROJECT_ID: green-moon-61901921
         run: |
           set -euo pipefail
+          if [ -n "${DATABASE_URL:-}" ]; then
+            echo "Secret DATABASE_URL détecté — utilisation directe (masquée)."
+            URI="$DATABASE_URL"
+            # Connexion DIRECTE requise pour les migrations (Neon : jamais -pooler)
+            URI=$(echo "$URI" | sed 's/-pooler\././')
+            echo "::add-mask::$URI"
+            echo "DATABASE_URL=$URI" >> "$GITHUB_ENV"
+            exit 0
+          fi
           API="https://console.neon.tech/api/v2"
           AUTH="Authorization: Bearer ${NEON_API_KEY}"
 
