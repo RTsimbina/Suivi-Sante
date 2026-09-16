@@ -63,26 +63,37 @@ jobs:
         id: neon
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # Clé scopée au projet (cf. incident du 16/09 : « not allowed to
+          # perform actions outside the project this key is scoped to ») —
+          # on cible donc le projet directement au lieu de le lister.
+          NEON_PROJECT_ID: green-moon-61901921
         run: |
           set -euo pipefail
           API="https://console.neon.tech/api/v2"
           AUTH="Authorization: Bearer ${NEON_API_KEY}"
 
-          # 1er projet Neon (le compte n'en gère qu'un pour cette application)
+          # Projet ciblé (clé scopée) — GET /projects/{id}
           PROJET=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
             -H "$AUTH" -H "Accept: application/json" \
-            -w '\n%{http_code}' "$API/projects")
+            -w '\n%{http_code}' "$API/projects/${NEON_PROJECT_ID}")
           CODE_PROJET=$(echo "$PROJET" | tail -n1)
           if [ "$CODE_PROJET" != "200" ]; then
-            echo "::error::API Neon /projects → HTTP $CODE_PROJET. Réponse :"
+            echo "::error::API Neon /projects/${NEON_PROJECT_ID} → HTTP $CODE_PROJET. Réponse :"
             echo "$PROJET" | head -n -1 | head -c 500
             echo ""
             exit 1
           fi
-          PROJECT_ID=$(echo "$PROJET" | head -n -1 | jq -r '.projects[0].id')
-          BRANCH_ID=$(echo "$PROJET" | head -n -1 | jq -r '.projects[0].default_branch_id // .projects[0].branches[0].id')
+          PROJECT_ID=$(echo "$PROJET" | head -n -1 | jq -r '.project.id')
+          BRANCH_ID=$(echo "$PROJET" | head -n -1 | jq -r '.project.default_branch_id // ""')
+          if [ -z "$BRANCH_ID" ] || [ "$BRANCH_ID" = "null" ]; then
+            # Repli : branche primaire via GET /branches
+            BRANCH_ID=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
+              -H "$AUTH" -H "Accept: application/json" \
+              "$API/projects/$PROJECT_ID/branches" \
+              | jq -r '[.branches[] | select(.primary == true)][0].id // .branches[0].id')
+          fi
           if [ -z "$PROJECT_ID" ] || [ "$PROJECT_ID" = "null" ]; then
-            echo "::error::Aucun projet Neon accessible avec NEON_API_KEY."
+            echo "::error::Projet Neon ${NEON_PROJECT_ID} inaccessible avec NEON_API_KEY."
             exit 1
           fi
           echo "Projet Neon : $PROJECT_ID / branche : $BRANCH_ID"
