@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { liaisonContactEntrepriseExiste } from '@/lib/liaison-externe';
 import { parseJsonBody } from '@/lib/validation/parse';
 import {
   utilisateurCreateSchema,
@@ -34,11 +35,9 @@ async function liaisonExterneExiste(role: string, email: string): Promise<boolea
     return !!assure;
   }
   if (role === 'CONTACT_ENTREPRISE') {
-    const contact = await db.entrepriseContact.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
-      select: { id: true },
-    });
-    return !!contact;
+    // Contact déclaré, e-mail du contact principal (« Modifier la société »)
+    // ou e-mail général de la société — cf. src/lib/liaison-externe.ts.
+    return liaisonContactEntrepriseExiste(email);
   }
   return true; // rôles internes : pas de liaison exigée
 }
@@ -46,7 +45,7 @@ async function liaisonExterneExiste(role: string, email: string): Promise<boolea
 function erreurLiaisonExterne(role: string, email: string): string {
   return role === 'PORTAIL_CLIENT'
     ? `Aucun assuré n'a l'e-mail « ${email} » : ce compte Portail Client afficherait une erreur de liaison. Créez d'abord l'assuré avec cet e-mail (ou corrigez l'e-mail saisi).`
-    : `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Sélectionnez la société du représentant pour créer le contact automatiquement (ou créez d'abord le contact avec cet e-mail dans Sociétés → Contacts).`;
+    : `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Saisissez cet e-mail comme « Contact principal » dans Modifier la société, sélectionnez la société ci-dessous, ou créez le contact dans Sociétés → Contacts.`;
 }
 
 /**
@@ -130,8 +129,9 @@ export async function GET(request: NextRequest) {
 
     const assuresParEmail = new Set<string>();
     const contactsParEmail = new Set<string>();
+    const societesParEmail = new Set<string>();
     if (emailsExternes.length > 0) {
-      const [assures, contacts] = await Promise.all([
+      const [assures, contacts, societesLiees] = await Promise.all([
         db.assure.findMany({
           where: { email: { in: emailsExternes, mode: 'insensitive' } },
           select: { email: true },
@@ -140,9 +140,22 @@ export async function GET(request: NextRequest) {
           where: { email: { in: emailsExternes, mode: 'insensitive' } },
           select: { email: true },
         }),
+        db.societe.findMany({
+          where: {
+            OR: [
+              { emailContactPrincipal: { in: emailsExternes, mode: 'insensitive' } },
+              { email: { in: emailsExternes, mode: 'insensitive' } },
+            ],
+          },
+          select: { email: true, emailContactPrincipal: true },
+        }),
       ]);
       assures.forEach(a => assuresParEmail.add((a.email ?? '').trim().toLowerCase()));
       contacts.forEach(c => contactsParEmail.add((c.email ?? '').trim().toLowerCase()));
+      societesLiees.forEach(s => {
+        if (s.emailContactPrincipal) societesParEmail.add(s.emailContactPrincipal.trim().toLowerCase());
+        if (s.email) societesParEmail.add(s.email.trim().toLowerCase());
+      });
     }
 
     const enriched = utilisateurs.map(u => {
@@ -150,7 +163,8 @@ export async function GET(request: NextRequest) {
       if (u.role === 'PORTAIL_CLIENT') {
         liaisonExterne = assuresParEmail.has(u.email.trim().toLowerCase());
       } else if (u.role === 'CONTACT_ENTREPRISE') {
-        liaisonExterne = contactsParEmail.has(u.email.trim().toLowerCase());
+        liaisonExterne = contactsParEmail.has(u.email.trim().toLowerCase()) ||
+          societesParEmail.has(u.email.trim().toLowerCase());
       }
       return {
         ...u,

@@ -59,7 +59,7 @@ export async function PUT(
     // ─── Validation Zod centralisée (whitelist, barèmes : enum, taux, plafond) ─
     const parsed = await parseJsonBody(request, societeTechniqueUpdateSchema);
     if (!parsed.success) return parsed.response;
-    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = parsed.data;
+    const { nom, adresse, telephone, email, nif, contactPrincipal, emailContactPrincipal, baremes } = parsed.data;
 
     // Vérifier que la société existe
     const existing = await db.societe.findUnique({
@@ -184,6 +184,7 @@ export async function PUT(
           ...(email !== undefined ? { email: email ?? null } : {}),
           ...(nif !== undefined ? { nif: nif ?? null } : {}),
           ...(contactPrincipal !== undefined ? { contactPrincipal: contactPrincipal ?? null } : {}),
+          ...(emailContactPrincipal !== undefined ? { emailContactPrincipal: emailContactPrincipal ?? null } : {}),
         },
         include: {
           baremes: { orderBy: { prestation: 'asc' } },

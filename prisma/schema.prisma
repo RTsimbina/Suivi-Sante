@@ -32,6 +32,10 @@ model Societe {
   email     String?
   nif       String?
   contactPrincipal String?
+  // E-mail du contact principal (représentant de la société cliente) saisi
+  // dans « Modifier la société » — sert de liaison au compte portail
+  // CONTACT_ENTREPRISE (cf. src/lib/liaison-externe.ts).
+  emailContactPrincipal String?
   baremes   Bareme[]
   dossiers  Dossier[]
   contrats  Contrat[]

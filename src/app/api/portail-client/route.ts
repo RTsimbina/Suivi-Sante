@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 import { enNombre, sommer } from '@/lib/money';
+import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
 
 // ─── GET : Données du portail client ──────────────────────────────────────
 // Renvoie les données filtrées selon le rôle externe connecté :
@@ -25,11 +26,10 @@ async function resoudreAssureParEmail(email: string) {
 }
 
 async function resoudreSocieteIdParEmailContact(email: string): Promise<string | null> {
-  const contact = await db.entrepriseContact.findFirst({
-    where: { email: { equals: email, mode: 'insensitive' } },
-    select: { societeId: true },
-  });
-  return contact?.societeId ?? null;
+  // Contact déclaré, e-mail du contact principal (« Modifier la société »)
+  // ou e-mail général de la société — cf. src/lib/liaison-externe.ts.
+  const liaison = await resoudreLiaisonContactEntreprise(email);
+  return liaison?.societeId ?? null;
 }
 
 async function chargerAssure(id: string) {
@@ -234,14 +234,14 @@ export async function GET(request: NextRequest) {
 
       if (!societeId) {
         console.error(
-          `[PORTAIL CLIENT] Compte ${emailToken || userId} (rôle ${role}) : aucun EntrepriseContact ` +
-          `avec cet e-mail. Vérifiez l'e-mail du contact côté Configuration.`
+          `[PORTAIL CLIENT] Compte ${emailToken || userId} (rôle ${role}) : aucune liaison ` +
+          `avec cet e-mail (contact déclaré, contact principal ou e-mail société).`
         );
         return NextResponse.json(
           {
             erreur:
               `Aucune société liée à votre compte${emailToken ? ` (e-mail recherché : ${emailToken})` : ''}. ` +
-              `Vérifiez que le contact d'entreprise a exactement cet e-mail dans la base ; une fois corrigé, rechargez cette page.`,
+              `Vérifiez que ce compte a l'e-mail du contact principal (Modifier la société) ou d'un contact d'entreprise ; une fois corrigé, rechargez cette page.`,
           },
           { status: 403 }
         );

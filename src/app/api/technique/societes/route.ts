@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     //     taux 0-100, plafond > 0) ────────────────────────────────────────────
     const parsed = await parseJsonBody(request, societeTechniqueCreateSchema);
     if (!parsed.success) return parsed.response;
-    const { nom, adresse, telephone, email, nif, contactPrincipal, baremes } = parsed.data;
+    const { nom, adresse, telephone, email, nif, contactPrincipal, emailContactPrincipal, baremes } = parsed.data;
 
     // Vérifier les doublons de prestation dans le tableau
     if (baremes && baremes.length > 0) {
@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
         ...(email ? { email } : {}),
         ...(nif ? { nif } : {}),
         ...(contactPrincipal ? { contactPrincipal } : {}),
+        ...(emailContactPrincipal ? { emailContactPrincipal } : {}),
         baremes: baremes && baremes.length > 0
           ? {
               create: baremes.map((b) => ({

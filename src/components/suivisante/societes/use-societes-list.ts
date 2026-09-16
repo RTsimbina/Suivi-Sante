@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 
 import {
   Societe,
@@ -35,6 +36,7 @@ export function useSocietesList() {
   const [formEmail, setFormEmail] = useState('');
   const [formNif, setFormNif] = useState('');
   const [formContact, setFormContact] = useState('');
+  const [formContactEmail, setFormContactEmail] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Détail : onglet actif + filtres
@@ -113,6 +115,7 @@ export function useSocietesList() {
   function resetForm() {
     setFormNom(''); setFormAdresse(''); setFormTelephone('');
     setFormEmail(''); setFormNif(''); setFormContact('');
+    setFormContactEmail('');
     setEditing(null);
   }
 
@@ -126,6 +129,7 @@ export function useSocietesList() {
     setFormNom(s.nom); setFormAdresse(s.adresse || '');
     setFormTelephone(s.telephone || ''); setFormEmail(s.email || '');
     setFormNif(s.nif || ''); setFormContact(s.contactPrincipal || '');
+    setFormContactEmail(s.emailContactPrincipal || '');
     setFormOpen(true);
   }
 
@@ -140,6 +144,21 @@ export function useSocietesList() {
         email: formEmail.trim() || undefined,
         nif: formNif.trim() || undefined,
         contactPrincipal: formContact.trim() || undefined,
+        // Liaison du futur compte portail CONTACT_ENTREPRISE
+        emailContactPrincipal: formContactEmail.trim() || undefined,
+      };
+
+      const erreur = async (res: Response, defaut: string) => {
+        let data: Record<string, unknown> = {};
+        try { data = await res.json(); } catch { /* corps non JSON */ }
+        const details = Array.isArray(data.details) ? data.details : [];
+        const premier = details[0] as { champ?: string; message?: string } | undefined;
+        const msg = (typeof data.erreur === 'string' && data.erreur)
+          || (typeof data.error === 'string' && data.error
+            ? premier?.message ? `${data.error} — ${premier.message}` : data.error
+            : null)
+          || defaut;
+        toast.error(msg);
       };
 
       if (editing) {
@@ -148,16 +167,20 @@ export function useSocietesList() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (res.ok) { setFormOpen(false); fetchSocietes(); }
+        if (res.ok) { toast.success('Societe modifiee.'); setFormOpen(false); fetchSocietes(); }
+        else await erreur(res, "Erreur lors de l'enregistrement de la société.");
       } else {
         const res = await fetch('/api/technique/societes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (res.ok) { setFormOpen(false); fetchSocietes(); }
+        if (res.ok) { toast.success('Societe creee.'); setFormOpen(false); fetchSocietes(); }
+        else await erreur(res, 'Erreur lors de la création de la société.');
       }
-    } catch { /* silent */ } finally {
+    } catch {
+      toast.error('Erreur reseau');
+    } finally {
       setSaving(false);
     }
   }
@@ -169,8 +192,14 @@ export function useSocietesList() {
         setDeleteConfirm(null);
         if (selectedId === id) setSelectedId(null);
         fetchSocietes();
+      } else {
+        let data: Record<string, unknown> = {};
+        try { data = await res.json(); } catch { /* corps non JSON */ }
+        toast.error((typeof data.erreur === 'string' && data.erreur) || 'Erreur lors de la suppression.');
       }
-    } catch { /* silent */ }
+    } catch {
+      toast.error('Erreur reseau');
+    }
   }
 
   // ─── Dérivés ────────────────────────────────────────────────────────────
@@ -265,6 +294,8 @@ export function useSocietesList() {
     setFormNif,
     formContact,
     setFormContact,
+    formContactEmail,
+    setFormContactEmail,
     saving,
     // Stats agrégées
     totalDossiers,

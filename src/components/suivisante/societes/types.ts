@@ -15,6 +15,7 @@ export interface Societe {
   email?: string;
   nif?: string;
   contactPrincipal?: string;
+  emailContactPrincipal?: string | null;
   actif: boolean;
   createdAt: string;
   _count: { dossiers: number; contrats: number; assures: number; baremes: number };

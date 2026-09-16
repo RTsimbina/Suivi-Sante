@@ -53,6 +53,8 @@ interface FormData {
 interface SocieteRef {
   id: string;
   nom: string;
+  contactPrincipal?: string | null;
+  emailContactPrincipal?: string | null;
 }
 
 // Résultat de la vérification de liaison en direct (rôles externes)
@@ -696,7 +698,14 @@ export default function UtilisateursView() {
                 </Label>
                 <Select
                   value={formData.societeId || undefined}
-                  onValueChange={v => setFormData(f => ({ ...f, societeId: v }))}
+                  onValueChange={v => setFormData(f => {
+                    const soc = societes.find(x => x.id === v);
+                    // Contact Entreprise = contact principal de la société :
+                    // préremplir l'e-mail (et le nom) s'ils sont encore vides.
+                    const prefillEmail = !f.email.trim() && soc?.emailContactPrincipal ? soc.emailContactPrincipal : f.email;
+                    const prefillNom = !f.nom.trim() && soc?.contactPrincipal ? soc.contactPrincipal : f.nom;
+                    return { ...f, societeId: v, email: prefillEmail, nom: prefillNom };
+                  })}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Choisir la société à rattacher" />
@@ -711,10 +720,23 @@ export default function UtilisateursView() {
                     )}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  Utilisee pour rattacher le representant a sa societe (contact cree automatiquement si besoin).
-                </p>
+                {(() => {
+                  const soc = societes.find(x => x.id === formData.societeId);
+                  if (soc?.contactPrincipal || soc?.emailContactPrincipal) {
+                    return (
+                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                        <Info className="h-3 w-3" />
+                        Contact principal : {soc.contactPrincipal || '—'}{soc.emailContactPrincipal ? ` (${soc.emailContactPrincipal})` : ''}
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      Astuce : saisissez d'abord le contact principal et son e-mail dans Modifier la société.
+                    </p>
+                  );
+                })()}
               </div>
             )}
 

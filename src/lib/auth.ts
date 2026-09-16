@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
+import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
 import { getClientIp } from '@/lib/rate-limit';
 import {
   evaluateLoginAttempt,
@@ -157,17 +158,15 @@ export const authOptions: NextAuthOptions = {
             );
           }
         } else if (user.role === 'CONTACT_ENTREPRISE') {
-          // Rechercher le contact d'entreprise correspondant à cet e-mail
-          const contact = await db.entrepriseContact.findFirst({
-            where: { email: { equals: emailLiaison, mode: 'insensitive' } },
-            select: { societeId: true },
-          });
-          if (contact) {
-            societeId = contact.societeId ?? undefined;
+          // Résoudre la société : contact déclaré (EntrepriseContact), e-mail
+          // du contact principal (« Modifier la société ») ou e-mail société.
+          const liaison = await resoudreLiaisonContactEntreprise(emailLiaison);
+          if (liaison) {
+            societeId = liaison.societeId;
           } else {
             console.warn(
-              `[AUTH] Compte CONTACT_ENTREPRISE "${user.email}" : aucun EntrepriseContact en base ` +
-              `avec cet e-mail. Le portail affichera une erreur tant que l'e-mail du contact ne correspond pas.`
+              `[AUTH] Compte CONTACT_ENTREPRISE "${user.email}" : aucun EntrepriseContact ni Societe ` +
+              `avec cet e-mail. Le portail affichera une erreur tant que la liaison n'est pas établie.`
             );
           }
         }

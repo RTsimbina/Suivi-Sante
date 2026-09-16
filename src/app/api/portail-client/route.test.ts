@@ -26,6 +26,7 @@ const dbMocks = vi.hoisted(() => ({
   dossierFindMany: vi.fn(),
   baremeFindMany: vi.fn(),
   societeFindUnique: vi.fn(),
+  societeFindFirst: vi.fn(),
   contactFindFirst: vi.fn(),
 }));
 
@@ -43,7 +44,7 @@ vi.mock('@/lib/db', () => ({
     contrat: { findMany: dbMocks.contratFindMany },
     dossier: { findMany: dbMocks.dossierFindMany },
     bareme: { findMany: dbMocks.baremeFindMany },
-    societe: { findUnique: dbMocks.societeFindUnique },
+    societe: { findUnique: dbMocks.societeFindUnique, findFirst: dbMocks.societeFindFirst },
     entrepriseContact: { findFirst: dbMocks.contactFindFirst },
   },
 }));
@@ -77,6 +78,7 @@ const ASSURE_COMPLET = {
 beforeEach(() => {
   vi.clearAllMocks();
   // Valeurs par défaut : collections vides (ayants droit, contrats, dossiers, barèmes)
+  dbMocks.societeFindFirst.mockResolvedValue(null); // aucune liaison par e-mail société
   dbMocks.assureFindMany.mockResolvedValue([]);
   dbMocks.contratFindMany.mockResolvedValue([]);
   dbMocks.dossierFindMany.mockResolvedValue([]);

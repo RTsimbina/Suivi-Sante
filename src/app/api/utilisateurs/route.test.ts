@@ -24,6 +24,8 @@ const dbMocks = vi.hoisted(() => ({
   contactFindMany: vi.fn(),
   contactCreate: vi.fn(),
   societeFindUnique: vi.fn(),
+  societeFindFirst: vi.fn(),
+  societeFindMany: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -46,6 +48,8 @@ vi.mock('@/lib/db', () => ({
     },
     societe: {
       findUnique: dbMocks.societeFindUnique,
+      findFirst: dbMocks.societeFindFirst,
+      findMany: dbMocks.societeFindMany,
     },
   },
 }));
@@ -98,6 +102,8 @@ beforeEach(() => {
   dbMocks.utilisateurFindUnique.mockResolvedValue(null); // e-mail disponible
   dbMocks.utilisateurCreate.mockResolvedValue(UTILISATEUR_CREE);
   dbMocks.societeFindUnique.mockResolvedValue({ id: 's1' }); // société existante
+  dbMocks.societeFindFirst.mockResolvedValue(null); // aucune liaison par e-mail société
+  dbMocks.societeFindMany.mockResolvedValue([]); // enrichissement GET
   dbMocks.contactCreate.mockResolvedValue({ id: 'c1' });
 });
 
@@ -178,7 +184,8 @@ describe('POST /api/utilisateurs — liaison des rôles externes', () => {
   });
 
   it('societeId ignoré quand le contact existe déjà (comportement inchangé)', async () => {
-    dbMocks.contactFindFirst.mockResolvedValue({ id: 'c-existant' });
+    // Le select réel renvoie societeId (cf. liaison-externe.ts)
+    dbMocks.contactFindFirst.mockResolvedValue({ id: 'c-existant', societeId: 's1' });
 
     const res = await POST(requetePost({
       ...PAYLOAD_PORTAIL,
@@ -190,6 +197,23 @@ describe('POST /api/utilisateurs — liaison des rôles externes', () => {
     expect(res.status).toBe(201);
     expect(dbMocks.contactCreate).not.toHaveBeenCalled();
     expect(dbMocks.utilisateurCreate).toHaveBeenCalled();
+  });
+
+  it('201 sans fiche contact quand l\'e-mail est celui du contact principal de la société (Modifier la société)', async () => {
+    dbMocks.contactFindFirst.mockResolvedValue(null);
+    dbMocks.societeFindFirst.mockResolvedValueOnce({ id: 's1' }); // emailContactPrincipal correspond
+
+    const res = await POST(requetePost({
+      ...PAYLOAD_PORTAIL,
+      email: 'principal@societe.mg',
+      role: 'CONTACT_ENTREPRISE',
+    }));
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.contactCreate).not.toHaveBeenCalled();
+    expect(dbMocks.utilisateurCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ role: 'CONTACT_ENTREPRISE' }) })
+    );
   });
 
   it('201 pour un rôle interne : aucune liaison exigée', async () => {

@@ -217,10 +217,19 @@ export default function SocietesView({ userRole }: Props) {
               <Label className="text-xs">Adresse</Label>
               <Input value={list.formAdresse} onChange={e => list.setFormAdresse(e.target.value)} className="h-8 text-sm" placeholder="Adresse" />
             </div>
-            <div>
-              <Label className="text-xs">Contact principal</Label>
-              <Input value={list.formContact} onChange={e => list.setFormContact(e.target.value)} className="h-8 text-sm" placeholder="Nom du contact" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Contact principal</Label>
+                <Input value={list.formContact} onChange={e => list.setFormContact(e.target.value)} className="h-8 text-sm" placeholder="Nom du contact" />
+              </div>
+              <div>
+                <Label className="text-xs">Email du contact</Label>
+                <Input value={list.formContactEmail} onChange={e => list.setFormContactEmail(e.target.value)} className="h-8 text-sm" type="email" placeholder="contact@exemple.com" />
+              </div>
             </div>
+            <p className="text-[11px] text-muted-foreground -mt-1">
+              L'e-mail du contact principal permet de lui ouvrir un accès portail (rôle Contact Entreprise) dans Utilisateurs.
+            </p>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => list.setFormOpen(false)} className="h-8 text-sm">Annuler</Button>
               <Button onClick={list.handleSave} disabled={list.saving || !list.formNom.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-sm">

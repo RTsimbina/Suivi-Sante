@@ -121,6 +121,9 @@ export const societeTechniqueCreateSchema = z
     email: emailOptionnel,
     nif: texteOptionnel(50),
     contactPrincipal: texteOptionnel(200),
+    // E-mail du contact principal — sert de liaison au compte portail
+    // CONTACT_ENTREPRISE (cf. src/lib/liaison-externe.ts).
+    emailContactPrincipal: emailOptionnel,
     baremes: z.array(baremeLigneSchema).max(50, "50 barèmes maximum").optional(),
   });
 
