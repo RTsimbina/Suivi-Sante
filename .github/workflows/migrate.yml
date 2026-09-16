@@ -65,7 +65,7 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         run: |
           set -euo pipefail
-          API="https://api.neon.tech/v2"
+          API="https://console.neon.tech/api/v2"
           AUTH="Authorization: Bearer ${NEON_API_KEY}"
 
           # 1er projet Neon (le compte n'en gère qu'un pour cette application)
