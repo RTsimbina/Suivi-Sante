@@ -1,8 +1,16 @@
-# ─── Diagnostic verrou consultatif Prisma (one-shot, suppression prévue) ─────
-# Identifie le détenteur de pg_advisory_lock(72707369) utilisé par migrate
-# deploy (P1002 « Timed out trying to acquire a postgres advisory lock »).
+# ─── Réparation : libérer le verrou consultatif Prisma en fuite ──────────────
+# (one-shot, suppression prévue)
+#
+# Incident du 17/09/2026 : le build Vercel exécute `prisma migrate deploy`
+# avec une DATABASE_URL poolée (-pooler). Le verrou consultatif de migrate
+# (objid 72707369, verrou de SESSION) a fuité dans une session serveur pgbouncer
+# restée idle : toute migration ultérieure via le workflow échoue en P1002
+# (« Timed out trying to acquire a postgres advisory lock »).
+#
+# Réparation : terminer UNIQUEMENT la session idle de pgbouncer qui détient
+# ce verrou précis, puis relancer « Migration base de données ».
 
-name: Diagnostic verrous DB
+name: Réparation verrou migrate
 
 on:
   workflow_dispatch: {}
@@ -11,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  diag:
+  repair:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,7 +41,7 @@ jobs:
           echo "::add-mask::$URI"
           echo "DATABASE_URL=$URI" >> "$GITHUB_ENV"
 
-      - name: Sessions actives + détenteur du verrou consultatif
+      - name: Terminer la session en fuite (verrou consultatif migrate)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
@@ -42,15 +50,18 @@ jobs:
           node --input-type=module -e "
           import { PrismaClient } from '@prisma/client';
           const db = new PrismaClient();
-          const verrous = await db.\$queryRawUnsafe(
-            \"SELECT pid, objid, granted, mode FROM pg_locks WHERE locktype='advisory'\"
+          const cibles = await db.\$queryRawUnsafe(
+            \"SELECT a.pid FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid WHERE l.locktype='advisory' AND l.objid=72707369 AND l.granted AND a.state='idle'\"
           );
-          console.log('=== Verrous consultatifs (objid 72707369 = verrou Prisma migrate) ===');
-          console.table(verrous.map(v => ({...v, objid: Number(v.objid)})));
-          const sessions = await db.\$queryRawUnsafe(
-            \"SELECT pid, usename, application_name, client_addr, state, backend_start, xact_start, state_change, left(query, 90) AS query FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = current_database() ORDER BY backend_start\"
+          console.log('Sessions en fuite détectées :', cibles.map(c => Number(c.pid)));
+          for (const c of cibles) {
+            const pid = Number(c.pid);
+            const res = await db.\$queryRawUnsafe('SELECT pg_terminate_backend(\$1) AS ok', pid);
+            console.log('pg_terminate_backend(' + pid + ') →', res[0].ok);
+          }
+          const restant = await db.\$queryRawUnsafe(
+            \"SELECT pid, granted FROM pg_locks WHERE locktype='advisory' AND objid=72707369\"
           );
-          console.log('=== Sessions actives (production) ===');
-          console.table(sessions.map(s => ({...s, query: s.query?.replace(/\n/g,' ')})));
+          console.log('Verrous restants sur 72707369 :', restant.map(r => ({ pid: Number(r.pid), granted: r.granted })));
           await db.\$disconnect();
-          " 2>&1 | head -90
+          " 2>&1 | head -40
