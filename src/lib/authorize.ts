@@ -138,7 +138,9 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
       POST: ['ADMINISTRATEUR'],
-      PUT: ['ADMINISTRATEUR'],
+      // Modification de la fiche prestataire : Administrateur ET Service
+      // Technique exclusivement (ACCUEIL/COMPTABILITE/SANTE : lecture seule).
+      PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
       DELETE: ['ADMINISTRATEUR'],
       // SANTE : lecture seule (GET)
     },

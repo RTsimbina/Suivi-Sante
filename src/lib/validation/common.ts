@@ -44,6 +44,72 @@ export const emailOptionnel = z
   .nullish()
   .transform((v) => (!v || v === "" ? null : v));
 
+// ─── Identifiants & coordonnées de référence (prestataires, sociétés...) ────
+// Conventions de validation : les séparateurs (espaces, points, tirets) sont
+// autorisés à la saisie puis retirés avant contrôle de la forme compacte.
+// La valeur renvoyée reste telle que saisie (trim) — la normalisation compacte
+// ne sert qu'aux tests de format et aux contrôles de doublons.
+
+/** Téléphone : format international souple — chiffres, espaces, points,
+ *  tirets, parenthèses et préfixe « + » ; au moins 7 chiffres, 30 caractères max.
+ *  (ex. +261 34 12 345 67, 020 22 345 67). */
+export const telephoneLibreSchema = z
+  .string()
+  .trim()
+  .max(30, "Le téléphone ne peut pas dépasser 30 caractères")
+  .refine(
+    (v) =>
+      v === "" ||
+      (/^\+?[\d\s().-]+$/.test(v) && (v.match(/\d/g) ?? []).length >= 7),
+    "Format de téléphone invalide (ex. +261 34 12 345 67)"
+  )
+  .nullish()
+  .transform((v) => (!v || v === "" ? null : v));
+
+/** NIF — Numéro d'Identification Fiscale (Madagascar) : 8 à 15 caractères
+ *  alphanumériques une fois les séparateurs retirés (ex. 3000 123 456). */
+export const nifSchema = z
+  .string()
+  .trim()
+  .max(25, "Le NIF ne peut pas dépasser 25 caractères")
+  .refine((v) => {
+    if (v === "") return true;
+    const compact = v.replace(/[\s.-]/g, "").toUpperCase();
+    return /^[A-Z0-9]{8,15}$/.test(compact);
+  }, "Format du NIF invalide (8 à 15 caractères alphanumériques, ex. 3000 123 456)")
+  .nullish()
+  .transform((v) => (!v || v === "" ? null : v));
+
+/** Num STAT — Numéro Statistique (Madagascar) : 10 à 20 chiffres une fois les
+ *  séparateurs retirés (ex. 6512 311 2001 01234). */
+export const numStatSchema = z
+  .string()
+  .trim()
+  .max(30, "Le Numéro STAT ne peut pas dépasser 30 caractères")
+  .refine((v) => {
+    if (v === "") return true;
+    const compact = v.replace(/[\s.-]/g, "");
+    return /^\d{10,20}$/.test(compact);
+  }, "Format du Numéro STAT invalide (10 à 20 chiffres, ex. 6512 311 2001 01234)")
+  .nullish()
+  .transform((v) => (!v || v === "" ? null : v));
+
+/** RIB / coordonnées bancaires — deux formes acceptées :
+ *  1. Compte numérique national : ≥ 12 chiffres (ex. 000 12345 67890 12 3) ;
+ *  2. IBAN : 2 lettres + 2 chiffres de contrôle + 8 à 30 caractères alphanumériques.
+ *  Cohérence : tout autre mélange lettres/chiffres est refusé. */
+export const ribSchema = z
+  .string()
+  .trim()
+  .max(50, "Le RIB ne peut pas dépasser 50 caractères")
+  .refine((v) => {
+    if (v === "") return true;
+    const compact = v.replace(/[\s.-]/g, "").toUpperCase();
+    return /^\d{12,30}$/.test(compact) || /^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/.test(compact);
+  }, "Format du RIB invalide (numéros de compte en chiffres, ex. 000 12345 67890 12 3)")
+  .nullish()
+  .transform((v) => (!v || v === "" ? null : v));
+
 /**
  * Mot de passe : même politique que la création de comptes (≥ 8 caractères,
  * au moins une lettre et un chiffre). Utilisé par /api/utilisateurs,

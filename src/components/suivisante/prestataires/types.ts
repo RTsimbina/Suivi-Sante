@@ -8,13 +8,22 @@ export interface SocieteItem {
   nom: string;
 }
 
+/** Fiche complète d'un prestataire (réponse de GET /api/prestataires et /api/prestataires/[id]). */
 export interface PrestataireItem {
   id: string;
   nom: string;
   type: string;
   telephone: string | null;
   email: string | null;
+  adresse: string | null;
+  nif: string | null;
+  stat: string | null;
+  statutJuridique: string | null;
+  /** Statut conventionnel (CONVENTIONNE / SUSPENDU / libre). */
+  statut: string | null;
+  rib: string | null;
   actif: boolean;
+  nbDossiers?: number;
 }
 
 export interface LienPS {
@@ -40,7 +49,7 @@ export interface SocieteStats {
 /** Filtre de statut du tableau des liens. */
 export type StatutFilter = '' | 'actif' | 'inactif';
 
-/** Formulaire de création d'un prestataire. */
+/** Formulaire de création / modification d'un prestataire. */
 export interface CreateFormState {
   nom: string;
   type: string;
@@ -48,13 +57,30 @@ export interface CreateFormState {
   email: string;
   adresse: string;
   nif: string;
+  stat: string;
+  statutJuridique: string;
   statut: string;
   rib: string;
 }
 
 export const EMPTY_CREATE_FORM: CreateFormState = {
-  nom: '', type: '', telephone: '', email: '', adresse: '', nif: '', statut: '', rib: '',
+  nom: '', type: '', telephone: '', email: '', adresse: '', nif: '', stat: '', statutJuridique: '', statut: '', rib: '',
 };
+
+/** Formulaire de modification d'un prestataire (champs éditables de la fiche). */
+export type EditFormState = CreateFormState;
+
+export const STATUTS_CONVENTIONNELS = ['CONVENTIONNE', 'SUSPENDU'] as const;
+
+export const STATUT_CONVENTIONNEL_LABELS: Record<string, string> = {
+  CONVENTIONNE: 'Conventionné',
+  SUSPENDU: 'Suspendu',
+};
+
+/** Suggestions de statut juridique (liste indicative, saisie libre). */
+export const STATUTS_JURIDIQUES_SUGGERES = [
+  'SARL', 'SUARL', 'SA', 'EI', 'ONG', 'Association', 'GIE', 'Coopérative', 'Établissement public',
+];
 
 export const TYPE_LABELS: Record<string, string> = {
   HOPITAL: 'Hôpital',
@@ -77,3 +103,19 @@ export const TYPE_COLORS: Record<string, string> = {
   OPTICIEN: 'bg-cyan-100 text-cyan-700 border-cyan-200',
   AUTRE: 'bg-muted text-muted-foreground border-border',
 };
+
+/** Pré-remplit le formulaire de modification depuis la fiche du prestataire. */
+export function formulaireDepuisPrestataire(p: PrestataireItem): EditFormState {
+  return {
+    nom: p.nom ?? '',
+    type: p.type ?? '',
+    telephone: p.telephone ?? '',
+    email: p.email ?? '',
+    adresse: p.adresse ?? '',
+    nif: p.nif ?? '',
+    stat: p.stat ?? '',
+    statutJuridique: p.statutJuridique ?? '',
+    statut: p.statut ?? '',
+    rib: p.rib ?? '',
+  };
+}

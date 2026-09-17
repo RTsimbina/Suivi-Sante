@@ -336,15 +336,16 @@ async function main() {
 
   // ── 3. Prestataires + conventions par société ────────────────────────────
   console.log('\n🏥 PRESTATAIRES');
-  const P = (nom, type, tel, email, adr, nif, actif = true, rib = null) => db.prestataire.create({
-    data: { nom, type, telephone: tel, email, adresse: adr, nif, actif, statut: actif ? 'CONVENTIONNE' : 'SUSPENDU', rib },
+  // stat = Numéro Statistique (Madagascar), statutJuridique = forme juridique
+  const P = (nom, type, tel, email, adr, nif, actif = true, rib = null, stat = null, statutJuridique = null) => db.prestataire.create({
+    data: { nom, type, telephone: tel, email, adresse: adr, nif, actif, statut: actif ? 'CONVENTIONNE' : 'SUSPENDU', rib, stat, statutJuridique },
   });
-  const pHop = await P('Hôpital Principal HJ Anosy', 'HOPITAL', '020 22 345 67', 'facturation@hopital-principal.mg', 'Avenue de la Libération, Anosy, Antananarivo', '4002345678', true, '000 12345 67890 12 3');
-  const pCli = await P('Clinique Sainte Marie', 'CLINIQUE', '032 12 345 67', 'contact@clinique-saintemarie.mg', 'Lot VJ 34 Antanimena, Antananarivo', '4001234567', true, '000 23456 78901 23 4');
-  const pPha = await P('Pharmacie Centrale Anosy', 'PHARMACIE', '020 22 456 78', 'commande@pharmacie-centrale.mg', 'Place Behorizy, Antananarivo', '4004567890');
-  const pBio = await P('Laboratoire BioMad', 'LABORATOIRE', '020 22 567 89', 'lab@biomad.mg', 'Isotry, Antananarivo', '4006789012');
-  const pDen = await P('Cabinet Dentaire Blanc', 'DENTAIRE', '033 67 890 12', 'blanc.dental@gmail.com', 'Analakely, Antananarivo', '4005678901', false); // INACTIF — cas d'erreur
-  const pAmb = await P('Centre Médical Ambatobe', 'CABINET_MEDICAL', '034 56 789 01', 'rdv@cm-ambatobe.mg', 'Ambatobe, Antananarivo', '4003456789');
+  const pHop = await P('Hôpital Principal HJ Anosy', 'HOPITAL', '020 22 345 67', 'facturation@hopital-principal.mg', 'Avenue de la Libération, Anosy, Antananarivo', '4002345678', true, '000 12345 67890 12 3', '6512 311 2001 01234', 'SA');
+  const pCli = await P('Clinique Sainte Marie', 'CLINIQUE', '032 12 345 67', 'contact@clinique-saintemarie.mg', 'Lot VJ 34 Antanimena, Antananarivo', '4001234567', true, '000 23456 78901 23 4', '6512 311 2002 02345', 'SARL');
+  const pPha = await P('Pharmacie Centrale Anosy', 'PHARMACIE', '020 22 456 78', 'commande@pharmacie-centrale.mg', 'Place Behorizy, Antananarivo', '4004567890', true, null, '6512 311 2003 03456', 'SARL');
+  const pBio = await P('Laboratoire BioMad', 'LABORATOIRE', '020 22 567 89', 'lab@biomad.mg', 'Isotry, Antananarivo', '4006789012', true, null, '6512 311 2004 04567', 'SUARL');
+  const pDen = await P('Cabinet Dentaire Blanc', 'DENTAIRE', '033 67 890 12', 'blanc.dental@gmail.com', 'Analakely, Antananarivo', '4005678901', false, null, '6512 311 2005 05678', 'EI'); // INACTIF — cas d'erreur
+  const pAmb = await P('Centre Médical Ambatobe', 'CABINET_MEDICAL', '034 56 789 01', 'rdv@cm-ambatobe.mg', 'Ambatobe, Antananarivo', '4003456789', true, null, '6512 311 2006 06789', 'SARL');
   const PRESTATAIRES = { pHop, pCli, pPha, pBio, pDen, pAmb };
   const CONVENTIONS = {
     SANLAM: [['pHop', true], ['pCli', true], ['pPha', true], ['pBio', true], ['pDen', true]], // pDen : convention active MAIS prestataire suspendu

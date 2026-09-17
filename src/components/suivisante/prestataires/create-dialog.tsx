@@ -135,37 +135,48 @@ export default function CreateDialog({
               />
             </div>
 
-            {/* NIF + Statut */}
+            {/* NIF + Num STAT */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">NIF</Label>
                 <Input
-                  placeholder="Numéro d'identification fiscale"
+                  placeholder="3000 123 456"
                   value={createForm.nif}
                   onChange={e => onCreateFormChange(f => ({ ...f, nif: e.target.value }))}
                   className="h-9 text-sm"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Statut juridique</Label>
+                <Label className="text-xs font-medium">Num STAT</Label>
                 <Input
-                  placeholder="Ex : SA, SARL..."
-                  value={createForm.statut}
-                  onChange={e => onCreateFormChange(f => ({ ...f, statut: e.target.value }))}
+                  placeholder="Numéro statistique"
+                  value={createForm.stat}
+                  onChange={e => onCreateFormChange(f => ({ ...f, stat: e.target.value }))}
                   className="h-9 text-sm"
                 />
               </div>
             </div>
 
-            {/* RIB */}
-            <div className="space-y-1">
-              <Label className="text-xs font-medium">RIB (Relevé d'Identité Bancaire)</Label>
-              <Input
-                placeholder="Numéro de compte bancaire"
-                value={createForm.rib}
-                onChange={e => onCreateFormChange(f => ({ ...f, rib: e.target.value }))}
-                className="h-9 text-sm"
-              />
+            {/* Statut juridique + RIB */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Statut juridique</Label>
+                <Input
+                  placeholder="Ex : SARL, SA, ONG..."
+                  value={createForm.statutJuridique}
+                  onChange={e => onCreateFormChange(f => ({ ...f, statutJuridique: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">RIB (Relevé d'Identité Bancaire)</Label>
+                <Input
+                  placeholder="Numéro de compte bancaire"
+                  value={createForm.rib}
+                  onChange={e => onCreateFormChange(f => ({ ...f, rib: e.target.value }))}
+                  className="h-9 text-sm"
+                />
+              </div>
             </div>
 
             {/* Séparation */}

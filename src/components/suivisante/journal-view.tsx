@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { ROLE_LABELS } from '@/lib/auth-context';
 import { SharedPagination, type PaginationState } from '@/components/ui/shared-pagination';
 import { usePeriode } from '@/lib/periode-context';
 
@@ -27,6 +28,8 @@ interface HistoriqueEntry {
   nouvelleValeur: string | null;
   modifiePar: string;
   modifieParId: string | null;
+  /** Rôle de l'utilisateur au moment de l'opération (figé côté serveur). */
+  roleUtilisateur?: string | null;
   dateModification: string;
   action: string;
   niveau: string;
@@ -628,6 +631,7 @@ export default function JournalView() {
                   <DetailField label="Ancienne valeur" value={selectedEntry.ancienneValeur || 'vide'} />
                   <DetailField label="Nouvelle valeur" value={selectedEntry.nouvelleValeur || 'vide'} />
                   <DetailField label="Effectué par" value={selectedEntry.modifiePar} />
+                  <DetailField label="Rôle" value={selectedEntry.roleUtilisateur ? (ROLE_LABELS[selectedEntry.roleUtilisateur as keyof typeof ROLE_LABELS] ?? selectedEntry.roleUtilisateur) : '-'} />
                   <DetailField label="ID utilisateur" value={selectedEntry.modifieParId || '-'} mono />
                   <DetailField label="ID entité" value={selectedEntry.entiteId} mono />
                   <DetailField label="Niveau" value={selectedEntry.niveau} />

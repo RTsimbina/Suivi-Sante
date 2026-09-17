@@ -103,6 +103,49 @@ function rowOf(nom: string): HTMLElement {
   return row as HTMLElement;
 }
 
+// ─── Données : fiche détaillée (module GESTION → PRESTATAIRES) ───────────────
+
+const ficheP1 = {
+  id: 'p1',
+  nom: 'Clinique A',
+  type: 'CLINIQUE',
+  telephone: '034 11 111 11',
+  email: 'contact@cliniquea.mg',
+  adresse: 'Anosy, Antananarivo',
+  nif: '4001111111',
+  stat: '6512 311 2001 01234',
+  statutJuridique: 'SARL',
+  statut: 'CONVENTIONNE',
+  rib: '000 12345 67890 12 3',
+  actif: true,
+  societes: [
+    { id: 'l1', prestataireId: 'p1', societeId: 's1', actif: true, societe: societes[0] },
+  ],
+  _count: { dossiers: 5 },
+};
+
+/** Stub standard + fiche GET /api/prestataires/p1 pour les tests du module. */
+function stubFetchAvecFiche() {
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith('/api/prestataires/p1')) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ prestataire: ficheP1 }) });
+    }
+    if (url.startsWith('/api/prestataires?limit=500')) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ prestataires }) });
+    }
+    if (url.startsWith('/api/prestataires/societes')) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ liens }) });
+    }
+    if (url.startsWith('/api/technique/societes')) {
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(societes) });
+    }
+    return Promise.reject(new Error('fetch non mocké : ' + url));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 describe('PrestatairesView — caractérisation', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -373,5 +416,178 @@ describe('PrestatairesView — caractérisation', () => {
     render(<PrestatairesView userRole="ADMINISTRATEUR" />);
 
     expect(await screen.findByText('Aucune société enregistrée')).toBeInTheDocument();
+  });
+});
+
+// ─── Module GESTION → PRESTATAIRES : liste centralisée, fiche, modification ──
+
+describe('PrestatairesView — annuaire, fiche détaillée et modification', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function allerSurAnnuaire(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('tab', { name: /Tous les prestataires/ }));
+  }
+
+  it('affiche la liste centralisée de tous les prestataires avec statut et rattachements', async () => {
+    const user = userEvent.setup();
+    stubFetchAvecFiche();
+    render(<PrestatairesView userRole="ADMINISTRATEUR" />);
+
+    await allerSurAnnuaire(user);
+
+    // Les 3 prestataires du référentiel sont visibles, y compris Optique C
+    // qui n'est pas conventionné avec la société auto-sélectionnée.
+    expect(await screen.findByText('Clinique A')).toBeInTheDocument();
+    expect(screen.getByText('Pharmacie B')).toBeInTheDocument();
+    expect(screen.getByText('Optique C')).toBeInTheDocument();
+
+    // Rattachements (badges sociétés) — Clinique A et Pharmacie B ↔ CNAPS
+    expect(screen.getAllByText('CNAPS').length).toBeGreaterThanOrEqual(1);
+
+    // Statut rapide
+    expect(screen.getAllByText('Actif').length).toBeGreaterThan(0);
+  });
+
+  it('recherche et filtres du panneau centralisé (nom, e-mail, NIF, Num STAT)', async () => {
+    const user = userEvent.setup();
+    stubFetchAvecFiche();
+    render(<PrestatairesView userRole="ADMINISTRATEUR" />);
+
+    await allerSurAnnuaire(user);
+    await screen.findByText('Clinique A');
+
+    await user.type(screen.getByPlaceholderText('Rechercher par nom, e-mail, NIF, Num STAT...'), 'Pharmacie');
+    await waitFor(() => {
+      expect(screen.queryByText('Clinique A')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Pharmacie B')).toBeInTheDocument();
+  });
+
+  it('ouvre la fiche détaillée avec les informations structurées et les sociétés rattachées', async () => {
+    const user = userEvent.setup();
+    const fetchMock = stubFetchAvecFiche();
+    render(<PrestatairesView userRole="ADMINISTRATEUR" />);
+
+    await allerSurAnnuaire(user);
+    const row = rowOf('Clinique A');
+    const boutons = await within(row).findAllByRole('button');
+    const voir = boutons.find(b => b.querySelector('.lucide-eye'));
+    expect(voir).toBeDefined();
+    await user.click(voir!);
+
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url) === '/api/prestataires/p1')
+    ).toBe(true);
+    const dialog = await screen.findByRole('dialog');
+    // Informations structurées exigées sur la fiche
+    expect(within(dialog).getByText('Statut juridique')).toBeInTheDocument();
+    expect(within(dialog).getByText('SARL')).toBeInTheDocument();
+    expect(within(dialog).getByText('Num STAT (Numéro Statistique)')).toBeInTheDocument();
+    expect(within(dialog).getByText('6512 311 2001 01234')).toBeInTheDocument();
+    expect(within(dialog).getByText('NIF (Numéro d\'Identification Fiscale)')).toBeInTheDocument();
+    expect(within(dialog).getByText('000 12345 67890 12 3')).toBeInTheDocument();
+    // Sociétés clientes rattachées avec état de la convention
+    expect(within(dialog).getByText('CNAPS')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Convention active/)).toBeInTheDocument();
+    // Accès à la modification depuis la fiche (ADMINISTRATEUR)
+    expect(within(dialog).getByRole('button', { name: /Modifier le prestataire/ })).toBeInTheDocument();
+  });
+
+  it('ouvre le formulaire « Modifier le prestataire » depuis la fiche et enregistre (PUT)', async () => {
+    const user = userEvent.setup();
+    const fetchMock = stubFetchAvecFiche();
+    render(<PrestatairesView userRole="ADMINISTRATEUR" />);
+
+    await allerSurAnnuaire(user);
+    const row = rowOf('Clinique A');
+    const boutons = await within(row).findAllByRole('button');
+    const voir = boutons.find(b => b.querySelector('.lucide-eye'));
+    await user.click(voir!);
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /Modifier le prestataire/ }));
+
+    // Le formulaire est pré-rempli avec les données de la fiche
+    const form = await screen.findByRole('dialog');
+    const nomInput = within(form).getByLabelText(/Nom \/ Raison sociale/) as HTMLInputElement;
+    expect(nomInput.value).toBe('Clinique A');
+
+    // Modifier le téléphone puis enregistrer
+    const telInput = within(form).getByLabelText('Téléphone');
+    await user.clear(telInput);
+    await user.type(telInput, '032 22 222 22');
+    await user.click(within(form).getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/prestataires',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({
+            id: 'p1',
+            nom: 'Clinique A',
+            type: 'CLINIQUE',
+            telephone: '032 22 222 22',
+            email: 'contact@cliniquea.mg',
+            adresse: 'Anosy, Antananarivo',
+            nif: '4001111111',
+            stat: '6512 311 2001 01234',
+            statutJuridique: 'SARL',
+            statut: 'CONVENTIONNE',
+            rib: '000 12345 67890 12 3',
+          }),
+        }),
+      );
+    });
+  });
+
+  it('bloque l\u2019enregistrement si l\u2019e-mail est invalide (validation Zod partagée)', async () => {
+    const user = userEvent.setup();
+    const fetchMock = stubFetchAvecFiche();
+    render(<PrestatairesView userRole="ADMINISTRATEUR" />);
+
+    await allerSurAnnuaire(user);
+    const row = rowOf('Clinique A');
+    const boutons = await within(row).findAllByRole('button');
+    await user.click(boutons.find(b => b.querySelector('.lucide-eye'))!);
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /Modifier le prestataire/ }));
+
+    const form = await screen.findByRole('dialog');
+    const emailInput = within(form).getByLabelText('Adresse e-mail');
+    await user.clear(emailInput);
+    await user.type(emailInput, 'pas-un-email');
+    await user.click(within(form).getByRole('button', { name: 'Enregistrer' }));
+
+    // Aucun PUT n'est envoyé et l'erreur du champ est affichée
+    await waitFor(() => {
+      expect(within(form).getByText(/Adresse email invalide/)).toBeInTheDocument();
+    });
+    const appelsPut = fetchMock.mock.calls.filter(
+      (call) =>
+        String(call[0]) === '/api/prestataires' && call[1]?.method === 'PUT'
+    );
+    expect(appelsPut).toHaveLength(0);
+  });
+
+  it('masque la modification sans rôle autorisé (ACCUEIL : lecture seule)', async () => {
+    const user = userEvent.setup();
+    stubFetchAvecFiche();
+    render(<PrestatairesView userRole="ACCUEIL" />);
+
+    await allerSurAnnuaire(user);
+    const row = rowOf('Clinique A');
+    const boutons = await within(row).findAllByRole('button');
+    // Bouton fiche présent, bouton modifier absent
+    expect(boutons.find(b => b.querySelector('.lucide-eye'))).toBeDefined();
+    expect(boutons.find(b => b.querySelector('.lucide-pencil'))).toBeUndefined();
+
+    // La fiche reste consultable mais sans bouton de modification
+    await user.click(boutons.find(b => b.querySelector('.lucide-eye'))!);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: /Modifier le prestataire/ })).not.toBeInTheDocument();
   });
 });

@@ -8,10 +8,12 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 
 import {
   SocieteItem, PrestataireItem, LienPS, SocieteStats,
   StatutFilter, CreateFormState, EMPTY_CREATE_FORM,
+  formulaireDepuisPrestataire,
 } from './types';
 
 export function usePrestatairesData() {
@@ -45,6 +47,18 @@ export function usePrestatairesData() {
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [createSocieteSearch, setCreateSocieteSearch] = useState('');
+
+  // Formulaire de modification (état piloté par la vue d'édition)
+  const [editForm, setEditForm] = useState<CreateFormState>(EMPTY_CREATE_FORM);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+
+  // Fiche détaillée + modification du prestataire (module GESTION → PRESTATAIRES)
+  const [ficheOuvert, setFicheOuvert] = useState(false);
+  const [fichePrestataire, setFichePrestataire] = useState<PrestataireItem | null>(null);
+  const [ficheLoading, setFicheLoading] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editPrestataire, setEditPrestataire] = useState<PrestataireItem | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // ─── Fetches ────────────────────────────────────────────────────────────
   const fetchSocietes = useCallback(async () => {
@@ -103,8 +117,21 @@ export function usePrestatairesData() {
       if (res.ok) {
         const data = await res.json();
         setAllPrestatairesList(
-          (data.prestataires || []).map((p: { id: string; nom: string; type: string; telephone: string | null; actif: boolean }) => ({
-            id: p.id, nom: p.nom, type: p.type, telephone: p.telephone, actif: p.actif,
+          (data.prestataires || []).map((p: Record<string, unknown> & { id: string; nom: string; type: string }) => ({
+            id: p.id,
+            nom: p.nom,
+            type: p.type,
+            telephone: (p.telephone as string | null) ?? null,
+            email: (p.email as string | null) ?? null,
+            adresse: (p.adresse as string | null) ?? null,
+            nif: (p.nif as string | null) ?? null,
+            stat: (p.stat as string | null) ?? null,
+            statutJuridique: (p.statutJuridique as string | null) ?? null,
+            statut: (p.statut as string | null) ?? null,
+            rib: (p.rib as string | null) ?? null,
+            actif: Boolean(p.actif),
+            nbDossiers:
+              (p._count as { dossiers?: number } | undefined)?.dossiers ?? 0,
           }))
         );
       }
@@ -202,6 +229,18 @@ export function usePrestatairesData() {
     return societes.filter(s => s.nom.toLowerCase().includes(q));
   }, [societes, createSocieteSearch]);
 
+  // Rattachements par prestataire (dérivés des liens) — alimente la liste
+  // centralisée et la fiche détaillée (« sociétés clientes rattachées »).
+  const societesParPrestataire = useMemo(() => {
+    const map = new Map<string, { societe: { id: string; nom: string }; actif: boolean }[]>();
+    for (const l of liens) {
+      const list = map.get(l.prestataireId) ?? [];
+      list.push({ societe: l.societe, actif: l.actif });
+      map.set(l.prestataireId, list);
+    }
+    return map;
+  }, [liens]);
+
   // ─── Actions ────────────────────────────────────────────────────────────
   async function handleSyncFromDossiers() {
     setSyncing(true);
@@ -283,6 +322,8 @@ export function usePrestatairesData() {
           email: createForm.email || undefined,
           adresse: createForm.adresse || undefined,
           nif: createForm.nif || undefined,
+          stat: createForm.stat || undefined,
+          statutJuridique: createForm.statutJuridique || undefined,
           statut: createForm.statut || undefined,
           rib: createForm.rib || undefined,
         }),
@@ -360,6 +401,106 @@ export function usePrestatairesData() {
     }
   }
 
+  // ─── Fiche détaillée d'un prestataire ───────────────────────────────────
+  // Chargée depuis GET /api/prestataires/[id] : données les plus fraîches,
+  // rattachements aux sociétés inclus, 404 si l'identifiant est inconnu
+  // (protection contre la manipulation d'identifiant dans l'URL).
+  async function ouvrirFiche(prestataireId: string) {
+    setFicheOuvert(true);
+    setFicheLoading(true);
+    try {
+      const res = await fetch(`/api/prestataires/${prestataireId}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setFicheOuvert(false);
+        toast.error((data && typeof data.erreur === 'string' && data.erreur) || `Erreur ${res.status} : fiche indisponible`);
+        return;
+      }
+      setFichePrestataire(data.prestataire);
+    } catch {
+      setFicheOuvert(false);
+      toast.error('Erreur réseau : fiche indisponible');
+    } finally {
+      setFicheLoading(false);
+    }
+  }
+
+  function fermerFiche() {
+    setFicheOuvert(false);
+    setFichePrestataire(null);
+    setFicheLoading(false);
+  }
+
+  /** Ouvre le formulaire « Modifier le prestataire » pré-rempli. */
+  function ouvrirEdition(p: PrestataireItem) {
+    setEditPrestataire({ ...p });
+    setEditForm(formulaireDepuisPrestataire(p));
+    setEditErrors({});
+    setEditDialogOpen(true);
+  }
+
+  /** Depuis la fiche : bouton « Modifier le prestataire ». */
+  function modifierDepuisFiche() {
+    if (!fichePrestataire) return;
+    const fiche = fichePrestataire;
+    fermerFiche();
+    ouvrirEdition(fiche);
+  }
+
+  /**
+   * Enregistre la modification (PUT /api/prestataires).
+   * Validation locale avec les MÊMES schémas Zod que l'API (validations.ts) ;
+   * l'autorisation est tranchée côté serveur (Admin + Service Technique) :
+   * un 403 est affiché à l'utilisateur, jamais contourné côté client.
+   */
+  async function handleSaveEdit(form: CreateFormState) {
+    if (!editPrestataire) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch('/api/prestataires', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editPrestataire.id,
+          nom: form.nom,
+          type: form.type || undefined,
+          telephone: form.telephone || undefined,
+          email: form.email || undefined,
+          adresse: form.adresse || undefined,
+          nif: form.nif || undefined,
+          stat: form.stat || undefined,
+          statutJuridique: form.statutJuridique || undefined,
+          statut: form.statut || undefined,
+          rib: form.rib || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // 400 = validation, 403 = rôle non autorisé, 404 = introuvable,
+        // 409 = doublon (nom, e-mail, NIF, Num STAT) — messages français serveur
+        const detailZod =
+          data && Array.isArray(data.details) && data.details.length > 0
+            ? `${data.details[0].champ} : ${data.details[0].message}`
+            : '';
+        toast.error(
+          (data && typeof data.erreur === 'string' && data.erreur) ||
+            detailZod ||
+            `Erreur ${res.status} : modification refusée`
+        );
+        return;
+      }
+      toast.success('Prestataire modifié. La modification est enregistrée dans le journal d\'audit.');
+      setEditDialogOpen(false);
+      setEditPrestataire(null);
+      // Rafraîchir les listes (fiche + annuaire + conventions)
+      fetchAllPrestataires();
+    } catch {
+      toast.error('Erreur réseau : modification non enregistrée');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   return {
     // Données
     societes,
@@ -367,6 +508,8 @@ export function usePrestatairesData() {
     allPrestatairesList,
     loading,
     fetchError,
+    // Rattachements par prestataire (liste centralisée + fiche)
+    societesParPrestataire,
     // Recherche & filtres
     searchSociete,
     setSearchSociete,
@@ -425,6 +568,24 @@ export function usePrestatairesData() {
     totalActifs,
     totalInactifs,
     totalPrestatairesUniques,
+    // Fiche détaillée + modification (module GESTION → PRESTATAIRES)
+    ficheOuvert,
+    fichePrestataire,
+    ficheLoading,
+    ouvrirFiche,
+    fermerFiche,
+    modifierDepuisFiche,
+    editDialogOpen,
+    setEditDialogOpen,
+    editPrestataire,
+    setEditPrestataire,
+    editForm,
+    setEditForm,
+    editErrors,
+    setEditErrors,
+    savingEdit,
+    ouvrirEdition,
+    handleSaveEdit,
   };
 }
 

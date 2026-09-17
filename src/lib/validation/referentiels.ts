@@ -11,8 +11,12 @@ import {
   idOptionnel,
   idSchema,
   motDePasseSchema,
+  nifSchema,
+  numStatSchema,
+  ribSchema,
   roleUtilisateurSchema,
   sexeSchema,
+  telephoneLibreSchema,
   typeBeneficiaireSchema,
   typePrestataireSchema,
   texteOptionnel,
@@ -70,16 +74,21 @@ export const societeCreateSchema = z.object({
 });
 
 // ─── Prestataires (/api/prestataires) ───────────────────────────────────────
+// Validation centralisée : formats NIF / Num STAT / téléphone / RIB contrôlés
+// par les primitives partagées de common.ts (client ET serveur utilisent ces
+// mêmes schémas — aucune règle dupliquée côté formulaire).
 
 export const prestataireCreateSchema = z.object({
   nom: texteCourt(200, "Le nom du prestataire"),
   type: typePrestataireSchema,
-  telephone: texteOptionnel(50),
+  telephone: telephoneLibreSchema,
   email: emailOptionnel,
   adresse: texteOptionnel(300),
-  nif: texteOptionnel(50),
+  nif: nifSchema,
+  stat: numStatSchema,
+  statutJuridique: texteOptionnel(60),
   statut: texteOptionnel(50),
-  rib: texteOptionnel(50),
+  rib: ribSchema,
   actif: z.boolean().optional(),
 });
 
@@ -87,12 +96,14 @@ export const prestataireUpdateSchema = z.object({
   id: idSchema,
   nom: texteCourt(200, "Le nom du prestataire").optional(),
   type: typePrestataireSchema.optional(),
-  telephone: texteOptionnel(50),
+  telephone: telephoneLibreSchema,
   email: emailOptionnel,
   adresse: texteOptionnel(300),
-  nif: texteOptionnel(50),
+  nif: nifSchema,
+  stat: numStatSchema,
+  statutJuridique: texteOptionnel(60),
   statut: texteOptionnel(50),
-  rib: texteOptionnel(50),
+  rib: ribSchema,
   actif: z.boolean().optional(),
 });
 

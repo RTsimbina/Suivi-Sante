@@ -13,6 +13,10 @@ export interface AuditParams {
   nouvelleValeur: unknown;
   modifiePar: string;
   modifieParId?: string;
+  // Rôle de l'utilisateur au moment de l'opération — figé dans le journal
+  // (l'exigence d'audit impose de conserver le rôle TEL QU'IL ÉTAIT : le rôle
+  // actuel de l'utilisateur peut évoluer après coup, la trace doit rester fidèle).
+  roleUtilisateur?: string;
   // Champs enrichis (optionnels — remplis automatiquement si request fournie)
   action?: AuditAction;
   niveau?: AuditNiveau;
@@ -46,7 +50,12 @@ const CHAMPS_SENSIBLES: Record<string, string[]> = {
   Contrat: ['budgetAnnuel', 'statut', 'dateFin'],
   Utilisateur: ['role', 'actif', 'password'],
   Societe: ['nom', 'nif', 'actif'],
-  Prestataire: ['actif', 'rib', 'nif'],
+  // Libellés FR utilisés par /api/prestataires pour la traçabilité par champ :
+  // identifiers (NIF, Num STAT), RIB et activation sont des données sensibles.
+  Prestataire: [
+    'NIF', 'Num STAT', 'RIB / Coordonnées bancaires', 'Compte actif',
+    'Nom / Raison sociale',
+  ],
   PrestataireSociete: ['actif'],
   Assure: ['actif', 'bareme', 'typeBeneficiaire'],
 };
@@ -145,7 +154,7 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
     const {
       entite, entiteId, champ,
       ancienneValeur, nouvelleValeur, modifiePar,
-      modifieParId, action: actionOverride, niveau: niveauOverride,
+      modifieParId, roleUtilisateur, action: actionOverride, niveau: niveauOverride,
       module: moduleOverride, objet: objetOverride,
       societeId, motif, request,
     } = params;
@@ -181,6 +190,7 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
         nouvelleValeur: newStr,
         modifiePar,
         modifieParId: modifieParId || null,
+        roleUtilisateur: roleUtilisateur || null,
         action,
         niveau,
         module: moduleLabel,
@@ -214,10 +224,13 @@ function getUserIdFromRequest(request: Request): string {
 }
 
 /**
- * Extrait le nom complet + ID utilisateur depuis une requête authentifiée.
- * Utilise le token JWT si disponible.
+ * Extrait le nom complet + ID + rôle utilisateur depuis une requête authentifiée.
+ * Utilise le token JWT si disponible (le rôle vient du JWT signé, jamais d'un
+ * header falsifiable côté client).
  */
-export async function getUserInfoFromRequest(request: Request): Promise<{ nom: string; id: string }> {
+export async function getUserInfoFromRequest(
+  request: Request
+): Promise<{ nom: string; id: string; role?: string }> {
   try {
     const { getToken } = await import('next-auth/jwt');
     const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
@@ -225,6 +238,7 @@ export async function getUserInfoFromRequest(request: Request): Promise<{ nom: s
       return {
         nom: (token.nom as string) || (token.email as string) || 'inconnu',
         id: (token.id as string) || 'inconnu',
+        role: (token.role as string) || undefined,
       };
     }
   } catch { /* fallback */ }

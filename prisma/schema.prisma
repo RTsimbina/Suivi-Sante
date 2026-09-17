@@ -233,9 +233,11 @@ model Prestataire {
   telephone         String?
   email             String?
   adresse           String?
-  nif               String?
-  statut            String?
-  rib               String?
+  nif               String?                             // NIF — Numéro d'Identification Fiscale
+  stat              String?                             // Num STAT — Numéro Statistique (Madagascar)
+  statutJuridique   String?                             // Statut juridique (SARL, SA, SUARL, ONG...)
+  statut            String?                             // Statut conventionnel (CONVENTIONNE / SUSPENDU)
+  rib               String?                             // RIB / coordonnées bancaires
   actif             Boolean             @default(true)
   dossiers          Dossier[]           @relation("PrestataireDossier")
   societes          PrestataireSociete[]
@@ -372,6 +374,7 @@ model HistoriqueParametre {
   navigateur       String?                             // User-Agent du navigateur
   sessionId        String?                             // ID de session NextAuth
   motif            String?                             // Motif / description de l'opération
+  roleUtilisateur  String?                             // Rôle de l'utilisateur au moment de l'opération (figé — immuable)
 
   @@index([entite, entiteId])
   @@index([dateModification])
