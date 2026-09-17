@@ -1,0 +1,71 @@
+# ─── Réinitialisation du jeu de données de test (reset + seed) ──────────────
+#
+# DANGER : ce workflow PURGE les données métier de la base de production
+# (sociétés, contrats, assurés, dossiers, finances, courriels…) puis injecte
+# le jeu de test complet : 5 sociétés, chacune avec SES données de janvier à
+# septembre 2026 (cf. scripts/reset_seed.mjs).
+#
+# Les référentiels sont conservés (gestionnaires, configuration e-mail) ainsi
+# que les comptes réels (admin + comptes personnels).
+#
+# Secret requis : DATABASE_URL (postgresql://… — masqué dans les logs).
+# Lancer : GitHub → Actions → « Jeu de données de test » → Run workflow.
+# (Ou via API : POST /repos/RTsimbina/Suivi-Sante/actions/workflows/seed.yml/dispatches)
+
+name: Jeu de données de test (reset + seed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmer:
+        description: "Taper PURGE pour confirmer la réinitialisation des données"
+        type: string
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-seed
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Générer le client Prisma
+        run: npx prisma generate
+
+      - name: Contrôle de confirmation
+        run: |
+          if [ "${{ inputs.confirmer }}" != "PURGE" ]; then
+            echo "::error::Confirmation absente — tapez PURGE dans l'input « confirmer »."
+            exit 1
+          fi
+
+      - name: Réinitialiser et ré-injecter le jeu de données
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "::add-mask::${DATABASE_URL}"
+          node scripts/reset_seed.mjs
+
+      - name: Synthèse
+        if: always()
+        run: |
+          echo "Le script affiche en fin d'exécution :"
+          echo "• les identifiants de test (comptes internes / externes) ;"
+          echo "• les IDs clés (sociétés / contrats / dossiers) pour les tests d'isolation ;"
+          echo "• le résultat des vérifications intégrées (échec = workflow en échec)."
