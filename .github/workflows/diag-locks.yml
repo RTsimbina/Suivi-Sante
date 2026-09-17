@@ -1,0 +1,62 @@
+# ─── Diagnostic verrou consultatif Prisma (one-shot, suppression prévue) ─────
+# Identifie le détenteur de pg_advisory_lock(72707369) utilisé par migrate
+# deploy (P1002 « Timed out trying to acquire a postgres advisory lock »).
+
+name: Diagnostic verrous DB
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Récupérer l'URL (identique à migrate.yml)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          URI="$DATABASE_URL"
+          URI=$(echo "$URI" | sed 's/-pooler\././')
+          URI=$(echo "$URI" | sed 's/channel_binding=require//; s/&channel_binding=require//; s/channel_binding=require&//')
+          echo "::add-mask::$URI"
+          echo "DATABASE_URL=$URI" >> "$GITHUB_ENV"
+
+      - name: Sessions actives + détenteur du verrou consultatif
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          npm ci --silent 2>/dev/null || npm install prisma@6.19.2 --silent
+          node --input-type=module -e "
+          import pg from 'pg';
+          const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+          await client.connect();
+          const verrous = await client.query(
+            \"SELECT pid, locktype, objid, granted, mode FROM pg_locks WHERE locktype='advisory'\"
+          );
+          console.log('=== Verrous consultatifs ===');
+          console.table(verrous.rows);
+          const sessions = await client.query(
+            \"SELECT pid, usename, application_name, client_addr, state, backend_start, xact_start, state_change, left(query, 80) AS query FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = current_database() ORDER BY backend_start\"
+          );
+          console.log('=== Sessions actives (production) ===');
+          console.table(sessions.rows.map(r => ({...r, query: r.query?.replace(/\n/g,' ')})));
+          const attente = await client.query(
+            \"SELECT pid, wait_event_type, wait_event, left(query,100) AS q FROM pg_stat_activity WHERE wait_event_type='Lock'\"
+          );
+          console.log('=== Sessions en attente de verrou ===');
+          console.table(attente.rows);
+          await client.end();
+          " 2>&1 | head -80
