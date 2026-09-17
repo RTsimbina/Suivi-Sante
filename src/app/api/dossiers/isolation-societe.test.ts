@@ -63,8 +63,8 @@ import { GET as getDossierDetail } from './[id]/detail/route';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const SOC_A = 'cmu48xsbi0004sgz1ru7g8ipt'; // SANLAM MADAGASCAR ASSURANCE (jeu de test prod)
-const SOC_B = 'cmu48xsn80005sgz1ovuyhm5c'; // TELMA MADAGASCAR (jeu de test prod)
+const SOC_A = 'cmu4y4295000442wt7hqtgtbg'; // SANLAM MADAGASCAR ASSURANCE (jeu de test prod)
+const SOC_B = 'cmu4y42b1000t42wtea0ncwc6'; // TELMA MADAGASCAR (jeu de test prod)
 
 function requete(path: string, headers: Record<string, string> = {}): NextRequest {
   const r = new Request(`http://localhost${path}`, { headers });
