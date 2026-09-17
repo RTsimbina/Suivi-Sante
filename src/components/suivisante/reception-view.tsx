@@ -28,6 +28,7 @@ import {
   FileText, Receipt, ClipboardList, Filter,
 } from 'lucide-react';
 import { formatMontantCourt, formatDate, statutLabel, statutColor } from './format';
+import { usePeriode } from '@/lib/periode-context';
 /* statutLabel & statutColor used in code but not directly in JSX — kept for extensibility */
 import { toast } from 'sonner';
 import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
@@ -101,6 +102,7 @@ const steps = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
+  const { queryString: qsPeriode } = usePeriode();
   // Courriels state
   const [courriels, setCourriels] = useState<CourrielItem[]>([]);
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
@@ -167,6 +169,10 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
       if (filterType !== 'TOUS') params.set('type', filterType);
       if (filterStatut !== 'TOUS') params.set('statut', filterStatut);
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      // Filtre de période partagé (date de référence : date du courriel)
+      if (qsPeriode) {
+        for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
+      }
 
       const res = await fetch(`/api/reception/courriels?${params}`);
       if (res.ok) {
@@ -179,7 +185,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
     } finally {
       setLoadingCourriels(false);
     }
-  }, [filterType, filterStatut, searchQuery]);
+  }, [filterType, filterStatut, searchQuery, qsPeriode]);
 
   useEffect(() => {
     fetchCourriels(1);

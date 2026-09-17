@@ -10,6 +10,7 @@ import { Search } from 'lucide-react';
 import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
 import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
 import DossierDetail from './dossier-detail';
+import { usePeriode } from '@/lib/periode-context';
 
 interface Dossier {
   id: string;
@@ -28,6 +29,7 @@ interface Dossier {
 }
 
 export default function DossiersView() {
+  const { queryString: qsPeriode } = usePeriode();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [pagination, setPagination] = useState<PaginationState>({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
   const [search, setSearch] = useState('');
@@ -43,7 +45,11 @@ export default function DossiersView() {
       const params = new URLSearchParams({ page: String(pagination.page), limit: String(pagination.limit) });
       if (search) params.set('search', search);
       if (statutFilter) params.set('statut', statutFilter);
-      const res = await fetch(`/api/dossiers?${params}`);
+      // Filtre de période partagé (date de référence : date de réception)
+      if (qsPeriode) {
+        for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
+      }
+      const res = await fetch(`/api/dossiers?${params.toString()}`);
       const data = await res.json();
       setDossiers(data.dossiers || []);
       if (data.pagination) {
@@ -54,7 +60,12 @@ export default function DossiersView() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, search, statutFilter]);
+  }, [pagination.page, pagination.limit, search, statutFilter, qsPeriode]);
+
+  // Changement de période : revenir à la première page
+  useEffect(() => {
+    setPagination(p => (p.page === 1 ? p : { ...p, page: 1 }));
+  }, [qsPeriode]);
 
   useEffect(() => { fetchDossiers(); }, [fetchDossiers]);
 

@@ -3,6 +3,8 @@ import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 import { enNombre, sommer } from '@/lib/money';
 import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
+import type { Prisma } from '@prisma/client';
+import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
 
 // ─── GET : Données du portail client ──────────────────────────────────────
 // Renvoie les données filtrées selon le rôle externe connecté :
@@ -57,6 +59,12 @@ export async function GET(request: NextRequest) {
     let societeId = token.societeId as string | undefined;
     const userId = token.id as string;
     const emailToken = (token.email as string | undefined)?.trim() ?? '';
+
+    // Filtre de période réutilisable (date de référence : Dossier.dateReception)
+    // Appliqué APRÈS la résolution du périmètre de l'utilisateur : l'isolation est garantie
+    // (PORTAIL_CLIENT → sa famille, CONTACT_ENTREPRISE → sa société uniquement).
+    // `new URL(request.url)` plutôt que request.nextUrl : tolère les Request standards.
+    const plage = plageDepuisParams(new URL(request.url).searchParams);
 
     // Rôles internes n'ont rien à faire ici
     if (!['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'].includes(role)) {
@@ -137,10 +145,10 @@ export async function GET(request: NextRequest) {
 
       // Récupérer les dossiers de toute la famille
       const allAssureIds = ayantsDroit.map(a => a.id);
+      const whereDossiers: Prisma.DossierWhereInput = { assureId: { in: allAssureIds } };
+      Object.assign(whereDossiers, filtreDateChamp('dateReception', plage));
       const dossiers = await db.dossier.findMany({
-        where: {
-          assureId: { in: allAssureIds },
-        },
+        where: whereDossiers,
         include: {
           societe: { select: { id: true, nom: true } },
           assure: { select: { id: true, nom: true, prenom: true, typeBeneficiaire: true } },
@@ -270,9 +278,11 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      // Récupérer les dossiers
+      // Récupérer les dossiers (uniquement ceux de la société du contact)
+      const whereDossiers: Prisma.DossierWhereInput = { societeId };
+      Object.assign(whereDossiers, filtreDateChamp('dateReception', plage));
       const dossiers = await db.dossier.findMany({
-        where: { societeId },
+        where: whereDossiers,
         include: {
           assure: { select: { id: true, nom: true, prenom: true, typeBeneficiaire: true } },
         },

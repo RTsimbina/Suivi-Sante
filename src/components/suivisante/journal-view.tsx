@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { SharedPagination, type PaginationState } from '@/components/ui/shared-pagination';
+import { usePeriode } from '@/lib/periode-context';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -132,6 +133,7 @@ function truncate(str: string | null, max: number): string {
 // ─── Composant principal ──────────────────────────────────────────────────
 
 export default function JournalView() {
+  const { queryString: qsPeriode } = usePeriode();
   const [entries, setEntries] = useState<HistoriqueEntry[]>([]);
   const [pagination, setPagination] = useState<PaginationState | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -144,8 +146,7 @@ export default function JournalView() {
   const [entite, setEntite] = useState('');
   const [action, setAction] = useState('');
   const [niveau, setNiveau] = useState('');
-  const [dateDebut, setDateDebut] = useState('');
-  const [dateFin, setDateFin] = useState('');
+  // La période (anciennement champs Du/Au locaux) est gérée par le filtre de période partagé
   const [utilisateurId, setUtilisateurId] = useState('');
   const [recherche, setRecherche] = useState('');
   const [page, setPage] = useState(1);
@@ -183,8 +184,10 @@ export default function JournalView() {
       } else if (niveau) {
         params.set('niveau', niveau);
       }
-      if (dateDebut) params.set('dateDebut', dateDebut);
-      if (dateFin) params.set('dateFin', dateFin);
+      // Filtre de période partagé (date de référence : date de modification)
+      if (qsPeriode) {
+        for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
+      }
       if (utilisateurId) params.set('utilisateurId', utilisateurId);
       if (societeId) params.set('societeId', societeId);
       if (recherche.trim()) params.set('recherche', recherche.trim());
@@ -207,7 +210,12 @@ export default function JournalView() {
     } finally {
       setLoading(false);
     }
-  }, [entite, action, niveau, dateDebut, dateFin, utilisateurId, societeId, recherche, criticalOnly]);
+  }, [entite, action, niveau, qsPeriode, utilisateurId, societeId, recherche, criticalOnly]);
+
+  // Changement de période : revenir à la première page
+  useEffect(() => {
+    setPage(1);
+  }, [qsPeriode]);
 
   useEffect(() => {
     fetchStats();
@@ -223,8 +231,7 @@ export default function JournalView() {
     setEntite('');
     setAction('');
     setNiveau('');
-    setDateDebut('');
-    setDateFin('');
+    // La période est réinitialisée via le filtre partagé (bouton « Toutes les périodes »)
     setUtilisateurId('');
     setSocieteId('');
     setRecherche('');
@@ -241,8 +248,10 @@ export default function JournalView() {
       if (entite) params.set('entite', entite);
       if (action) params.set('action', action);
       if (niveau) params.set('niveau', niveau);
-      if (dateDebut) params.set('dateDebut', dateDebut);
-      if (dateFin) params.set('dateFin', dateFin);
+      // Filtre de période partagé (date de référence : date de modification)
+      if (qsPeriode) {
+        for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
+      }
       if (recherche.trim()) params.set('recherche', recherche.trim());
 
       const res = await fetch(`/api/historique-parametres?${params}`);
@@ -388,15 +397,7 @@ export default function JournalView() {
 
           {filtresOuverts && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2">
-              {/* Période */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Du</label>
-                <Input type="date" className="h-8 text-xs" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Au</label>
-                <Input type="date" className="h-8 text-xs" value={dateFin} onChange={(e) => setDateFin(e.target.value)} />
-              </div>
+              {/* Période : gérée par la barre de filtre de période partagée (en haut de page) */}
 
               {/* Module */}
               <div className="space-y-1">

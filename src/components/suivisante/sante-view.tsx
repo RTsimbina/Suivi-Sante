@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { usePeriode } from '@/lib/periode-context';
+import { versDateISO } from '@/lib/periodes';
 
 /* ── Types ── */
 
@@ -134,6 +136,11 @@ function getStatutBadge(statut: string) {
 /* ── Composant principal ── */
 
 export default function SanteView() {
+  // Filtre de période partagé (date de référence : date de réception des dossiers)
+  const { plage: plagePeriode } = usePeriode();
+  const dateDebutPeriode = plagePeriode ? versDateISO(plagePeriode.debut) : '';
+  const dateFinPeriode = plagePeriode ? versDateISO(new Date(plagePeriode.fin.getTime() - 1)) : '';
+
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showResults, setShowResults] = useState(false);
@@ -158,8 +165,7 @@ export default function SanteView() {
   // Filtres actifs — dates par défaut = année courante
   const [filtreType, setFiltreType] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
-  const [filtreDateDebut, setFiltreDateDebut] = useState(`${new Date().getFullYear()}-01-01`);
-  const [filtreDateFin, setFiltreDateFin] = useState(`${new Date().getFullYear()}-12-31`);
+  // Période des actes : dérivée du filtre de période partagé (barre en haut de page)
   const [filtreSearch, setFiltreSearch] = useState('');
   const [actesPage, setActesPage] = useState(1);
   const [showFiltres, setShowFiltres] = useState(true);
@@ -196,8 +202,6 @@ export default function SanteView() {
     setActesFiltres({ typesActe: [], statuts: [] });
     setFiltreType('');
     setFiltreStatut('');
-    setFiltreDateDebut(`${new Date().getFullYear()}-01-01`);
-    setFiltreDateFin(`${new Date().getFullYear()}-12-31`);
     setFiltreSearch('');
     setActesPage(1);
 
@@ -233,8 +237,8 @@ export default function SanteView() {
       });
       const t = overrides?.typeDossier ?? filtreType;
       const s = overrides?.statut ?? filtreStatut;
-      const dd = overrides?.dateDebut ?? filtreDateDebut;
-      const df = overrides?.dateFin ?? filtreDateFin;
+      const dd = overrides?.dateDebut ?? dateDebutPeriode;
+      const df = overrides?.dateFin ?? dateFinPeriode;
       const q = overrides?.search ?? filtreSearch;
       if (t) params.set('typeDossier', t);
       if (s) params.set('statut', s);
@@ -254,20 +258,20 @@ export default function SanteView() {
     } finally {
       setActesLoading(false);
     }
-  }, [filtreType, filtreStatut, filtreDateDebut, filtreDateFin, filtreSearch]);
+  }, [filtreType, filtreStatut, dateDebutPeriode, dateFinPeriode, filtreSearch]);
 
-  // Charger automatiquement quand result change
+  // Charger automatiquement quand result change (fetchActes change aussi avec la période)
   useEffect(() => {
     if (result?.assure.id) {
       fetchActes(result.assure.id, 1);
     }
-  }, [result?.assure.id]);
+  }, [result?.assure.id, fetchActes]);
 
   // Recharger quand la page change (pagination)
   useEffect(() => {
     if (!result?.assure.id) return;
     fetchActes(result.assure.id, actesPage);
-  }, [actesPage]);
+  }, [result?.assure.id, fetchActes, actesPage]);
 
   // Appliquer les filtres (uniquement via le bouton Rechercher)
   const handleAppliquerFiltres = () => {
@@ -280,8 +284,6 @@ export default function SanteView() {
   const handleResetFiltres = () => {
     setFiltreType('');
     setFiltreStatut('');
-    setFiltreDateDebut(`${new Date().getFullYear()}-01-01`);
-    setFiltreDateFin(`${new Date().getFullYear()}-12-31`);
     setFiltreSearch('');
     // Relancer après reset
     if (result?.assure.id) {
@@ -358,14 +360,10 @@ export default function SanteView() {
     return 'dark:bg-emerald-400';
   }
 
-  // Compteur de filtres actifs (dates par défaut = année courante, ne comptent pas)
-  const defaultDebut = `${new Date().getFullYear()}-01-01`;
-  const defaultFin = `${new Date().getFullYear()}-12-31`;
+  // Compteur de filtres actifs (la période est gérée par la barre partagée, ne compte pas ici)
   const nbFiltresActifs = [
     filtreType,
     filtreStatut,
-    filtreDateDebut !== defaultDebut ? filtreDateDebut : '',
-    filtreDateFin !== defaultFin ? filtreDateFin : '',
     filtreSearch,
   ].filter(Boolean).length;
 
@@ -618,31 +616,13 @@ export default function SanteView() {
                         ))}
                       </select>
                     </div>
-                    {/* Date début */}
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Date début</label>
-                      <div className="relative">
-                        <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          type="date"
-                          value={filtreDateDebut}
-                          onChange={(e) => setFiltreDateDebut(e.target.value)}
-                          className="h-8 pl-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                    {/* Date fin */}
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Date fin</label>
-                      <div className="relative">
-                        <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          type="date"
-                          value={filtreDateFin}
-                          onChange={(e) => setFiltreDateFin(e.target.value)}
-                          className="h-8 pl-8 text-xs"
-                        />
-                      </div>
+                    {/* Période : gérée par la barre de filtre de période partagée (en haut de page) */}
+                    <div className="flex items-end">
+                      <p className="text-[10px] text-muted-foreground leading-tight">
+                        Période : {dateDebutPeriode && dateFinPeriode
+                          ? <><strong className="text-foreground">du {dateDebutPeriode.split('-').reverse().join('/')} au {dateFinPeriode.split('-').reverse().join('/')}</strong></>
+                          : 'toutes les périodes'}
+                      </p>
                     </div>
                   </div>
                   {/* Bouton Rechercher */}

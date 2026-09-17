@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { enNombre, sommer, superieurA, inferieurA, moins } from "@/lib/money";
+import { partiesLocales, type PlagePeriode } from "./periodes";
 
 /* ──────────────────────────────────────────────────────────────
    Helpers
@@ -89,13 +90,21 @@ export async function getSocieteBreakdown(where?: Prisma.DossierWhereInput) {
    4. Monthly volume  (1 raw SQL)
    ────────────────────────────────────────────────────────────── */
 
-export async function getMonthlyVolume(year: number) {
-  const startDate = new Date(year, 0, 1);
-  const endDate = new Date(year + 1, 0, 1);
+/**
+ * Volume mensuel de dossiers reçus.
+ * Sans plage : année complète (bornes et bucketing alignés sur le fuseau plateforme).
+ * Avec plage : seuls les dossiers de la plage, mois zéro-remplis entre les bornes.
+ */
+export async function getMonthlyVolume(year: number, plage?: PlagePeriode | null) {
+  const startDate = plage ? plage.debut : zonedBornesAnnee(year).debut;
+  const endDate = plage ? plage.fin : zonedBornesAnnee(year).fin;
 
+  // Colonne TIMESTAMP sans fuseau stockant des instants UTC :
+  // 1) AT TIME ZONE 'UTC' → timestamptz ; 2) AT TIME ZONE fuseau → heure murale locale.
+  // Le fuseau est une constante du code (Indian/Antananarivo, UTC+3 fixe) → littéral inline.
   const rows: { month: string; count: bigint }[] = await db.$queryRaw`
-    SELECT TO_CHAR("dateReception", 'YYYY-MM') AS month,
-           COUNT(*)::bigint                      AS count
+    SELECT TO_CHAR(("dateReception" AT TIME ZONE 'UTC') AT TIME ZONE 'Indian/Antananarivo', 'YYYY-MM') AS month,
+           COUNT(*)::bigint                                                                             AS count
     FROM "Dossier"
     WHERE "dateReception" >= ${startDate}
       AND "dateReception" <  ${endDate}
@@ -104,47 +113,69 @@ export async function getMonthlyVolume(year: number) {
   `;
 
   const map = new Map<string, number>();
-  for (let m = 1; m <= 12; m++)
-    map.set(`${year}-${String(m).padStart(2, "0")}`, 0);
-  for (const r of rows) map.set(r.month, Number(r.count));
+  if (plage) {
+    // Zéro-remplir chaque mois couvert par la plage (fuseau plateforme)
+    const dernier = partiesLocales(new Date(endDate.getTime() - 1));
+    let cy = partiesLocales(startDate).annee;
+    let cm = partiesLocales(startDate).mois;
+    for (let garde = 0; garde < 1200 && (cy < dernier.annee || (cy === dernier.annee && cm <= dernier.mois)); garde++) {
+      map.set(`${cy}-${String(cm).padStart(2, "0")}`, 0);
+      cm++;
+      if (cm > 12) { cm = 1; cy++; }
+    }
+  } else {
+    for (let m = 1; m <= 12; m++)
+      map.set(`${year}-${String(m).padStart(2, "0")}`, 0);
+  }
+  for (const r of rows) if (map.has(r.month)) map.set(r.month, Number(r.count));
   return Array.from(map.entries()).map(([mois, nbDossiers]) => ({
     mois,
     nbDossiers,
   }));
 }
 
+/** Bornes d'une année complète dans le fuseau plateforme (fin exclusive). */
+function zonedBornesAnnee(year: number): PlagePeriode {
+  const debut = new Date(Date.UTC(year, 0, 1) - 3 * 60 * 60 * 1000); // Antananarivo = UTC+3 fixe
+  const fin = new Date(Date.UTC(year + 1, 0, 1) - 3 * 60 * 60 * 1000);
+  return { debut, fin };
+}
+
 /* ──────────────────────────────────────────────────────────────
    5. Average delays  (raw SQL – one query each)
    ────────────────────────────────────────────────────────────── */
 
-/** Avg days reception → paiement (PAYE only) */
-export async function getAvgDelaiPaiement(): Promise<number> {
+/** Avg days reception → paiement (PAYE only), filtrable sur la date de réception. */
+export async function getAvgDelaiPaiement(plage?: PlagePeriode | null): Promise<number> {
+  const cond = plage ? Prisma.sql` AND "dateReception" >= ${plage.debut} AND "dateReception" < ${plage.fin}` : Prisma.empty;
   const rows: { avg: number | null }[] = await db.$queryRaw`
     SELECT COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM ("datePaiement" - "dateReception")) / 86400), 2), 0) AS avg
     FROM "Dossier"
-    WHERE "statut" = 'PAYE' AND "datePaiement" IS NOT NULL AND "dateReception" IS NOT NULL
+    WHERE "statut" = 'PAYE' AND "datePaiement" IS NOT NULL AND "dateReception" IS NOT NULL${cond}
   `;
   return rows[0]?.avg ?? 0;
 }
 
-/** Avg days reception → traitement technique (all with both dates) */
-export async function getAvgDelaiTransfert(): Promise<number> {
+/** Avg days reception → traitement technique (all with both dates), filtrable. */
+export async function getAvgDelaiTransfert(plage?: PlagePeriode | null): Promise<number> {
+  const cond = plage ? Prisma.sql` AND "dateReception" >= ${plage.debut} AND "dateReception" < ${plage.fin}` : Prisma.empty;
   const rows: { avg: number | null }[] = await db.$queryRaw`
     SELECT COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM ("dateTraitementTechnique" - "dateReception")) / 86400), 2), 0) AS avg
     FROM "Dossier"
-    WHERE "dateTraitementTechnique" IS NOT NULL AND "dateReception" IS NOT NULL
+    WHERE "dateTraitementTechnique" IS NOT NULL AND "dateReception" IS NOT NULL${cond}
   `;
   return rows[0]?.avg ?? 0;
 }
 
-/** Avg days reception → traitement technique (EN_ANALYSE / VALIDE / REJETE only) */
-export async function getAvgDelaiAnalyse(): Promise<number> {
+/** Avg days reception → traitement technique (EN_ANALYSE / VALIDE / REJETE only), filtrable. */
+export async function getAvgDelaiAnalyse(plage?: PlagePeriode | null): Promise<number> {
+  const cond = plage ? Prisma.sql` AND "dateReception" >= ${plage.debut} AND "dateReception" < ${plage.fin}` : Prisma.empty;
   const rows: { avg: number | null }[] = await db.$queryRaw`
     SELECT COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM ("dateTraitementTechnique" - "dateReception")) / 86400), 2), 0) AS avg
     FROM "Dossier"
     WHERE "statut" IN ('EN_ANALYSE','VALIDE','REJETE')
       AND "dateTraitementTechnique" IS NOT NULL
-      AND "dateReception"        IS NOT NULL
+      AND "dateReception"        IS NOT NULL${cond}
   `;
   return rows[0]?.avg ?? 0;
 }
@@ -175,23 +206,26 @@ function buildProductiviteFromGroups(
     .sort((a, b) => b.nbDossiers - a.nbDossiers);
 }
 
-export async function getGestionnaireProductivite() {
-  // 1. Group dossiers by each gestionnaire field
+export async function getGestionnaireProductivite(where?: Prisma.DossierWhereInput) {
+  // 1. Group dossiers by each gestionnaire field (respect du filtre de période)
   const [accueilGroups, techniqueGroups, comptaGroups] = await Promise.all([
     db.dossier.groupBy({
       by: ['gestionnaireAccueilId'],
       _count: true,
       _sum: { montantValide: true, montantReclame: true },
+      where,
     }),
     db.dossier.groupBy({
       by: ['gestionnaireTechniqueId'],
       _count: true,
       _sum: { montantValide: true, montantReclame: true },
+      where,
     }),
     db.dossier.groupBy({
       by: ['gestionnaireComptaId'],
       _count: true,
       _sum: { montantValide: true, montantReclame: true },
+      where,
     }),
   ]);
 
@@ -211,6 +245,7 @@ export async function getGestionnaireProductivite() {
   // 3. Compute average treatment times per gestionnaire (single query)
   // dateReception is required (non-null) in schema, no need to filter
   const timedDossiers = await db.dossier.findMany({
+    where,
     select: {
       gestionnaireAccueilId: true,
       gestionnaireTechniqueId: true,

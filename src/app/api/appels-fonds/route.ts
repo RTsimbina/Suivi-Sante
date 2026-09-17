@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { appelFondsCreateSchema } from "@/lib/validation";
+import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,9 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {};
     if (contratId) where.contratId = contratId;
     if (statut) where.statut = statut;
+
+    // Filtre de période réutilisable (date de référence : AppelDeFonds.dateAppel)
+    Object.assign(where, filtreDateChamp("dateAppel", plageDepuisParams(searchParams)));
 
     const appels = await db.appelDeFonds.findMany({
       where,

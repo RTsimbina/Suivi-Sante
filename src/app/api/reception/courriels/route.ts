@@ -4,6 +4,7 @@ import { checkAuth } from "@/lib/authorize";
 import { Prisma } from "@prisma/client";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { courrielCreateSchema } from "@/lib/validation";
+import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
 
 const VALID_TYPES = ["FACTURE_PRESTATAIRE", "DOSSIER_REMBOURSEMENT"];
 const VALID_STATUTS = ["RECU", "TRAITE", "REJETE"];
@@ -42,6 +43,9 @@ export async function GET(request: NextRequest) {
         { societe: { nom: { contains: search, mode: "insensitive" } } },
       ];
     }
+
+    // Filtre de période réutilisable (date de référence : Courriel.dateCourriel)
+    Object.assign(where, filtreDateChamp("dateCourriel", plageDepuisParams(searchParams)));
 
     const [courriels, total] = await Promise.all([
       db.courriel.findMany({

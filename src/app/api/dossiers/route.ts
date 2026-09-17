@@ -15,6 +15,7 @@ import {
   genererNumeroDossier,
   avecRetryNumeroDossier,
 } from "@/lib/numero-dossier";
+import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,6 +40,11 @@ export async function GET(request: NextRequest) {
     if (isolationError) return isolationError;
 
     const where: Prisma.DossierWhereInput = {};
+
+    // ─── Filtre de période réutilisable (date de référence : Dossier.dateReception) ───
+    // Appliqué AVANT avecPerimetreSociete : le périmètre société reste garanti par-dessus.
+    const plage = plageDepuisParams(searchParams);
+    Object.assign(where, filtreDateChamp('dateReception', plage));
 
     // Filter by statut (supports comma-separated: "VALIDE,REJETE")
     if (statut) {
@@ -74,9 +80,9 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    // ─── Fusion du périmètre : écrase tout societeId client pour les rôles restreints ───
     const skip = (page - 1) * limit;
 
-    // Fusion du périmètre : écrase tout societeId client pour les rôles restreints
     const whereFiltre = avecPerimetreSociete(where, perimetre);
 
     const [dossiers, total] = await Promise.all([

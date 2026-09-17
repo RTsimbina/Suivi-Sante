@@ -16,6 +16,8 @@ import {
   Baby, UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
+import PeriodFilter from '@/components/suivisante/period-filter';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,8 +99,17 @@ function StatutIcon({ statut }: { statut: string }) {
 // ─── Composant Principal ────────────────────────────────────────────────────
 
 export default function PortailPage() {
+  return (
+    <PeriodeProvider>
+      <ContenuPortail />
+    </PeriodeProvider>
+  );
+}
+
+function ContenuPortail() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { queryString: qsPeriode } = usePeriode();
   const [data, setData] = useState<PortailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -120,7 +131,9 @@ export default function PortailPage() {
     try {
       setLoading(true);
       setError('');
-      const res = await fetch('/api/portail-client');
+      // Filtre de période partagé (date de référence : date de réception des dossiers)
+      const url = qsPeriode ? `/api/portail-client?${qsPeriode}` : '/api/portail-client';
+      const res = await fetch(url);
       if (res.status === 401) { router.push('/login'); return; }
       if (!res.ok) {
         const err = await res.json();
@@ -134,7 +147,7 @@ export default function PortailPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, qsPeriode]);
 
   useEffect(() => {
     if (isPortailUser) fetchData();
@@ -204,6 +217,11 @@ export default function PortailPage() {
           </Button>
         </div>
       </header>
+
+      {/* Barre de filtre par période — réutilisable, visible pour les utilisateurs du portail */}
+      <div className="border-b bg-card/60 px-4 py-2 flex justify-center">
+        <PeriodFilter dateRefLabel="Date de réception des dossiers" />
+      </div>
 
       {/* Contenu principal */}
       <main className='flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full'>

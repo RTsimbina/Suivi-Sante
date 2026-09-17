@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, ShieldAlert, TrendingUp, FileX, AlertOctagon, ChevronDown } from 'lucide-react';
+import { usePeriode } from '@/lib/periode-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -83,6 +84,7 @@ function getRisqueLabel(risque: number): string {
 }
 
 export default function IaView() {
+  const { queryString: qsPeriode } = usePeriode();
   const [data, setData] = useState<IaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,9 @@ export default function IaView() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/ia');
+        // Filtre de période partagé (date de référence : date de réception)
+        const url = qsPeriode ? `/api/ia?${qsPeriode}` : '/api/ia';
+        const res = await fetch(url);
         if (!res.ok) {
           throw new Error(`Erreur ${res.status}: ${res.statusText}`);
         }
@@ -106,7 +110,7 @@ export default function IaView() {
       }
     }
     fetchData();
-  }, []);
+  }, [qsPeriode]);
 
   function toggleCard(key: string) {
     setExpandedCards((prev) => {

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { getToken } from 'next-auth/jwt';
 import { writeExcelFromJson } from '@/lib/excel';
+import { plageDepuisParams } from '@/lib/periodes';
 
 // ─── Constantes ────────────────────────────────────────────────────────────
 
@@ -255,7 +256,7 @@ function buildWhere(searchParams: URLSearchParams): Record<string, unknown> {
   const societeId = searchParams.get('societeId');
   if (societeId) where.societeId = societeId;
 
-  // Filtre par période (dateDebut / dateFin)
+  // Filtre par période (dateDebut / dateFin) — filtre historique conservé
   const dateDebut = parseDate(searchParams.get('dateDebut'));
   const dateFin = parseDate(searchParams.get('dateFin'));
   if (dateDebut || dateFin) {
@@ -268,6 +269,13 @@ function buildWhere(searchParams: URLSearchParams): Record<string, unknown> {
       dateFilter.lte = fin;
     }
     where.dateModification = dateFilter;
+  }
+
+  // Filtre de période réutilisable (periodeMode/…) — prioritaire sur dateDebut/dateFin
+  // Date de référence du journal : HistoriqueParametre.dateModification
+  const plagePeriode = plageDepuisParams(searchParams);
+  if (plagePeriode) {
+    where.dateModification = { gte: plagePeriode.debut, lt: plagePeriode.fin };
   }
 
   // Filtre par recherche textuelle (champ, ancienne/nouvelle valeur, modifiePar)

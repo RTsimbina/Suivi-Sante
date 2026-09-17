@@ -13,6 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
+import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
+import PeriodFilter from '@/components/suivisante/period-filter';
 import UserMenu from '@/components/suivisante/user-menu';
 import UtilisateursView from '@/components/suivisante/utilisateurs-view';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -69,9 +71,35 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
 ];
 
+/** Vues concernées par le filtre de période (la barre n'y est affichée que pour elles). */
+const VUES_AVEC_PERIODE: View[] = ['direction', 'dossiers', 'kanban', 'technique', 'comptabilite', 'reception', 'reporting', 'ia', 'journal', 'sante'];
+
+/** Date de référence du filtre de période, définie explicitement par module. */
+const DATE_REFERENCE_PAR_VUE: Partial<Record<View, string>> = {
+  direction: 'Date de réception des dossiers',
+  dossiers: 'Date de réception des dossiers',
+  kanban: 'Date de réception des dossiers',
+  technique: 'Date de réception des dossiers',
+  comptabilite: 'Date de réception des dossiers',
+  ia: 'Date de réception des dossiers',
+  sante: 'Date de réception des dossiers',
+  reception: 'Date du courriel',
+  reporting: 'Date de début des contrats',
+  journal: 'Date de modification',
+};
+
 export default function Home() {
+  return (
+    <PeriodeProvider>
+      <ContenuSante />
+    </PeriodeProvider>
+  );
+}
+
+function ContenuSante() {
   const { role, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const { queryString: qsPeriode } = usePeriode();
   const [view, setView] = useState<View>('direction');
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loadingKpis, setLoadingKpis] = useState(true);
@@ -120,7 +148,10 @@ export default function Home() {
   useEffect(() => {
     async function fetchKpis() {
       try {
-        const res = await fetch('/api/kpis');
+        // Le filtre de période est transmis à l'API : les indicateurs, graphiques
+        // et tableaux de bord reflètent automatiquement la période sélectionnée.
+        const url = qsPeriode ? `/api/kpis?${qsPeriode}` : '/api/kpis';
+        const res = await fetch(url);
         if (!res.ok) return; // Le proxy gère déjà la redirection 401
         const data = await res.json();
         setKpis(data);
@@ -131,7 +162,7 @@ export default function Home() {
       }
     }
     if (isAuthenticated) fetchKpis();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, qsPeriode]);
 
   function handleNav(key: View) {
     setView(key);
@@ -141,8 +172,9 @@ export default function Home() {
   function handleDossierCreated() {
     setFormOpen(false);
     setFormKey(k => k + 1);
-    // Re-fetch KPIs
-    fetch('/api/kpis').then(r => r.json()).then(setKpis).catch(() => {});
+    // Re-fetch KPIs (avec la période sélectionnée)
+    const url = qsPeriode ? `/api/kpis?${qsPeriode}` : '/api/kpis';
+    fetch(url).then(r => r.json()).then(setKpis).catch(() => {});
   }
 
   // Group nav items by section
@@ -275,6 +307,13 @@ export default function Home() {
             <UserMenu onProfilClick={() => setView('profil')} />
           </div>
         </header>
+
+        {/* Barre de filtre par période — réutilisable, visible sur les vues concernées */}
+        {isViewAllowed && VUES_AVEC_PERIODE.includes(view) && (
+          <div className="border-b bg-muted/30 px-4 py-2 flex justify-start lg:justify-end">
+            <PeriodFilter dateRefLabel={DATE_REFERENCE_PAR_VUE[view]} />
+          </div>
+        )}
 
         {/* Page content — garde : ne rien rendre si la vue n'est pas autorisée */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">

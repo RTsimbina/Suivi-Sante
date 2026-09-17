@@ -18,6 +18,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { usePeriode } from '@/lib/periode-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -448,6 +449,7 @@ function AssignDialog({
 // ── Kanban View ──────────────────────────────────────────────────────────────
 
 export default function KanbanView() {
+  const { queryString: qsPeriode } = usePeriode();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -459,7 +461,11 @@ export default function KanbanView() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: '200' });
-      const res = await fetch(`/api/dossiers?${params}`);
+      // Filtre de période partagé (date de référence : date de réception)
+      if (qsPeriode) {
+        for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
+      }
+      const res = await fetch(`/api/dossiers?${params.toString()}`);
       const data = await res.json();
       setDossiers(data.dossiers || []);
     } catch {
@@ -467,7 +473,7 @@ export default function KanbanView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [qsPeriode]);
 
   const fetchGestionnaires = useCallback(async () => {
     try {

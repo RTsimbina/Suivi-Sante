@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Building2, DollarSign, Clock, CheckCircle2, Plus, FileBarChart, TrendingUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatMontant, formatDate } from './format';
+import { usePeriode } from '@/lib/periode-context';
 
 interface Contrat {
   id: string; reference: string; budgetAnnuel: number; budgetUtilise: number;
@@ -41,6 +42,7 @@ const STATUT_LABEL: Record<string, string> = {
 };
 
 export default function ReportingView() {
+  const { queryString: qsPeriode, selection: selectionPeriode } = usePeriode();
   const [tab, setTab] = useState<'contrats' | 'appels' | 'rapport'>('contrats');
   const [contrats, setContrats] = useState<Contrat[]>([]);
   const [rapportMois, setRapportMois] = useState(new Date().getMonth() + 1);
@@ -49,7 +51,9 @@ export default function ReportingView() {
   const handleGenererRapport = async () => {
     setGeneratingRapport(true);
     try {
-      const res = await fetch(`/api/reporting/rapport?mois=${rapportMois}&annee=2026`);
+      // Année dérivée du filtre de période partagé (fini l'année codée en dur)
+      const anneeRapport = selectionPeriode.annee;
+      const res = await fetch(`/api/reporting/rapport?mois=${rapportMois}&annee=${anneeRapport}`);
       if (!res.ok) {
         toast.error('Erreur lors de la génération du rapport');
         return;
@@ -58,7 +62,7 @@ export default function ReportingView() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rapport-suivi-sante-2026-${String(rapportMois).padStart(2, '0')}.pdf`;
+      a.download = `rapport-suivi-sante-${anneeRapport}-${String(rapportMois).padStart(2, '0')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -82,19 +86,23 @@ export default function ReportingView() {
   const [formObs, setFormObs] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [cRes, aRes] = await Promise.all([fetch('/api/contrats'), fetch('/api/appels-fonds')]);
+      // Filtre de période partagé :
+      //  - contrats  → date de référence : date de début du contrat
+      //  - appels    → date de référence : date d'appel
+      const suffixe = qsPeriode ? `?${qsPeriode}` : '';
+      const [cRes, aRes] = await Promise.all([fetch(`/api/contrats${suffixe}`), fetch(`/api/appels-fonds${suffixe}`)]);
       const cData = await cRes.json();
       const aData = await aRes.json();
       setContrats(Array.isArray(cData) ? cData : []);
       setAppels(Array.isArray(aData) ? aData : []);
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }
+  }, [qsPeriode]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
   async function handleSubmitAppel() {
     if (!formContratId || !formMontant || !formDate) { toast.error('Champs obligatoires manquants'); return; }

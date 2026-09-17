@@ -8,6 +8,7 @@ import {
 } from '@/lib/data-isolation';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { contratCreateSchema } from '@/lib/validation';
+import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
 
 // ─── GET : Liste des contrats ──────────────────────────────────────────────
 
@@ -22,8 +23,11 @@ export async function GET(request: NextRequest) {
     const isolationError = refuserHorsPerimetre(perimetre);
     if (isolationError) return isolationError;
 
+    // Filtre de période réutilisable (date de référence : Contrat.dateDebut — mise en place)
+    const plage = plageDepuisParams(request.nextUrl.searchParams);
+
     const contrats = await db.contrat.findMany({
-      where: avecPerimetreSociete({}, perimetre),
+      where: avecPerimetreSociete(filtreDateChamp('dateDebut', plage), perimetre),
       include: {
         societe: { select: { id: true, nom: true } },
         appelsDeFonds: { select: { montant: true, statut: true } },

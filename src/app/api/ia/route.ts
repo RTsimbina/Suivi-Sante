@@ -5,6 +5,12 @@ import {
   findPiecesManquantes, getMonthlyVolume, getGestionnaireCharge,
   getStatutCounts,
 } from "@/lib/kpi-queries";
+import { plageDepuisParams, filtreDateChamp, anneeCouranteFuseau } from "@/lib/periodes";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSociete,
+} from "@/lib/data-isolation";
 
 async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try { return await fn(); } catch (err) { console.error(`[IA] ${label} failed:`, err); return fallback; }
@@ -15,6 +21,15 @@ export async function GET(request: NextRequest) {
     const authError = await checkAuth(request);
     if (authError) return authError;
 
+    // Filtre de période réutilisable (date de référence : Dossier.dateReception)
+    // + périmètre société forcé depuis le JWT — les alertes (retards, anomalies…)
+    // restent basées sur « maintenant ».
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+    const plage = plageDepuisParams(new URL(request.url).searchParams);
+    const where = avecPerimetreSociete(filtreDateChamp('dateReception', plage), perimetre);
+
     const [retards, anomalies, doublons, incoherences, piecesManquantes, monthlyVolume, chargeParGestionnaire, statuts] =
       await Promise.all([
         safe("findRetards", () => findRetards(), []),
@@ -22,9 +37,9 @@ export async function GET(request: NextRequest) {
         safe("detectDoublons", () => detectDoublons(), []),
         safe("findIncoherences", () => findIncoherences(), []),
         safe("findPiecesManquantes", () => findPiecesManquantes(), []),
-        safe("getMonthlyVolume", () => getMonthlyVolume(2026), []),
+        safe("getMonthlyVolume", () => getMonthlyVolume(anneeCouranteFuseau(), plage), []),
         safe("getGestionnaireCharge", () => getGestionnaireCharge(), []),
-        safe("getStatutCounts", () => getStatutCounts(), {}),
+        safe("getStatutCounts", () => getStatutCounts(where), {}),
       ]);
 
     const firstHalf = monthlyVolume.filter((m) => {

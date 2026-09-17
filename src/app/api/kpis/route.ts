@@ -5,6 +5,21 @@ import {
   getAvgDelaiPaiement, getAvgDelaiTransfert, getAvgDelaiAnalyse,
   getGestionnaireProductivite, round2,
 } from "@/lib/kpi-queries";
+import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
+import {
+  perimetreDepuisHeaders,
+  refuserHorsPerimetre,
+  avecPerimetreSociete,
+} from "@/lib/data-isolation";
+import type { Prisma } from "@prisma/client";
+
+/** Fusionne plusieurs `where` en un seul (AND). Les objets vides sont ignorés. */
+function combinerWhere(...wheres: Prisma.DossierWhereInput[]): Prisma.DossierWhereInput {
+  const nonVides = wheres.filter((w) => w && Object.keys(w).length > 0);
+  if (nonVides.length === 0) return {};
+  if (nonVides.length === 1) return nonVides[0];
+  return { AND: nonVides };
+}
 
 /** Wrap an async call so one failure doesn't kill the whole response */
 async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -31,16 +46,26 @@ export async function GET(request: NextRequest) {
     const yearParam = request.nextUrl.searchParams.get('annee');
     const annee = yearParam ? parseInt(yearParam, 10) : currentYear;
 
+    // ─── Isolation des données : périmètre société forcé depuis le JWT ────
+    const perimetre = perimetreDepuisHeaders(request.headers);
+    const isolationError = refuserHorsPerimetre(perimetre);
+    if (isolationError) return isolationError;
+
+    // ─── Filtre de période réutilisable (date de référence : Dossier.dateReception) ───
+    // Fusionné avec le périmètre : la période ne peut jamais élargir l'accès aux données.
+    const plage = plageDepuisParams(request.nextUrl.searchParams);
+    const where = avecPerimetreSociete(filtreDateChamp('dateReception', plage), perimetre);
+
     const [statuts, sums, parSociete, volumeMensuel, delaiPaiement, delaiTransfert, delaiAnalyse, productivite] =
       await Promise.all([
-        safe("getStatutCounts", () => getStatutCounts(), emptyStatuts),
-        safe("getTotalSums", () => getTotalSums(), emptySums),
-        safe("getSocieteBreakdown", () => getSocieteBreakdown(), emptySociete),
-        safe("getMonthlyVolume", () => getMonthlyVolume(annee), emptyMonthly),
-        safe("getAvgDelaiPaiement", () => getAvgDelaiPaiement(), 0),
-        safe("getAvgDelaiTransfert", () => getAvgDelaiTransfert(), 0),
-        safe("getAvgDelaiAnalyse", () => getAvgDelaiAnalyse(), 0),
-        safe("getGestionnaireProductivite", () => getGestionnaireProductivite(), emptyProductivite),
+        safe("getStatutCounts", () => getStatutCounts(where), emptyStatuts),
+        safe("getTotalSums", () => getTotalSums(where), emptySums),
+        safe("getSocieteBreakdown", () => getSocieteBreakdown(where), emptySociete),
+        safe("getMonthlyVolume", () => getMonthlyVolume(annee, plage), emptyMonthly),
+        safe("getAvgDelaiPaiement", () => getAvgDelaiPaiement(plage), 0),
+        safe("getAvgDelaiTransfert", () => getAvgDelaiTransfert(plage), 0),
+        safe("getAvgDelaiAnalyse", () => getAvgDelaiAnalyse(plage), 0),
+        safe("getGestionnaireProductivite", () => getGestionnaireProductivite(where), emptyProductivite),
       ]);
 
     const c = (s: string) => statuts[s] || 0;
@@ -51,8 +76,8 @@ export async function GET(request: NextRequest) {
     const tauxRejet = sums.total > 0 ? round2((totalRejetes / sums.total) * 100) : 0;
 
     const [validSums, payeSums] = await Promise.all([
-      safe("getTotalSums(VALIDE)", () => getTotalSums({ statut: "VALIDE" }), emptySums),
-      safe("getTotalSums(PAYE)", () => getTotalSums({ statut: "PAYE" }), emptySums),
+      safe("getTotalSums(VALIDE)", () => getTotalSums(combinerWhere({ statut: "VALIDE" }, where)), emptySums),
+      safe("getTotalSums(PAYE)", () => getTotalSums(combinerWhere({ statut: "PAYE" }, where)), emptySums),
     ]);
 
     return NextResponse.json({
