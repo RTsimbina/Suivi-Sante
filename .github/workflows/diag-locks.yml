@@ -1,16 +1,7 @@
-# ─── Réparation : libérer le verrou consultatif Prisma en fuite ──────────────
-# (one-shot, suppression prévue)
-#
-# Incident du 17/09/2026 : le build Vercel exécute `prisma migrate deploy`
-# avec une DATABASE_URL poolée (-pooler). Le verrou consultatif de migrate
-# (objid 72707369, verrou de SESSION) a fuité dans une session serveur pgbouncer
-# restée idle : toute migration ultérieure via le workflow échoue en P1002
-# (« Timed out trying to acquire a postgres advisory lock »).
-#
-# Réparation : terminer UNIQUEMENT la session idle de pgbouncer qui détient
-# ce verrou précis, puis relancer « Migration base de données ».
+# ─── Vérification post-migration (one-shot, suppression prévue) ──────────────
+# Contrôle que les colonnes du module Prestataires existent bien en production.
 
-name: Réparation verrou migrate
+name: Vérification schéma production
 
 on:
   workflow_dispatch: {}
@@ -19,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -41,27 +32,24 @@ jobs:
           echo "::add-mask::$URI"
           echo "DATABASE_URL=$URI" >> "$GITHUB_ENV"
 
-      - name: Terminer la session en fuite (verrou consultatif migrate)
+      - name: Colonnes Prestataire / HistoriqueParametre + état migrations
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           set -euo pipefail
           npm ci --silent
+          npx prisma migrate status
           node --input-type=module -e "
           import { PrismaClient } from '@prisma/client';
           const db = new PrismaClient();
-          const cibles = await db.\$queryRawUnsafe(
-            \"SELECT a.pid FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid WHERE l.locktype='advisory' AND l.objid=72707369 AND l.granted AND a.state='idle'\"
+          const cols = await db.\$queryRawUnsafe(
+            \"SELECT table_name, column_name, data_type FROM information_schema.columns WHERE (table_name='Prestataire' AND column_name IN ('stat','statutJuridique')) OR (table_name='HistoriqueParametre' AND column_name='roleUtilisateur') ORDER BY table_name, column_name\"
           );
-          console.log('Sessions en fuite détectées :', cibles.map(c => Number(c.pid)));
-          for (const c of cibles) {
-            const pid = Number(c.pid);
-            const res = await db.\$queryRawUnsafe('SELECT pg_terminate_backend(\$1::int4) AS ok', pid);
-            console.log('pg_terminate_backend(' + pid + ') →', res[0].ok);
-          }
-          const restant = await db.\$queryRawUnsafe(
-            \"SELECT pid, granted FROM pg_locks WHERE locktype='advisory' AND objid=72707369\"
-          );
-          console.log('Verrous restants sur 72707369 :', restant.map(r => ({ pid: Number(r.pid), granted: r.granted })));
+          console.log('=== Colonnes attendues en production ===');
+          console.table(cols);
+          const nbPresta = await db.prestataire.count();
+          console.log('Prestataires en base :', nbPresta);
+          const nbJournal = await db.historiqueParametre.count();
+          console.log('Traces de journal en base :', nbJournal);
           await db.\$disconnect();
           " 2>&1 | head -40
