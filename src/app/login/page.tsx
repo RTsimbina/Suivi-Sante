@@ -67,6 +67,10 @@ export default function LoginPage() {
             window.location.href = '/portail';
             return;
           }
+          if (role === 'PRESTATAIRE') {
+            window.location.href = '/portail-prestataire';
+            return;
+          }
         }
       } catch {
         // En cas d'erreur, redirection par défaut

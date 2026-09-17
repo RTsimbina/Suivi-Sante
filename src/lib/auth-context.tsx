@@ -10,7 +10,8 @@ export type RoleType =
   | 'COMPTABILITE'
   | 'SANTE'
   | 'PORTAIL_CLIENT'
-  | 'CONTACT_ENTREPRISE';
+  | 'CONTACT_ENTREPRISE'
+  | 'PRESTATAIRE';
 
 export const ROLE_LABELS: Record<RoleType, string> = {
   ADMINISTRATEUR: 'Administrateur',
@@ -20,6 +21,7 @@ export const ROLE_LABELS: Record<RoleType, string> = {
   SANTE: 'Contrôle Santé',
   PORTAIL_CLIENT: 'Portail Client',
   CONTACT_ENTREPRISE: 'Contact Entreprise',
+  PRESTATAIRE: 'Prestataire',
 };
 
 interface AuthContextValue {
@@ -31,6 +33,7 @@ interface AuthContextValue {
     avatar?: string | null;
     assureId?: string | null;
     societeId?: string | null;
+    prestataireId?: string | null;
   } | null;
   role: RoleType | null;
   isAuthenticated: boolean;

@@ -71,6 +71,7 @@ const ROLE_COLORS: Record<string, string> = {
   SANTE: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300',
   PORTAIL_CLIENT: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',
   CONTACT_ENTREPRISE: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300',
+  PRESTATAIRE: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
 };
 
 function formatDate(d: string | null): string {

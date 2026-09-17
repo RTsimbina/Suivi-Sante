@@ -85,6 +85,9 @@ async function main() {
     { email: 'compta@suivisante.mg', nom: 'Marie Rasoa', password: passwordHash, role: 'COMPTABILITE' },
     { email: 'utilisateur@suivisante.mg', nom: 'Andry Faly', password: passwordHash, role: 'SANTE' },
     { email: 'sante@suivisante.mg', nom: 'Dr. Nahitra Raza', password: passwordHash, role: 'SANTE' },
+    // Portail Prestataire : l'e-mail du compte = e-mail de la fiche Prestataire
+    // « Clinique Sainte Marie » (liaison serveur par e-mail).
+    { email: 'contact@clinique-saintemarie.mg', nom: 'Clinique Sainte Marie', password: passwordHash, role: 'PRESTATAIRE' },
   ];
 
   for (const u of utilisateursData) {

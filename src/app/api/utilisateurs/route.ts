@@ -3,6 +3,7 @@ import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { liaisonContactEntrepriseExiste } from '@/lib/liaison-externe';
+import { liaisonPrestataireExiste } from '@/lib/liaison-prestataire';
 import { parseJsonBody } from '@/lib/validation/parse';
 import {
   utilisateurCreateSchema,
@@ -18,14 +19,20 @@ const ROLE_LABELS: Record<string, string> = {
   SANTE: 'Controle Sante',
   PORTAIL_CLIENT: 'Portail Client',
   CONTACT_ENTREPRISE: 'Contact Entreprise',
+  PRESTATAIRE: 'Prestataire',
 };
 
+/** Rôles externes dont le compte doit être lié à une entité métier par e-mail. */
+const estRoleExterneLiaison = (role: string): boolean =>
+  role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE' || role === 'PRESTATAIRE';
+
 // ─── Validation de la liaison des rôles externes ──────────────────────────────
-// La liaison assuré↔compte (ou contact↔compte) repose sur la correspondance
-// d'e-mail au moment du login : sans Assure/EntrepriseContact portant cet
-// e-mail, le portail affiche « Aucun assuré lié à votre compte ». On refuse
-// donc la création/modification d'un compte externe sans liaison existante
-// (422) au lieu de produire un compte cassé découvrable seulement au login.
+// La liaison assuré↔compte (contact↔compte, prestataire↔compte) repose sur la
+// correspondance d'e-mail au moment du login : sans Assure/EntrepriseContact/
+// Prestataire portant cet e-mail, le portail affiche « Aucun assuré lié à
+// votre compte ». On refuse donc la création/modification d'un compte externe
+// sans liaison existante (422) au lieu de produire un compte cassé
+// découvrable seulement au login.
 async function liaisonExterneExiste(role: string, email: string): Promise<boolean> {
   if (role === 'PORTAIL_CLIENT') {
     const assure = await db.assure.findFirst({
@@ -39,13 +46,21 @@ async function liaisonExterneExiste(role: string, email: string): Promise<boolea
     // ou e-mail général de la société — cf. src/lib/liaison-externe.ts.
     return liaisonContactEntrepriseExiste(email);
   }
+  if (role === 'PRESTATAIRE') {
+    // Fiche Prestataire portant cet e-mail (GESTION → Prestataires).
+    return liaisonPrestataireExiste(email);
+  }
   return true; // rôles internes : pas de liaison exigée
 }
 
 function erreurLiaisonExterne(role: string, email: string): string {
-  return role === 'PORTAIL_CLIENT'
-    ? `Aucun assuré n'a l'e-mail « ${email} » : ce compte Portail Client afficherait une erreur de liaison. Créez d'abord l'assuré avec cet e-mail (ou corrigez l'e-mail saisi).`
-    : `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Saisissez cet e-mail comme « Contact principal » dans Modifier la société, sélectionnez la société ci-dessous, ou créez le contact dans Sociétés → Contacts.`;
+  if (role === 'PORTAIL_CLIENT') {
+    return `Aucun assuré n'a l'e-mail « ${email} » : ce compte Portail Client afficherait une erreur de liaison. Créez d'abord l'assuré avec cet e-mail (ou corrigez l'e-mail saisi).`;
+  }
+  if (role === 'PRESTATAIRE') {
+    return `Aucun prestataire n'a l'e-mail « ${email} » : ce compte Prestataire afficherait une erreur de liaison. Saisissez cet e-mail sur la fiche du prestataire dans GESTION → Prestataires (champ Adresse e-mail), ou corrigez l'e-mail saisi.`;
+  }
+  return `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Saisissez cet e-mail comme « Contact principal » dans Modifier la société, sélectionnez la société ci-dessous, ou créez le contact dans Sociétés → Contacts.`;
 }
 
 /**
@@ -132,15 +147,16 @@ export async function GET(request: NextRequest) {
     // badge de liaison (liaisonExterne = null = inconnu).
     let erreurBadge = false;
     const emailsExternes = utilisateurs
-      .filter(u => u.role === 'PORTAIL_CLIENT' || u.role === 'CONTACT_ENTREPRISE')
+      .filter(u => estRoleExterneLiaison(u.role))
       .map(u => u.email);
 
     const assuresParEmail = new Set<string>();
     const contactsParEmail = new Set<string>();
     const societesParEmail = new Set<string>();
+    const prestatairesParEmail = new Set<string>();
     if (emailsExternes.length > 0) {
       try {
-        const [assures, contacts, societesLiees] = await Promise.all([
+        const [assures, contacts, societesLiees, prestataires] = await Promise.all([
           db.assure.findMany({
             where: { email: { in: emailsExternes, mode: 'insensitive' } },
             select: { email: true },
@@ -158,6 +174,10 @@ export async function GET(request: NextRequest) {
             },
             select: { email: true, emailContactPrincipal: true },
           }),
+          db.prestataire.findMany({
+            where: { email: { in: emailsExternes, mode: 'insensitive' } },
+            select: { email: true },
+          }),
         ]);
         assures.forEach(a => assuresParEmail.add((a.email ?? '').trim().toLowerCase()));
         contacts.forEach(c => contactsParEmail.add((c.email ?? '').trim().toLowerCase()));
@@ -165,6 +185,7 @@ export async function GET(request: NextRequest) {
           if (s.emailContactPrincipal) societesParEmail.add(s.emailContactPrincipal.trim().toLowerCase());
           if (s.email) societesParEmail.add(s.email.trim().toLowerCase());
         });
+        prestataires.forEach(p => prestatairesParEmail.add((p.email ?? '').trim().toLowerCase()));
       } catch (error) {
         // Migration 20260916120000 non déployée, base indisponible, etc. :
         // on dégrade le badge, pas la liste.
@@ -181,6 +202,8 @@ export async function GET(request: NextRequest) {
         } else if (u.role === 'CONTACT_ENTREPRISE') {
           liaisonExterne = contactsParEmail.has(u.email.trim().toLowerCase()) ||
             societesParEmail.has(u.email.trim().toLowerCase());
+        } else if (u.role === 'PRESTATAIRE') {
+          liaisonExterne = prestatairesParEmail.has(u.email.trim().toLowerCase());
         }
       }
       return {
@@ -228,11 +251,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rôles externes : exiger une liaison assuré/contact sur cet e-mail.
+    // Rôles externes : exiger une liaison assuré/contact/prestataire sur cet e-mail.
     // CONTACT_ENTREPRISE : si le contact n'existe pas mais qu'une société est
     // fournie, création en une étape du contact lié (compte représentant
     // opérationnel immédiatement — sinon l'admin était bloqué par le 422).
-    if ((role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') &&
+    if (estRoleExterneLiaison(role) &&
         !(await liaisonExterneExiste(role, emailTrimmed))) {
       if (role === 'CONTACT_ENTREPRISE' && societeId) {
         const contactCree = await creerContactEntrepriseLiaison(societeId, nomTrimmed, emailTrimmed);
@@ -344,10 +367,10 @@ export async function PUT(request: NextRequest) {
     const emailFinal = (data.email as string | undefined) ?? existing.email;
     const basculeVersExterne =
       role !== undefined &&
-      (existing.role === 'PORTAIL_CLIENT' || existing.role === 'CONTACT_ENTREPRISE') === false &&
-      (roleFinal === 'PORTAIL_CLIENT' || roleFinal === 'CONTACT_ENTREPRISE');
+      !estRoleExterneLiaison(existing.role) &&
+      estRoleExterneLiaison(roleFinal);
     if (
-      (roleFinal === 'PORTAIL_CLIENT' || roleFinal === 'CONTACT_ENTREPRISE') &&
+      estRoleExterneLiaison(roleFinal) &&
       (data.email !== undefined || basculeVersExterne)
     ) {
       if (!(await liaisonExterneExiste(roleFinal, emailFinal))) {

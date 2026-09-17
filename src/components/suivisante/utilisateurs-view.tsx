@@ -73,6 +73,7 @@ const ROLES = [
   { value: 'SANTE', label: 'Controle Sante', color: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300' },
   { value: 'PORTAIL_CLIENT', label: 'Portail Client', color: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' },
   { value: 'CONTACT_ENTREPRISE', label: 'Contact Entreprise', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' },
+  { value: 'PRESTATAIRE', label: 'Prestataire', color: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' },
 ];
 
 const EMPTY_FORM: FormData = { email: '', nom: '', password: '', role: 'ACCUEIL', societeId: '' };

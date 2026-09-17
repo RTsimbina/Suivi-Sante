@@ -33,6 +33,7 @@ const EMAILS_DEMO = [
   'accueil@suivisante.mg', 'contact.sanlam@sanlam.mg', 'contact.telma@telma.mg',
   'contact.jirama@jirama.mg', 'contact.airtel@airtel.mg', 'contact.bni@bni.mg',
   'portail.sanlam@suivisante.mg', 'portail.telma@suivisante.mg',
+  'contact@clinique-saintemarie.mg', 'facturation@hopital-principal.mg',
 ];
 
 const ANNEE = 2026;
@@ -427,7 +428,11 @@ async function main() {
   await upUtil('j.rakotoarison@jirama.mg', 'Jean-Claude Rakotoarison', 'CONTACT_ENTREPRISE', pwdExt);
   await upUtil('portail.sanlam@suivisante.mg', 'Tiana Rasoanaivo', 'PORTAIL_CLIENT', pwdExt);
   await upUtil('portail.telma@suivisante.mg', 'Lova Randrianasolo', 'PORTAIL_CLIENT', pwdExt);
-  console.log('  ✅ 5 comptes CONTACT_ENTREPRISE (1 par société) + 2 PORTAIL_CLIENT (liaison par e-mail)');
+  // Portail Prestataire : l'e-mail du compte = e-mail de facturation de la
+  // fiche Prestataire (liaison serveur par e-mail — src/lib/liaison-prestataire.ts).
+  await upUtil('facturation@hopital-principal.mg', 'Hôpital Principal HJ Anosy', 'PRESTATAIRE', pwdExt);
+  await upUtil('contact@clinique-saintemarie.mg', 'Clinique Sainte Marie', 'PRESTATAIRE', pwdExt);
+  console.log('  ✅ 5 comptes CONTACT_ENTREPRISE (1 par société) + 2 PORTAIL_CLIENT + 2 PRESTATAIRE (liaison par e-mail)');
 
   // ── 6. DOSSIERS — par société, de janvier à septembre ────────────────────
   console.log('\n📁 DOSSIERS (chaque société, chaque mois de jan → sep)');
@@ -768,6 +773,8 @@ async function main() {
   // comptes
   chk('5 comptes CONTACT_ENTREPRISE actifs (1 par société)', (await db.utilisateur.count({ where: { email: { in: ['contact.sanlam@sanlam.mg', 'contact.telma@telma.mg', 'contact.airtel@airtel.mg', 'contact.bni@bni.mg', 'j.rakotoarison@jirama.mg'] }, role: 'CONTACT_ENTREPRISE', actif: true } })) === 5);
   chk('2 comptes PORTAIL_CLIENT de démo actifs (+ compte réel conservé)', (await db.utilisateur.count({ where: { email: { in: ['portail.sanlam@suivisante.mg', 'portail.telma@suivisante.mg'] }, role: 'PORTAIL_CLIENT', actif: true } })) === 2);
+  chk('2 comptes PRESTATAIRE actifs (Portail Prestataire)', (await db.utilisateur.count({ where: { email: { in: ['facturation@hopital-principal.mg', 'contact@clinique-saintemarie.mg'] }, role: 'PRESTATAIRE', actif: true } })) === 2);
+  chk('liaison prestataire : e-mails de facturation portés par les fiches Prestataire', (await db.prestataire.count({ where: { email: { in: ['facturation@hopital-principal.mg', 'contact@clinique-saintemarie.mg'], mode: 'insensitive' } } })) === 2);
   for (const e of EMAILS_A_CONSERVER) {
     const pref = e.split('@')[0] + '@';
     chk(`compte conservé : ${e}`, (await db.utilisateur.count({ where: { email: { startsWith: pref, mode: 'insensitive' } } })) >= 1);

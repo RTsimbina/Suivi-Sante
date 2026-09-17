@@ -4,6 +4,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
+import { resoudreLiaisonPrestataire } from '@/lib/liaison-prestataire';
 import { getClientIp } from '@/lib/rate-limit';
 import {
   evaluateLoginAttempt,
@@ -140,6 +141,7 @@ export const authOptions: NextAuthOptions = {
         // (e-mail nettoyé : la base peut contenir des espaces parasites)
         let assureId: string | undefined;
         let societeId: string | undefined;
+        let prestataireId: string | undefined;
         const emailLiaison = user.email.trim();
 
         if (user.role === 'PORTAIL_CLIENT') {
@@ -169,6 +171,17 @@ export const authOptions: NextAuthOptions = {
               `avec cet e-mail. Le portail affichera une erreur tant que la liaison n'est pas établie.`
             );
           }
+        } else if (user.role === 'PRESTATAIRE') {
+          // Résoudre la fiche Prestataire par e-mail (liaison par facturation).
+          const liaison = await resoudreLiaisonPrestataire(emailLiaison);
+          if (liaison) {
+            prestataireId = liaison.prestataireId;
+          } else {
+            console.warn(
+              `[AUTH] Compte PRESTATAIRE "${user.email}" : aucun Prestataire en base avec cet e-mail. ` +
+              `Le portail affichera une erreur tant que l'e-mail du prestataire ne correspond pas.`
+            );
+          }
         }
 
         // Mettre à jour la dernière connexion
@@ -182,6 +195,7 @@ export const authOptions: NextAuthOptions = {
           avatar: user.avatar,
           assureId,
           societeId,
+          prestataireId,
         };
       },
     }),
@@ -197,6 +211,7 @@ export const authOptions: NextAuthOptions = {
         const userAny = user as any;
         if (userAny.assureId) token.assureId = userAny.assureId;
         if (userAny.societeId) token.societeId = userAny.societeId;
+        if (userAny.prestataireId) token.prestataireId = userAny.prestataireId;
       }
       return token;
     },
@@ -209,6 +224,7 @@ export const authOptions: NextAuthOptions = {
         // Exposer les identifiants de portail pour les rôles externes
         if (token.assureId) (session.user as any).assureId = token.assureId;
         if (token.societeId) (session.user as any).societeId = token.societeId;
+        if (token.prestataireId) (session.user as any).prestataireId = token.prestataireId;
       }
       return session;
     },
@@ -275,6 +291,7 @@ declare module 'next-auth' {
       avatar?: string | null;
       assureId?: string;
       societeId?: string;
+      prestataireId?: string;
     };
   }
 
@@ -286,6 +303,7 @@ declare module 'next-auth' {
     avatar?: string | null;
     assureId?: string;
     societeId?: string;
+    prestataireId?: string;
   }
 }
 
@@ -298,5 +316,6 @@ declare module 'next-auth/jwt' {
     avatar?: string | null;
     assureId?: string;
     societeId?: string;
+    prestataireId?: string;
   }
 }

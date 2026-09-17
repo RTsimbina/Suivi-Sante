@@ -5,6 +5,10 @@ import {
   refuserHorsPerimetre,
   avecPerimetreSociete,
   avecPerimetreSocieteCourante,
+  resoudrePerimetrePrestataire,
+  perimetrePrestataireDepuisHeaders,
+  refuserHorsPerimetrePrestataire,
+  avecPerimetrePrestataire,
   INTERNAL_ROLES,
   EXTERNAL_ROLES,
   ERREUR_SANS_SOCIETE,
@@ -238,5 +242,82 @@ describe('CHAÎNE COMPLÈTE — simulation du flux handler', () => {
     const perimetre = perimetreDepuisHeaders(headers);
     const whereFiltre = avecPerimetreSociete({ societeId: SOCIETE_B }, perimetre);
     expect(whereFiltre.societeId).toBe(SOCIETE_B); // filtre client conservé pour interne
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── Périmètre PRESTATAIRE (Portail Prestataire) ───────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('resoudrePerimetre — rôle PRESTATAIRE sur les routes à périmètre société', () => {
+  it('FAIL-CLOSED : un PRESTATAIRE est refusé sur les routes à périmètre société', () => {
+    const p = resoudrePerimetre('PRESTATAIRE', SOCIETE_A);
+    expect(p.refusal).not.toBeNull();
+    expect(refuserHorsPerimetre(p)?.status).toBe(403);
+  });
+
+  it('FAIL-CLOSED : refusé même sans societeId (chaîne incomplète)', () => {
+    const p = resoudrePerimetre('PRESTATAIRE', null);
+    expect(p.refusal).not.toBeNull();
+  });
+});
+
+describe('perimetrePrestataire (Portail Prestataire)', () => {
+  it('PRESTATAIRE avec prestataireId → restreint à SON prestataire', () => {
+    const p = resoudrePerimetrePrestataire('PRESTATAIRE', 'prest-A');
+    expect(p.restricted).toBe(true);
+    expect(p.prestataireId).toBe('prest-A');
+    expect(p.refusal).toBeNull();
+  });
+
+  it('FAIL-CLOSED : PRESTATAIRE sans prestataireId → refus 403 actionnable', () => {
+    const p = resoudrePerimetrePrestataire('PRESTATAIRE', null);
+    expect(p.restricted).toBe(true);
+    expect(p.refusal).not.toBeNull();
+    const res = refuserHorsPerimetrePrestataire(p);
+    expect(res?.status).toBe(403);
+  });
+
+  it('espaces parasites trimés (résilience)', () => {
+    const p = resoudrePerimetrePrestataire('  PRESTATAIRE  ', '  prest-A  ');
+    expect(p.prestataireId).toBe('prest-A');
+  });
+
+  it('ADMINISTRATEUR → périmètre global (mode démonstration, jamais restreint à un prestataire)', () => {
+    const p = resoudrePerimetrePrestataire('ADMINISTRATEUR', null);
+    expect(p.restricted).toBe(false);
+    expect(p.refusal).toBeNull();
+  });
+
+  it('rôle inconnu → refus par défaut', () => {
+    const p = resoudrePerimetrePrestataire('ACCUEIL', null);
+    expect(p.refusal).not.toBeNull();
+  });
+
+  it('headers middleware → périmètre prestataire (x-user-prestataireid)', () => {
+    const headers = new Headers({
+      'x-user-role': 'PRESTATAIRE',
+      'x-user-prestataireid': 'prest-A',
+    });
+    const p = perimetrePrestataireDepuisHeaders(headers);
+    expect(p.prestataireId).toBe('prest-A');
+  });
+});
+
+describe('avecPerimetrePrestataire — écrasement du prestataireId client', () => {
+  it('un ?prestataireId=B manipulé est ÉCRASÉ par l\u2019identité serveur (A)', () => {
+    const p = resoudrePerimetrePrestataire('PRESTATAIRE', 'prest-A');
+    const where = avecPerimetrePrestataire<Record<string, unknown>>(
+      { prestataireId: 'prest-B', statut: 'VALIDE' },
+      p
+    );
+    expect(where.prestataireId).toBe('prest-A'); // jamais prest-B
+    expect(where.statut).toBe('VALIDE');
+  });
+
+  it('no-op pour ADMINISTRATEUR (mode démonstration)', () => {
+    const p = resoudrePerimetrePrestataire('ADMINISTRATEUR', null);
+    const where = avecPerimetrePrestataire({ statut: 'VALIDE' }, p);
+    expect('prestataireId' in where).toBe(false);
   });
 });

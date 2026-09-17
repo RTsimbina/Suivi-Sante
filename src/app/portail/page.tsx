@@ -117,10 +117,13 @@ function ContenuPortail() {
   const role = session?.user?.role as string;
   const isPortailUser = role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE';
 
-  // Rediriger les utilisateurs internes
+  // Rediriger les utilisateurs non-portail-client (internes → dashboard,
+  // prestataires → leur portail dédié)
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
+    } else if (status === 'authenticated' && role === 'PRESTATAIRE') {
+      router.push('/portail-prestataire');
     } else if (status === 'authenticated' && !isPortailUser) {
       router.push('/');
     }

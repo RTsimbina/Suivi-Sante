@@ -201,6 +201,7 @@ export const ROLES_UTILISATEUR = [
   "SANTE",
   "PORTAIL_CLIENT",
   "CONTACT_ENTREPRISE",
+  "PRESTATAIRE",
 ] as const;
 export const roleUtilisateurSchema = z.enum(ROLES_UTILISATEUR);
 

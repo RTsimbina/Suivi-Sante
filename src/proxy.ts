@@ -163,6 +163,7 @@ export default async function proxy(request: NextRequest) {
   const userEmail = (token.email as string) || '';
   const userNom = (token.nom as string) || '';
   const userSocieteId = (token.societeId as string) || '';
+  const userPrestataireId = (token.prestataireId as string) || '';
 
   // 5. Vérification automatique des permissions API
   if (pathname.startsWith('/api/')) {
@@ -182,6 +183,8 @@ export default async function proxy(request: NextRequest) {
     requestHeaders.set('x-user-nom', userNom);
     // societeId depuis le JWT signé — écrase toute valeur client spoofée
     requestHeaders.set('x-user-societeid', userSocieteId);
+    // prestataireId depuis le JWT signé — écrase toute valeur client spoofée
+    requestHeaders.set('x-user-prestataireid', userPrestataireId);
 
     const apiResponse = NextResponse.next({
       request: { headers: requestHeaders },

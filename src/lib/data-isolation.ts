@@ -10,6 +10,7 @@
  *   1. Login (src/lib/auth.ts) : le societeId est résolu CÔTÉ SERVEUR
  *        PORTAIL_CLIENT      → Assure rattaché à l'e-mail du compte
  *        CONTACT_ENTREPRISE  → EntrepriseContact rattaché à l'e-mail du compte
+ *        PRESTATAIRE         → Prestataire rattaché à l'e-mail du compte
  *   2. JWT signé (8 h) : token.societeId — non modifiable par le client
  *   3. Middleware (src/proxy.ts) : header x-user-societeid ÉCRASÉ depuis le JWT
  *      (toute valeur envoyée par le navigateur est écrasée, donc non falsifiable)
@@ -24,6 +25,11 @@
  *     → périmètre FORCÉ sur leur société. FAIL-CLOSED : un compte externe
  *       sans société rattachée est refusé (403), jamais servi avec une liste
  *       vide silencieuse qui masquerait un compte mal provisionné.
+ *   - Rôle PRESTATAIRE : le périmètre société ne s'applique pas (un
+ *     prestataire conventionne avec PLUSIEURS sociétés clientes). Son
+ *     identité est le prestataireId résolu côté serveur — voir les
+ *     fonctions perimetrePrestataire* ci-dessous. Sur les routes à
+ *     périmètre société il est refusé en fail-closed (403).
  *   - Accès unitaires hors périmètre → 404 (jamais 403) : ne pas révéler
  *     l'existence d'un dossier/contrat d'une autre société.
  * ──────────────────────────────────────────────────────────────────────────
@@ -45,6 +51,10 @@ export const EXTERNAL_ROLES = ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'] as const;
 export const ERREUR_SANS_SOCIETE =
   "Ce compte n'est rattaché à aucune société. Contactez l'administrateur.";
 
+/** Message renvoyé à un compte prestataire hors routes dédiées (fail-closed). */
+export const ERREUR_HORS_PORTAIL_PRESTATAIRE =
+  "Ce compte prestataire n'accède qu'au Portail Prestataire. Contactez l'administrateur.";
+
 /** Périmètre de société d'un utilisateur authentifié. */
 export interface PerimetreSociete {
   /** true → les requêtes DOIVENT être filtrées par societeId */
@@ -59,6 +69,9 @@ export interface PerimetreSociete {
  * Résout le périmètre depuis l'identité SERVEUR (rôle + societeId du JWT).
  * - Rôle externe + société    → restreint à cette société
  * - Rôle externe sans société → refus (fail-closed)
+ * - Rôle PRESTATAIRE          → refus sur les routes à périmètre société
+ *                               (son périmètre propre est prestataireId,
+ *                               voir perimetrePrestataireDepuisHeaders)
  * - Rôle interne              → périmètre global (un header societeId
  *                               résiduel est ignoré : il ne fait pas foi)
  * - Rôle inconnu              → refus par défaut (défense en profondeur)
@@ -79,6 +92,12 @@ export function resoudrePerimetre(
 
   if ((INTERNAL_ROLES as readonly string[]).includes(role)) {
     return { restricted: false, societeId: null, refusal: null };
+  }
+
+  // Rôle PRESTATAIRE : pas de périmètre société (multi-sociétés par
+  // convention) — mais JAMAIS d'accès aux routes à périmètre société.
+  if (role === 'PRESTATAIRE') {
+    return { restricted: true, societeId: null, refusal: ERREUR_HORS_PORTAIL_PRESTATAIRE };
   }
 
   // Rôle non répertorié : fail-closed. En pratique le middleware ne laisse
@@ -133,4 +152,125 @@ export function avecPerimetreSocieteCourante<T>(
 ): T {
   if (!perimetre.restricted || !perimetre.societeId) return where;
   return { ...(where as Record<string, unknown>), id: perimetre.societeId } as T;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ─── Périmètre PRESTATAIRE (Portail Prestataire) ─────────────────────
+//
+// Même chaîne de confiance que le périmètre société :
+//   1. Login (src/lib/auth.ts)  : prestataireId résolu CÔTÉ SERVEUR
+//                                 (fiche Prestataire portant l'e-mail du compte)
+//   2. JWT signé (8 h)          : token.prestataireId — non falsifiable
+//   3. Middleware (src/proxy.ts): header x-user-prestataireid ÉCRASÉ depuis
+//                                 le JWT (toute valeur navigateur est écrasée)
+//   4. Handler                  : perimetrePrestataireDepuisHeaders(headers)
+//                                 = SEULE source admise. Un ?prestataireId=…
+//                                 fourni par le client qui ne correspond PAS
+//                                 à l'identité serveur est un rejet (403).
+//
+// FAIL-CLOSED : un compte PRESTATAIRE sans prestataire résolu est refusé
+// (403 actionnable), jamais servi avec une liste vide silencieuse.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Message renvoyé à un compte PRESTATAIRE sans fiche rattachée (fail-closed). */
+export const ERREUR_SANS_PRESTATAIRE =
+  "Aucun prestataire n'est rattaché à votre compte. Vérifiez que la fiche du prestataire (GESTION → Prestataires) porte exactement l'e-mail de ce compte ; une fois corrigé, rechargez cette page.";
+
+/** Périmètre prestataire d'un utilisateur authentifié. */
+export interface PerimetrePrestataire {
+  /** true → les requêtes DOIVENT être filtrées par prestataireId */
+  restricted: boolean;
+  /** prestataire imposé si restricted ; null pour les rôles internes */
+  prestataireId: string | null;
+  /** présent quand le périmètre est invalide → 403 */
+  refusal: string | null;
+}
+
+/**
+ * Résout le périmètre prestataire depuis l'identité SERVEUR.
+ * - PRESTATAIRE + prestataireId → restreint à ce prestataire
+ * - PRESTATAIRE sans prestataireId → refus (fail-closed)
+ * - ADMINISTRATEUR → périmètre global (mode démonstration du portail :
+ *   la route renvoie un message, jamais de données d'un prestataire choisi)
+ * - Autre rôle → refus par défaut (défense en profondeur)
+ */
+export function resoudrePerimetrePrestataire(
+  userRole: string,
+  prestataireIdServeur: string | null | undefined
+): PerimetrePrestataire {
+  const role = (userRole || '').trim();
+
+  if (role === 'PRESTATAIRE') {
+    const prestataireId = (prestataireIdServeur || '').trim();
+    if (!prestataireId) {
+      return { restricted: true, prestataireId: null, refusal: ERREUR_SANS_PRESTATAIRE };
+    }
+    return { restricted: true, prestataireId, refusal: null };
+  }
+
+  if (role === 'ADMINISTRATEUR') {
+    return { restricted: false, prestataireId: null, refusal: null };
+  }
+
+  // Tout autre rôle : fail-closed (le middleware ne laisse déjà passer
+  // que PRESTATAIRE / ADMINISTRATEUR sur ces routes, défense en profondeur).
+  return { restricted: true, prestataireId: null, refusal: 'Accès refusé.' };
+}
+
+/**
+ * Extrait le périmètre prestataire depuis les headers injectés par le
+ * middleware (x-user-role / x-user-prestataireid — écrasés depuis le JWT
+ * signé, donc non falsifiables par le navigateur).
+ */
+export function perimetrePrestataireDepuisHeaders(headers: Headers): PerimetrePrestataire {
+  return resoudrePerimetrePrestataire(
+    headers.get('x-user-role') || '',
+    headers.get('x-user-prestataireid')
+  );
+}
+
+/**
+ * À appeler juste après la résolution du périmètre : renvoie une Response 403
+ * si le périmètre est invalide, sinon null.
+ */
+export function refuserHorsPerimetrePrestataire(
+  perimetre: PerimetrePrestataire
+): Response | null {
+  if (perimetre.refusal) {
+    return Response.json({ erreur: perimetre.refusal }, { status: 403 });
+  }
+  return null;
+}
+
+/**
+ * Fusionne le périmètre dans un where Prisma en ÉCRASANT tout prestataireId
+ * transmis par le client (query/body). Pré-condition :
+ * refuserHorsPerimetrePrestataire a déjà été appelé (pas de refusal).
+ */
+export function avecPerimetrePrestataire<T>(
+  where: T,
+  perimetre: PerimetrePrestataire
+): T {
+  if (!perimetre.restricted || !perimetre.prestataireId) return where;
+  return { ...(where as Record<string, unknown>), prestataireId: perimetre.prestataireId } as T;
+}
+
+/**
+ * Rejet explicite (403) si le client transmet un prestataireId qui ne
+ * correspond pas à l'identité serveur. Utilisé par les routes du portail :
+ * un prestataire A qui tente ?prestataireId=B est REFUSÉ (et non silencieusement
+ * ignoré) — le serveur ne révèle rien sur B.
+ */
+export function refuserPrestataireIdEtranger(
+  prestataireIdClient: string | null | undefined,
+  prestataireIdServeur: string
+): Response | null {
+  const fourni = (prestataireIdClient || '').trim();
+  if (fourni && fourni !== prestataireIdServeur) {
+    return Response.json(
+      { erreur: 'Accès refusé : vous ne pouvez consulter que les données de votre propre prestataire.' },
+      { status: 403 }
+    );
+  }
+  return null;
 }

@@ -34,6 +34,12 @@ export const API_PERMISSIONS: Record<
   '/api/portail-client': {
     roles: ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
   },
+  // ─── Portail Prestataire (rôles externes prestataires de soins) ─────────
+  // L'identité du prestataire est résolue CÔTÉ SERVEUR (JWT → liaison par
+  // e-mail) : aucun prestataireId transmis par le navigateur n'est accepté.
+  '/api/portail-prestataire': {
+    roles: ['PRESTATAIRE', 'ADMINISTRATEUR'],
+  },
   '/api/dossiers': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
     methods: {

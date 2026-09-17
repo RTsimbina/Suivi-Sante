@@ -26,6 +26,8 @@ const dbMocks = vi.hoisted(() => ({
   societeFindUnique: vi.fn(),
   societeFindFirst: vi.fn(),
   societeFindMany: vi.fn(),
+  prestataireFindFirst: vi.fn(),
+  prestataireFindMany: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -50,6 +52,10 @@ vi.mock('@/lib/db', () => ({
       findUnique: dbMocks.societeFindUnique,
       findFirst: dbMocks.societeFindFirst,
       findMany: dbMocks.societeFindMany,
+    },
+    prestataire: {
+      findFirst: dbMocks.prestataireFindFirst,
+      findMany: dbMocks.prestataireFindMany,
     },
   },
 }));
@@ -104,6 +110,7 @@ beforeEach(() => {
   dbMocks.societeFindUnique.mockResolvedValue({ id: 's1' }); // société existante
   dbMocks.societeFindFirst.mockResolvedValue(null); // aucune liaison par e-mail société
   dbMocks.societeFindMany.mockResolvedValue([]); // enrichissement GET
+  dbMocks.prestataireFindMany.mockResolvedValue([]); // enrichissement GET (comptes PRESTATAIRE)
   dbMocks.contactCreate.mockResolvedValue({ id: 'c1' });
 });
 

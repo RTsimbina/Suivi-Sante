@@ -111,6 +111,8 @@ function ContenuSante() {
   useEffect(() => {
     if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
       router.replace('/portail');
+    } else if (role === 'PRESTATAIRE') {
+      router.replace('/portail-prestataire');
     }
   }, [role, router]);
 
