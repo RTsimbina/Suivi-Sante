@@ -56,7 +56,7 @@ jobs:
           console.log('Sessions en fuite détectées :', cibles.map(c => Number(c.pid)));
           for (const c of cibles) {
             const pid = Number(c.pid);
-            const res = await db.\$queryRawUnsafe('SELECT pg_terminate_backend(\$1) AS ok', pid);
+            const res = await db.\$queryRawUnsafe('SELECT pg_terminate_backend(\$1::int4) AS ok', pid);
             console.log('pg_terminate_backend(' + pid + ') →', res[0].ok);
           }
           const restant = await db.\$queryRawUnsafe(
