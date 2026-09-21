@@ -49,7 +49,7 @@ export const questionsEntreprise: QuestionDef[] = [
     presentation: 'NOMBRE',
     async impl(ctx) {
       const total = await db.assure.count({ where: await whereSociete(ctx, { actif: true }) });
-      return resultatNombre(T('Assurés actifs'), total, `${fmtNb(total)} assuré(s) actif(s).`);
+      return resultatNombre(T('Assurés actifs'), total, `${fmtNb(total)} assuré(s) actif(s).`, null, 'assurés');
     },
   },
   {

@@ -28,7 +28,7 @@ export const questionsAccueil: QuestionDef[] = [
     presentation: 'NOMBRE',
     async impl() {
       const total = await db.assure.count();
-      return resultatNombre(T('Assurés enregistrés'), total, `${fmtNb(total)} assuré(s) enregistré(s).`);
+      return resultatNombre(T('Assurés enregistrés'), total, `${fmtNb(total)} assuré(s) enregistré(s).`, null, 'assurés');
     },
   },
   {
@@ -40,7 +40,7 @@ export const questionsAccueil: QuestionDef[] = [
     presentation: 'NOMBRE',
     async impl() {
       const total = await db.assure.count({ where: { actif: true } });
-      return resultatNombre(T('Assurés actifs'), total, `${fmtNb(total)} assuré(s) actif(s).`);
+      return resultatNombre(T('Assurés actifs'), total, `${fmtNb(total)} assuré(s) actif(s).`, null, 'assurés');
     },
   },
   {

@@ -18,9 +18,10 @@ export function resultatNombre(
   _q: { question: string },
   valeur: number,
   synthese: string,
-  periode: PeriodeResolue | null = null
+  periode: PeriodeResolue | null = null,
+  unite = 'dossiers'
 ): AssistantResultCore {
-  return withPeriode({ type: 'NOMBRE', titre: _q.question, synthese, valeur, unite: 'dossiers', periode: null, date: new Date().toISOString() }, periode);
+  return withPeriode({ type: 'NOMBRE', titre: _q.question, synthese, valeur, unite, periode: null, date: new Date().toISOString() }, periode);
 }
 
 export function resultatMontant(

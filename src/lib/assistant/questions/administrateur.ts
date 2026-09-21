@@ -54,7 +54,7 @@ export const questionsAdministrateur: QuestionDef[] = [
       const total = await db.utilisateur.count({ where: { actif: true } });
       const totalTous = await db.utilisateur.count();
       return resultatNombre(T('Utilisateurs actifs'), total,
-        `${fmtNb(total)} utilisateur(s) actif(s) sur ${fmtNb(totalTous)} compte(s) enregistré(s).`);
+        `${fmtNb(total)} utilisateur(s) actif(s) sur ${fmtNb(totalTous)} compte(s) enregistré(s).`, null, 'utilisateurs');
     },
   },
   {
@@ -145,7 +145,7 @@ export const questionsAdministrateur: QuestionDef[] = [
       const actives = await db.societe.count({ where: { contrats: { some: { statut: 'ACTIF' } } } });
       const total = await db.societe.count();
       return resultatNombre(T('Sociétés actives'), actives,
-        `${fmtNb(actives)} société(s) cliente(s) active(s) (avec contrat ACTIF) sur ${fmtNb(total)} enregistrée(s).`);
+        `${fmtNb(actives)} société(s) cliente(s) active(s) (avec contrat ACTIF) sur ${fmtNb(total)} enregistrée(s).`, null, 'sociétés');
     },
   },
   {
@@ -159,7 +159,7 @@ export const questionsAdministrateur: QuestionDef[] = [
       const actifs = await db.prestataire.count({ where: { actif: true } });
       const total = await db.prestataire.count();
       return resultatNombre(T('Prestataires actifs'), actifs,
-        `${fmtNb(actifs)} prestataire(s) actif(s) sur ${fmtNb(total)} enregistré(s).`);
+        `${fmtNb(actifs)} prestataire(s) actif(s) sur ${fmtNb(total)} enregistré(s).`, null, 'prestataires');
     },
   },
   {
@@ -173,7 +173,7 @@ export const questionsAdministrateur: QuestionDef[] = [
       const total = await db.assure.count();
       const actifs = await db.assure.count({ where: { actif: true } });
       return resultatNombre(T('Assurés enregistrés'), total,
-        `${fmtNb(total)} assuré(s) enregistré(s), dont ${fmtNb(actifs)} actif(s).`);
+        `${fmtNb(total)} assuré(s) enregistré(s), dont ${fmtNb(actifs)} actif(s).`, null, 'assurés');
     },
   },
   {
@@ -186,7 +186,7 @@ export const questionsAdministrateur: QuestionDef[] = [
     async impl() {
       const total = await db.contrat.count({ where: { statut: 'ACTIF' } });
       return resultatNombre(T('Contrats actifs'), total,
-        `${fmtNb(total)} contrat(s) actuellement au statut ACTIF.`);
+        `${fmtNb(total)} contrat(s) actuellement au statut ACTIF.`, null, 'contrats');
     },
   },
 

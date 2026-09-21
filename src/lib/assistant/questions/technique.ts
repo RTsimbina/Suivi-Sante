@@ -25,7 +25,7 @@ export const questionsTechnique: QuestionDef[] = [
     presentation: 'NOMBRE',
     async impl() {
       const total = await db.prestataire.count({ where: { actif: true } });
-      return resultatNombre(T('Prestataires actifs'), total, `${fmtNb(total)} prestataire(s) actif(s).`);
+      return resultatNombre(T('Prestataires actifs'), total, `${fmtNb(total)} prestataire(s) actif(s).`, null, 'prestataires');
     },
   },
   {
