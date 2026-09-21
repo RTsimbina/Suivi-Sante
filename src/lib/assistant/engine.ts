@@ -69,7 +69,7 @@ export async function executerQuestion(
     if (ctx.role === 'CONTACT_ENTREPRISE' && !ctx.societeId) {
       throw new AssistantError('Aucune société liée à votre compte. Contactez votre administrateur.', 403);
     }
-    if (ctx.role === 'PORTAIL_PRESTATAIRE' && !ctx.prestataireId) {
+    if (ctx.role === 'PRESTATAIRE' && !ctx.prestataireId) {
       throw new AssistantError('Aucun prestataire lié à votre compte. Contactez votre administrateur.', 403);
     }
   }

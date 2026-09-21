@@ -19,7 +19,7 @@ const CONTEXTES: Record<RoleType, AssistantContext> = {
   SANTE: { userId: 'u5', role: 'SANTE', email: 'e@x.mg', nom: 'Santé', assureId: null, societeId: null, prestataireId: null },
   PORTAIL_CLIENT: { userId: 'u6', role: 'PORTAIL_CLIENT', email: 'f@x.mg', nom: 'Assuré', assureId: 'assure-A', societeId: 'soc-A', prestataireId: null },
   CONTACT_ENTREPRISE: { userId: 'u7', role: 'CONTACT_ENTREPRISE', email: 'g@x.mg', nom: 'Entreprise', assureId: null, societeId: 'soc-A', prestataireId: null },
-  PORTAIL_PRESTATAIRE: { userId: 'u8', role: 'PORTAIL_PRESTATAIRE', email: 'h@x.mg', nom: 'Prestataire', assureId: null, societeId: null, prestataireId: 'presta-A' },
+  PRESTATAIRE: { userId: 'u8', role: 'PRESTATAIRE', email: 'h@x.mg', nom: 'Prestataire', assureId: null, societeId: null, prestataireId: 'presta-A' },
 };
 
 // ─── 1. Intégrité du catalogue ───────────────────────────────────────────────
@@ -32,7 +32,7 @@ describe('Catalogue — intégrité', () => {
   it('propose exactement 20 questions pour chacun des 8 rôles', () => {
     const roles: RoleType[] = [
       'ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE',
-      'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'PORTAIL_PRESTATAIRE',
+      'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'PRESTATAIRE',
     ];
     for (const role of roles) {
       expect(questionsDuRole(role)).toHaveLength(20);
@@ -45,7 +45,7 @@ describe('Catalogue — intégrité', () => {
     const prefixes: Record<string, string> = {
       ADMINISTRATEUR: 'ADMIN_', ACCUEIL: 'ACCUEIL_', TECHNIQUE: 'TECH_',
       COMPTABILITE: 'COMPTA_', SANTE: 'CONTROLE_', PORTAIL_CLIENT: 'ASSURE_',
-      CONTACT_ENTREPRISE: 'ENTREPRISE_', PORTAIL_PRESTATAIRE: 'PRESTATAIRE_',
+      CONTACT_ENTREPRISE: 'ENTREPRISE_', PRESTATAIRE: 'PRESTATAIRE_',
     };
     for (const q of CATALOGUE) {
       expect(q.id.startsWith(prefixes[q.role])).toBe(true);
@@ -73,7 +73,7 @@ describe('Catalogue — intégrité', () => {
 
   it('expose les questions du catalogue via questionParId', () => {
     expect(questionParId('COMPTA_TOTAL_FACTURES')?.role).toBe('COMPTABILITE');
-    expect(questionParId('PRESTATAIRE_FACTURES_IMPAYEES')?.role).toBe('PORTAIL_PRESTATAIRE');
+    expect(questionParId('PRESTATAIRE_FACTURES_IMPAYEES')?.role).toBe('PRESTATAIRE');
     expect(questionParId('ASSURE_REMBOURSEMENT_EN_COURS')?.role).toBe('PORTAIL_CLIENT');
     expect(questionParId('ENTREPRISE_TOTAL_ASSURES')?.role).toBe('CONTACT_ENTREPRISE');
     expect(questionParId('CONTROLE_DOSSIERS_EN_ATTENTE')?.role).toBe('SANTE');
@@ -108,7 +108,7 @@ describe('Moteur — permissions par rôle', () => {
   });
 
   it('expose uniquement les questions du rôle via listerQuestions', () => {
-    const liste = listerQuestions('PORTAIL_PRESTATAIRE');
+    const liste = listerQuestions('PRESTATAIRE');
     expect(liste.total).toBe(20);
     for (const q of liste.questions) {
       expect(q.id.startsWith('PRESTATAIRE_')).toBe(true);
@@ -116,14 +116,14 @@ describe('Moteur — permissions par rôle', () => {
   });
 
   it('questionEstAutorisee vérifie la correspondance rôle-question', () => {
-    expect(questionEstAutorisee('PORTAIL_PRESTATAIRE', 'PRESTATAIRE_TOTAL_FACTURES')).toBe(true);
-    expect(questionEstAutorisee('PORTAIL_PRESTATAIRE', 'PRESTATAIRE_SITUATION_PAIEMENT')).toBe(true);
-    expect(questionEstAutorisee('PORTAIL_PRESTATAIRE', 'ADMIN_UTILISATEURS_ACTIFS')).toBe(false);
+    expect(questionEstAutorisee('PRESTATAIRE', 'PRESTATAIRE_TOTAL_FACTURES')).toBe(true);
+    expect(questionEstAutorisee('PRESTATAIRE', 'PRESTATAIRE_SITUATION_PAIEMENT')).toBe(true);
+    expect(questionEstAutorisee('PRESTATAIRE', 'ADMIN_UTILISATEURS_ACTIFS')).toBe(false);
   });
 
   it('refuse l\u2019exécution pour un rôle externe sans rattachement de données (403)', async () => {
     const sansRattachement: AssistantContext = {
-      ...CONTEXTES.PORTAIL_PRESTATAIRE,
+      ...CONTEXTES.PRESTATAIRE,
       prestataireId: null,
     };
     await expect(
@@ -141,7 +141,7 @@ describe('Moteur — permissions par rôle', () => {
 
   it('exige un paramètre obligatoire manquant (400)', async () => {
     await expect(
-      executerQuestion(CONTEXTES.PORTAIL_PRESTATAIRE, 'PRESTATAIRE_STATUT_FACTURE', {})
+      executerQuestion(CONTEXTES.PRESTATAIRE, 'PRESTATAIRE_STATUT_FACTURE', {})
     ).rejects.toMatchObject({ status: 400 });
   });
 });
@@ -183,7 +183,7 @@ describe('Sécurité — garde-fous d\u2019isolation', () => {
     expect(isRoleExterne('SANTE')).toBe(false);
     expect(isRoleExterne('PORTAIL_CLIENT')).toBe(true);
     expect(isRoleExterne('CONTACT_ENTREPRISE')).toBe(true);
-    expect(isRoleExterne('PORTAIL_PRESTATAIRE')).toBe(true);
+    expect(isRoleExterne('PRESTATAIRE')).toBe(true);
   });
 });
 

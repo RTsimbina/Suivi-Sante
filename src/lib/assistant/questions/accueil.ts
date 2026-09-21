@@ -3,7 +3,7 @@ import type { ParamValeurs, QuestionDef } from '../types';
 import { AssistantError } from '../types';
 import {
   resultatNombre, resultatTableau, resultatListe, resultatKpi, resultatVide,
-  fmtAr, fmtNb, statutLabel, STATUTS_ATTENTE, COLONNES_DOSSIER, lignesDossiers, LIMITE_LISTE,
+  round2, enNombre, fmtAr, fmtNb, statutLabel, STATUTS_ATTENTE, COLONNES_DOSSIER, lignesDossiers, LIMITE_LISTE,
 } from '../results';
 
 // ─── Catalogue ACCUEIL — 20 questions prédéfinies ────────────────────────────
@@ -206,7 +206,7 @@ export const questionsAccueil: QuestionDef[] = [
           type: d.typeDossier,
           statut: statutLabel(d.statut),
           date: d.dateReception.toISOString(),
-          montant: Math.round(d.montantReclame * 100) / 100,
+          montant: round2(d.montantReclame),
         })),
         total,
         `Les ${dossiers.length} dossier(s) en attente les plus anciens (sur ${fmtNb(total)}).`
@@ -245,9 +245,9 @@ export const questionsAccueil: QuestionDef[] = [
           { champ: 'Acte', valeur: d.typeDossier },
           { champ: 'Statut', valeur: statutLabel(d.statut) },
           { champ: 'Date de réception', valeur: d.dateReception.toISOString() },
-          { champ: 'Montant réclamé', valeur: Math.round(d.montantReclame * 100) / 100 },
-          { champ: 'Montant validé', valeur: d.montantValide !== null ? Math.round(d.montantValide * 100) / 100 : '—' },
-          { champ: 'Montant payé', valeur: d.montantPaye !== null ? Math.round(d.montantPaye * 100) / 100 : '—' },
+          { champ: 'Montant réclamé', valeur: round2(d.montantReclame) },
+          { champ: 'Montant validé', valeur: d.montantValide !== null ? round2(d.montantValide) : '—' },
+          { champ: 'Montant payé', valeur: d.montantPaye !== null ? round2(d.montantPaye) : '—' },
           { champ: 'Date de paiement', valeur: d.datePaiement ? d.datePaiement.toISOString() : '—' },
           { champ: 'Motif de rejet', valeur: d.motifRejet ?? '—' },
         ],
@@ -371,8 +371,8 @@ export const questionsAccueil: QuestionDef[] = [
         contrats.map((c) => ({
           ref: c.reference,
           societe: c.societe.nom,
-          budget: Math.round(c.budgetAnnuel * 100) / 100,
-          utilise: Math.round(c.budgetUtilise * 100) / 100,
+          budget: round2(c.budgetAnnuel),
+          utilise: round2(c.budgetUtilise),
           fin: c.dateFin.toISOString(),
         })),
         total,
@@ -463,7 +463,7 @@ export const questionsAccueil: QuestionDef[] = [
           type: d.typeDossier,
           statut: statutLabel(d.statut),
           date: d.dateReception.toISOString(),
-          montant: Math.round(d.montantReclame * 100) / 100,
+          montant: round2(d.montantReclame),
         })),
         total,
         `Les ${dossiers.length} dossier(s) mis à jour le plus récemment.`

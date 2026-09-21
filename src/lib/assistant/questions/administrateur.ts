@@ -6,7 +6,7 @@ import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
   resultatGraphique, resultatKpi, resultatVide,
-  round2, fmtAr, fmtNb, statutLabel, STATUTS_EN_COURS, STATUTS_ATTENTE,
+  round2, enNombre, fmtAr, fmtNb, statutLabel, STATUTS_EN_COURS, STATUTS_ATTENTE,
   serieMensuelle, LIMITE_LISTE,
 } from '../results';
 import { findRetards, findAnomalies } from '@/lib/kpi-queries';
@@ -23,7 +23,7 @@ function scopeSql(ctx: AssistantContext): Prisma.Sql {
   switch (ctx.role) {
     case 'CONTACT_ENTREPRISE':
       return Prisma.sql`AND "societeId" = ${ctx.societeId}`;
-    case 'PORTAIL_PRESTATAIRE':
+    case 'PRESTATAIRE':
       return Prisma.sql`AND "prestataireId" = ${ctx.prestataireId}`;
     default:
       return Prisma.empty;
@@ -34,7 +34,7 @@ function scopeWhere(ctx: AssistantContext): Record<string, unknown> {
   switch (ctx.role) {
     case 'CONTACT_ENTREPRISE':
       return { societeId: ctx.societeId };
-    case 'PORTAIL_PRESTATAIRE':
+    case 'PRESTATAIRE':
       return { prestataireId: ctx.prestataireId };
     default:
       return {};
@@ -366,7 +366,7 @@ export const questionsAdministrateur: QuestionDef[] = [
         _sum: { montantReclame: true, montantPaye: true },
         _count: true,
       });
-      const solde = round2((res._sum.montantReclame ?? 0) - (res._sum.montantPaye ?? 0));
+      const solde = round2(enNombre(res._sum.montantReclame) - enNombre(res._sum.montantPaye));
       return resultatMontant(T('Factures impayées'), solde,
         `${fmtAr(solde)} restant à régler sur ${fmtNb(res._count)} dossier(s) en cours.`);
     },

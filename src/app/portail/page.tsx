@@ -13,8 +13,9 @@ import {
   Sparkles, LogOut, User, Building2, FileText, Heart, Users, FolderOpen,
   Shield, CreditCard, TrendingUp, BarChart3, CalendarDays, ChevronRight,
   AlertTriangle, CheckCircle, Clock, XCircle, Info, Phone, Mail, MapPin,
-  Baby, UserCheck,
+  Baby, UserCheck, Bot,
 } from 'lucide-react';
+import AssistantView from '@/components/suivisante/assistant-view';
 import { cn } from '@/lib/utils';
 import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
 import PeriodFilter from '@/components/suivisante/period-filter';
@@ -310,6 +311,9 @@ function PortailAssure({ data }: { data: PortailData }) {
           <TabsTrigger value='contrats' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
             <CreditCard className='h-3.5 w-3.5' /> Contrats
           </TabsTrigger>
+          <TabsTrigger value='assistant' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+            <Bot className='h-3.5 w-3.5' /> Assistant IA
+          </TabsTrigger>
         </TabsList>
 
         {/* Tab : Dossiers */}
@@ -504,6 +508,15 @@ function PortailAssure({ data }: { data: PortailData }) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Tab : Assistant IA */}
+        <TabsContent value='assistant' className='mt-4'>
+          <Card className='overflow-hidden'>
+            <div className='h-[600px]'>
+              <AssistantView compact />
+            </div>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -584,6 +597,9 @@ function PortailEntreprise({ data }: { data: PortailData }) {
           </TabsTrigger>
           <TabsTrigger value='contrats' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
             <CreditCard className='h-3.5 w-3.5' /> Contrats
+          </TabsTrigger>
+          <TabsTrigger value='assistant' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+            <Bot className='h-3.5 w-3.5' /> Assistant IA
           </TabsTrigger>
         </TabsList>
 
@@ -734,6 +750,15 @@ function PortailEntreprise({ data }: { data: PortailData }) {
                 </div>
               )}
             </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab : Assistant IA */}
+        <TabsContent value='assistant' className='mt-4'>
+          <Card className='overflow-hidden'>
+            <div className='h-[600px]'>
+              <AssistantView compact />
+            </div>
           </Card>
         </TabsContent>
       </Tabs>

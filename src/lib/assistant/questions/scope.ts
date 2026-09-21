@@ -35,7 +35,7 @@ export function scopeSociete(ctx: AssistantContext): string {
   return ctx.societeId;
 }
 
-/** Prestataire : PORTAIL_PRESTATAIRE → prestataireId du token. */
+/** Prestataire : PRESTATAIRE → prestataireId du token. */
 export function scopePrestataire(ctx: AssistantContext): string {
   if (!ctx.prestataireId) {
     throw new AssistantError(
@@ -54,7 +54,7 @@ export function scopePrestataire(ctx: AssistantContext): string {
 export async function dossierAutorise(
   numeroDossier: string,
   where: Record<string, unknown>
-): Promise<number | null> {
+): Promise<string | null> {
   const numero = numeroDossier.trim().toUpperCase();
   if (!/^[A-Z0-9-]{1,40}$/.test(numero)) {
     throw new AssistantError('Numéro de dossier invalide.');
@@ -67,7 +67,7 @@ export async function dossierAutorise(
 }
 
 /**
- * Valide le paramètre SOCIETE d'un PORTAIL_PRESTATAIRE : la société doit
+ * Valide le paramètre SOCIETE d'un PRESTATAIRE : la société doit
  * être parmi celles auxquelles le prestataire est réellement rattaché.
  */
 export async function societeAutoriseePrestataire(

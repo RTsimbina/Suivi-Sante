@@ -68,7 +68,7 @@ export const API_PERMISSIONS: Record<
       'SANTE',
       'PORTAIL_CLIENT',
       'CONTACT_ENTREPRISE',
-      'PORTAIL_PRESTATAIRE',
+      'PRESTATAIRE',
     ],
     methods: {
       GET: [
@@ -79,7 +79,7 @@ export const API_PERMISSIONS: Record<
         'SANTE',
         'PORTAIL_CLIENT',
         'CONTACT_ENTREPRISE',
-        'PORTAIL_PRESTATAIRE',
+        'PRESTATAIRE',
       ],
       POST: [
         'ADMINISTRATEUR',
@@ -89,7 +89,7 @@ export const API_PERMISSIONS: Record<
         'SANTE',
         'PORTAIL_CLIENT',
         'CONTACT_ENTREPRISE',
-        'PORTAIL_PRESTATAIRE',
+        'PRESTATAIRE',
       ],
     },
   },
@@ -130,22 +130,6 @@ export const API_PERMISSIONS: Record<
   },
   '/api/portail': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
-  },
-  // ─── Assistant IA à questions prédéfinies ───────────────────────────────
-  // Accessible aux 8 rôles : la question appartient à UN rôle et le moteur
-  // applique l'isolation des données côté serveur (scope société /
-  // prestataire / assuré dérivé du JWT, jamais du client).
-  '/api/assistant': {
-    roles: [
-      'ADMINISTRATEUR',
-      'ACCUEIL',
-      'TECHNIQUE',
-      'COMPTABILITE',
-      'SANTE',
-      'PORTAIL_CLIENT',
-      'CONTACT_ENTREPRISE',
-      'PRESTATAIRE',
-    ],
   },
   '/api/upload': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],

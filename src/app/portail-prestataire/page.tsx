@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Sparkles, LogOut, Stethoscope, Scale, Receipt, FileText, AlertTriangle, RefreshCw,
+  Sparkles, LogOut, Stethoscope, Scale, Receipt, FileText, AlertTriangle, RefreshCw, Bot,
 } from 'lucide-react';
+import AssistantView from '@/components/suivisante/assistant-view';
 import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
 import PeriodFilter from '@/components/suivisante/period-filter';
 import { DashboardTab } from '@/components/suivisante/portail-prestataire/dashboard-tab';
@@ -228,6 +229,10 @@ function ContenuPortailPrestataire() {
                 <Receipt className='h-3.5 w-3.5' />
                 Factures / Règlements
               </TabsTrigger>
+              <TabsTrigger value='assistant' className='gap-1.5 text-xs'>
+                <Bot className='h-3.5 w-3.5' />
+                Assistant IA
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value='dashboard'>
@@ -241,6 +246,13 @@ function ContenuPortailPrestataire() {
             </TabsContent>
             <TabsContent value='factures'>
               <FacturesTab societes={societes} qsPeriode={qsPeriode} refreshKey={refreshKey} />
+            </TabsContent>
+            <TabsContent value='assistant'>
+              <Card className='overflow-hidden'>
+                <div className='h-[600px]'>
+                  <AssistantView compact />
+                </div>
+              </Card>
             </TabsContent>
           </Tabs>
         )}

@@ -7,12 +7,12 @@ import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
   resultatGraphique, resultatKpi, resultatVide,
-  round2, fmtAr, fmtNb, statutLabel, STATUTS_EN_COURS, serieMensuelle,
+  round2, enNombre, fmtAr, fmtNb, statutLabel, STATUTS_EN_COURS, serieMensuelle,
   COLONNES_DOSSIER, LIMITE_LISTE,
 } from '../results';
 import { scopePrestataire, societeAutoriseePrestataire, dossierAutorise } from './scope';
 
-// ─── Catalogue PRESTATAIRE (PORTAIL_PRESTATAIRE) — 20 questions ──────────────
+// ─── Catalogue PRESTATAIRE (PRESTATAIRE) — 20 questions ──────────────
 // Les questions sont limitées aux données du prestataire connecté. Le
 // prestataireId provient EXCLUSIVEMENT du token (dérivé serveur à la
 // connexion). Un prestataire A ne peut jamais voir les données d'un B.
@@ -28,7 +28,7 @@ export const questionsPrestataire: QuestionDef[] = [
   // ─── Mes factures ──────────────────────────────────────────────────────────
   {
     id: 'PRESTATAIRE_TOTAL_FACTURES',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: 'Quel est le montant total de mes factures ?',
     params: [],
@@ -46,7 +46,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_FACTURES_IMPAYEES',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: 'Quel est le montant total de mes factures impayées ?',
     params: [],
@@ -57,14 +57,14 @@ export const questionsPrestataire: QuestionDef[] = [
         _sum: { montantReclame: true, montantPaye: true },
         _count: true,
       });
-      const solde = round2((res._sum.montantReclame ?? 0) - (res._sum.montantPaye ?? 0));
+      const solde = round2(enNombre(res._sum.montantReclame) - enNombre(res._sum.montantPaye));
       return resultatMontant(T('Vos factures impayées'), solde,
         `${fmtAr(solde)} restant à percevoir sur ${fmtNb(res._count)} dossier(s) en cours.`);
     },
   },
   {
     id: 'PRESTATAIRE_FACTURES_REGLEES',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: 'Quel est le montant total de mes factures réglées ?',
     params: [],
@@ -81,7 +81,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_FACTURES_ATTENTE_PAIEMENT',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: 'Quelles sont mes factures actuellement en attente de paiement ?',
     params: [],
@@ -117,7 +117,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_FACTURES_REGLEES_LISTE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: 'Quelles factures ont été réglées ?',
     params: [],
@@ -157,7 +157,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_STATUT_FACTURE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: "Quel est le statut d'une facture donnée ?",
     params: [{ key: 'DOSSIER', label: 'Numéro de dossier', required: true }],
@@ -186,9 +186,9 @@ export const questionsPrestataire: QuestionDef[] = [
           { champ: 'Patient', valeur: d.beneficiaire },
           { champ: 'Acte', valeur: d.typeDossier },
           { champ: 'Statut', valeur: statutLabel(d.statut) },
-          { champ: 'Montant réclamé', valeur: Math.round(d.montantReclame * 100) / 100 },
-          { champ: 'Montant validé', valeur: d.montantValide !== null ? Math.round(d.montantValide * 100) / 100 : '—' },
-          { champ: 'Montant réglé', valeur: d.montantPaye !== null ? Math.round(d.montantPaye * 100) / 100 : '—' },
+          { champ: 'Montant réclamé', valeur: round2(d.montantReclame) },
+          { champ: 'Montant validé', valeur: d.montantValide !== null ? round2(d.montantValide) : '—' },
+          { champ: 'Montant réglé', valeur: d.montantPaye !== null ? round2(d.montantPaye) : '—' },
         ],
         7,
         `Facture ${d.numeroDossier} : ${statutLabel(d.statut)}.`
@@ -197,7 +197,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_DATE_REGLEMENT',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes factures',
     question: "Quand une facture a-t-elle été réglée ?",
     params: [{ key: 'DOSSIER', label: 'Numéro de dossier', required: true }],
@@ -234,7 +234,7 @@ export const questionsPrestataire: QuestionDef[] = [
   // ─── Mes actes ─────────────────────────────────────────────────────────────
   {
     id: 'PRESTATAIRE_ACTES_PERIODE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes actes',
     question: "Combien d'actes ai-je réalisés sur une période donnée ?",
     params: [{ key: 'PERIODE', label: 'Période' }],
@@ -250,7 +250,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_ACTES_LISTE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes actes',
     question: 'Quels actes ai-je réalisés ?',
     params: [],
@@ -283,7 +283,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_ACTES_TOP',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes actes',
     question: 'Quels sont mes actes les plus fréquents ?',
     params: [],
@@ -311,7 +311,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_DOSSIERS_PERIODE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes actes',
     question: 'Combien de dossiers ai-je traités sur une période donnée ?',
     params: [{ key: 'PERIODE', label: 'Période' }],
@@ -327,7 +327,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_EVOLUTION_ACTIVITE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes actes',
     question: "Quelle est l'évolution de mon activité par mois ?",
     params: [{ key: 'PERIODE', label: 'Période' }],
@@ -350,7 +350,7 @@ export const questionsPrestataire: QuestionDef[] = [
   // ─── Mes prestations ───────────────────────────────────────────────────────
   {
     id: 'PRESTATAIRE_TOTAL_PRESTATIONS',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes prestations',
     question: 'Quel est le montant total de mes prestations ?',
     params: [],
@@ -367,7 +367,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_PRESTATIONS_PERIODE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Mes prestations',
     question: 'Quel est le montant total de mes prestations sur une période donnée ?',
     params: [{ key: 'PERIODE', label: 'Période' }],
@@ -387,7 +387,7 @@ export const questionsPrestataire: QuestionDef[] = [
   // ─── Sociétés & barèmes ────────────────────────────────────────────────────
   {
     id: 'PRESTATAIRE_SOCIETES',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Sociétés & barèmes',
     question: 'Quelles sociétés clientes sont rattachées à mon compte ?',
     params: [],
@@ -414,7 +414,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_BAREMES_APPLICABLES',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Sociétés & barèmes',
     question: 'Quels barèmes sont applicables à mes prestations ?',
     params: [{ key: 'SOCIETE', label: 'Société (optionnel)' }],
@@ -445,8 +445,8 @@ export const questionsPrestataire: QuestionDef[] = [
         baremes.map((b) => ({
           societe: b.societe.nom,
           acte: b.prestation,
-          taux: Math.round(b.tauxCouverture * 100),
-          plafond: Math.round(b.plafond),
+          taux: Math.round(enNombre(b.tauxCouverture) * 100),
+          plafond: round2(b.plafond),
         })),
         baremes.length,
         `${baremes.length} barème(s) actif(s) des sociétés conventionnées avec vous.`
@@ -455,7 +455,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_TARIF_ACTE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Sociétés & barèmes',
     question: 'Quel est le tarif d\u2019un acte donné ?',
     params: [
@@ -490,8 +490,8 @@ export const questionsPrestataire: QuestionDef[] = [
         ],
         baremes.map((b) => ({
           societe: b.societe.nom,
-          taux: Math.round(b.tauxCouverture * 100),
-          plafond: Math.round(b.plafond),
+          taux: Math.round(enNombre(b.tauxCouverture) * 100),
+          plafond: round2(b.plafond),
         })),
         baremes.length,
         `${baremes.length} barème(s) actif(s) trouvé(s) pour cet acte.`
@@ -500,7 +500,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_ACTES_SOCIETE',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Sociétés & barèmes',
     question: 'Quels actes puis-je réaliser pour une société donnée ?',
     params: [{ key: 'SOCIETE', label: 'Société', required: true }],
@@ -523,8 +523,8 @@ export const questionsPrestataire: QuestionDef[] = [
         ],
         baremes.map((b) => ({
           acte: b.prestation,
-          taux: Math.round(b.tauxCouverture * 100),
-          plafond: Math.round(b.plafond),
+          taux: Math.round(enNombre(b.tauxCouverture) * 100),
+          plafond: round2(b.plafond),
         })),
         baremes.length,
         `${baremes.length} acte(s) couvert(s) par le barème actif de cette société.`
@@ -535,7 +535,7 @@ export const questionsPrestataire: QuestionDef[] = [
   // ─── Ma situation ──────────────────────────────────────────────────────────
   {
     id: 'PRESTATAIRE_MONTANT_RESTANT',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Ma situation',
     question: 'Quel est le montant restant à me payer ?',
     params: [],
@@ -546,7 +546,7 @@ export const questionsPrestataire: QuestionDef[] = [
         _sum: { montantReclame: true, montantValide: true, montantPaye: true },
         _count: true,
       });
-      const restant = round2((res._sum.montantReclame ?? 0) - (res._sum.montantPaye ?? 0));
+      const restant = round2(enNombre(res._sum.montantReclame) - enNombre(res._sum.montantPaye));
       const valide = round2(res._sum.montantValide);
       return resultatMontant(T('Montant restant à percevoir'), restant,
         `${fmtAr(restant)} restant à percevoir sur ${fmtNb(res._count)} dossier(s) en cours (montants validés : ${fmtAr(valide)}).`);
@@ -554,7 +554,7 @@ export const questionsPrestataire: QuestionDef[] = [
   },
   {
     id: 'PRESTATAIRE_SITUATION_PAIEMENT',
-    role: 'PORTAIL_PRESTATAIRE',
+    role: 'PRESTATAIRE',
     categorie: 'Ma situation',
     question: 'Quelle est ma situation de paiement actuelle ?',
     params: [],
@@ -570,7 +570,7 @@ export const questionsPrestataire: QuestionDef[] = [
       if (rows.length === 0) return resultatVide(T('Votre situation de paiement'));
       const nb = (s: string) => rows.find((r) => r.statut === s)?._count.statut ?? 0;
       const somme = (s: string[], champ: 'montantReclame' | 'montantPaye') =>
-        round2(rows.filter((r) => s.includes(r.statut)).reduce((acc, r) => acc + (r._sum[champ] ?? 0), 0));
+        round2(enNombre(rows.filter((r) => s.includes(r.statut)).reduce((acc, r) => acc + enNombre(r._sum[champ]), 0)));
       const totalFactures = rows.reduce((s, r) => s + r._count.statut, 0);
       const regle = somme(['PAYE'], 'montantPaye');
       const enCours = somme(STATUTS_EN_COURS, 'montantReclame');

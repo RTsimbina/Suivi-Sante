@@ -7,7 +7,7 @@ import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
   resultatGraphique, resultatVide,
-  round2, fmtAr, fmtNb, statutLabel, serieMensuelle, COLONNES_DOSSIER, LIMITE_LISTE,
+  round2, enNombre, fmtAr, fmtNb, statutLabel, serieMensuelle, COLONNES_DOSSIER, LIMITE_LISTE,
 } from '../results';
 import { scopeSociete } from './scope';
 
@@ -430,8 +430,8 @@ export const questionsEntreprise: QuestionDef[] = [
         ],
         contrats.map((c) => ({
           ref: c.reference,
-          budget: Math.round(c.budgetAnnuel * 100) / 100,
-          utilise: Math.round(c.budgetUtilise * 100) / 100,
+          budget: round2(c.budgetAnnuel),
+          utilise: round2(c.budgetUtilise),
           fin: c.dateFin.toISOString(),
         })),
         contrats.length,

@@ -3,7 +3,7 @@ import type { ParamValeurs, QuestionDef } from '../types';
 import { AssistantError } from '../types';
 import {
   resultatNombre, resultatTableau, resultatListe, resultatVide,
-  fmtNb, LIMITE_LISTE,
+  round2, enNombre, fmtNb, LIMITE_LISTE,
 } from '../results';
 
 // ─── Catalogue SERVICE TECHNIQUE — 20 questions prédéfinies ──────────────────
@@ -238,7 +238,7 @@ export const questionsTechnique: QuestionDef[] = [
           acte: r.prestation,
           nb: r._count.societeId,
           taux: Math.round((r._avg.tauxCouverture ?? 0) * 100),
-          plafond: Math.round(r._avg.plafond ?? 0),
+          plafond: round2(r._avg.plafond),
         })),
         rows.length,
         `${rows.length} acte(s) distinct(s) dans les barèmes (moyennes par acte).`
@@ -277,8 +277,8 @@ export const questionsTechnique: QuestionDef[] = [
         baremes.map((b) => ({
           societe: b.societe.nom,
           acte: b.prestation,
-          taux: Math.round(b.tauxCouverture * 100),
-          plafond: Math.round(b.plafond),
+          taux: Math.round(enNombre(b.tauxCouverture) * 100),
+          plafond: round2(b.plafond),
         })),
         total,
         `${fmtNb(total)} barème(s) actif(s) (${baremes.length} affiché(s)).`
@@ -311,8 +311,8 @@ export const questionsTechnique: QuestionDef[] = [
         ],
         baremes.map((b) => ({
           acte: b.prestation,
-          taux: Math.round(b.tauxCouverture * 100),
-          plafond: Math.round(b.plafond),
+          taux: Math.round(enNombre(b.tauxCouverture) * 100),
+          plafond: round2(b.plafond),
           actif: b.active ? 'Oui' : 'Non',
         })),
         baremes.length,

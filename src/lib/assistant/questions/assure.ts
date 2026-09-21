@@ -5,7 +5,7 @@ import { resolvePeriode } from '../periods';
 import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
-  resultatVide, round2, fmtAr, fmtNb, statutLabel, COLONNES_DOSSIER, LIMITE_LISTE,
+  resultatGraphique, resultatVide, round2, enNombre, fmtAr, fmtNb, statutLabel, COLONNES_DOSSIER, LIMITE_LISTE,
 } from '../results';
 import { scopeAssure, dossierAutorise } from './scope';
 
@@ -99,8 +99,8 @@ export const questionsAssure: QuestionDef[] = [
         ],
         baremes.map((b) => ({
           acte: b.prestation,
-          taux: Math.round(b.tauxCouverture * 100),
-          plafond: Math.round(b.plafond),
+          taux: Math.round(enNombre(b.tauxCouverture) * 100),
+          plafond: round2(b.plafond),
         })),
         baremes.length,
         `${baremes.length} garantie(s) active(s) pour votre société.`
@@ -316,8 +316,8 @@ export const questionsAssure: QuestionDef[] = [
           { champ: 'Acte', valeur: d.typeDossier },
           { champ: 'Statut', valeur: statutLabel(d.statut) },
           { champ: 'Date de réception', valeur: d.dateReception.toISOString() },
-          { champ: 'Montant réclamé', valeur: Math.round(d.montantReclame * 100) / 100 },
-          { champ: 'Montant validé', valeur: d.montantValide !== null ? Math.round(d.montantValide * 100) / 100 : '—' },
+          { champ: 'Montant réclamé', valeur: round2(d.montantReclame) },
+          { champ: 'Montant validé', valeur: d.montantValide !== null ? round2(d.montantValide) : '—' },
           { champ: 'Motif de rejet', valeur: d.motifRejet ?? '—' },
         ],
         8,
@@ -353,8 +353,8 @@ export const questionsAssure: QuestionDef[] = [
         ],
         [
           { champ: 'Statut', valeur: statutLabel(d.statut) },
-          { champ: 'Montant validé', valeur: d.montantValide !== null ? Math.round(d.montantValide * 100) / 100 : '—' },
-          { champ: 'Montant payé', valeur: d.montantPaye !== null ? Math.round(d.montantPaye * 100) / 100 : '—' },
+          { champ: 'Montant validé', valeur: d.montantValide !== null ? round2(d.montantValide) : '—' },
+          { champ: 'Montant payé', valeur: d.montantPaye !== null ? round2(d.montantPaye) : '—' },
           { champ: 'Date de paiement', valeur: d.datePaiement ? d.datePaiement.toISOString() : '—' },
           { champ: 'Référence de paiement', valeur: d.referencePaiement ?? '—' },
         ],
@@ -485,9 +485,9 @@ export const questionsAssure: QuestionDef[] = [
       for (const d of dossiers) {
         if (!d.datePaiement) continue;
         const mois = d.datePaiement.toISOString().slice(0, 7);
-        parMois.set(mois, (parMois.get(mois) ?? 0) + (d.montantPaye ?? 0));
+        parMois.set(mois, (parMois.get(mois) ?? 0) + enNombre(d.montantPaye));
       }
-      const serie = [...parMois.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, valeur]) => ({ label, valeur: Math.round(valeur * 100) / 100 }));
+      const serie = [...parMois.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, valeur]) => ({ label, valeur: round2(valeur) }));
       const total = serie.reduce((s, p) => s + p.valeur, 0);
       return resultatGraphique(T('Historique de vos remboursements'), serie, 'Montant payé (Ar)',
         `${fmtAr(total)} remboursés sur ${dossiers.length} dossier(s) — ${periode.label}.`, periode);

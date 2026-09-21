@@ -7,7 +7,7 @@ import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
   resultatGraphique, resultatKpi, resultatVide,
-  round2, fmtAr, fmtNb, statutLabel, STATUTS_EN_COURS, serieMensuelle,
+  round2, enNombre, fmtAr, fmtNb, statutLabel, STATUTS_EN_COURS, serieMensuelle,
   COLONNES_DOSSIER, LIMITE_LISTE,
 } from '../results';
 
@@ -19,9 +19,9 @@ import {
 const T = (question: string) => ({ question });
 const P = (params: ParamValeurs) => resolvePeriode(extrairePeriode(params));
 
-/** Solde d'un dossier = montant réclamé − montant payé */
-function solde(d: { montantReclame: number; montantPaye: number | null }): number {
-  return round2(d.montantReclame - (d.montantPaye ?? 0));
+/** Solde d'un dossier = montant réclamé − montant payé (Decimal → Number) */
+function solde(d: { montantReclame: unknown; montantPaye: unknown }): number {
+  return round2(enNombre(d.montantReclame) - enNombre(d.montantPaye));
 }
 
 export const questionsComptabilite: QuestionDef[] = [
@@ -58,7 +58,7 @@ export const questionsComptabilite: QuestionDef[] = [
         _sum: { montantReclame: true, montantPaye: true },
         _count: true,
       });
-      const montant = round2((res._sum.montantReclame ?? 0) - (res._sum.montantPaye ?? 0));
+      const montant = round2(enNombre(res._sum.montantReclame) - enNombre(res._sum.montantPaye));
       return resultatMontant(T('Factures impayées'), montant,
         `${fmtAr(montant)} restant à payer sur ${fmtNb(res._count)} dossier(s) en cours.`);
     },
@@ -192,7 +192,7 @@ export const questionsComptabilite: QuestionDef[] = [
         .map((r) => ({
           societe: noms.get(r.societeId) ?? 'Inconnu',
           nb: r._count,
-          restant: round2((r._sum.montantReclame ?? 0) - (r._sum.montantPaye ?? 0)),
+          restant: round2(enNombre(r._sum.montantReclame) - enNombre(r._sum.montantPaye)),
         }))
         .filter((l) => l.restant > 0)
         .sort((a, b) => b.restant - a.restant)
@@ -358,7 +358,7 @@ export const questionsComptabilite: QuestionDef[] = [
         .map((r) => ({
           prestataire: noms.get(r.prestataireId!) ?? 'Inconnu',
           nb: r._count,
-          restant: round2((r._sum.montantReclame ?? 0) - (r._sum.montantPaye ?? 0)),
+          restant: round2(enNombre(r._sum.montantReclame) - enNombre(r._sum.montantPaye)),
         }))
         .sort((a, b) => b.restant - a.restant)
         .slice(0, LIMITE_LISTE);
@@ -391,7 +391,7 @@ export const questionsComptabilite: QuestionDef[] = [
         _sum: { montantReclame: true, montantPaye: true },
         _count: true,
       });
-      const montant = round2((res._sum.montantReclame ?? 0) - (res._sum.montantPaye ?? 0));
+      const montant = round2(enNombre(res._sum.montantReclame) - enNombre(res._sum.montantPaye));
       return resultatMontant(T(`Montant dû à ${prest.nom}`), montant,
         `${fmtAr(montant)} dus à ${prest.nom} sur ${fmtNb(res._count)} dossier(s) en cours.`);
     },

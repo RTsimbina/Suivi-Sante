@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { Prisma } from '@prisma/client';
-import type { AssistantResultCore, ResultColonne, ResultKpi } from './types';
+import type { AssistantResultCore, ResultColonne, ResultKpi, AssistantContext } from './types';
 import type { PeriodeResolue } from './types';
 import { periodeSqlFrag } from './periods';
 
@@ -98,9 +98,20 @@ export function resultatKpi(
 
 // ─── Helpers de mise en forme ────────────────────────────────────────────────
 
-export function round2(n: number | null | undefined): number {
-  if (n === null || n === undefined || isNaN(n)) return 0;
-  return Math.round(n * 100) / 100;
+/**
+ * Convertit une valeur Prisma (Decimal(18,2) → objet Decimal) en nombre JS.
+ * Les montants du schéma sont des Decimal : l'arithmétique JS (`-`, `*`)
+ * ne fonctionne pas directement dessus, d'où la coercion systématique.
+ */
+export function enNombre(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  const n = typeof v === 'object' ? Number((v as { toString(): string }).toString()) : Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
+export function round2(n: unknown): number {
+  const v = enNombre(n);
+  return Math.round(v * 100) / 100;
 }
 
 export function fmtAr(n: number): string {
@@ -247,7 +258,7 @@ export async function familleAssureIds(assureId: string): Promise<string[]> {
 
 /**
  * Sociétés clientes autorisées pour un prestataire (liaison PrestataireSociete).
- * Utilisé pour valider le paramètre SOCIETE d'un PORTAIL_PRESTATAIRE.
+ * Utilisé pour valider le paramètre SOCIETE d'un PRESTATAIRE.
  */
 export async function societesDuPrestataire(prestataireId: string): Promise<string[]> {
   const rows = await db.prestataireSociete.findMany({
@@ -263,7 +274,7 @@ export async function societesDuPrestataire(prestataireId: string): Promise<stri
  *   - rôles internes : aucun filtre (comportement plateforme) ;
  *   - CONTACT_ENTREPRISE : societeId forcé ;
  *   - PORTAIL_CLIENT : assureId ∈ famille (résolu côté serveur) ;
- *   - PORTAIL_PRESTATAIRE : prestataireId forcé.
+ *   - PRESTATAIRE : prestataireId forcé.
  */
 export async function filtresScopeDossier(ctx: AssistantContext): Promise<Record<string, unknown>> {
   switch (ctx.role) {
@@ -276,7 +287,7 @@ export async function filtresScopeDossier(ctx: AssistantContext): Promise<Record
       const ids = await familleAssureIds(ctx.assureId);
       return { assureId: { in: ids } };
     }
-    case 'PORTAIL_PRESTATAIRE': {
+    case 'PRESTATAIRE': {
       if (!ctx.prestataireId) throw new Error('Prestataire non rattaché');
       return { prestataireId: ctx.prestataireId };
     }
@@ -300,7 +311,7 @@ export async function filtresScopeSql(ctx: AssistantContext, colonneAssure = 'as
       const inList = Prisma.join(ids, ', ');
       return Prisma.sql`AND "${Prisma.raw(colonneAssure)}" IN (${inList})`;
     }
-    case 'PORTAIL_PRESTATAIRE':
+    case 'PRESTATAIRE':
       if (!ctx.prestataireId) throw new Error('Prestataire non rattaché');
       return Prisma.sql`AND "prestataireId" = ${ctx.prestataireId}`;
     default:

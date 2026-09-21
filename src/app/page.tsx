@@ -109,7 +109,7 @@ function ContenuSante() {
 
   // Rediriger les utilisateurs portail vers leur page dédiée
   useEffect(() => {
-    if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE' || role === 'PORTAIL_PRESTATAIRE') {
+    if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
       router.replace('/portail');
     } else if (role === 'PRESTATAIRE') {
       router.replace('/portail-prestataire');

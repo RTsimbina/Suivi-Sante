@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         id: a.id,
         label: [a.nom, a.prenom].filter(Boolean).join(' ') + (a.matricule ? ` (${a.matricule})` : ''),
       }));
-    } else if (ctx.role === 'PORTAIL_PRESTATAIRE' && ctx.prestataireId) {
+    } else if (ctx.role === 'PRESTATAIRE' && ctx.prestataireId) {
       // Prestataire : ses sociétés conventionnées uniquement
       const ids = await societesDuPrestataire(ctx.prestataireId);
       const societes = ids.length
@@ -92,7 +92,6 @@ export async function GET(request: NextRequest) {
     options.ANNEE = [2, 1, 0].map((k) => ({ id: String(now - k), label: String(now - k) }));
 
     return NextResponse.json({
-      role: ctx.role,
       ...listing,
       options,
     });

@@ -1,5 +1,7 @@
 import type { RoleType } from '@/lib/auth-context';
 
+export type { RoleType };
+
 // ─── Assistant IA à questions prédéfinies — Types partagés ───────────────────
 //
 // Principes (cahier des charges) :
@@ -135,7 +137,7 @@ export interface AssistantContext {
   assureId: string | null;
   /** PORTAIL_CLIENT / CONTACT_ENTREPRISE : dérivé du compte */
   societeId: string | null;
-  /** PORTAIL_PRESTATAIRE : dérivé du compte */
+  /** PRESTATAIRE : dérivé du compte */
   prestataireId: string | null;
 }
 
