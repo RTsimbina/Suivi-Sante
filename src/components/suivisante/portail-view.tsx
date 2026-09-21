@@ -432,30 +432,14 @@ function ChatbotTab() {
         };
         setMessages((prev) => [...prev, botMsg]);
       } else {
-        // Sinon, essayer le chat API pour des questions générales
-        try {
-          const chatRes = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: messageText }),
-          });
-          const chatData = await chatRes.json();
-          const botMsg: ChatMessage = {
-            id: `bot-${Date.now()}`,
-            role: 'bot',
-            content: chatData.reponse || chatData.error || 'Désolé, je n\'ai pas pu traiter votre demande.',
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, botMsg]);
-        } catch {
-          const errorMsg: ChatMessage = {
-            id: `bot-${Date.now()}`,
-            role: 'bot',
-            content: 'Désolé, je n\'ai pas pu trouver d\'information correspondante. Vérifiez votre numéro de dossier ou nom de bénéficiaire et réessayez.',
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, errorMsg]);
-        }
+        // Aucun résultat structuré — réponse claire sans invention (pas de LLM externe)
+        const errorMsg: ChatMessage = {
+          id: `bot-${Date.now()}`,
+          role: 'bot',
+          content: 'Désolé, je n\'ai pas pu trouver d\'information correspondante. Vérifiez votre numéro de dossier ou nom de bénéficiaire et réessayez.',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
       }
     } catch {
       const errorMsg: ChatMessage = {

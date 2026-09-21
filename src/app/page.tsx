@@ -22,7 +22,7 @@ import DirectionView from '@/components/suivisante/direction-view';
 import TechniqueView from '@/components/suivisante/technique-view';
 import ComptabiliteView from '@/components/suivisante/comptabilite-view';
 import IaView from '@/components/suivisante/ia-view';
-import ChatView from '@/components/suivisante/chat-view';
+import AssistantView from '@/components/suivisante/assistant-view';
 import DossiersView from '@/components/suivisante/dossiers-view';
 import KanbanView from '@/components/suivisante/kanban-view';
 import ImportView from '@/components/suivisante/import-view';
@@ -67,7 +67,7 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
-  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Chat', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
+  { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Questions', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
 ];
 
@@ -109,7 +109,7 @@ function ContenuSante() {
 
   // Rediriger les utilisateurs portail vers leur page dédiée
   useEffect(() => {
-    if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE') {
+    if (role === 'PORTAIL_CLIENT' || role === 'CONTACT_ENTREPRISE' || role === 'PORTAIL_PRESTATAIRE') {
       router.replace('/portail');
     } else if (role === 'PRESTATAIRE') {
       router.replace('/portail-prestataire');
@@ -328,7 +328,7 @@ function ContenuSante() {
           {isViewAllowed && view === 'reception' && <ReceptionView kpis={kpis as Record<string, unknown> | null} loading={loadingKpis} />}
           {isViewAllowed && view === 'reporting' && <ReportingView />}
           {isViewAllowed && view === 'ia' && <IaView />}
-          {isViewAllowed && view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><ChatView /></div>}
+          {isViewAllowed && view === 'chat' && <div className="h-[calc(100vh-8rem)] rounded-xl border bg-card overflow-hidden shadow-sm"><AssistantView /></div>}
           {isViewAllowed && view === 'portail' && <PortailView />}
           {isViewAllowed && view === 'assures' && <AssuresView userRole={role || ''} />}
           {isViewAllowed && view === 'prestataires' && <PrestatairesView userRole={role || ''} />}

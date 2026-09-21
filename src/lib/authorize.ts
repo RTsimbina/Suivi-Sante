@@ -19,7 +19,9 @@ import type { RoleType } from './auth-context';
  *    - /api/kpis (indicateurs financiers : montants, paiements)
  *    SANTE a un accès LECTURE SEULE (GET) à : /api/contrats, /api/assures,
  *    /api/prestataires, /api/technique/societes, /api/societes, /api/ia,
- *    /api/chat, /api/portail, /api/dossiers.
+ *    /api/portail, /api/dossiers.
+ *    L'assistant (/api/assistant) est accessible aux 8 rôles : l'isolation
+ *    des données est appliquée côté serveur par le moteur (scope par rôle).
  */
 export const API_PERMISSIONS: Record<
   string,
@@ -57,8 +59,39 @@ export const API_PERMISSIONS: Record<
   '/api/ia': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
-  '/api/chat': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+  '/api/assistant': {
+    roles: [
+      'ADMINISTRATEUR',
+      'ACCUEIL',
+      'TECHNIQUE',
+      'COMPTABILITE',
+      'SANTE',
+      'PORTAIL_CLIENT',
+      'CONTACT_ENTREPRISE',
+      'PORTAIL_PRESTATAIRE',
+    ],
+    methods: {
+      GET: [
+        'ADMINISTRATEUR',
+        'ACCUEIL',
+        'TECHNIQUE',
+        'COMPTABILITE',
+        'SANTE',
+        'PORTAIL_CLIENT',
+        'CONTACT_ENTREPRISE',
+        'PORTAIL_PRESTATAIRE',
+      ],
+      POST: [
+        'ADMINISTRATEUR',
+        'ACCUEIL',
+        'TECHNIQUE',
+        'COMPTABILITE',
+        'SANTE',
+        'PORTAIL_CLIENT',
+        'CONTACT_ENTREPRISE',
+        'PORTAIL_PRESTATAIRE',
+      ],
+    },
   },
   '/api/import': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL'],
@@ -97,6 +130,22 @@ export const API_PERMISSIONS: Record<
   },
   '/api/portail': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+  },
+  // ─── Assistant IA à questions prédéfinies ───────────────────────────────
+  // Accessible aux 8 rôles : la question appartient à UN rôle et le moteur
+  // applique l'isolation des données côté serveur (scope société /
+  // prestataire / assuré dérivé du JWT, jamais du client).
+  '/api/assistant': {
+    roles: [
+      'ADMINISTRATEUR',
+      'ACCUEIL',
+      'TECHNIQUE',
+      'COMPTABILITE',
+      'SANTE',
+      'PORTAIL_CLIENT',
+      'CONTACT_ENTREPRISE',
+      'PRESTATAIRE',
+    ],
   },
   '/api/upload': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
