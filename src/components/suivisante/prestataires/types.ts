@@ -3,6 +3,8 @@
  * Extraits de prestataires-view.tsx lors du découpage Vague 3 (comportement inchangé).
  */
 
+import { TYPES_PRESTATAIRE } from '@/lib/referentiels';
+
 export interface SocieteItem {
   id: string;
   nom: string;

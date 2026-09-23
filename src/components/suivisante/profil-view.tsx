@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { passwordSchema } from '@/lib/validations';
+import { motDePasseSchema } from '@/lib/validation';
 import { useSession } from 'next-auth/react';
 import { ROLE_LABELS } from '@/lib/auth-context';
 import type { RoleType } from '@/lib/auth-context';
@@ -159,7 +159,7 @@ export default function ProfilView() {
       return;
     }
     // Politique partagée (validations/common) : min 8 + lettre + chiffre
-    const mdpCheck = passwordSchema.safeParse(nouveauMdp);
+    const mdpCheck = motDePasseSchema.safeParse(nouveauMdp);
     if (!mdpCheck.success) {
       toast.error(mdpCheck.error.issues[0]?.message || 'Mot de passe invalide');
       return;

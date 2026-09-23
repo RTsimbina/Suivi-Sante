@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 
 import { Societe, SocieteDetails, DetailTab, ContratInfo, EntrepriseContact } from './types';
+import { CONTRAT_STATUTS, getStatutConfig } from '@/lib/statuts';
 import { BaremesTab, AssuresTab, PrestatairesTab, ContactsTab } from './detail-tabs';
 
 export default function SocieteDetail({
@@ -182,10 +183,8 @@ export default function SocieteDetail({
                       <td className={cn('py-2 px-3 text-right font-medium', c.solde < 0 ? 'text-red-600' : 'text-emerald-600')}>{c.solde.toLocaleString('fr-FR')} Ar</td>
                       <td className="py-2 px-3 text-center">
                         <Badge variant="outline" className={cn('text-[9px]',
-                          c.statut === 'ACTIF' ? 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                          : c.statut === 'EXPIRE' ? 'border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
-                          : 'border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
-                        )}>{c.statut}</Badge>
+                            getStatutConfig(CONTRAT_STATUTS, c.statut)?.badge ?? 'bg-muted text-muted-foreground'
+                          )}>{getStatutConfig(CONTRAT_STATUTS, c.statut)?.label ?? c.statut}</Badge>
                       </td>
                     </tr>
                   ))}
