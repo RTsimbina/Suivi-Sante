@@ -2,32 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { enNombre, egaux, superieurA } from "@/lib/money";
 import { parseJsonBody } from "@/lib/validation/parse";
+import { DOSSIER_TRANSITIONS, DOSSIER_ROLE_TRANSITIONS } from '@/lib/statuts';
 import { dossierUpdateSchema } from "@/lib/validation";
 
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  RECU: ["EN_ANALYSE", "REJETE"],
-  EN_ANALYSE: ["VALIDE", "REJETE"],
-  VALIDE: ["EN_COMPTABILITE", "REJETE"],
-  EN_COMPTABILITE: ["EN_PAIEMENT", "REJETE"],
-  EN_PAIEMENT: ["PAYE", "REJETE"],
-  PAYE: [],
-  REJETE: [],
-};
-
-const ROLE_TRANSITIONS: Record<string, string[]> = {
-  'RECU_EN_ANALYSE': ['ADMINISTRATEUR', 'ACCUEIL'],
-  'RECU_REJETE': ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE'],
-  'EN_ANALYSE_VALIDE': ['ADMINISTRATEUR', 'TECHNIQUE'],
-  'EN_ANALYSE_REJETE': ['ADMINISTRATEUR', 'TECHNIQUE'],
-  'VALIDE_EN_COMPTABILITE': ['ADMINISTRATEUR', 'TECHNIQUE'],
-  'VALIDE_REJETE': ['ADMINISTRATEUR', 'TECHNIQUE'],
-  'EN_COMPTABILITE_EN_PAIEMENT': ['ADMINISTRATEUR', 'COMPTABILITE'],
-  'EN_COMPTABILITE_REJETE': ['ADMINISTRATEUR', 'COMPTABILITE'],
-  'EN_PAIEMENT_PAYE': ['ADMINISTRATEUR', 'COMPTABILITE'],
-  'EN_PAIEMENT_REJETE': ['ADMINISTRATEUR', 'COMPTABILITE'],
-};
+// Matrices centralisées dans src/lib/statuts.ts (DOSSIER_TRANSITIONS / DOSSIER_ROLE_TRANSITIONS)
 
 export async function PATCH(
   request: NextRequest,
@@ -83,7 +64,7 @@ export async function PATCH(
         );
       }
 
-      const allowed = VALID_TRANSITIONS[existing.statut] || [];
+      const allowed = DOSSIER_TRANSITIONS[existing.statut] || [];
       if (!allowed.includes(statut)) {
         return NextResponse.json({ erreur: `Transition non autorisée de "${existing.statut}" vers "${statut}"` },
           { status: 400 }
@@ -91,7 +72,7 @@ export async function PATCH(
       }
 
       const transitionKey = `${existing.statut}_${statut}`;
-      const allowedRoles = ROLE_TRANSITIONS[transitionKey];
+      const allowedRoles = DOSSIER_ROLE_TRANSITIONS[transitionKey];
 
       if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
         return NextResponse.json({ erreur: `Le rôle '${userRole}' n'est pas autorisé à effectuer la transition de "${existing.statut}" vers "${statut}"` },
@@ -265,6 +246,21 @@ export async function PATCH(
         gestionnaireTechnique: true,
         gestionnaireCompta: true,
       },
+    });
+
+    // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
+    // Valeurs converties comme en base pour éviter les faux positifs de diff
+    const valeursEnvoyees: Record<string, unknown> = { ...updateData };
+    if (statut) valeursEnvoyees.statut = statut;
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Dossier', entiteId: id, action: 'MODIFICATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: `Dossier ${existing.numeroDossier} — ${existing.beneficiaire}`,
+      societeId: existing.societeId,
+      ancien: existing as unknown as Record<string, unknown>,
+      nouveau: valeursEnvoyees,
+      request,
     });
 
     return NextResponse.json(updated);

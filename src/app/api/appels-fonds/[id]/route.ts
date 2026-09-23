@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { parseJsonBody } from "@/lib/validation/parse";
+import { APPEL_FONDS_STATUT_VALEURS, transitionAppelFondsAutorisee } from '@/lib/statuts';
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { appelFondsUpdateSchema } from "@/lib/validation";
 import { egaux, moins } from "@/lib/money";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Erreur sentinelle : appel introuvable (dans la transaction)
   class AppelIntrouvable extends Error {}
+  class TransitionInterdite extends Error {}
 
   try {
     const authError = await checkAuth(request);
@@ -25,6 +28,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // (double incrément du budgetUtilise) ; (2) contrat.update puis
     // appel.update séparés → un échec intermédiaire désynchronisait le
     // budget du contrat.
+    // État avant modification + données appliquées, capturés pour l'audit
+    let existingAvant: Record<string, unknown> = {};
+    let updateDataApplique: Record<string, unknown> = {};
+
     const appel = await db.$transaction(async (tx) => {
       // Verrou de ligne : sérialise les PATCH concurrents sur LE MÊME appel
       await tx.$queryRaw`SELECT "id" FROM "AppelDeFonds" WHERE "id" = ${id} FOR UPDATE`;
@@ -35,11 +42,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         include: { contrat: true },
       });
       if (!existing) throw new AppelIntrouvable();
+      existingAvant = existing as unknown as Record<string, unknown>;
 
       const updateData: Record<string, unknown> = {};
 
       // Le schéma Zod garantit statut ∈ [EN_ATTENTE, REGLE, ANNULE]
-      if (statut !== undefined) {
+      // + règles de changement de statut centralisées (statuts.ts).
+      // La matrice n'est appliquée que si le statut actuel est connu (les
+      // lignes historiques avec un statut absent/atypique restent modifiables).
+      if (statut !== undefined && statut !== existing.statut) {
+        const statutActuelConnu = APPEL_FONDS_STATUT_VALEURS.includes(existing.statut);
+        if (statutActuelConnu && !transitionAppelFondsAutorisee(existing.statut, statut)) {
+          throw new TransitionInterdite(`Transition non autorisée de "${existing.statut}" vers "${statut}"`);
+        }
         updateData.statut = statut;
       }
 
@@ -63,6 +78,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
       }
 
+      updateDataApplique = updateData;
+
       return tx.appelDeFonds.update({
         where: { id },
         data: updateData,
@@ -70,8 +87,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       });
     });
 
+    // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'AppelDeFonds', entiteId: id, action: 'MODIFICATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: `Appel de fonds — ${appel.contrat?.reference ?? ''}`,
+      societeId: appel.contrat?.societeId ?? undefined,
+      ancien: existingAvant,
+      nouveau: updateDataApplique,
+      request,
+    });
+
     return NextResponse.json(appel);
   } catch (error) {
+    if (error instanceof TransitionInterdite) {
+      return NextResponse.json({ erreur: error.message }, { status: 400 });
+    }
     if (error instanceof AppelIntrouvable) {
       return NextResponse.json({ erreur: "Appel de fonds introuvable" }, { status: 404 });
     }

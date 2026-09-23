@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { readExcelRows } from "@/lib/excel";
+import { MOYEN_PAIEMENT_VALEURS, normaliserMoyenPaiement } from '@/lib/referentiels';
 import { parseFormData } from "@/lib/validation/parse";
 import { importFichierSeulSchema } from "@/lib/validation";
 
@@ -17,12 +18,12 @@ import { importFichierSeulSchema } from "@/lib/validation";
  *   MontantPaye         — montant payé (nombre)
  *   DatePaiement        — date de paiement (DD/MM/YYYY ou format Excel)
  *   ReferencePaiement   — référence / numéro de pièce comptable
- *   MoyenPaiement       — VIREMENT, CHEQUE, ESPECE, PRELEVEMENT
+ *   MoyenPaiement       — VIREMENT, CHEQUE, ESPECES, PRELEVEMENT (alias normalisés)
  *   Observations        — notes libres
  */
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "EN_PAIEMENT", "PAYE", "REJETE"];
-const VALID_MOYENS = ["VIREMENT", "CHEQUE", "ESPECE", "PRELEVEMENT", "VIREMENT_BANCAIRE"];
+const VALID_MOYENS = MOYEN_PAIEMENT_VALEURS;
 
 interface Anomalie {
   ligne: number;
@@ -191,8 +192,10 @@ export async function POST(request: NextRequest) {
       // Validation du moyen de paiement
       let moyenPaiement: string | undefined;
       if (moyenPaiementRaw) {
-        if (VALID_MOYENS.includes(moyenPaiementRaw)) {
-          moyenPaiement = moyenPaiementRaw;
+        // Normalisation centralisée (ESPECE→ESPECES, VIREMENT_BANCAIRE→VIREMENT…)
+        const canonique = normaliserMoyenPaiement(String(moyenPaiementRaw));
+        if (VALID_MOYENS.includes(canonique)) {
+          moyenPaiement = canonique;
         } else {
           anomalies.push({
             ligne: ligneNum,

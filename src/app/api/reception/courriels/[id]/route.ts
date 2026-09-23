@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { parseJsonBody } from "@/lib/validation/parse";
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { courrielUpdateSchema } from "@/lib/validation";
 
 export async function PATCH(
@@ -92,6 +93,18 @@ export async function PATCH(
       },
     });
 
+    // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Courriel', entiteId: id, action: 'MODIFICATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: existing.objet,
+      societeId: existing.societeId ?? undefined,
+      ancien: existing as unknown as Record<string, unknown>,
+      nouveau: updateData,
+      request,
+    });
+
     const statutLabel = statut === "TRAITE"
       ? "traité"
       : statut === "REJETE"
@@ -130,6 +143,17 @@ export async function DELETE(
     }
 
     await db.courriel.delete({ where: { id } });
+
+    // ─── Audit : suppression de courriel (operationId) ──────────────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Courriel', entiteId: id, action: 'SUPPRESSION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: existing.objet,
+      societeId: existing.societeId ?? undefined,
+      resume: `${existing.objet} (${existing.expediteur})`,
+      request,
+    });
 
     return NextResponse.json({
       message: "Courriel supprimé avec succès.",

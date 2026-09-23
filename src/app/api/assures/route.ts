@@ -7,6 +7,7 @@ import {
   avecPerimetreSociete,
 } from '@/lib/data-isolation';
 import { parseJsonBody } from '@/lib/validation/parse';
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { assureCreateSchema, assureUpdateSchema } from '@/lib/validation';
 
 // ─── GET : Lister les assurés (avec filtres famille) ──────────────────────────
@@ -211,6 +212,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ─── Audit : création d'assuré (operationId) ────────────────────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Assure', entiteId: assure.id, action: 'CREATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: `${assure.nom}${assure.prenom ? ' ' + assure.prenom : ''} — ${societe.nom}`,
+      societeId,
+      resume: `Type : ${typeBeneficiaire}`,
+      request,
+    });
+
     return NextResponse.json(
       { message: 'Assuré créé avec succès.', assure },
       { status: 201 }
@@ -343,6 +355,18 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Assure', entiteId: id, action: 'MODIFICATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: `${existing.nom}${existing.prenom ? ' ' + existing.prenom : ''}`,
+      societeId: existing.societeId,
+      ancien: existing as unknown as Record<string, unknown>,
+      nouveau: updateData,
+      request,
+    });
+
     return NextResponse.json({ message: 'Assuré mis à jour avec succès.', assure: updated });
   } catch (error) {
     console.error('Erreur lors de la mise à jour de l\'assuré :', error);
@@ -397,6 +421,17 @@ export async function DELETE(request: NextRequest) {
     }
 
     await db.assure.delete({ where: { id } });
+
+    // ─── Audit : suppression d'assuré (operationId) ─────────────────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Assure', entiteId: id, action: 'SUPPRESSION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: `${assure.nom}${assure.prenom ? ' ' + assure.prenom : ''}`,
+      societeId: assure.societeId,
+      resume: assure.nom,
+      request,
+    });
 
     return NextResponse.json({ message: `L'assuré "${assure.nom}" a été supprimé avec succès.` });
   } catch (error) {

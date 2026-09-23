@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { readExcelRows } from "@/lib/excel";
+import { MOYEN_PAIEMENT_VALEURS, normaliserMoyenPaiement } from '@/lib/referentiels';
 import { enNombre, superieurA } from "@/lib/money";
 import { parseFormData } from "@/lib/validation/parse";
 import { importFichierSeulSchema } from "@/lib/validation";
@@ -24,7 +25,7 @@ import { importFichierSeulSchema } from "@/lib/validation";
  */
 
 const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "EN_PAIEMENT", "PAYE", "REJETE"];
-const VALID_MOYENS = ["VIREMENT", "CHEQUE", "ESPECE", "PRELEVEMENT", "VIREMENT_BANCAIRE", "CARTE"];
+const VALID_MOYENS = MOYEN_PAIEMENT_VALEURS;
 
 interface Anomalie {
   ligne: number;
@@ -222,23 +223,9 @@ export async function POST(request: NextRequest) {
       let moyenPaiement: string | undefined;
       if (moyenPaiementRaw !== undefined) {
         const normalized = String(moyenPaiementRaw).trim().toUpperCase().replace(/[\s-]/g, "_");
-        // Mapping des libellés SAGE courants
-        const mapping: Record<string, string> = {
-          VIREMENT: "VIREMENT",
-          VIREMENT_BANCAIRE: "VIREMENT_BANCAIRE",
-          "VIREMENT BANCAIRE": "VIREMENT_BANCAIRE",
-          VB: "VIREMENT_BANCAIRE",
-          CHEQUE: "CHEQUE",
-          CHÈQUE: "CHEQUE",
-          CHQ: "CHEQUE",
-          ESPECE: "ESPECE",
-          ESPÈCE: "ESPECE",
-          PRELEVEMENT: "PRELEVEMENT",
-          PRÉLÈVEMENT: "PRELEVEMENT",
-          CARTTE: "CARTE",
-          CARTE: "CARTE",
-        };
-        moyenPaiement = mapping[normalized] || (VALID_MOYENS.includes(normalized) ? normalized : undefined);
+        // Normalisation centralisée — alias SAGE inclus (ESPECE, CHQ, VB, CARTTE…)
+        const canonique = normaliserMoyenPaiement(normalized);
+        moyenPaiement = VALID_MOYENS.includes(canonique) ? canonique : undefined;
         if (!moyenPaiement && String(moyenPaiementRaw).trim()) {
           anomalies.push({
             ligne: ligneNum,

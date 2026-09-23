@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { Prisma } from "@prisma/client";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { contactEntrepriseCreateSchema } from "@/lib/validation";
@@ -37,6 +38,18 @@ export async function POST(request: NextRequest) {
       data: { societeId, nom, prenom: prenom ?? null, fonction: fonction ?? null, telephone: telephone ?? null, email: email ?? null },
       include: { societe: { select: { id: true, nom: true } } },
     });
+
+    // ─── Audit : création de contact entreprise (operationId) ──────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'EntrepriseContact', entiteId: contact.id, action: 'CREATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: `${contact.nom}${contact.prenom ? ' ' + contact.prenom : ''} — ${contact.societe?.nom ?? ''}`,
+      societeId,
+      resume: contact.nom,
+      request,
+    });
+
     return NextResponse.json(contact, { status: 201 });
   } catch (error) {
     console.error("Error creating entreprise contact:", error);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import {
   perimetreDepuisHeaders,
   refuserHorsPerimetre,
@@ -286,6 +287,20 @@ export async function POST(request: NextRequest) {
     if (plafondResult) {
       response.plafondCheck = plafondResult;
     }
+
+    // ─── Audit : création de dossier (operationId) ─────────────────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Dossier',
+      entiteId: dossier.id,
+      action: 'CREATION',
+      modifiePar: auditNom,
+      modifieParId: auditId,
+      objet: `Dossier ${dossier.numeroDossier} — ${dossier.beneficiaire}`,
+      societeId: dossier.societeId,
+      resume: `Montant réclamé : ${dossier.montantReclame} Ar`,
+      request,
+    });
 
     return NextResponse.json(response, { status: 201 });
   } catch (error) {

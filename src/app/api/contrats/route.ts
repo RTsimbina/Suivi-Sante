@@ -7,6 +7,7 @@ import {
   avecPerimetreSociete,
 } from '@/lib/data-isolation';
 import { parseJsonBody } from '@/lib/validation/parse';
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { contratCreateSchema } from '@/lib/validation';
 import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
 
@@ -96,6 +97,16 @@ export async function POST(request: NextRequest) {
         societe: { select: { id: true, nom: true } },
         _count: { select: { appelsDeFonds: true } },
       },
+    });
+
+    // ─── Audit : création de contrat (operationId) ─────────────────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'Contrat', entiteId: contrat.id, action: 'CREATION',
+      modifiePar: auditNom, modifieParId: auditId,
+      objet: contrat.reference, societeId,
+      resume: `Budget annuel : ${contrat.budgetAnnuel} Ar`,
+      request,
     });
 
     return NextResponse.json(contrat, { status: 201 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { parseJsonBody } from "@/lib/validation/parse";
 import { appelFondsCreateSchema } from "@/lib/validation";
 import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
@@ -78,6 +79,20 @@ export async function POST(request: NextRequest) {
       });
 
       return nouvelAppel;
+    });
+
+    // ─── Audit : création d'appel de fonds (operationId) ───────────────────
+    const { nom: auditNom, id: auditId } = await getUserInfoFromRequest(request);
+    await logAuditOperation({
+      entite: 'AppelDeFonds',
+      entiteId: appel.id,
+      action: 'CREATION',
+      modifiePar: auditNom,
+      modifieParId: auditId,
+      objet: `Appel de fonds — ${appel.contrat?.reference ?? ''}`,
+      societeId: appel.contrat?.societeId ?? undefined,
+      resume: `Montant : ${appel.montant} Ar`,
+      request,
     });
 
     return NextResponse.json(appel, { status: 201 });

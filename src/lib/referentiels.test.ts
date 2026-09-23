@@ -24,10 +24,10 @@ import {
 } from './referentiels';
 
 describe('Rôles', () => {
-  it('les 7 rôles ont tous un libellé avec accents', () => {
+  it('les 8 rôles ont tous un libellé avec accents', () => {
     expect(ROLES).toEqual([
       'ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE',
-      'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE',
+      'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'PRESTATAIRE',
     ]);
     for (const r of ROLES) {
       expect(ROLE_LABELS[r], `libellé manquant pour ${r}`).toBeTruthy();
