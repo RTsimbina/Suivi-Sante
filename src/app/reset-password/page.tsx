@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import { EMAIL_REGEX } from '@/lib/validations';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Sparkles, Lock, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, KeyRound, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -189,7 +190,7 @@ function RequestForm({ router }: { router: ReturnType<typeof useRouter> }) {
     e.preventDefault();
     setError('');
     const emailTrimmed = email.trim();
-    if (!emailTrimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+    if (!emailTrimmed || !EMAIL_REGEX.test(emailTrimmed)) {
       setError('Veuillez saisir une adresse e-mail valide.');
       return;
     }

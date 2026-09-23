@@ -1,9 +1,20 @@
 import { db } from './db';
+import {
+  type AuditAction,
+  type AuditNiveau,
+} from './referentiels';
+import {
+  diffFields,
+  serialiserValeurAudit,
+  buildOperationId,
+  type ChampDiff,
+} from './audit-diff';
+
+// Ré-export pour compatibilité avec les usages existants
+export { diffFields };
+export type { AuditAction, AuditNiveau };
 
 // ─── Types ─────────────────────────────────────────────────────────────────
-
-export type AuditAction = 'CREATION' | 'MODIFICATION' | 'SUPPRESSION';
-export type AuditNiveau = 'INFO' | 'STANDARD' | 'SENSIBLE' | 'CRITIQUE';
 
 export interface AuditParams {
   entite: string;
@@ -17,6 +28,9 @@ export interface AuditParams {
   // (l'exigence d'audit impose de conserver le rôle TEL QU'IL ÉTAIT : le rôle
   // actuel de l'utilisateur peut évoluer après coup, la trace doit rester fidèle).
   roleUtilisateur?: string;
+  /** Identifiant d'opération (généré automatiquement par logAuditOperation) */
+  operationId?: string;
+
   // Champs enrichis (optionnels — remplis automatiquement si request fournie)
   action?: AuditAction;
   niveau?: AuditNiveau;
@@ -28,9 +42,9 @@ export interface AuditParams {
   request?: Request;
 }
 
-// ─── Mapping entité → module lisible ────────────────────────────────────────
+// ─── Mapping entité → module lisible (exporté pour la route historique) ─────
 
-const ENTITE_MODULE_MAP: Record<string, string> = {
+export const ENTITE_MODULE_MAP: Record<string, string> = {
   Bareme: 'Barèmes',
   Contrat: 'Contrats',
   Utilisateur: 'Utilisateurs',
@@ -41,6 +55,9 @@ const ENTITE_MODULE_MAP: Record<string, string> = {
   Gestionnaire: 'Gestionnaires',
   EntrepriseContact: 'Contacts Entreprise',
   Dossier: 'Dossiers',
+  Courriel: 'Courriels',
+  AppelDeFonds: 'Appels de fonds',
+  Justificatif: 'Justificatifs',
 };
 
 // ─── Champs sensibles (classification SENSIBLE ou CRITIQUE) ─────────────────
@@ -58,6 +75,7 @@ const CHAMPS_SENSIBLES: Record<string, string[]> = {
   ],
   PrestataireSociete: ['actif'],
   Assure: ['actif', 'bareme', 'typeBeneficiaire'],
+  Dossier: ['statut', 'montantValide', 'montantReclame', 'ticketModerateur'],
 };
 
 // ─── Classification automatique du niveau ──────────────────────────────────
@@ -76,9 +94,6 @@ function classifyNiveau(
   // Modification : vérifier si le champ est sensible
   const sensibles = CHAMPS_SENSIBLES[entite];
   if (sensibles && sensibles.includes(champ)) {
-    // Champs très critiques
-    const champsCritiques = ['actif', 'role', 'password', 'budgetAnnuel'];
-    if (champsCritiques.includes(champ)) return 'SENSIBLE';
     return 'SENSIBLE';
   }
 
@@ -111,7 +126,6 @@ function extractRequestContext(request: Request) {
   // Navigateur : user-agent (tronqué à 200 chars)
   const ua = request.headers.get('user-agent');
   if (ua) {
-    // Extraire le nom du navigateur de manière simplifiée
     let browserName = ua;
     if (ua.includes('Edg/')) browserName = 'Edge ' + ua.match(/Edg\/(\d+\.\d+)/)?.[1];
     else if (ua.includes('Chrome/')) browserName = 'Chrome ' + ua.match(/Chrome\/(\d+\.\d+)/)?.[1];
@@ -130,31 +144,27 @@ function extractRequestContext(request: Request) {
   return { ipAdresse, navigateur, sessionId };
 }
 
-// ─── Générer un numéro de journal ──────────────────────────────────────────
-
-function generateJournalNumber(date: Date, index: number): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const seq = String(index).padStart(6, '0');
-  return `AUD-${y}${m}${d}-${seq}`;
-}
-
-// ─── Fonction principale de logging ────────────────────────────────────────
+// ─── Fonction principale de logging (une ligne par champ) ──────────────────
 
 /**
- * Enregistre une opération dans le journal d'audit immuable.
- * Ce journal est en lecture seule — aucune fonction de suppression ou modification n'est exposée.
+ * Enregistre UNE LIGNE dans le journal d'audit immuable.
+ * Ce journal est en lecture seule — aucune fonction de suppression ou
+ * modification n'est exposée, et la table n'est accessible qu'aux profils
+ * autorisés (route GET réservée à ADMINISTRATEUR, cf. API_PERMISSIONS).
  *
  * La classification du niveau (INFO/STANDARD/SENSIBLE/CRITIQUE) est automatique
  * sauf si `niveau` est explicitement fourni.
+ *
+ * Pour tracer une modification multi-champs, préférer `logAuditOperation()`
+ * qui regroupe les lignes sous un même `operationId`.
  */
 export async function logParametreChange(params: AuditParams): Promise<void> {
   try {
     const {
       entite, entiteId, champ,
       ancienneValeur, nouvelleValeur, modifiePar,
-      modifieParId, roleUtilisateur, action: actionOverride, niveau: niveauOverride,
+      modifieParId, roleUtilisateur, operationId, action: actionOverride, niveau: niveauOverride,
+
       module: moduleOverride, objet: objetOverride,
       societeId, motif, request,
     } = params;
@@ -170,13 +180,10 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
 
     // Ne pas logger si les valeurs sont identiques (sauf création/suppression)
     if (action === 'MODIFICATION') {
-      const oldStr = ancienneValeur === undefined || ancienneValeur === null ? null : String(ancienneValeur);
-      const newStr = nouvelleValeur === undefined || nouvelleValeur === null ? null : String(nouvelleValeur);
+      const oldStr = serialiserValeurAudit(ancienneValeur);
+      const newStr = serialiserValeurAudit(nouvelleValeur);
       if (oldStr === newStr) return;
     }
-
-    const oldStr = ancienneValeur === undefined || ancienneValeur === null ? null : String(ancienneValeur);
-    const newStr = nouvelleValeur === undefined || nouvelleValeur === null ? null : String(nouvelleValeur);
 
     // Contexte requête
     const ctx = request ? extractRequestContext(request) : { ipAdresse: undefined, navigateur: undefined, sessionId: undefined };
@@ -186,11 +193,13 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
         entite,
         entiteId,
         champ,
-        ancienneValeur: oldStr,
-        nouvelleValeur: newStr,
+        ancienneValeur: serialiserValeurAudit(ancienneValeur),
+        nouvelleValeur: serialiserValeurAudit(nouvelleValeur),
         modifiePar,
         modifieParId: modifieParId || null,
         roleUtilisateur: roleUtilisateur || null,
+        operationId: operationId || null,
+
         action,
         niveau,
         module: moduleLabel,
@@ -212,6 +221,73 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
  * Purge code mort : logAudit (alias jamais utilisé) supprimé —
  * utiliser logParametreChange directement.
  */
+
+// ─── Audit par opération (1 opération = N champs, un seul operationId) ──────
+
+/**
+ * Trace une opération complète dans le journal d'audit, champ par champ :
+ *  - MODIFICATION : compare `ancien` et `nouveau`, écrit UNE LIGNE PAR CHAMP
+ *    réellement modifié, toutes regroupées sous le même `operationId`.
+ *  - CREATION / SUPPRESSION : écrit une ligne unique (champ 'CREATION' /
+ *    'SUPPRESSION') avec le résumé de l'objet.
+ *
+ * @returns l'operationId généré (utile pour corréler les lignes en base).
+ *
+ * L'échec d'audit ne fait jamais planter l'opération métier (try/catch interne).
+ */
+export async function logAuditOperation(
+  params:
+    | (import('./audit-diff').AuditModificationParams & { roleUtilisateur?: string })
+    | (import('./audit-diff').AuditActionSimpleParams & { roleUtilisateur?: string })
+): Promise<string> {
+  const operationId = buildOperationId();
+
+  try {
+    const base = {
+      entite: params.entite,
+      entiteId: params.entiteId,
+      action: params.action,
+      modifiePar: params.modifiePar,
+      modifieParId: params.modifieParId,
+      roleUtilisateur: params.roleUtilisateur,
+      module: params.module,
+      objet: params.objet,
+      societeId: params.societeId,
+      motif: params.motif,
+      request: params.request,
+    };
+
+    if (params.action === 'MODIFICATION') {
+      const diffs: ChampDiff[] = diffFields(params.ancien, params.nouveau);
+
+      // Rien n'a changé : ne pas polluer le journal
+      if (diffs.length === 0) return operationId;
+
+      for (const diff of diffs) {
+        await logParametreChange({
+          ...base,
+          champ: diff.champ,
+          ancienneValeur: diff.ancienneValeur,
+          nouvelleValeur: diff.nouvelleValeur,
+          operationId,
+        });
+      }
+    } else {
+      // CREATION / SUPPRESSION : une seule ligne résumé
+      await logParametreChange({
+        ...base,
+        champ: params.action,
+        ancienneValeur: params.action === 'SUPPRESSION' ? (params.resume ?? null) : null,
+        nouvelleValeur: params.action === 'CREATION' ? (params.resume ?? null) : null,
+        operationId,
+      });
+    }
+  } catch (error) {
+    console.error('[AuditLog] Erreur lors de l\'enregistrement de l\'opération :', error);
+  }
+
+  return operationId;
+}
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────
 
@@ -246,6 +322,7 @@ export async function getUserInfoFromRequest(
 }
 
 /**
- * Purge code mort : diffFields, AUDIT_ACTIONS, AUDIT_NIVEAUX et AUDIT_MODULES
- * supprimés — jamais référencés hors de ce module (frontend inclus).
+ * Note : diffFields vit désormais dans audit-diff.ts (ré-exporté ci-dessus) ;
+ * les libellés d'audit (actions/niveaux) vivent dans referentiels.ts.
  */
+

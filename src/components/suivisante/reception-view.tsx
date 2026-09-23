@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { COURRIEL_STATUTS } from '@/lib/statuts';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -80,17 +81,14 @@ const TYPE_COLORS: Record<string, string> = {
   DOSSIER_REMBOURSEMENT: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
 };
 
-const COURRIEL_STATUT_COLORS: Record<string, string> = {
-  RECU: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  TRAITE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  REJETE: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
-};
+// Statuts courriel — délégués à la source de vérité (statuts.ts)
+const COURRIEL_STATUT_COLORS: Record<string, string> = Object.fromEntries(
+  COURRIEL_STATUTS.map((s) => [s.valeur, s.badge])
+);
 
-const COURRIEL_STATUT_LABELS: Record<string, string> = {
-  RECU: 'Reçu',
-  TRAITE: 'Traité',
-  REJETE: 'Rejeté',
-};
+const COURRIEL_STATUT_LABELS: Record<string, string> = Object.fromEntries(
+  COURRIEL_STATUTS.map((s) => [s.valeur, s.label])
+);
 
 const steps = [
   { title: 'Réception', desc: 'Saisie dans Excel, création ID unique', icon: FileInput, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40', border: 'border-sky-200 dark:border-sky-800' },

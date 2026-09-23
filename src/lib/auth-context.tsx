@@ -2,6 +2,10 @@
 
 import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
+import { ROLE_LABELS } from '@/lib/referentiels';
+
+// Ré-export — la source de vérité des libellés est referentiels.ts
+export { ROLE_LABELS };
 
 export type RoleType =
   | 'ADMINISTRATEUR'
@@ -13,16 +17,6 @@ export type RoleType =
   | 'CONTACT_ENTREPRISE'
   | 'PRESTATAIRE';
 
-export const ROLE_LABELS: Record<RoleType, string> = {
-  ADMINISTRATEUR: 'Administrateur',
-  ACCUEIL: 'Accueil',
-  TECHNIQUE: 'Service Technique',
-  COMPTABILITE: 'Comptabilité',
-  SANTE: 'Contrôle Santé',
-  PORTAIL_CLIENT: 'Portail Client',
-  CONTACT_ENTREPRISE: 'Contact Entreprise',
-  PRESTATAIRE: 'Prestataire',
-};
 
 interface AuthContextValue {
   user: {

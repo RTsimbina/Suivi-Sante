@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { MOYENS_PAIEMENT, CATEGORIES_DOSSIER, TYPES_JUSTIFICATIF, TYPE_JUSTIFICATIF_VALEURS } from '@/lib/referentiels';
 import { getPrestationSelectOptions, getParentType } from '@/lib/prestations';
 
 interface Societe { id: string; nom: string; }
@@ -49,21 +50,15 @@ interface CalculResult {
 
 // Dossier.typeDossier uses sous-types from getPrestationSelectOptions()
 
-const MOYENS = [
-  { value: 'VIREMENT', label: 'Virement bancaire' },
-  { value: 'CHEQUE', label: 'Chèque' },
-  { value: 'ESPECES', label: 'Espèces' },
-  { value: 'MOBILE_MONEY', label: 'Mobile Money' },
-  { value: 'AUTRE', label: 'Autre' },
-];
+// Moyens de paiement / catégories / justificatifs — référentiels centraux
+const MOYENS = MOYENS_PAIEMENT.map((m) => ({ value: m.valeur, label: m.label }));
 
-const CATEGORIES = [
-  { value: 'REMBOURSEMENT_ASSURE', label: 'Remboursement assuré' },
-  { value: 'REGLEMENT_PRESTATAIRE', label: 'Règlement prestataire' },
-];
+const CATEGORIES = CATEGORIES_DOSSIER.map((c) => ({ value: c.valeur, label: c.label }));
 
-const JUSTIF_TYPES = ['FACTURE', 'ORDONNANCE', 'RIB', 'CARNET_SOINS', 'DECOMPTE', 'AUTRE'];
-const JUSTIF_LABELS: Record<string, string> = { FACTURE: 'Facture', ORDONNANCE: 'Ordonnance', RIB: 'RIB', CARNET_SOINS: 'Carnet de soins', DECOMPTE: 'Décompte', AUTRE: 'Autre' };
+const JUSTIF_TYPES = TYPE_JUSTIFICATIF_VALEURS;
+const JUSTIF_LABELS: Record<string, string> = Object.fromEntries(
+  TYPES_JUSTIFICATIF.map((t) => [t.valeur, t.label])
+);
 
 interface UploadedFile { file: File; type: string; id: string; }
 

@@ -303,6 +303,76 @@ interface AuthResult {
   status: number;
 }
 
+export interface PermissionCheckResult {
+  allowed: boolean;
+  error: string;
+  status: number;
+}
+
+/**
+ * Vérifie si un rôle est autorisé à accéder à une route API avec une méthode HTTP.
+ *
+ * Utilise le PLUS LONG préfixe correspondant dans API_PERMISSIONS pour gérer
+ * correctement les sous-routes (ex: /api/assures/import doit matcher
+ * /api/assures/import et non /api/assures).
+ *
+ * ⚠️  DÉFAUT D'ACCÈS (default-deny) : toute route API non déclarée
+ *     dans API_PERMISSIONS est automatiquement refusée (403).
+ *
+ * ⚠️  FONCTION PARTAGÉE : utilisée par `authorizeRequest` (routes API, Node)
+ *     ET par le middleware `src/proxy.ts` (Edge). Ne pas y introduire de
+ *     dépendance Node-specific.
+ */
+export function matchPermission(
+  pathname: string,
+  method: string,
+  userRole: RoleType
+): PermissionCheckResult {
+  // Trouver le préfixe le plus long qui correspond
+  let matchedPrefix = '';
+  for (const prefix of Object.keys(API_PERMISSIONS)) {
+    if (pathname.startsWith(prefix) && prefix.length > matchedPrefix.length) {
+      matchedPrefix = prefix;
+    }
+  }
+
+  // Route non définie dans les permissions → accès refusé par défaut
+  if (!matchedPrefix) {
+    return {
+      allowed: false,
+      error: 'Route API non reconnue.',
+      status: 403,
+    };
+  }
+
+  const permission = API_PERMISSIONS[matchedPrefix];
+  const upperMethod = method.toUpperCase();
+
+  // Vérifier les permissions par méthode (si défini)
+  if (permission.methods && permission.methods[upperMethod]) {
+    const allowedRoles = permission.methods[upperMethod];
+    if (!allowedRoles.includes(userRole)) {
+      return {
+        allowed: false,
+        error: `Accès refusé. Le rôle '${userRole}' ne peut pas effectuer l'action ${upperMethod} sur cette ressource.`,
+        status: 403,
+      };
+    }
+    return { allowed: true, error: '', status: 200 };
+  }
+
+  // Sinon vérifier les rôles généraux
+  if (!permission.roles.includes(userRole)) {
+    return {
+      allowed: false,
+      error: `Accès refusé. Le rôle '${userRole}' n'est pas autorisé à accéder à cette ressource.`,
+      status: 403,
+    };
+  }
+
+  return { allowed: true, error: '', status: 200 };
+}
+
 /**
  * Vérifie l'authentification et l'autorisation pour une requête API.
  * Retourne { authorized: false } avec le bon message d'erreur et statut HTTP.
@@ -338,48 +408,15 @@ export async function authorizeRequest(
     };
   }
 
-  // 2. Trouver la permission correspondante au chemin
-  //    ⚠️ On cherche le PLUS LONG préfixe qui correspond (pas le premier).
-  //    Ex: /api/prestataires/societes/sync doit matcher sa règle propre,
-  //    pas la règle générique /api/prestataires.
-  const matchedPrefix = Object.keys(API_PERMISSIONS)
-    .filter((prefix) => pathname.startsWith(prefix))
-    .sort((a, b) => b.length - a.length)[0];
-
-  if (!matchedPrefix) {
-    // Route non définie dans les permissions → accès refusé par défaut
+  // 2. Vérifier les permissions via la fonction partagée avec le middleware
+  const perm = matchPermission(pathname, request.method, userRole);
+  if (!perm.allowed) {
     return {
       authorized: false,
       token,
-      error: 'Route API non reconnue.',
-      status: 403,
+      error: perm.error,
+      status: perm.status,
     };
-  }
-
-  const permission = API_PERMISSIONS[matchedPrefix];
-  const method = request.method.toUpperCase();
-
-  // 3. Vérifier les permissions par méthode (si défini)
-  if (permission.methods && permission.methods[method]) {
-    const allowedRoles = permission.methods[method];
-    if (!allowedRoles.includes(userRole)) {
-      return {
-        authorized: false,
-        token,
-        error: `Accès refusé. Le rôle '${userRole}' ne peut pas effectuer l'action ${method} sur cette ressource.`,
-        status: 403,
-      };
-    }
-  } else {
-    // 4. Sinon vérifier les rôles généraux
-    if (!permission.roles.includes(userRole)) {
-      return {
-        authorized: false,
-        token,
-        error: `Accès refusé. Le rôle '${userRole}' n'est pas autorisé à accéder à cette ressource.`,
-        status: 403,
-      };
-    }
   }
 
   return {

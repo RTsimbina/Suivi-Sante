@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
-import { API_PERMISSIONS } from '@/lib/authorize';
+import { matchPermission } from '@/lib/authorize';
 import { enTeteEgalSecret } from '@/lib/mail/api-auth';
 import type { RoleType } from '@/lib/auth-context';
 
@@ -166,8 +166,10 @@ export default async function proxy(request: NextRequest) {
   const userPrestataireId = (token.prestataireId as string) || '';
 
   // 5. Vérification automatique des permissions API
+  //    (matchPermission : fonction UNIQUE partagée avec authorizeRequest,
+  //    défense en profondeur sans duplication d'algorithme)
   if (pathname.startsWith('/api/')) {
-    const permResult = checkApiPermission(pathname, request.method, userRole as RoleType);
+    const permResult = matchPermission(pathname, request.method, userRole as RoleType);
     if (!permResult.allowed) {
       return Response.json(
         { erreur: permResult.error },
@@ -200,78 +202,10 @@ export default async function proxy(request: NextRequest) {
   return response;
 }
 
-// ─── Logique de correspondance des permissions ─────────────────────────────
-
-interface PermissionCheckResult {
-  allowed: boolean;
-  error: string;
-  status: number;
-}
-
-/**
- * Vérifie si le rôle utilisateur est autorisé à accéder à cette route API
- * avec cette méthode HTTP.
- *
- * Utilise le PLUS LONG préfixe correspondant dans API_PERMISSIONS
- * pour gérer correctement les sous-routes (ex: /api/assures/import
- * doit matcher /api/assures/import et non /api/assures).
- *
- * ⚠️  DÉFAUT D'ACCÈS (default-deny) : toute route API non déclarée
- *     dans API_PERMISSIONS est automatiquement refusée (403).
- */
-function checkApiPermission(
-  pathname: string,
-  method: string,
-  userRole: RoleType
-): PermissionCheckResult {
-  // Trouver le préfixe le plus long qui correspond
-  let matchedPrefix = '';
-  const prefixes = Object.keys(API_PERMISSIONS);
-
-  for (const prefix of prefixes) {
-    if (pathname.startsWith(prefix) && prefix.length > matchedPrefix.length) {
-      matchedPrefix = prefix;
-    }
-  }
-
-  // Route non définie dans les permissions → accès refusé par défaut
-  if (!matchedPrefix) {
-    return {
-      allowed: false,
-      error: `Route API non reconnue. Ajoutez cette route dans API_PERMISSIONS si nécessaire.`,
-      status: 403,
-    };
-  }
-
-  const permission = API_PERMISSIONS[matchedPrefix];
-  const upperMethod = method.toUpperCase();
-
-  // Vérifier les permissions par méthode (restrictives)
-  if (permission.methods && permission.methods[upperMethod]) {
-    const allowedRoles = permission.methods[upperMethod];
-    if (!allowedRoles.includes(userRole)) {
-      return {
-        allowed: false,
-        error: `Accès refusé. Le rôle '${userRole}' ne peut pas effectuer l'action ${upperMethod} sur cette ressource.`,
-        status: 403,
-      };
-    }
-    return { allowed: true, error: '', status: 200 };
-  }
-
-  // Sinon vérifier les rôles généraux
-  if (!permission.roles.includes(userRole)) {
-    return {
-      allowed: false,
-      error: `Accès refusé. Le rôle '${userRole}' n'est pas autorisé à accéder à cette ressource.`,
-      status: 403,
-    };
-  }
-
-  return { allowed: true, error: '', status: 200 };
-}
-
 // ─── Configuration du matcher ──────────────────────────────────────────────
+// La logique de correspondance des permissions (matchPermission) vit dans
+// src/lib/authorize.ts — unique source partagée entre le middleware et les
+// routes API (défaut d'accès : toute route non déclarée est refusée).
 
 export const config = {
   matcher: [

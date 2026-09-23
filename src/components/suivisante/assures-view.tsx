@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { TYPES_BENEFICIAIRE } from '@/lib/referentiels';
 import { toast } from 'sonner';
 import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
 
@@ -55,11 +56,10 @@ interface ImportResult {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const TYPE_BENEF_LABELS: Record<string, string> = {
-  ASSURE: 'Assuré principal',
-  CONJOINT: 'Conjoint',
-  ENFANT: 'Enfant',
-};
+// Libellés délégués au référentiel central (uniformité portail ↔ vue)
+const TYPE_BENEF_LABELS: Record<string, string> = Object.fromEntries(
+  TYPES_BENEFICIAIRE.map((t) => [t.valeur, t.label])
+);
 
 const TYPE_BENEF_ICONS: Record<string, typeof UserCheck> = {
   ASSURE: UserCheck,

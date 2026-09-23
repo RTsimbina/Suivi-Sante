@@ -9,7 +9,8 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
-import { formatMontantCourt, statutLabel, statutColor } from './format';
+import { serviceGestionnaireLabel } from '@/lib/referentiels';
+import { formatMontantCourt } from './format';
 
 interface DirectionViewProps {
   kpis: {
@@ -33,7 +34,7 @@ const kpiDefs = [
 ];
 
 const serviceColors: Record<string, string> = {
-  RECEPTION: 'bg-sky-100 text-sky-700 dark:text-sky-300 dark:bg-sky-900/50 dark:text-sky-300',
+  ACCUEIL: 'bg-sky-100 text-sky-700 dark:text-sky-300 dark:bg-sky-900/50 dark:text-sky-300',
   TECHNIQUE: 'bg-amber-100 text-amber-700 dark:text-amber-300 dark:bg-amber-900/50 dark:text-amber-300',
   COMPTABILITE: 'bg-emerald-100 text-emerald-700 dark:text-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300',
 };
@@ -136,7 +137,7 @@ export default function DirectionView({ kpis, loading }: DirectionViewProps) {
                 {kpis.productivite.map((p, i) => (
                   <tr key={i} className="border-b last:border-0">
                     <td className="py-2 font-medium">{p.gestionnaireNom}</td>
-                    <td className="py-2"><Badge variant="outline" className={serviceColors[p.service] || ''}>{statutLabel(p.service)}</Badge></td>
+                    <td className="py-2"><Badge variant="outline" className={serviceColors[p.service] || ''}>{serviceGestionnaireLabel(p.service)}</Badge></td>
                     <td className="py-2 text-right">{p.nbDossiers}</td>
                     <td className="py-2 text-right">{formatMontantCourt(p.montantTraite)}</td>
                     <td className="py-2 text-right">{p.tempsMoyenTraitement}</td>

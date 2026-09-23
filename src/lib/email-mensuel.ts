@@ -3,6 +3,7 @@ import { getEmailRapportDestinataire } from './email';
 import { envoyerCourriel, envoyerEmailTest } from '@/lib/mail';
 import { getPrestationLabel } from './prestations';
 import { enNombre, sommer } from './money';
+import { DOSSIER_STATUTS } from './statuts';
 
 // ─── Type pour un expéditeur Comptabilité ──────────────────────────────────
 interface ExpediteurComptable {
@@ -48,14 +49,12 @@ function genererHTMLRapportSociete(data: {
   expediteurNom?: string;
   expediteurEmail?: string;
 }): string {
-  const statutColors: Record<string, string> = {
-    RECU: '#f59e0b', EN_ANALYSE: '#3b82f6', VALIDE: '#8b5cf6',
-    EN_COMPTABILITE: '#ec4899', EN_PAIEMENT: '#f97316', PAYE: '#10b981', REJETE: '#ef4444',
-  };
-  const statutLabels: Record<string, string> = {
-    RECU: 'Reçu', EN_ANALYSE: 'En analyse', VALIDE: 'Validé',
-    EN_COMPTABILITE: 'En comptabilité', EN_PAIEMENT: 'En paiement', PAYE: 'Payé', REJETE: 'Rejeté',
-  };
+  const statutColors: Record<string, string> = Object.fromEntries(
+    DOSSIER_STATUTS.map((s) => [s.valeur, s.hex])
+  );
+  const statutLabels: Record<string, string> = Object.fromEntries(
+    DOSSIER_STATUTS.map((s) => [s.valeur, s.label])
+  );
 
   const fmt = (n: number) => Math.round(n).toLocaleString('fr-FR');
 

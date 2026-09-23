@@ -50,6 +50,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
 import { cn } from '@/lib/utils';
+import { DOSSIER_STATUT_VALEURS } from '@/lib/statuts';
+import { TYPES_JUSTIFICATIF } from '@/lib/referentiels';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -110,16 +112,11 @@ interface HistoriqueEntry {
   userId?: string;
 }
 
-const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
+const STATUTS = DOSSIER_STATUT_VALEURS;
 
-const JUSTIFICATIF_LABELS: Record<string, string> = {
-  FACTURE: 'Facture',
-  ORDONNANCE: 'Ordonnance',
-  RIB: 'RIB',
-  CARNET_SOINS: 'Carnet de soins',
-  DECOMPTE: 'Décompte',
-  AUTRE: 'Autre',
-};
+const JUSTIFICATIF_LABELS: Record<string, string> = Object.fromEntries(
+  TYPES_JUSTIFICATIF.map((t) => [t.valeur, t.label])
+);
 
 const JUSTIFICATIF_COLORS: Record<string, string> = {
   FACTURE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
@@ -130,14 +127,15 @@ const JUSTIFICATIF_COLORS: Record<string, string> = {
   AUTRE: 'bg-muted text-muted-foreground border-border',
 };
 
+// Points de couleur de la timeline — alignés sur les couleurs canoniques des statuts
 const HISTORIQUE_STATUT_COLORS: Record<string, string> = {
-  RECU: 'bg-slate-500',
-  EN_ANALYSE: 'bg-amber-50 dark:bg-amber-950/400',
-  VALIDE: 'bg-emerald-50 dark:bg-emerald-950/400',
-  EN_COMPTABILITE: 'bg-sky-50 dark:bg-sky-950/400',
-  EN_PAIEMENT: 'bg-indigo-500',
-  PAYE: 'bg-teal-50 dark:bg-teal-950/400',
-  REJETE: 'bg-red-50 dark:bg-red-950/400',
+  RECU: 'bg-slate-400',
+  EN_ANALYSE: 'bg-amber-500',
+  VALIDE: 'bg-emerald-500',
+  EN_COMPTABILITE: 'bg-orange-500',
+  EN_PAIEMENT: 'bg-sky-500',
+  PAYE: 'bg-teal-500',
+  REJETE: 'bg-red-500',
 };
 
 // ── Component ──────────────────────────────────────────────────────────────

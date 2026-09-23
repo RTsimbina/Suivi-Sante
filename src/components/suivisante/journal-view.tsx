@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { ROLE_LABELS } from '@/lib/auth-context';
+import { auditActionLabel, auditNiveauLabel } from '@/lib/referentiels';
 import { SharedPagination, type PaginationState } from '@/components/ui/shared-pagination';
 import { usePeriode } from '@/lib/periode-context';
 
@@ -556,7 +557,7 @@ export default function JournalView() {
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
                           <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium', actCfg.bg, actCfg.text)}>
-                            {actCfg.icon} {entry.action === 'CREATION' ? 'Création' : entry.action === 'SUPPRESSION' ? 'Suppression' : 'Modification'}
+                            {actCfg.icon} {auditActionLabel(entry.action)}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
@@ -589,7 +590,7 @@ export default function JournalView() {
                         <td className="py-2.5 px-3 whitespace-nowrap">
                           <span className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full', nivCfg.bg, nivCfg.text)}>
                             <span className={cn('h-1.5 w-1.5 rounded-full', nivCfg.dot)} />
-                            {entry.niveau === 'INFO' ? 'Info' : entry.niveau === 'STANDARD' ? 'Moyen' : entry.niveau === 'SENSIBLE' ? 'Élevé' : 'Critique'}
+                            {auditNiveauLabel(entry.niveau)}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-center">

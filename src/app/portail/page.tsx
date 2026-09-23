@@ -19,6 +19,8 @@ import AssistantView from '@/components/suivisante/assistant-view';
 import { cn } from '@/lib/utils';
 import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
 import PeriodFilter from '@/components/suivisante/period-filter';
+import { DOSSIER_STATUTS, CONTRAT_STATUTS, getStatutConfig } from '@/lib/statuts';
+import { TYPES_BENEFICIAIRE } from '@/lib/referentiels';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,31 +56,19 @@ interface PortailDossier {
 
 // ─── Utilitaires ──────────────────────────────────────────────────────────────
 
-const STATUT_LABELS: Record<string, string> = {
-  RECU: 'Reçu',
-  EN_ANALYSE: 'En analyse',
-  VALIDE: 'Validé',
-  EN_COMPTABILITE: 'En comptabilité',
-  EN_PAIEMENT: 'En paiement',
-  PAYE: 'Payé',
-  REJETE: 'Rejeté',
-};
+// ─── Utilitaires — libellés/couleurs délégués aux sources de vérité ─────────
 
-const STATUT_COLORS: Record<string, string> = {
-  RECU: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
-  EN_ANALYSE: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  VALIDE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  EN_COMPTABILITE: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  EN_PAIEMENT: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
-  PAYE: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
-  REJETE: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-};
+const STATUT_LABELS: Record<string, string> = Object.fromEntries(
+  DOSSIER_STATUTS.map((s) => [s.valeur, s.label])
+);
 
-const TYPE_BENEF_LABELS: Record<string, string> = {
-  ASSURE: 'Assuré principal',
-  CONJOINT: 'Conjoint(e)',
-  ENFANT: 'Enfant',
-};
+const STATUT_COLORS: Record<string, string> = Object.fromEntries(
+  DOSSIER_STATUTS.map((s) => [s.valeur, s.badge])
+);
+
+const TYPE_BENEF_LABELS: Record<string, string> = Object.fromEntries(
+  TYPES_BENEFICIAIRE.map((t) => [t.valeur, t.label])
+);
 
 function formatMontant(n: number): string {
   return new Intl.NumberFormat('fr-FR').format(n) + ' Ar';
@@ -472,8 +462,8 @@ function PortailAssure({ data }: { data: PortailData }) {
                           <p className='text-sm font-medium'>{c.reference}</p>
                           <Badge className={cn(
                             'text-[10px]',
-                            c.statut === 'ACTIF' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-700'
-                          )}>{c.statut}</Badge>
+                            c.statut === 'ACTIF' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : getStatutConfig(CONTRAT_STATUTS, c.statut)?.badge ?? 'bg-muted text-muted-foreground'
+                          )}>{getStatutConfig(CONTRAT_STATUTS, c.statut)?.label ?? c.statut}</Badge>
                         </div>
                         <div className='grid grid-cols-3 gap-4 text-xs'>
                           <div>
@@ -718,8 +708,8 @@ function PortailEntreprise({ data }: { data: PortailData }) {
                       <div key={c.id} className='p-4 rounded-lg border bg-card'>
                         <div className='flex items-center justify-between mb-2'>
                           <p className='text-sm font-medium'>{c.reference}</p>
-                          <Badge className={cn('text-[10px]', c.statut === 'ACTIF' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-700')}>
-                            {c.statut}
+                          <Badge className={cn('text-[10px]', c.statut === 'ACTIF' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : getStatutConfig(CONTRAT_STATUTS, c.statut)?.badge ?? 'bg-muted text-muted-foreground')}>
+                            {getStatutConfig(CONTRAT_STATUTS, c.statut)?.label ?? c.statut}
                           </Badge>
                         </div>
                         <div className='grid grid-cols-3 gap-4 text-xs'>

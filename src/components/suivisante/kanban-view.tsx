@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { usePeriode } from '@/lib/periode-context';
+import { DOSSIER_STATUT_VALEURS } from '@/lib/statuts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,15 +66,7 @@ interface Dossier {
   gestionnaireComptaId: string | null;
 }
 
-const STATUTS_ORDER = [
-  'RECU',
-  'EN_ANALYSE',
-  'VALIDE',
-  'EN_COMPTABILITE',
-  'EN_PAIEMENT',
-  'PAYE',
-  'REJETE',
-] as const;
+const STATUTS_ORDER = DOSSIER_STATUT_VALEURS;
 
 /** Quel champ gestionnaire est pertinent selon le statut du dossier */
 function champPourStatut(statut: string): 'ACCUEIL' | 'TECHNIQUE' | 'COMPTABILITE' | null {
@@ -298,7 +291,7 @@ function AssignDialog({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Erreur lors de l'assignation");
+        toast.error(data.erreur || "Erreur lors de l'assignation");
       } else {
         toast.success(data.message || `${data.updated} dossier(s) assigné(s)`);
         onAssigned();
@@ -555,7 +548,7 @@ export default function KanbanView() {
 
       if (!res.ok) {
         const data = await res.json();
-        toast.error(data.error || 'Erreur lors de la mise à jour');
+        toast.error(data.erreur || 'Erreur lors de la mise à jour');
         setDossiers((prev) =>
           prev.map((d) =>
             d.id === draggedDossier.id ? { ...d, statut: draggedDossier.statut } : d

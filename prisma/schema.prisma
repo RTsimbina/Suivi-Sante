@@ -375,6 +375,7 @@ model HistoriqueParametre {
   sessionId        String?                             // ID de session NextAuth
   motif            String?                             // Motif / description de l'opération
   roleUtilisateur  String?                             // Rôle de l'utilisateur au moment de l'opération (figé — immuable)
+  operationId      String?                             // Regroupe les lignes d'une même opération (1 opération = N champs modifiés)
 
   @@index([entite, entiteId])
   @@index([dateModification])
@@ -383,6 +384,8 @@ model HistoriqueParametre {
   @@index([modifieParId])
   @@index([societeId])
   @@index([module])
+  @@index([roleUtilisateur])
+  @@index([operationId])
 }
 
 // ─── Compteurs du rate limiting distribué (src/lib/rate-limit.ts) ───────────

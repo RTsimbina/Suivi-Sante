@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
+import { DOSSIER_STATUT_VALEURS } from '@/lib/statuts';
 import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
 import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
 import DossierDetail from './dossier-detail';
@@ -79,7 +80,8 @@ export default function DossiersView() {
     fetchDossiers();
   };
 
-  const statuts = ['RECU', 'EN_ANALYSE', 'VALIDE', 'REJETE', 'EN_PAIEMENT', 'PAYE'];
+  // Filtres statut — liste complète issue de la source de vérité (statuts.ts)
+  const statuts = DOSSIER_STATUT_VALEURS;
 
   return (
     <div className="space-y-4">

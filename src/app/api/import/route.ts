@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
+import { DOSSIER_STATUT_VALEURS } from "@/lib/statuts";
 import { readExcelRows } from "@/lib/excel";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
 import { parseFormData } from "@/lib/validation/parse";
 import { importDossiersSchema } from "@/lib/validation";
 
-const VALID_STATUTS = ["RECU", "EN_ANALYSE", "VALIDE", "EN_COMPTABILITE", "EN_PAIEMENT", "PAYE", "REJETE"];
+const VALID_STATUTS = DOSSIER_STATUT_VALEURS;
 const ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",

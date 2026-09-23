@@ -1,41 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { API_PERMISSIONS } from '@/lib/authorize';
+import { API_PERMISSIONS, matchPermission } from '@/lib/authorize';
 import type { RoleType } from '@/lib/auth-context';
 
-// ─── Extraction de la logique pure de vérification de permissions ──────────
-// (reflète exactement la logique de proxy.ts::checkApiPermission)
+// ─── Vérification des permissions via la FONCTION PARTAGÉE réelle ──────────
+// matchPermission est désormais la source unique utilisée par authorizeRequest
+// (routes API) ET le middleware proxy.ts. Le test vérifie l'implémentation réelle.
 
 function checkPermission(
   pathname: string,
   method: string,
   userRole: RoleType
 ): { allowed: boolean; reason: string } {
-  let matchedPrefix = '';
-  for (const prefix of Object.keys(API_PERMISSIONS)) {
-    if (pathname.startsWith(prefix) && prefix.length > matchedPrefix.length) {
-      matchedPrefix = prefix;
-    }
-  }
-
-  if (!matchedPrefix) {
-    return { allowed: false, reason: 'Route non définie dans API_PERMISSIONS (default-deny)' };
-  }
-
-  const permission = API_PERMISSIONS[matchedPrefix];
-  const upperMethod = method.toUpperCase();
-
-  if (permission.methods && permission.methods[upperMethod]) {
-    if (!permission.methods[upperMethod].includes(userRole)) {
-      return { allowed: false, reason: `Méthode ${upperMethod} interdite pour le rôle ${userRole}` };
-    }
-    return { allowed: true, reason: '' };
-  }
-
-  if (!permission.roles.includes(userRole)) {
-    return { allowed: false, reason: `Rôle ${userRole} non autorisé sur ${matchedPrefix}` };
-  }
-
-  return { allowed: true, reason: '' };
+  const result = matchPermission(pathname, method, userRole);
+  return { allowed: result.allowed, reason: result.allowed ? '' : result.error };
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -44,7 +21,7 @@ describe('API_PERMISSIONS — default-deny', () => {
   it('refuse une route non déclarée (default-deny)', () => {
     const result = checkPermission('/api/non-existante', 'GET', 'ADMINISTRATEUR');
     expect(result.allowed).toBe(false);
-    expect(result.reason).toContain('non définie');
+    expect(result.reason).toContain('non reconnue');
   });
 
   it('refuse un rôle inconnu même sur une route déclarée', () => {

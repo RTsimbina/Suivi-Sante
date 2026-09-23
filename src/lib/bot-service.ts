@@ -2,6 +2,7 @@ import { db } from './db';
 import { callLLM } from './llm';
 import { getPrestationLabel, getParentType } from './prestations';
 import { enNombre, sommer, moins, minDecimal, appliquerTaux, formaterAr, formaterNombre, superieurA, inferieurA } from './money';
+import { DOSSIER_STATUTS } from './statuts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type CanalBot = 'WHATSAPP' | 'TELEGRAM' | 'MESSENGER';
@@ -122,11 +123,9 @@ async function verifierNSS(nss: string, canal: CanalBot, expediteurId: string): 
 
 // ─── Consultation des dossiers d'un assuré (STATUT UNIQUEMENT) ───────────────
 
-const STATUT_LABELS: Record<string, string> = {
-  RECU: 'Reçu', EN_ANALYSE: 'En analyse', VALIDE: 'Validé',
-  EN_COMPTABILITE: 'En comptabilité', EN_PAIEMENT: 'En cours de paiement',
-  PAYE: 'Payé', REJETE: 'Rejeté',
-};
+const STATUT_LABELS: Record<string, string> = Object.fromEntries(
+  DOSSIER_STATUTS.map((s) => [s.valeur, s.label])
+);
 
 async function mesDossiers(assureId: string, assureNom: string): Promise<string> {
   const dossiers = await db.dossier.findMany({

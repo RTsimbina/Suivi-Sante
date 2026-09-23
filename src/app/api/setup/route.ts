@@ -2,6 +2,9 @@ import { timingSafeEqual } from "crypto";
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hash } from 'bcryptjs';
+import { ALL_SOUS_TYPES } from '@/lib/prestations';
+import { DOSSIER_STATUT_VALEURS } from '@/lib/statuts';
+import { MOYEN_PAIEMENT_VALEURS } from '@/lib/referentiels';
 
 // Ce endpoint initialise la base de données PostgreSQL sur Vercel
 // 1. Crée les tables (DDL)  2. Insère les données de démo
@@ -432,16 +435,10 @@ CREATE TABLE IF NOT EXISTS "EntrepriseContact" (
 );
 `;
 
-const TYPES_DOSSIER = [
-  'HOSPITALISATION_CHIRURGICAL', 'HOSPITALISATION_MEDICAL',
-  'CONSULTATION_SPECIALISE', 'CONSULTATION_PRE_NATAL', 'CONSULTATION_SIMPLE',
-  'EXAMEN',
-  'ACCOUCHEMENT_CHIRURGICAL', 'ACCOUCHEMENT_NORMAL',
-  'IMAGERIE', 'OPTIQUE', 'PHARMACIE',
-  'DENTAIRES_SOIN', 'DENTAIRES_DETARTRAGE', 'DENTAIRES_EXTRACTION', 'DENTAIRES_PROTHESE', 'DENTAIRES_ORTHODONTIE',
-];
-const STATUTS = ['RECU', 'EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE', 'REJETE'];
-const MOYENS_PAIEMENT = ['VIREMENT', 'CHEQUE', 'ESPECES'];
+// Référentiels importés des sources de vérité (src/lib/prestations, statuts, referentiels)
+const TYPES_DOSSIER = ALL_SOUS_TYPES;
+const STATUTS = DOSSIER_STATUT_VALEURS;
+const MOYENS_PAIEMENT = MOYEN_PAIEMENT_VALEURS;
 const OBSERVATIONS = [
   'Urgence prise en charge', 'Dossier prioritaire', 'A vérifier avec la mutuelle',
   'Réclamation client en cours', 'Deuxième avis médical requis', '', '', '', '', '',

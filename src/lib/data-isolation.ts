@@ -35,17 +35,17 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-/** Rôles internes : périmètre global (toutes les sociétés). */
-export const INTERNAL_ROLES = [
-  'ADMINISTRATEUR',
-  'ACCUEIL',
-  'TECHNIQUE',
-  'COMPTABILITE',
-  'SANTE',
-] as const;
+import type { Prisma } from "@prisma/client";
+import {
+  INTERNAL_ROLES as INTERNAL_ROLES_SOURCE,
+  EXTERNAL_ROLES as EXTERNAL_ROLES_SOURCE,
+} from "./referentiels";
 
-/** Rôles externes : périmètre forcé sur la société rattachée au compte. */
-export const EXTERNAL_ROLES = ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'] as const;
+/** Rôles internes : périmètre global (toutes les sociétés) — source : referentiels.ts */
+export const INTERNAL_ROLES = INTERNAL_ROLES_SOURCE;
+
+/** Rôles externes : périmètre forcé sur la société rattachée au compte — source : referentiels.ts */
+export const EXTERNAL_ROLES = EXTERNAL_ROLES_SOURCE;
 
 /** Message renvoyé à un compte externe sans société rattachée (fail-closed). */
 export const ERREUR_SANS_SOCIETE =

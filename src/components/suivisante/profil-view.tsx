@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { passwordSchema } from '@/lib/validations';
 import { useSession } from 'next-auth/react';
 import { ROLE_LABELS } from '@/lib/auth-context';
 import type { RoleType } from '@/lib/auth-context';
@@ -157,8 +158,10 @@ export default function ProfilView() {
       toast.error('La confirmation ne correspond pas au nouveau mot de passe');
       return;
     }
-    if (nouveauMdp.length < 6) {
-      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+    // Politique partagée (validations/common) : min 8 + lettre + chiffre
+    const mdpCheck = passwordSchema.safeParse(nouveauMdp);
+    if (!mdpCheck.success) {
+      toast.error(mdpCheck.error.issues[0]?.message || 'Mot de passe invalide');
       return;
     }
     setSubmittingMdp(true);
@@ -370,7 +373,7 @@ export default function ProfilView() {
                   value={nouveauMdp}
                   onChange={e => setNouveauMdp(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                   className="h-9 pr-10"
                 />
                 <button
@@ -392,7 +395,7 @@ export default function ProfilView() {
                 value={confirmMdp}
                 onChange={e => setConfirmMdp(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
                 className="h-9"
               />
               {confirmMdp && nouveauMdp !== confirmMdp && (

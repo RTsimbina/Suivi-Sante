@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { CONTRAT_STATUTS, APPEL_FONDS_STATUTS, APPEL_FONDS_STATUT_VALEURS } from '@/lib/statuts';
 import { formatMontant, formatDate } from './format';
 import { usePeriode } from '@/lib/periode-context';
 
@@ -27,19 +28,22 @@ interface AppelFonds {
   contrat: { id: string; reference: string; societe: { id: string; nom: string } };
 }
 
-const STATUT_BADGE: Record<string, string> = {
-  ACTIF: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  EXPIRE: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
-  SUSPENDU: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  EN_ATTENTE: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  REGLE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  PARTIELLEMENT_REGLE: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
-};
-
-const STATUT_LABEL: Record<string, string> = {
-  ACTIF: 'Actif', EXPIRE: 'Expiré', SUSPENDU: 'Suspendu',
-  EN_ATTENTE: 'En attente', REGLE: 'Réglé', PARTIELLEMENT_REGLE: 'Partiellement réglé',
-};
+// Badges statuts — délégués aux sources de vérité (statuts.ts)
+// [imports en tête de fichier : CONTRAT_STATUTS, APPEL_FONDS_STATUTS, APPEL_FONDS_STATUT_VALEURS]
+const CONTRAT_BADGE: Record<string, string> = Object.fromEntries(
+  CONTRAT_STATUTS.map((s) => [s.valeur, s.badge])
+);
+const CONTRAT_LABEL: Record<string, string> = Object.fromEntries(
+  CONTRAT_STATUTS.map((s) => [s.valeur, s.label])
+);
+const APPEL_BADGE: Record<string, string> = Object.fromEntries(
+  APPEL_FONDS_STATUTS.map((s) => [s.valeur, s.badge])
+);
+const APPEL_LABEL: Record<string, string> = Object.fromEntries(
+  APPEL_FONDS_STATUTS.map((s) => [s.valeur, s.label])
+);
+const STATUT_BADGE_LOOKUP: Record<string, string> = { ...CONTRAT_BADGE, ...APPEL_BADGE };
+const STATUT_LABEL_LOOKUP: Record<string, string> = { ...CONTRAT_LABEL, ...APPEL_LABEL };
 
 export default function ReportingView() {
   const { queryString: qsPeriode, selection: selectionPeriode } = usePeriode();
@@ -187,7 +191,7 @@ export default function ReportingView() {
                         </div>
                       </td>
                       <td className={`px-4 py-2.5 text-right font-medium ${solde < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatMontant(solde)}</td>
-                      <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE[c.statut] || ''}>{STATUT_LABEL[c.statut] || c.statut}</Badge></td>
+                      <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE_LOOKUP[c.statut] || ''}>{STATUT_LABEL_LOOKUP[c.statut] || c.statut}</Badge></td>
                       <td className="px-4 py-2.5 text-muted-foreground">{formatDate(c.dateFin)}</td>
                     </tr>
                     );
@@ -204,9 +208,9 @@ export default function ReportingView() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-1.5">
-              {['TOUS', 'EN_ATTENTE', 'REGLE', 'PARTIELLEMENT_REGLE'].map(s => (
+              {['TOUS', ...APPEL_FONDS_STATUT_VALEURS].map(s => (
                 <Button key={s} variant={filterStatut === s ? 'default' : 'outline'} size="sm" className={filterStatut === s ? 'bg-emerald-600' : ''} onClick={() => setFilterStatut(s)}>
-                  {s === 'TOUS' ? 'Tous' : STATUT_LABEL[s]}
+                  {s === 'TOUS' ? 'Tous' : STATUT_LABEL_LOOKUP[s]}
                 </Button>
               ))}
             </div>
@@ -261,7 +265,7 @@ export default function ReportingView() {
                       <td className="px-4 py-2.5 text-right font-medium">{formatMontant(a.montant)}</td>
                       <td className="px-4 py-2.5">{formatDate(a.dateAppel)}</td>
                       <td className="px-4 py-2.5">{a.datePaiement ? formatDate(a.datePaiement) : <span className="text-muted-foreground">—</span>}</td>
-                      <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE[a.statut] || ''}>{STATUT_LABEL[a.statut] || a.statut}</Badge></td>
+                      <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE_LOOKUP[a.statut] || ''}>{STATUT_LABEL_LOOKUP[a.statut] || a.statut}</Badge></td>
                       <td className="px-4 py-2.5 text-right">
                         {a.statut === 'EN_ATTENTE' && (
                           <Button size="sm" variant="outline" onClick={() => marquerRegle(a.id)} className="text-xs h-7 text-emerald-600 border-emerald-200 dark:border-emerald-800">

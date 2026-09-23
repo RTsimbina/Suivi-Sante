@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ROLES as ROLES_REFERENTIEL, ROLE_LABELS, ROLE_COLORS } from '@/lib/referentiels';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -65,17 +66,12 @@ interface LiaisonInfo {
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
-const ROLES = [
-  { value: 'ADMINISTRATEUR', label: 'Administrateur', color: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300' },
-  { value: 'ACCUEIL', label: 'Accueil', color: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300' },
-  { value: 'TECHNIQUE', label: 'Service Technique', color: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' },
-  { value: 'COMPTABILITE', label: 'Comptabilite', color: 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300' },
-  { value: 'SANTE', label: 'Controle Sante', color: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300' },
-  { value: 'PORTAIL_CLIENT', label: 'Portail Client', color: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300' },
-  { value: 'CONTACT_ENTREPRISE', label: 'Contact Entreprise', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300' },
-  { value: 'PRESTATAIRE', label: 'Prestataire', color: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' },
-];
-
+// Rôles — délégués au référentiel central (libellés avec accents, couleurs canoniques)
+const ROLES: { value: string; label: string; color: string }[] = ROLES_REFERENTIEL.map((r) => ({
+  value: r,
+  label: ROLE_LABELS[r] || r,
+  color: ROLE_COLORS[r] || 'bg-muted text-muted-foreground',
+}));
 const EMPTY_FORM: FormData = { email: '', nom: '', password: '', role: 'ACCUEIL', societeId: '' };
 
 function formatDate(d: string | null): string {
