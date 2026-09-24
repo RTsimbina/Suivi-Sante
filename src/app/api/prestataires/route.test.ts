@@ -12,7 +12,7 @@
  * dans permissions.test.ts) ; la base est mockée.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 // ─── Mocks de modules (hoistés) ──────────────────────────────────────────────
@@ -36,8 +36,8 @@ const dbMocks = vi.hoisted(() => ({
   prestataireDelete: vi.fn(),
   exceptionDoublonCreateMany: vi.fn().mockResolvedValue({ count: 0 }),
   groupePrestataireFindUnique: vi.fn().mockResolvedValue(null),
-  /** Exécute la callback de transaction avec un client tx simulé */
-  transaction: null as unknown as <T>(cb: (tx: unknown) => Promise<T>) => Promise<T>,
+  /** Exécute la callback de transaction avec un client tx simulé (vi.fn → mockImplementation disponible) */
+  transaction: null as unknown as Mock,
 }));
 
 /** Client tx transmis à la callback de $transaction : mêmes mocks + verrou */

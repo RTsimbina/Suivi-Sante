@@ -17,6 +17,11 @@
 #     appliquée par migrate deploy. Puis `prisma migrate status`.
 #   • adopter_existant = false (exécutions suivantes) : `migrate deploy`
 #     standard — n'applique que les migrations en attente, idempotent.
+#   • resoudre_echec = <nom de migration> (RÉCUPÉRATION P3018) : marque la
+#     migration indiquée comme « rolled-back » (prisma migrate resolve
+#     --rolled-back) AVANT le deploy, afin qu'elle puisse être rejouée.
+#     À utiliser quand un build Vercel a échoué en pleine migration
+#     (ex : erreur SQL) — corriger d'abord le SQL de la migration.
 #
 # Secret requis : NEON_API_KEY (déjà configuré). L'URL de connexion est
 # récupérée via l'API Neon (connexion DIRECTE, sans -pooler, requis pour
@@ -35,6 +40,11 @@ on:
         description: "Première exécution : base créée via db push ? (adopte la chaîne de migrations)"
         type: boolean
         default: false
+        required: false
+      resoudre_echec:
+        description: "Récupération P3018 : nom de la migration en échec à remettre « rolled-back » (vide sinon)"
+        type: string
+        default: ""
         required: false
 
 permissions:
@@ -185,6 +195,10 @@ jobs:
               echo "   (déjà enregistrée — ignoré)"
           done
 
+      - name: Résolution d'une migration en échec (rollback logique, mode récupération)
+        if: ${{ inputs.resoudre_echec != '' }}
+        run: npx prisma migrate resolve --rolled-back "${{ inputs.resoudre_echec }}"
+
       - name: Appliquer les migrations en attente
         run: npx prisma migrate deploy
 
@@ -197,5 +211,6 @@ jobs:
           echo "Rappel :"
           echo "• Première exécution → cocher « adopter_existant »."
           echo "• Exécutions suivantes → laisser décoché (deploy standard)."
+          echo "• Migration en échec (P3018) → renseigner « resoudre_echec » avec le nom de la migration."
           echo "• Une fois ce workflow vert, recharger l'application : les listes"
           echo "  Prestataires / Sociétés / Service Technique / Utilisateurs fonctionnent."
