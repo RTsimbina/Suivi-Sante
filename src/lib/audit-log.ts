@@ -30,6 +30,8 @@ export interface AuditParams {
   roleUtilisateur?: string;
   /** Identifiant d'opération (généré automatiquement par logAuditOperation) */
   operationId?: string;
+  /** JSON : contexte additionnel (exceptions de doublon validées, etc.) */
+  metadonnees?: string;
 
   // Champs enrichis (optionnels — remplis automatiquement si request fournie)
   action?: AuditAction;
@@ -88,6 +90,9 @@ function classifyNiveau(
   // Toute suppression = CRITIQUE
   if (action === 'SUPPRESSION') return 'CRITIQUE';
 
+  // Validation d'une exception de doublon = dérogation explicitement tracée → CRITIQUE
+  if (action === 'EXCEPTION_DOUBLON') return 'CRITIQUE';
+
   // Toute création = INFO
   if (action === 'CREATION') return 'INFO';
 
@@ -105,6 +110,7 @@ function classifyNiveau(
 function deduceAction(champ: string): AuditAction {
   if (champ === 'CREATION') return 'CREATION';
   if (champ === 'SUPPRESSION') return 'SUPPRESSION';
+  if (champ === 'EXCEPTION_DOUBLON') return 'EXCEPTION_DOUBLON';
   return 'MODIFICATION';
 }
 
@@ -163,7 +169,7 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
     const {
       entite, entiteId, champ,
       ancienneValeur, nouvelleValeur, modifiePar,
-      modifieParId, roleUtilisateur, operationId, action: actionOverride, niveau: niveauOverride,
+      modifieParId, roleUtilisateur, operationId, metadonnees, action: actionOverride, niveau: niveauOverride,
 
       module: moduleOverride, objet: objetOverride,
       societeId, motif, request,
@@ -199,6 +205,7 @@ export async function logParametreChange(params: AuditParams): Promise<void> {
         modifieParId: modifieParId || null,
         roleUtilisateur: roleUtilisateur || null,
         operationId: operationId || null,
+        metadonnees: metadonnees || null,
 
         action,
         niveau,

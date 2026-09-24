@@ -19,30 +19,45 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Eye, Pencil, Search, Stethoscope, Building2 } from 'lucide-react';
+import { Eye, Pencil, Search, Stethoscope, Building2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
-import { PrestataireItem, TYPE_LABELS, TYPE_COLORS, STATUT_CONVENTIONNEL_LABELS } from './types';
+import { PrestataireItem, TYPE_LABELS, TYPE_COLORS, STATUT_CONVENTIONNEL_LABELS, GroupeItem, STATUTS_JURIDIQUES_PRESTATAIRE, STATUT_JURIDIQUE_LABELS } from './types';
 
 export default function AnnuairePrestataires({
   prestataires,
   societesParPrestataire,
+  groupes = [],
   canEdit,
   onOuvrirFiche,
   onOuvrirEdition,
 }: {
   prestataires: PrestataireItem[];
   societesParPrestataire: Map<string, { societe: { id: string; nom: string }; actif: boolean }[]>;
+  groupes?: GroupeItem[];
   canEdit: boolean;
   onOuvrirFiche: (id: string) => void;
   onOuvrirEdition: (p: PrestataireItem) => void;
 }) {
+  // Sociétés connues (déduites des rattachements) pour le filtre société
+  const societesDisponibles = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of prestataires) {
+      const rattaches = societesParPrestataire.get(p.id) ?? p.societes ?? [];
+      for (const r of rattaches) map.set(r.societe.id, r.societe.nom);
+    }
+    return Array.from(map.entries()).map(([id, nom]) => ({ id, nom })).sort((a, b) => a.nom.localeCompare(b.nom));
+  }, [prestataires, societesParPrestataire]);
+
   // ─── Filtres locaux ────────────────────────────────────────────────────────
   const [recherche, setRecherche] = useState('');
   const [filtreType, setFiltreType] = useState('');
   const [filtreStatut, setFiltreStatut] = useState<'' | 'actif' | 'inactif'>('');
+  const [filtreStatutJuridique, setFiltreStatutJuridique] = useState('');
+  const [filtreSociete, setFiltreSociete] = useState('');
+  const [filtreGroupe, setFiltreGroupe] = useState('');
 
   const prestatairesFiltres = useMemo(() => {
     let result = prestataires;
@@ -50,6 +65,7 @@ export default function AnnuairePrestataires({
       const q = recherche.trim().toLowerCase();
       result = result.filter(p =>
         p.nom.toLowerCase().includes(q) ||
+        (p.code && p.code.toLowerCase().includes(q)) ||
         (p.email && p.email.toLowerCase().includes(q)) ||
         (p.telephone && p.telephone.includes(q)) ||
         (p.nif && p.nif.toLowerCase().includes(q)) ||
@@ -59,8 +75,16 @@ export default function AnnuairePrestataires({
     }
     if (filtreType) result = result.filter(p => p.type === filtreType);
     if (filtreStatut) result = result.filter(p => (filtreStatut === 'actif' ? p.actif : !p.actif));
+    if (filtreStatutJuridique) result = result.filter(p => p.statutJuridique === filtreStatutJuridique);
+    if (filtreGroupe) result = result.filter(p => p.groupePrestataire?.id === filtreGroupe);
+    if (filtreSociete) {
+      result = result.filter(p => {
+        const rattaches = societesParPrestataire.get(p.id) ?? p.societes ?? [];
+        return rattaches.some(r => r.societe.id === filtreSociete);
+      });
+    }
     return result;
-  }, [prestataires, recherche, filtreType, filtreStatut]);
+  }, [prestataires, recherche, filtreType, filtreStatut, filtreStatutJuridique, filtreGroupe, filtreSociete, societesParPrestataire]);
 
   return (
     <div className="space-y-3">
@@ -75,7 +99,7 @@ export default function AnnuairePrestataires({
             className="h-9 text-sm pl-9"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <select
             aria-label="Filtrer par type de prestataire"
             className="h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -85,6 +109,39 @@ export default function AnnuairePrestataires({
             <option value="">Tous les types</option>
             {Object.entries(TYPE_LABELS).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrer par statut juridique"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+            value={filtreStatutJuridique}
+            onChange={e => setFiltreStatutJuridique(e.target.value)}
+          >
+            <option value="">Tous les statuts juridiques</option>
+            {STATUTS_JURIDIQUES_PRESTATAIRE.map(s => (
+              <option key={s} value={s}>{STATUT_JURIDIQUE_LABELS[s] ?? s}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrer par société cliente"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+            value={filtreSociete}
+            onChange={e => setFiltreSociete(e.target.value)}
+          >
+            <option value="">Toutes les sociétés</option>
+            {societesDisponibles.map(s => (
+              <option key={s.id} value={s.id}>{s.nom}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrer par groupe de prestataires"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+            value={filtreGroupe}
+            onChange={e => setFiltreGroupe(e.target.value)}
+          >
+            <option value="">Tous les groupes</option>
+            {groupes.map(g => (
+              <option key={g.id} value={g.id}>{g.nom}</option>
             ))}
           </select>
           <select

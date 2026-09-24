@@ -228,21 +228,73 @@ model Assure {
 
 model Prestataire {
   id                String              @id @default(cuid())
+  code              String?             // Code prestataire interne (unicité — index partiel SQL)
   nom               String
+  nomNormalise      String?             // Nom normalisé (minuscules, sans accents) pour la détection de doublons
   type              String
   telephone         String?
   email             String?
   adresse           String?
   nif               String?                             // NIF — Numéro d'Identification Fiscale
   stat              String?                             // Num STAT — Numéro Statistique (Madagascar)
-  statutJuridique   String?                             // Statut juridique (SARL, SA, SUARL, ONG...)
+  statutJuridique   String?                             // Statut juridique (référentiel centralisé — src/lib/referentiels.ts)
   statut            String?                             // Statut conventionnel (CONVENTIONNE / SUSPENDU)
   rib               String?                             // RIB / coordonnées bancaires
+  iban              String?                             // IBAN international (validation mod-97), si applicable
   actif             Boolean             @default(true)
+  // Dérogation ciblée aux contraintes d'unicité : doublons explicitement validés
+  // par un Administrateur (ex : établissements d'un même groupe de prestataires).
+  // Toujours tracée dans ExceptionDoublon + Journal d'Audit. Ne désactive pas
+  // les autres contrôles ni les contraintes pour les fiches normales.
+  exceptionValidee  Boolean             @default(false)
+  groupePrestataireId String?
+  groupePrestataire GroupePrestataire?  @relation(fields: [groupePrestataireId], references: [id])
   dossiers          Dossier[]           @relation("PrestataireDossier")
   societes          PrestataireSociete[]
+  exceptionsDoublon ExceptionDoublon[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+
+  @@index([nomNormalise])
+  @@index([nif])
+  @@index([stat])
+  @@index([email])
+  @@index([code])
+  @@index([groupePrestataireId])
+}
+
+/// Groupe de prestataires : plusieurs établissements / agences d'un même
+/// opérateur. Justifie les exceptions de doublon (données communes légitimes).
+model GroupePrestataire {
+  id           String        @id @default(cuid())
+  nom          String        @unique
+  description  String?
+  prestataires Prestataire[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+/// Trace de chaque exception de doublon validée par un Administrateur.
+/// Ne jamais supprimer : complément structurel immuable du Journal d'Audit.
+model ExceptionDoublon {
+  id                     String      @id @default(cuid())
+  prestataireId          String
+  prestataire            Prestataire @relation(fields: [prestataireId], references: [id], onDelete: Cascade)
+  prestataireExistantId  String?     // Fiche déjà porteuse de la donnée (peut avoir été supprimée depuis)
+  prestataireExistantNom String      // Nom conservé pour traçabilité même si la fiche existante disparaît
+  champ                  String      // nif | stat | email | code | nom
+  valeur                 String      // Valeur en doublon (normalisée)
+  motif                  String      // Ex : appartenance au même groupe de prestataires
+  contexte               String      // CREATION | MODIFICATION
+  operationId            String?     // Regroupement des entrées d'audit d'une même opération
+  valideParNom           String
+  valideParId            String?
+  valideParRole          String
+  dateValidation         DateTime    @default(now())
+
+  @@index([prestataireId])
+  @@index([champ, valeur])
+  @@index([operationId])
 }
 
 /// Liaison many-to-many entre Prestataire et Societe avec statut actif/inactif par société.
@@ -376,6 +428,7 @@ model HistoriqueParametre {
   motif            String?                             // Motif / description de l'opération
   roleUtilisateur  String?                             // Rôle de l'utilisateur au moment de l'opération (figé — immuable)
   operationId      String?                             // Regroupe les lignes d'une même opération (1 opération = N champs modifiés)
+  metadonnees      String?                             // JSON : contexte additionnel (exceptions de doublon validées, etc.)
 
   @@index([entite, entiteId])
   @@index([dateModification])

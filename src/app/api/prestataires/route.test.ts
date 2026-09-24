@@ -34,7 +34,32 @@ const dbMocks = vi.hoisted(() => ({
   prestataireCreate: vi.fn(),
   prestataireUpdate: vi.fn(),
   prestataireDelete: vi.fn(),
+  exceptionDoublonCreateMany: vi.fn().mockResolvedValue({ count: 0 }),
+  groupePrestataireFindUnique: vi.fn().mockResolvedValue(null),
+  /** Exécute la callback de transaction avec un client tx simulé */
+  transaction: null as unknown as <T>(cb: (tx: unknown) => Promise<T>) => Promise<T>,
 }));
+
+/** Client tx transmis à la callback de $transaction : mêmes mocks + verrou */
+function makeTxClient() {
+  return {
+    $executeRaw: vi.fn().mockResolvedValue(0),
+    prestataire: {
+      findMany: dbMocks.prestataireFindMany,
+      findUnique: dbMocks.prestataireFindUnique,
+      create: dbMocks.prestataireCreate,
+      update: dbMocks.prestataireUpdate,
+    },
+    exceptionDoublon: {
+      createMany: dbMocks.exceptionDoublonCreateMany,
+    },
+    groupePrestataire: {
+      findUnique: dbMocks.groupePrestataireFindUnique,
+    },
+  };
+}
+
+dbMocks.transaction = vi.fn(async (cb) => cb(makeTxClient()));
 
 vi.mock('@/lib/authorize', () => ({
   checkAuth: authMocks.checkAuth,
@@ -47,12 +72,19 @@ vi.mock('@/lib/audit-log', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    $transaction: (cb: (tx: unknown) => Promise<unknown>) => dbMocks.transaction(cb),
     prestataire: {
       findMany: dbMocks.prestataireFindMany,
       findUnique: dbMocks.prestataireFindUnique,
       create: dbMocks.prestataireCreate,
       update: dbMocks.prestataireUpdate,
       delete: dbMocks.prestataireDelete,
+    },
+    exceptionDoublon: {
+      createMany: dbMocks.exceptionDoublonCreateMany,
+    },
+    groupePrestataire: {
+      findUnique: dbMocks.groupePrestataireFindUnique,
     },
   },
 }));
@@ -101,6 +133,7 @@ const PRESTATAIRE_EXISTANT = {
   statut: 'CONVENTIONNE',
   rib: '000 12345 67890 12 3',
   actif: true,
+  exceptionsDoublon: [],
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
 };
@@ -116,6 +149,8 @@ beforeEach(() => {
   dbMocks.prestataireCreate.mockResolvedValue({ id: 'p-new', ...FICHE_COMPLETE, actif: true });
   dbMocks.prestataireUpdate.mockResolvedValue({ ...PRESTATAIRE_EXISTANT });
   dbMocks.prestataireDelete.mockResolvedValue(PRESTATAIRE_EXISTANT);
+  dbMocks.exceptionDoublonCreateMany.mockResolvedValue({ count: 0 });
+  dbMocks.transaction.mockImplementation(async (cb) => cb(makeTxClient()));
 });
 
 // ─── POST : création ─────────────────────────────────────────────────────────
@@ -165,21 +200,29 @@ describe('POST /api/prestataires — création avec traçabilité', () => {
 
   it('refuse un nom en doublon (409) même avec casse/accents différents', async () => {
     dbMocks.prestataireFindMany.mockResolvedValue([
-      { id: 'p-autre', nom: 'CLINIQUE TEST', email: null, nif: null, stat: null, actif: true },
+      { id: 'p-autre', nom: 'CLINIQUE TEST', code: null, email: null, nif: null, stat: null, nomNormalise: null, actif: true },
     ]);
 
     const res = await POST(requeteJson('POST', FICHE_COMPLETE));
 
     expect(res.status).toBe(409);
     const data = await res.json();
-    expect(data.erreur).toContain('existe déjà');
+    // 409 structuré : message + liste des doublons avec l'information existante
+    expect(data.erreur).toContain('doublon');
+    expect(data.erreur).toContain('déjà utilisé');
+    expect(Array.isArray(data.doublons)).toBe(true);
+    expect(data.doublons[0]).toMatchObject({
+      champ: 'nom',
+      prestataireExistantId: 'p-autre',
+      prestataireExistantNom: 'CLINIQUE TEST',
+    });
     expect(dbMocks.prestataireCreate).not.toHaveBeenCalled();
     expect(auditMocks.logParametreChange).not.toHaveBeenCalled();
   });
 
   it('refuse un NIF déjà attribué même avec séparateurs différents (409)', async () => {
     dbMocks.prestataireFindMany.mockResolvedValue([
-      { id: 'p-autre', nom: 'Autre Cabinet', email: null, nif: '4001-234-567', stat: null, actif: true },
+      { id: 'p-autre', nom: 'Autre Cabinet', code: null, email: null, nif: '4001-234-567', stat: null, nomNormalise: null, actif: true },
     ]);
 
     const res = await POST(requeteJson('POST', FICHE_COMPLETE));
@@ -187,11 +230,12 @@ describe('POST /api/prestataires — création avec traçabilité', () => {
     expect(res.status).toBe(409);
     const data = await res.json();
     expect(data.erreur).toContain('NIF');
+    expect(data.doublons[0].champ).toBe('nif');
   });
 
   it('refuse un Num STAT déjà attribué (409)', async () => {
     dbMocks.prestataireFindMany.mockResolvedValue([
-      { id: 'p-autre', nom: 'Autre Cabinet', email: null, nif: null, stat: '6512311200202345', actif: true },
+      { id: 'p-autre', nom: 'Autre Cabinet', code: null, email: null, nif: null, stat: '6512311200202345', nomNormalise: null, actif: true },
     ]);
 
     const res = await POST(requeteJson('POST', FICHE_COMPLETE));
@@ -199,6 +243,59 @@ describe('POST /api/prestataires — création avec traçabilité', () => {
     expect(res.status).toBe(409);
     const data = await res.json();
     expect(data.erreur).toContain('STAT');
+    expect(data.doublons[0].champ).toBe('stat');
+  });
+
+  it('refuse la demande d\'exception par un rôle non Administrateur (403)', async () => {
+    auditMocks.getUserInfoFromRequest.mockResolvedValue({
+      nom: 'Tech User', id: 'u-tech', role: 'TECHNIQUE',
+    });
+    dbMocks.prestataireFindMany.mockResolvedValue([
+      { id: 'p-autre', nom: 'CLINIQUE TEST', code: null, email: null, nif: null, stat: null, nomNormalise: null, actif: true },
+    ]);
+
+    const res = await POST(requeteJson('POST', {
+      ...FICHE_COMPLETE,
+      exceptionDoublon: true,
+      motifException: 'Appartenance au même groupe de prestataires',
+    }));
+
+    expect(res.status).toBe(403);
+    const data = await res.json();
+    expect(data.erreur).toContain('Administrateur');
+    expect(dbMocks.prestataireCreate).not.toHaveBeenCalled();
+  });
+
+  it('crée avec exception si l\'Administrateur fournit un motif, et trace EXCEPTION_DOUBLON', async () => {
+    dbMocks.prestataireFindMany.mockResolvedValue([
+      { id: 'p-autre', nom: 'Autre Cabinet', code: null, email: null, nif: '4001234567', stat: null, nomNormalise: null, actif: true },
+    ]);
+    dbMocks.prestataireCreate.mockResolvedValue({
+      id: 'p-new', nom: 'Clinique Test', type: 'CLINIQUE', groupePrestataireId: null,
+    });
+
+    const res = await POST(requeteJson('POST', {
+      ...FICHE_COMPLETE,
+      exceptionDoublon: true,
+      motifException: 'Établissement du même groupe de prestataires (données communes légitimes)',
+    }));
+
+    expect(res.status).toBe(201);
+    // La dérogation est tracée structurellement + dans le journal d'audit
+    expect(dbMocks.exceptionDoublonCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ champ: 'nif', valideParRole: 'ADMINISTRATEUR' }),
+        ]),
+      })
+    );
+    expect(auditMocks.logParametreChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        champ: 'EXCEPTION_DOUBLON',
+        action: 'EXCEPTION_DOUBLON',
+        niveau: 'CRITIQUE',
+      })
+    );
   });
 });
 
@@ -300,7 +397,7 @@ describe('PUT /api/prestataires — modification tracée par champ', () => {
 
   it('refuse un e-mail déjà utilisé par un AUTRE prestataire (409)', async () => {
     dbMocks.prestataireFindMany.mockResolvedValue([
-      { id: 'p-autre', nom: 'Autre Cabinet', email: 'pris@clinique.mg', nif: null, stat: null, actif: true },
+      { id: 'p-autre', nom: 'Autre Cabinet', code: null, email: 'pris@clinique.mg', nif: null, stat: null, nomNormalise: null, actif: true },
     ]);
 
     const res = await PUT(requeteJson('PUT', { id: 'p1', email: 'pris@clinique.mg' }));

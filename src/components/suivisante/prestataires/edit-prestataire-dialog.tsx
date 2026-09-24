@@ -28,11 +28,12 @@ import {
 } from '@/components/ui/dialog';
 
 import {
-  CreateFormState, EditFormState, PrestataireItem,
+  CreateFormState, EditFormState, PrestataireItem, DoublonInfo, GroupeItem,
   STATUTS_CONVENTIONNELS, STATUT_CONVENTIONNEL_LABELS,
-  STATUTS_JURIDIQUES_SUGGERES, TYPE_LABELS,
+  STATUTS_JURIDIQUES_PRESTATAIRE, STATUT_JURIDIQUE_LABELS, TYPE_LABELS,
 } from './types';
 import { validerFormulairePrestataire } from './validations';
+import DoublonExceptionPanel from './doublon-exception';
 
 function ErreurChamp({ message }: { message?: string }) {
   if (!message) return null;
@@ -53,6 +54,13 @@ export default function EditPrestataireDialog({
   onErrorsChange,
   saving,
   onSave,
+  userRole,
+  groupes,
+  doublons,
+  motifException,
+  onMotifExceptionChange,
+  onConfirmerException,
+  onModifierSaisie,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,6 +71,13 @@ export default function EditPrestataireDialog({
   onErrorsChange: (errors: Record<string, string>) => void;
   saving: boolean;
   onSave: (form: CreateFormState) => void;
+  userRole: string;
+  groupes: GroupeItem[];
+  doublons: DoublonInfo[];
+  motifException: string;
+  onMotifExceptionChange: (motif: string) => void;
+  onConfirmerException: () => void;
+  onModifierSaisie: () => void;
 }) {
   function handleEnregistrer() {
     const erreurs = validerFormulairePrestataire(form);
@@ -85,6 +100,18 @@ export default function EditPrestataireDialog({
             {prestataire?.nom} — chaque modification est enregistrée dans le Journal d&apos;Audit
             des Paramétrages (champ, ancienne valeur, nouvelle valeur, utilisateur).
           </p>
+
+          {/* Doublons détectés (409) + validation d'exception Administrateur */}
+          <DoublonExceptionPanel
+            doublons={doublons}
+            isAdmin={userRole === 'ADMINISTRATEUR'}
+            saving={saving}
+            groupes={groupes}
+            motif={motifException}
+            onMotifChange={onMotifExceptionChange}
+            onConfirmer={onConfirmerException}
+            onModifierSaisie={onModifierSaisie}
+          />
 
           {/* Nom * */}
           <div className="space-y-1">
@@ -119,17 +146,17 @@ export default function EditPrestataireDialog({
             </div>
             <div className="space-y-1">
               <Label htmlFor="edit-statutJuridique" className="text-xs font-medium">Statut juridique</Label>
-              <Input
+              <select
                 id="edit-statutJuridique"
-                placeholder="Ex : SARL, SA, ONG..."
-                list="statuts-juridiques"
                 value={form.statutJuridique}
                 onChange={e => onFormChange(f => ({ ...f, statutJuridique: e.target.value }))}
-                className="h-9 text-sm"
-              />
-              <datalist id="statuts-juridiques">
-                {STATUTS_JURIDIQUES_SUGGERES.map(s => <option key={s} value={s} />)}
-              </datalist>
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">— Non défini —</option>
+                {STATUTS_JURIDIQUES_PRESTATAIRE.map(s => (
+                  <option key={s} value={s}>{STATUT_JURIDIQUE_LABELS[s] ?? s}</option>
+                ))}
+              </select>
               <ErreurChamp message={errors.statutJuridique} />
             </div>
           </div>
@@ -174,6 +201,35 @@ export default function EditPrestataireDialog({
               className="h-9 text-sm"
             />
             <ErreurChamp message={errors.adresse} />
+          </div>
+
+          {/* Code prestataire + Groupe */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="edit-code" className="text-xs font-medium">Code prestataire</Label>
+              <Input
+                id="edit-code"
+                placeholder="Ex : PRE-001"
+                value={form.code}
+                onChange={e => onFormChange(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                className="h-9 text-sm"
+              />
+              <ErreurChamp message={errors.code} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-groupe" className="text-xs font-medium">Groupe de prestataires</Label>
+              <select
+                id="edit-groupe"
+                value={form.groupePrestataireId}
+                onChange={e => onFormChange(f => ({ ...f, groupePrestataireId: e.target.value }))}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Aucun groupe</option>
+                {groupes.map(g => (
+                  <option key={g.id} value={g.id}>{g.nom}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* NIF + Num STAT */}
@@ -237,6 +293,19 @@ export default function EditPrestataireDialog({
               />
               <ErreurChamp message={errors.rib} />
             </div>
+          </div>
+
+          {/* IBAN */}
+          <div className="space-y-1">
+            <Label htmlFor="edit-iban" className="text-xs font-medium">IBAN (si applicable)</Label>
+            <Input
+              id="edit-iban"
+              placeholder="Ex : MG48..."
+              value={form.iban}
+              onChange={e => onFormChange(f => ({ ...f, iban: e.target.value.toUpperCase() }))}
+              className="h-9 text-sm"
+            />
+            <ErreurChamp message={errors.iban} />
           </div>
 
           {/* Boutons */}

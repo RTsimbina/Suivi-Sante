@@ -41,6 +41,7 @@ interface HistoriqueEntry {
   navigateur: string | null;
   sessionId: string | null;
   motif: string | null;
+  metadonnees?: string | null;
   journalNumero: string;
   moduleLibelle: string;
 }
@@ -79,6 +80,7 @@ const ACTION_OPTIONS = [
   { value: 'CREATION', label: '➕ Création' },
   { value: 'MODIFICATION', label: '✏️ Modification' },
   { value: 'SUPPRESSION', label: '🗑 Suppression' },
+  { value: 'EXCEPTION_DOUBLON', label: '⚠️ Exception doublon' },
 ];
 
 const NIVEAU_OPTIONS = [
@@ -561,7 +563,7 @@ export default function JournalView() {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
-                          {(entry.action === 'CREATION' || entry.action === 'SUPPRESSION') ? '-' : entry.champ}
+                          {(entry.action === 'CREATION' || entry.action === 'SUPPRESSION' || entry.action === 'EXCEPTION_DOUBLON') ? '-' : entry.champ}
                         </td>
                         <td className="py-2.5 px-3 max-w-[160px]">
                           {entry.action === 'CREATION' ? (
@@ -628,11 +630,27 @@ export default function JournalView() {
                   <DetailField label="Entité" value={selectedEntry.entite} mono />
                   <DetailField label="Objet" value={selectedEntry.objet || '-'} />
                   <DetailField label="Action" value={selectedEntry.action} />
-                  <DetailField label="Champ modifié" value={(selectedEntry.action === 'CREATION' || selectedEntry.action === 'SUPPRESSION') ? '-' : selectedEntry.champ} />
+                  <DetailField label="Champ modifié" value={(selectedEntry.action === 'CREATION' || selectedEntry.action === 'SUPPRESSION' || selectedEntry.action === 'EXCEPTION_DOUBLON') ? '-' : selectedEntry.champ} />
                   <DetailField label="Ancienne valeur" value={selectedEntry.ancienneValeur || 'vide'} />
                   <DetailField label="Nouvelle valeur" value={selectedEntry.nouvelleValeur || 'vide'} />
                   <DetailField label="Effectué par" value={selectedEntry.modifiePar} />
                   <DetailField label="Rôle" value={selectedEntry.roleUtilisateur ? (ROLE_LABELS[selectedEntry.roleUtilisateur as keyof typeof ROLE_LABELS] ?? selectedEntry.roleUtilisateur) : '-'} />
+                  {selectedEntry.metadonnees && (
+                    <div className="md:col-span-2 lg:col-span-3 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/20 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-2">
+                        Détails de l&apos;exception de doublon
+                      </p>
+                      <pre className="text-[11px] leading-relaxed text-foreground whitespace-pre-wrap break-words">
+                        {(() => {
+                          try {
+                            return JSON.stringify(JSON.parse(selectedEntry.metadonnees), null, 2);
+                          } catch {
+                            return selectedEntry.metadonnees;
+                          }
+                        })()}
+                      </pre>
+                    </div>
+                  )}
                   <DetailField label="ID utilisateur" value={selectedEntry.modifieParId || '-'} mono />
                   <DetailField label="ID entité" value={selectedEntry.entiteId} mono />
                   <DetailField label="Niveau" value={selectedEntry.niveau} />

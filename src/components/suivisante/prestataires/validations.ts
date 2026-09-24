@@ -23,6 +23,7 @@ export function validerFormulairePrestataire(form: CreateFormState): ErreursParC
   const resultat = prestataireCreateSchema.safeParse({
     nom: form.nom,
     type: form.type || undefined,
+    code: form.code || undefined,
     telephone: form.telephone || undefined,
     email: form.email || undefined,
     adresse: form.adresse || undefined,
@@ -31,6 +32,8 @@ export function validerFormulairePrestataire(form: CreateFormState): ErreursParC
     statutJuridique: form.statutJuridique || undefined,
     statut: form.statut || undefined,
     rib: form.rib || undefined,
+    iban: form.iban || undefined,
+    groupePrestataireId: form.groupePrestataireId || undefined,
   });
 
   if (resultat.success) return {};

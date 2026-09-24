@@ -10,11 +10,15 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
+import { validerFormulairePrestataire } from './validations';
+
 import {
   SocieteItem, PrestataireItem, LienPS, SocieteStats,
   StatutFilter, CreateFormState, EMPTY_CREATE_FORM,
-  formulaireDepuisPrestataire,
+  formulaireDepuisPrestataire, DoublonInfo,
 } from './types';
+
+export interface GroupeItem { id: string; nom: string }
 
 export function usePrestatairesData() {
   // ─── État ───────────────────────────────────────────────────────────────
@@ -47,6 +51,43 @@ export function usePrestatairesData() {
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [createSocieteSearch, setCreateSocieteSearch] = useState('');
+
+  // Doublons détectés (409) — information déjà existante affichée + exception admin
+  const [createDoublons, setCreateDoublons] = useState<DoublonInfo[]>([]);
+  const [editDoublons, setEditDoublons] = useState<DoublonInfo[]>([]);
+
+  // Groupes de prestataires
+  const [groupes, setGroupes] = useState<GroupeItem[]>([]);
+
+  const fetchGroupes = useCallback(async () => {
+    try {
+      const res = await fetch('/api/prestataires/groupes');
+      if (res.status === 401 || res.status === 403) return;
+      if (res.ok) {
+        const data = await res.json();
+        setGroupes((data.groupes || []).map((g: { id: string; nom: string }) => ({ id: g.id, nom: g.nom })));
+      }
+    } catch { /* silencieux : les listes de groupes restent vides */ }
+  }, []);
+
+  /** Crée un groupe de prestataires (Administrateur / Service Technique). */
+  async function creerGroupe(nom: string, description?: string): Promise<{ ok: boolean; erreur?: string }> {
+    try {
+      const res = await fetch('/api/prestataires/groupes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: nom.trim(), description: description?.trim() || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { ok: false, erreur: (data as { erreur?: string }).erreur || `Erreur ${res.status}` };
+      }
+      await fetchGroupes();
+      return { ok: true };
+    } catch {
+      return { ok: false, erreur: 'Erreur réseau' };
+    }
+  }
 
   // Formulaire de modification (état piloté par la vue d'édition)
   const [editForm, setEditForm] = useState<CreateFormState>(EMPTY_CREATE_FORM);
@@ -129,6 +170,13 @@ export function usePrestatairesData() {
             statutJuridique: (p.statutJuridique as string | null) ?? null,
             statut: (p.statut as string | null) ?? null,
             rib: (p.rib as string | null) ?? null,
+            iban: (p.iban as string | null) ?? null,
+            code: (p.code as string | null) ?? null,
+            exceptionValidee: Boolean(p.exceptionValidee),
+            groupePrestataire:
+              (p.groupePrestataire as { id: string; nom: string } | null) ?? null,
+            societes:
+              (p.societes as { societe: { id: string; nom: string }; actif: boolean }[] | undefined) ?? [],
             actif: Boolean(p.actif),
             nbDossiers:
               (p._count as { dossiers?: number } | undefined)?.dossiers ?? 0,
@@ -146,7 +194,8 @@ export function usePrestatairesData() {
     fetchSocietes();
     fetchLiens();
     fetchAllPrestataires();
-  }, [fetchSocietes, fetchLiens, fetchAllPrestataires]);
+    fetchGroupes();
+  }, [fetchSocietes, fetchLiens, fetchAllPrestataires, fetchGroupes]);
 
   // Auto-sélection première société
   useEffect(() => {
@@ -302,11 +351,37 @@ export function usePrestatairesData() {
     } catch { /* silent */ } finally { setSaving(false); }
   }
 
+  /** Corps JSON standard du formulaire (champs du référentiel).
+   *  NB : l'id est placé en premier (ordre de sérialisation stable). */
+  function corpsDepuisFormulaire(form: CreateFormState, avecId?: string): Record<string, unknown> {
+    const corps: Record<string, unknown> = avecId
+      ? { id: avecId }
+      : {};
+    Object.assign(corps, {
+      nom: form.nom,
+      type: form.type || undefined,
+      code: form.code || undefined,
+      telephone: form.telephone || undefined,
+      email: form.email || undefined,
+      adresse: form.adresse || undefined,
+      nif: form.nif || undefined,
+      stat: form.stat || undefined,
+      statutJuridique: form.statutJuridique || undefined,
+      statut: form.statut || undefined,
+      rib: form.rib || undefined,
+      iban: form.iban || undefined,
+      groupePrestataireId: form.groupePrestataireId || undefined,
+    });
+    return corps;
+  }
+
   async function handleCreatePrestataire() {
     setCreateError('');
     setCreateSuccess('');
-    if (!createForm.nom.trim() || !createForm.type) {
-      setCreateError('Le nom et le type sont obligatoires.');
+    setCreateDoublons([]);
+    const erreurs = validerFormulairePrestataire(createForm);
+    if (Object.keys(erreurs).length > 0) {
+      setCreateError(Object.values(erreurs)[0]);
       return;
     }
     setCreating(true);
@@ -315,19 +390,14 @@ export function usePrestatairesData() {
       const res = await fetch('/api/prestataires', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nom: createForm.nom,
-          type: createForm.type,
-          telephone: createForm.telephone || undefined,
-          email: createForm.email || undefined,
-          adresse: createForm.adresse || undefined,
-          nif: createForm.nif || undefined,
-          stat: createForm.stat || undefined,
-          statutJuridique: createForm.statutJuridique || undefined,
-          statut: createForm.statut || undefined,
-          rib: createForm.rib || undefined,
-        }),
+        body: JSON.stringify(corpsDepuisFormulaire(createForm)),
       });
+      if (res.status === 409 || res.status === 403) {
+        const err = await res.json().catch(() => ({}));
+        setCreateError(err.erreur || 'Des doublons ont été détectés.');
+        if (res.status === 409) setCreateDoublons(err.doublons || []);
+        return;
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setCreateError(err.erreur || 'Erreur lors de la création du prestataire.');
@@ -359,6 +429,7 @@ export function usePrestatairesData() {
       // 3) Réinitialiser le formulaire et rafraîchir les données
       setCreateForm(EMPTY_CREATE_FORM);
       setCreateSelectedSocietes([]);
+      setCreateDoublons([]);
       fetchAllPrestataires();
       fetchLiens();
       // Fermer le dialogue après un court délai pour montrer le succès
@@ -391,6 +462,7 @@ export function usePrestatairesData() {
     setCreateError('');
     setCreateSuccess('');
     setCreateSocieteSearch('');
+    setCreateDoublons([]);
   }
 
   function changeCreateDialogOpen(open: boolean) {
@@ -456,28 +528,25 @@ export function usePrestatairesData() {
   async function handleSaveEdit(form: CreateFormState) {
     if (!editPrestataire) return;
     setSavingEdit(true);
+    setEditDoublons([]);
     try {
       const res = await fetch('/api/prestataires', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editPrestataire.id,
-          nom: form.nom,
-          type: form.type || undefined,
-          telephone: form.telephone || undefined,
-          email: form.email || undefined,
-          adresse: form.adresse || undefined,
-          nif: form.nif || undefined,
-          stat: form.stat || undefined,
-          statutJuridique: form.statutJuridique || undefined,
-          statut: form.statut || undefined,
-          rib: form.rib || undefined,
-        }),
+        body: JSON.stringify(corpsDepuisFormulaire(form, editPrestataire.id)),
       });
       const data = await res.json().catch(() => null);
+      if (res.status === 409 || res.status === 403) {
+        // 409 = doublons (nom, e-mail, NIF, Num STAT, code) — l'information
+        // déjà existante est affichée ; l'exception est réservée à l'Administrateur.
+        toast.warning(
+          (data && typeof data.erreur === 'string' && data.erreur) ||
+            `Erreur ${res.status} : modification refusée`
+        );
+        if (res.status === 409) setEditDoublons((data as { doublons?: DoublonInfo[] }).doublons || []);
+        return;
+      }
       if (!res.ok) {
-        // 400 = validation, 403 = rôle non autorisé, 404 = introuvable,
-        // 409 = doublon (nom, e-mail, NIF, Num STAT) — messages français serveur
         const detailZod =
           data && Array.isArray(data.details) && data.details.length > 0
             ? `${data.details[0].champ} : ${data.details[0].message}`
@@ -493,6 +562,81 @@ export function usePrestatairesData() {
       setEditDialogOpen(false);
       setEditPrestataire(null);
       // Rafraîchir les listes (fiche + annuaire + conventions)
+      fetchAllPrestataires();
+    } catch {
+      toast.error('Erreur réseau : modification non enregistrée');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  /**
+   * Valide une exception de doublon : réémet l'opération avec le motif.
+   * Le serveur autorise l'exception UNIQUEMENT pour un Administrateur et
+   * l'enregistre dans le Journal d'Audit (action EXCEPTION_DOUBLON, CRITIQUE).
+   */
+  async function confirmerExceptionCreation(motif: string) {
+    if (!motif || motif.trim().length < 5) {
+      setCreateError('Un motif est requis (5 caractères minimum) pour valider une exception.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      const res = await fetch('/api/prestataires', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...corpsDepuisFormulaire(createForm),
+          exceptionDoublon: true,
+          motifException: motif.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCreateError((data as { erreur?: string }).erreur || `Erreur ${res.status}`);
+        return;
+      }
+      toast.success('Prestataire créé. Exception de doublon enregistrée dans le journal d\'audit.');
+      setCreateDoublons([]);
+      setCreateForm(EMPTY_CREATE_FORM);
+      setCreateSelectedSocietes([]);
+      fetchAllPrestataires();
+      fetchLiens();
+      setTimeout(() => { setCreateDialogOpen(false); setCreateSuccess(''); }, 1200);
+    } catch {
+      setCreateError('Erreur réseau.');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function confirmerExceptionEdition(motif: string) {
+    if (!editPrestataire) return;
+    if (!motif || motif.trim().length < 5) {
+      toast.error('Un motif est requis (5 caractères minimum) pour valider une exception.');
+      return;
+    }
+    setSavingEdit(true);
+    setEditDoublons([]);
+    try {
+      const res = await fetch('/api/prestataires', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...corpsDepuisFormulaire(editForm, editPrestataire.id),
+          exceptionDoublon: true,
+          motifException: motif.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error((data as { erreur?: string }).erreur || `Erreur ${res.status}`);
+        return;
+      }
+      toast.success('Modification enregistrée. Exception de doublon tracée dans le journal d\'audit.');
+      setEditDialogOpen(false);
+      setEditPrestataire(null);
       fetchAllPrestataires();
     } catch {
       toast.error('Erreur réseau : modification non enregistrée');
@@ -542,6 +686,17 @@ export function usePrestatairesData() {
     handleLinkPrestataire,
     handleToggleActif,
     handleUnlink,
+    // Groupes de prestataires
+    groupes,
+    fetchGroupes,
+    creerGroupe,
+    // Doublons / exception
+    createDoublons,
+    editDoublons,
+    setCreateDoublons,
+    setEditDoublons,
+    confirmerExceptionCreation,
+    confirmerExceptionEdition,
     // Dialog création
     createDialogOpen,
     openCreateDialog,

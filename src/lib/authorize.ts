@@ -176,12 +176,22 @@ export const API_PERMISSIONS: Record<
   '/api/prestataires': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
     methods: {
-      POST: ['ADMINISTRATEUR'],
-      // Modification de la fiche prestataire : Administrateur ET Service
-      // Technique exclusivement (ACCUEIL/COMPTABILITE/SANTE : lecture seule).
+      // CRUD complet : Administrateur ET Service Technique (spécification
+      // « Gestion des prestataires »). ACCUEIL/COMPTABILITE/SANTE : lecture
+      // seule (GET). Contrôle serveur — jamais uniquement côté interface.
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
       PUT: ['ADMINISTRATEUR', 'TECHNIQUE'],
-      DELETE: ['ADMINISTRATEUR'],
-      // SANTE : lecture seule (GET)
+      DELETE: ['ADMINISTRATEUR', 'TECHNIQUE'],
+    },
+  },
+  '/api/prestataires/verifier-doublons': {
+    // Contrôle de lecture réservé aux profils de saisie (avant enregistrement)
+    roles: ['ADMINISTRATEUR', 'TECHNIQUE'],
+  },
+  '/api/prestataires/groupes': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    methods: {
+      POST: ['ADMINISTRATEUR', 'TECHNIQUE'],
     },
   },
   '/api/prestataires/societes/sync': {

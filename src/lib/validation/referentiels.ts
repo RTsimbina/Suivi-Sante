@@ -5,9 +5,11 @@
 import { z } from "zod";
 import {
   coefficientBaremeSchema,
+  codePrestataireSchema,
   dateOptionnelle,
   emailOptionnel,
   emailSchema,
+  ibanSchema,
   idOptionnel,
   idSchema,
   motDePasseSchema,
@@ -22,6 +24,7 @@ import {
   texteOptionnel,
   texteCourt,
 } from "./common";
+import { canoniserStatutJuridique } from "@/lib/referentiels";
 
 // ─── Utilisateurs (/api/utilisateurs) ───────────────────────────────────────
 
@@ -78,17 +81,43 @@ export const societeCreateSchema = z.object({
 // par les primitives partagées de common.ts (client ET serveur utilisent ces
 // mêmes schémas — aucune règle dupliquée côté formulaire).
 
+/** Statut juridique canonisé contre le référentiel centralisé (source unique
+ *  : src/lib/referentiels.ts). Une valeur hors référentiel est rejetée.
+ *  Champ omis (undefined) = inchangé → passe tel quel (schéma de mise à jour). */
+const STATUT_JURIDIQUE_INVALIDE = '__STATUT_JURIDIQUE_INVALIDE__';
+const statutJuridiqueSchema = texteOptionnel(60)
+  .transform((v) => {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    const canon = canoniserStatutJuridique(v);
+    return canon === undefined ? STATUT_JURIDIQUE_INVALIDE : canon;
+  })
+  .refine((v) => v !== STATUT_JURIDIQUE_INVALIDE, {
+    message:
+      "Statut juridique invalide : choisir une valeur du référentiel (SUARL, SA, SARL, SAS, EI, ONG…)",
+  })
+  .transform((v) => (v === STATUT_JURIDIQUE_INVALIDE ? null : v));
+
+/** groupePrestataireId optionnel : "" côté client = non sélectionné. */
+const groupePrestataireIdOptionnel = z.preprocess(
+  (v) => (v === "" || v === null ? undefined : v),
+  idOptionnel
+);
+
 export const prestataireCreateSchema = z.object({
   nom: texteCourt(200, "Le nom du prestataire"),
   type: typePrestataireSchema,
+  code: codePrestataireSchema,
   telephone: telephoneLibreSchema,
   email: emailOptionnel,
   adresse: texteOptionnel(300),
   nif: nifSchema,
   stat: numStatSchema,
-  statutJuridique: texteOptionnel(60),
+  statutJuridique: statutJuridiqueSchema,
   statut: texteOptionnel(50),
   rib: ribSchema,
+  iban: ibanSchema,
+  groupePrestataireId: groupePrestataireIdOptionnel,
   actif: z.boolean().optional(),
 });
 
@@ -96,14 +125,17 @@ export const prestataireUpdateSchema = z.object({
   id: idSchema,
   nom: texteCourt(200, "Le nom du prestataire").optional(),
   type: typePrestataireSchema.optional(),
+  code: codePrestataireSchema,
   telephone: telephoneLibreSchema,
   email: emailOptionnel,
   adresse: texteOptionnel(300),
   nif: nifSchema,
   stat: numStatSchema,
-  statutJuridique: texteOptionnel(60),
+  statutJuridique: statutJuridiqueSchema,
   statut: texteOptionnel(50),
   rib: ribSchema,
+  iban: ibanSchema,
+  groupePrestataireId: groupePrestataireIdOptionnel,
   actif: z.boolean().optional(),
 });
 

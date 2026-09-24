@@ -15,10 +15,16 @@
  * - Les blocs de rendu sont des présentateurs purs dans ./prestataires/.
  */
 
-import { Plus, Loader2, Building2 } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Loader2, Building2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 
 import { usePrestatairesData } from './prestataires/use-prestataires-data';
 import StatsCards from './prestataires/stats-cards';
@@ -37,6 +43,30 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
   const canEdit = userRole === 'ADMINISTRATEUR' || userRole === 'TECHNIQUE';
   const d = usePrestatairesData();
 
+  // Motif d'exception de doublon (création / édition) + dialogue groupe
+  const [motifExceptionCreation, setMotifExceptionCreation] = useState('');
+  const [motifExceptionEdition, setMotifExceptionEdition] = useState('');
+  const [groupeDialogOpen, setGroupeDialogOpen] = useState(false);
+  const [groupeNom, setGroupeNom] = useState('');
+  const [groupeDescription, setGroupeDescription] = useState('');
+  const [groupeErreur, setGroupeErreur] = useState('');
+  const [groupeSaving, setGroupeSaving] = useState(false);
+
+  async function creerGroupe() {
+    setGroupeErreur('');
+    if (groupeNom.trim().length < 2) {
+      setGroupeErreur('Le nom du groupe est obligatoire (2 caractères minimum).');
+      return;
+    }
+    setGroupeSaving(true);
+    const r = await d.creerGroupe(groupeNom, groupeDescription);
+    setGroupeSaving(false);
+    if (!r.ok) { setGroupeErreur(r.erreur || 'Erreur'); return; }
+    setGroupeNom('');
+    setGroupeDescription('');
+    setGroupeDialogOpen(false);
+  }
+
   // ─── Rendu ──────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -44,12 +74,21 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
       <div className="flex items-center justify-between">
         <div />
         {canEdit && (
-          <Button
-            className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-xs"
-            onClick={d.openCreateDialog}
-          >
-            <Plus className="h-4 w-4 mr-1.5" /> Nouveau prestataire
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="h-9 text-xs"
+              onClick={() => { setGroupeErreur(''); setGroupeDialogOpen(true); }}
+            >
+              <Users className="h-4 w-4 mr-1.5" /> Nouveau groupe
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-xs"
+              onClick={d.openCreateDialog}
+            >
+              <Plus className="h-4 w-4 mr-1.5" /> Nouveau prestataire
+            </Button>
+          </div>
         )}
       </div>
 
@@ -146,6 +185,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
             <AnnuairePrestataires
               prestataires={d.allPrestatairesList}
               societesParPrestataire={d.societesParPrestataire}
+              groupes={d.groupes}
               canEdit={canEdit}
               onOuvrirFiche={d.ouvrirFiche}
               onOuvrirEdition={d.ouvrirEdition}
@@ -183,6 +223,13 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         createSuccess={d.createSuccess}
         creating={d.creating}
         onCreate={d.handleCreatePrestataire}
+        userRole={userRole}
+        groupes={d.groupes}
+        createDoublons={d.createDoublons}
+        motifException={motifExceptionCreation}
+        onMotifExceptionChange={setMotifExceptionCreation}
+        onConfirmerException={() => d.confirmerExceptionCreation(motifExceptionCreation)}
+        onModifierSaisie={() => d.setCreateDoublons([])}
       />
 
       {/* ─── Dialog : Fiche détaillée du prestataire ─── */}
@@ -212,7 +259,64 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         onErrorsChange={d.setEditErrors}
         saving={d.savingEdit}
         onSave={d.handleSaveEdit}
+        userRole={userRole}
+        groupes={d.groupes}
+        doublons={d.editDoublons}
+        motifException={motifExceptionEdition}
+        onMotifExceptionChange={setMotifExceptionEdition}
+        onConfirmerException={() => d.confirmerExceptionEdition(motifExceptionEdition)}
+        onModifierSaisie={() => d.setEditDoublons([])}
       />
+
+      {/* ─── Dialogue : nouveau groupe de prestataires ─── */}
+      <Dialog open={groupeDialogOpen} onOpenChange={o => { if (!o) setGroupeDialogOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Users className="h-5 w-5 text-emerald-600" /> Nouveau groupe de prestataires
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Un groupe regroupe les établissements / agences d&apos;un même opérateur.
+              Il justifie les exceptions de doublon lorsque des données communes sont légitimes.
+            </p>
+            {groupeErreur && (
+              <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40">
+                <p className="text-xs text-red-700 dark:text-red-300">{groupeErreur}</p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Nom du groupe <span className="text-red-500">*</span></Label>
+              <Input
+                placeholder="Ex : Groupe Médical ABC"
+                value={groupeNom}
+                onChange={e => setGroupeNom(e.target.value)}
+                className="h-9 text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Description (optionnel)</Label>
+              <Input
+                placeholder="Ex : Réseau de cliniques à Antananarivo et Toamasina"
+                value={groupeDescription}
+                onChange={e => setGroupeDescription(e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setGroupeDialogOpen(false)} disabled={groupeSaving}>
+                Annuler
+              </Button>
+              <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={creerGroupe} disabled={groupeSaving}>
+                {groupeSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Créer le groupe
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

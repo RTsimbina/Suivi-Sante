@@ -24,8 +24,29 @@ export interface PrestataireItem {
   /** Statut conventionnel (CONVENTIONNE / SUSPENDU / libre). */
   statut: string | null;
   rib: string | null;
+  iban: string | null;
+  code: string | null;
   actif: boolean;
+  /** Doublon(s) dérogé(s) explicitement validés par un Administrateur. */
+  exceptionValidee: boolean;
+  groupePrestataire: { id: string; nom: string } | null;
+  societes: { societe: { id: string; nom: string }; actif: boolean }[];
   nbDossiers?: number;
+}
+
+/** Groupe de prestataires (liste pour filtres et formulaires). */
+export interface GroupeItem {
+  id: string;
+  nom: string;
+}
+
+/** Un doublon renvoyé par l'API (409) : information déjà existante affichée. */
+export interface DoublonInfo {
+  champ: string;
+  valeur: string;
+  prestataireExistantId: string;
+  prestataireExistantNom: string;
+  prestataireExistantCode: string | null;
 }
 
 export interface LienPS {
@@ -55,6 +76,7 @@ export type StatutFilter = '' | 'actif' | 'inactif';
 export interface CreateFormState {
   nom: string;
   type: string;
+  code: string;
   telephone: string;
   email: string;
   adresse: string;
@@ -63,10 +85,13 @@ export interface CreateFormState {
   statutJuridique: string;
   statut: string;
   rib: string;
+  iban: string;
+  groupePrestataireId: string;
 }
 
 export const EMPTY_CREATE_FORM: CreateFormState = {
-  nom: '', type: '', telephone: '', email: '', adresse: '', nif: '', stat: '', statutJuridique: '', statut: '', rib: '',
+  nom: '', type: '', code: '', telephone: '', email: '', adresse: '', nif: '', stat: '',
+  statutJuridique: '', statut: '', rib: '', iban: '', groupePrestataireId: '',
 };
 
 /** Formulaire de modification d'un prestataire (champs éditables de la fiche). */
@@ -79,10 +104,8 @@ export const STATUT_CONVENTIONNEL_LABELS: Record<string, string> = {
   SUSPENDU: 'Suspendu',
 };
 
-/** Suggestions de statut juridique (liste indicative, saisie libre). */
-export const STATUTS_JURIDIQUES_SUGGERES = [
-  'SARL', 'SUARL', 'SA', 'EI', 'ONG', 'Association', 'GIE', 'Coopérative', 'Établissement public',
-];
+/** Référentiel centralisé des statuts juridiques (source unique : referentiels.ts). */
+export { STATUTS_JURIDIQUES_PRESTATAIRE, STATUT_JURIDIQUE_LABELS } from '@/lib/referentiels';
 
 export const TYPE_LABELS: Record<string, string> = {
   HOPITAL: 'Hôpital',
@@ -111,6 +134,7 @@ export function formulaireDepuisPrestataire(p: PrestataireItem): EditFormState {
   return {
     nom: p.nom ?? '',
     type: p.type ?? '',
+    code: p.code ?? '',
     telephone: p.telephone ?? '',
     email: p.email ?? '',
     adresse: p.adresse ?? '',
@@ -119,5 +143,7 @@ export function formulaireDepuisPrestataire(p: PrestataireItem): EditFormState {
     statutJuridique: p.statutJuridique ?? '',
     statut: p.statut ?? '',
     rib: p.rib ?? '',
+    iban: p.iban ?? '',
+    groupePrestataireId: p.groupePrestataire?.id ?? '',
   };
 }

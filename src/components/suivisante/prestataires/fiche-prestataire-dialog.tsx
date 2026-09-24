@@ -94,6 +94,7 @@ export default function FichePrestataireDialog({
                   <FicheField label="Nom / Raison sociale" value={prestataire.nom} />
                   <FicheField label="Type / Catégorie" value={TYPE_LABELS[prestataire.type] ?? prestataire.type} />
                   <FicheField label="Statut juridique" value={prestataire.statutJuridique} />
+                  <FicheField label="Code prestataire" value={prestataire.code} mono />
                   <FicheField label="Statut conventionnel" value={prestataire.statut ? (STATUT_CONVENTIONNEL_LABELS[prestataire.statut] ?? prestataire.statut) : null} />
                   <FicheField label="NIF (Numéro d'Identification Fiscale)" value={prestataire.nif} mono />
                   <FicheField label="Num STAT (Numéro Statistique)" value={prestataire.stat} mono />
@@ -115,6 +116,7 @@ export default function FichePrestataireDialog({
               <section className="rounded-lg border p-3 space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground">COORDONNÉES BANCAIRES</p>
                 <FicheField label="RIB" value={prestataire.rib} mono />
+                <FicheField label="IBAN" value={prestataire.iban} mono />
               </section>
 
               {/* ─── Sociétés clientes rattachées ─── */}
@@ -127,7 +129,7 @@ export default function FichePrestataireDialog({
                 ) : (
                   <ul className="space-y-1.5">
                     {rattachements.map(r => (
-                      <li key={r.id ?? r.societe.id} className="flex items-center gap-2 text-sm">
+                      <li key={r.societe.id} className="flex items-center gap-2 text-sm">
                         <Building2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                         <span className="truncate">{r.societe.nom}</span>
                         {r.actif ? (

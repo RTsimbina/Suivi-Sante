@@ -111,6 +111,49 @@ export const ribSchema = z
   .transform((v) => (!v || v === "" ? null : v));
 
 /**
+ * IBAN international (ISO 13616) : structure 2 lettres + 2 chiffres de contrôle
+ * + 11 à 30 alphanumériques, et clé de contrôle mod-97 vérifiée.
+ * Stocké en forme canonique (majuscules, sans espaces ni tirets).
+ */
+export function validerIban(valeur: string): boolean {
+  const iban = valeur.toUpperCase().replace(/[\s-]/g, "");
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(iban)) return false;
+  const rearrange = iban.slice(4) + iban.slice(0, 4);
+  const numerique = rearrange.replace(/[A-Z]/g, (c) =>
+    String(c.charCodeAt(0) - 55)
+  );
+  let reste = 0;
+  for (const ch of numerique) {
+    reste = (reste * 10 + Number(ch)) % 97;
+  }
+  return reste === 1;
+}
+
+export const ibanSchema = z
+  .string()
+  .trim()
+  .max(42, "L'IBAN ne peut pas dépasser 42 caractères")
+  .refine((v) => {
+    if (v === "") return true;
+    return validerIban(v);
+  }, "IBAN invalide : le format ou la clé de contrôle (mod-97) est incorrect")
+  .nullish()
+  .transform((v) => (!v || v === "" ? null : v.toUpperCase().replace(/[\s-]/g, "")));
+
+/** Code prestataire interne : 3 à 20 caractères (lettres, chiffres, tirets),
+ *  canonisé en majuscules. Ex. PRE-001. */
+export const codePrestataireSchema = z
+  .string()
+  .trim()
+  .max(30, "Le code prestataire ne peut pas dépasser 30 caractères")
+  .refine((v) => {
+    if (v === "") return true;
+    return /^[A-Z0-9-]{3,20}$/.test(v.toUpperCase().replace(/\s+/g, ""));
+  }, "Code prestataire invalide : 3 à 20 caractères (lettres, chiffres, tirets)")
+  .nullish()
+  .transform((v) => (!v || v === "" ? null : v.toUpperCase().replace(/\s+/g, "")));
+
+/**
  * Mot de passe : même politique que la création de comptes (≥ 8 caractères,
  * au moins une lettre et un chiffre). Utilisé par /api/utilisateurs,
  * /api/auth/reset-password et /api/profil/changer-mot-de-passe.

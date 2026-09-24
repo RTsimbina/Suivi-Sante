@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ZodType, ZodError } from "zod";
 
-type ParseSuccess<T> = { success: true; data: T };
+type ParseSuccess<T> = { success: true; data: T; raw?: unknown };
 type ParseFailure = { success: false; response: NextResponse };
 type ParseResult<T> = ParseSuccess<T> | ParseFailure;
 
@@ -37,10 +37,17 @@ function validationErrorResponse(error: ZodError): NextResponse {
  * - corps absent / JSON malformé → 400
  * - données non conformes au schéma → 400 avec le détail par champ
  * - champs inconnus → supprimés (protection contre l'injection de champs)
+ *
+ * Options :
+ *  - exposerBrut : renvoie aussi le corps JSON brut (body) dans `raw` —
+ *    utile pour les champs de contrôle hors schéma (ex. demande d'exception
+ *    de doublon traitée séparément par la route), sans exposer ces champs
+ *    aux données validées.
  */
 export async function parseJsonBody<T>(
   request: NextRequest,
-  schema: ZodType<T>
+  schema: ZodType<T>,
+  options?: { exposerBrut?: boolean }
 ): Promise<ParseResult<T>> {
   let body: unknown;
   try {
@@ -58,7 +65,11 @@ export async function parseJsonBody<T>(
   if (!result.success) {
     return { success: false, response: validationErrorResponse(result.error) };
   }
-  return { success: true, data: result.data };
+  return {
+    success: true,
+    data: result.data,
+    ...(options?.exposerBrut ? { raw: body } : {}),
+  };
 }
 
 /**

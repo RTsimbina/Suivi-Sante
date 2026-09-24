@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
-import { SocieteItem, CreateFormState, TYPE_LABELS } from './types';
+import { SocieteItem, CreateFormState, DoublonInfo, GroupeItem, TYPE_LABELS } from './types';
+import DoublonExceptionPanel from './doublon-exception';
 
 export default function CreateDialog({
   open,
@@ -33,6 +34,13 @@ export default function CreateDialog({
   createSuccess,
   creating,
   onCreate,
+  userRole,
+  groupes,
+  createDoublons,
+  motifException,
+  onMotifExceptionChange,
+  onConfirmerException,
+  onModifierSaisie,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,6 +57,13 @@ export default function CreateDialog({
   createSuccess: string;
   creating: boolean;
   onCreate: () => void;
+  userRole: string;
+  groupes: GroupeItem[];
+  createDoublons: DoublonInfo[];
+  motifException: string;
+  onMotifExceptionChange: (motif: string) => void;
+  onConfirmerException: () => void;
+  onModifierSaisie: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,6 +89,18 @@ export default function CreateDialog({
               </div>
             )}
 
+            {/* Doublons détectés (409) + validation d'exception Administrateur */}
+            <DoublonExceptionPanel
+              doublons={createDoublons}
+              isAdmin={userRole === 'ADMINISTRATEUR'}
+              saving={creating}
+              groupes={groupes}
+              motif={motifException}
+              onMotifChange={onMotifExceptionChange}
+              onConfirmer={onConfirmerException}
+              onModifierSaisie={onModifierSaisie}
+            />
+
             {/* Nom * */}
             <div className="space-y-1">
               <Label className="text-xs font-medium">Nom <span className="text-red-500">*</span></Label>
@@ -86,17 +113,43 @@ export default function CreateDialog({
               />
             </div>
 
-            {/* Type * */}
+            {/* Type * + Code prestataire */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Type / Catégorie <span className="text-red-500">*</span></Label>
+                <select
+                  value={createForm.type}
+                  onChange={e => onCreateFormChange(f => ({ ...f, type: e.target.value }))}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Sélectionner un type...</option>
+                  {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Code prestataire</Label>
+                <Input
+                  placeholder="Ex : PRE-001"
+                  value={createForm.code}
+                  onChange={e => onCreateFormChange(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Groupe de prestataires */}
             <div className="space-y-1">
-              <Label className="text-xs font-medium">Type / Catégorie <span className="text-red-500">*</span></Label>
+              <Label className="text-xs font-medium">Groupe de prestataires</Label>
               <select
-                value={createForm.type}
-                onChange={e => onCreateFormChange(f => ({ ...f, type: e.target.value }))}
+                value={createForm.groupePrestataireId}
+                onChange={e => onCreateFormChange(f => ({ ...f, groupePrestataireId: e.target.value }))}
                 className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
               >
-                <option value="">Sélectionner un type...</option>
-                {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
+                <option value="">Aucun groupe</option>
+                {groupes.map(g => (
+                  <option key={g.id} value={g.id}>{g.nom}</option>
                 ))}
               </select>
             </div>
@@ -177,6 +230,17 @@ export default function CreateDialog({
                   className="h-9 text-sm"
                 />
               </div>
+            </div>
+
+            {/* IBAN */}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">IBAN (si applicable)</Label>
+              <Input
+                placeholder="Ex : MG48..."
+                value={createForm.iban}
+                onChange={e => onCreateFormChange(f => ({ ...f, iban: e.target.value.toUpperCase() }))}
+                className="h-9 text-sm"
+              />
             </div>
 
             {/* Séparation */}

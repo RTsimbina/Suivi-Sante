@@ -326,8 +326,8 @@ describe('PrestatairesView — caractérisation', () => {
 
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByPlaceholderText(/Centre Hospitalier/), 'Clinique Test');
-    // Type obligatoire : 3e combobox à l'écran (2 filtres + type du formulaire)
-    await user.selectOptions(within(dialog).getByRole('combobox'), 'CLINIQUE');
+    // Type obligatoire : 1re combobox du formulaire (le groupe est ajouté après)
+    await user.selectOptions(within(dialog).getAllByRole('combobox')[0], 'CLINIQUE');
     await user.click(within(dialog).getByRole('button', { name: /Créer le prestataire/ }));
 
     await waitFor(() => {

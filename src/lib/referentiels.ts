@@ -196,10 +196,49 @@ export function typePrestataireLabel(valeur: string): string {
   return TYPES_PRESTATAIRE.find((t) => t.valeur === valeur)?.label ?? valeur;
 }
 
-/** Statuts juridiques suggérés pour les prestataires (champ libre conservé). */
+/** Statuts juridiques — référentiel centralisé des prestataires.
+ *  La saisie est canonisée (casse/accents/séparateurs) puis validée contre
+ *  cette liste ; une valeur hors référentiel est rejetée avec un message clair. */
 export const STATUTS_JURIDIQUES_PRESTATAIRE: string[] = [
-  'SA', 'SARL', 'SAS', 'EI', 'AUTO_ENTREPRENEUR', 'ONG', 'ASSOCIATION', 'AUTRE',
+  'SUARL', 'SA', 'SARL', 'SAS', 'EI', 'AUTO_ENTREPRENEUR', 'CABINET_LIBERAL',
+  'GROUPEMENT', 'COOPERATIVE', 'ONG', 'ASSOCIATION', 'ETABLISSEMENT_PUBLIC', 'AUTRE',
 ];
+
+/** Libellés lisibles des statuts juridiques (affichage uniforme). */
+export const STATUT_JURIDIQUE_LABELS: Record<string, string> = {
+  SUARL: 'SUARL',
+  SA: 'SA (Société Anonyme)',
+  SARL: 'SARL',
+  SAS: 'SAS',
+  EI: 'Entreprise individuelle',
+  AUTO_ENTREPRENEUR: 'Auto-entrepreneur',
+  CABINET_LIBERAL: 'Cabinet libéral',
+  GROUPEMENT: 'Groupement / GIE',
+  COOPERATIVE: 'Coopérative',
+  ONG: 'ONG',
+  ASSOCIATION: 'Association',
+  ETABLISSEMENT_PUBLIC: 'Établissement public',
+  AUTRE: 'Autre',
+};
+
+/**
+ * Canonise un statut juridique saisi librement vers la valeur du référentiel.
+ * Retourne null si vide. Retourne undefined si la valeur n'appartient pas au référentiel.
+ */
+export function canoniserStatutJuridique(
+  valeur: string | null | undefined
+): string | null | undefined {
+  if (valeur === undefined) return undefined;
+  if (valeur === null) return null;
+  const t = valeur.trim();
+  if (t === '') return null;
+  const up = t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  return STATUTS_JURIDIQUES_PRESTATAIRE.find((s) => s === up);
+}
 
 // ─── Types de courriel (réception) ──────────────────────────────────────────
 
@@ -290,13 +329,14 @@ export const STATUT_IMPORT_VALEURS: string[] = STATUTS_IMPORT.map((s) => s.valeu
 
 // ─── Journal d'audit : actions et niveaux ───────────────────────────────────
 
-export type AuditAction = 'CREATION' | 'MODIFICATION' | 'SUPPRESSION';
+export type AuditAction = 'CREATION' | 'MODIFICATION' | 'SUPPRESSION' | 'EXCEPTION_DOUBLON';
 export type AuditNiveau = 'INFO' | 'STANDARD' | 'SENSIBLE' | 'CRITIQUE';
 
 export const AUDIT_ACTION_ITEMS: { value: AuditAction; label: string }[] = [
   { value: 'CREATION', label: 'Création' },
   { value: 'MODIFICATION', label: 'Modification' },
   { value: 'SUPPRESSION', label: 'Suppression' },
+  { value: 'EXCEPTION_DOUBLON', label: 'Exception doublon' },
 ];
 
 export const AUDIT_NIVEAU_ITEMS: { value: AuditNiveau; label: string; color: string }[] = [

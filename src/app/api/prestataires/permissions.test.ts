@@ -47,9 +47,39 @@ describe('API_PERMISSIONS — module Prestataires', () => {
     expect(config.methods?.PUT).not.toContain('CONTACT_ENTREPRISE');
   });
 
-  it('la création et la suppression restent réservées à ADMINISTRATEUR', () => {
-    expect(config.methods?.POST).toEqual(['ADMINISTRATEUR']);
-    expect(config.methods?.DELETE).toEqual(['ADMINISTRATEUR']);
+  it('la création et la suppression sont réservées à ADMINISTRATEUR et TECHNIQUE (spécification CRUD)', () => {
+    expect(config.methods?.POST).toEqual(
+      expect.arrayContaining(['ADMINISTRATEUR', 'TECHNIQUE'])
+    );
+    expect(config.methods?.POST).not.toContain('ACCUEIL');
+    expect(config.methods?.POST).not.toContain('COMPTABILITE');
+    expect(config.methods?.POST).not.toContain('SANTE');
+    expect(config.methods?.DELETE).toEqual(
+      expect.arrayContaining(['ADMINISTRATEUR', 'TECHNIQUE'])
+    );
+    expect(config.methods?.DELETE).not.toContain('ACCUEIL');
+    expect(config.methods?.DELETE).not.toContain('COMPTABILITE');
+    expect(config.methods?.DELETE).not.toContain('SANTE');
+  });
+
+  it("la vérification de doublons est réservée aux profils de saisie (ADMINISTRATEUR, TECHNIQUE)", () => {
+    const verifier = API_PERMISSIONS['/api/prestataires/verifier-doublons'];
+    expect(verifier.roles).toEqual(
+      expect.arrayContaining(['ADMINISTRATEUR', 'TECHNIQUE'])
+    );
+    expect(verifier.roles).not.toContain('SANTE');
+    expect(verifier.roles).not.toContain('ACCUEIL');
+  });
+
+  it("la création de groupes de prestataires est réservée à ADMINISTRATEUR et TECHNIQUE", () => {
+    const groupes = API_PERMISSIONS['/api/prestataires/groupes'];
+    expect(groupes.methods?.POST).toEqual(
+      expect.arrayContaining(['ADMINISTRATEUR', 'TECHNIQUE'])
+    );
+    // Lecture ouverte aux rôles internes
+    expect(groupes.roles).toEqual(
+      expect.arrayContaining(['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'])
+    );
   });
 });
 
