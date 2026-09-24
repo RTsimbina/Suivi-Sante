@@ -22,6 +22,11 @@
 #     --rolled-back) AVANT le deploy, afin qu'elle puisse être rejouée.
 #     À utiliser quand un build Vercel a échoué en pleine migration
 #     (ex : erreur SQL) — corriger d'abord le SQL de la migration.
+#   • liberer_verrou = true (RÉCUPÉRATION P1002) : termine les sessions
+#     détenant encore le verrou consultatif prisma migrate
+#     (pg_advisory_lock(72707369)) — typiquement une session pgbouncer
+#     idle laissée par un build Vercel interrompu (incident du 16/09 et
+#     du 24/09). Sans cela, migrate échoue en P1002 (timeout du verrou).
 #
 # Secret requis : NEON_API_KEY (déjà configuré). L'URL de connexion est
 # récupérée via l'API Neon (connexion DIRECTE, sans -pooler, requis pour
@@ -45,6 +50,11 @@ on:
         description: "Récupération P3018 : nom de la migration en échec à remettre « rolled-back » (vide sinon)"
         type: string
         default: ""
+        required: false
+      liberer_verrou:
+        description: "Récupération P1002 : terminer les sessions détenant le verrou consultatif migrate"
+        type: boolean
+        default: false
         required: false
 
 permissions:
@@ -195,6 +205,12 @@ jobs:
               echo "   (déjà enregistrée — ignoré)"
           done
 
+      - name: Libération du verrou consultatif Prisma (mode récupération P1002)
+        if: ${{ inputs.liberer_verrou == true }}
+        run: |
+          npx prisma generate >/dev/null 2>&1 || true
+          node scripts/liberer-verrou-migrate.mjs
+
       - name: Résolution d'une migration en échec (rollback logique, mode récupération)
         if: ${{ inputs.resoudre_echec != '' }}
         run: npx prisma migrate resolve --rolled-back "${{ inputs.resoudre_echec }}"
@@ -212,5 +228,6 @@ jobs:
           echo "• Première exécution → cocher « adopter_existant »."
           echo "• Exécutions suivantes → laisser décoché (deploy standard)."
           echo "• Migration en échec (P3018) → renseigner « resoudre_echec » avec le nom de la migration."
+          echo "• Verrou migrate indisponible (P1002) → cocher « liberer_verrou »."
           echo "• Une fois ce workflow vert, recharger l'application : les listes"
           echo "  Prestataires / Sociétés / Service Technique / Utilisateurs fonctionnent."
