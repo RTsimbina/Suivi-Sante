@@ -130,7 +130,7 @@ jobs:
 
           if [ "${VERROU}" = "CHECKPOINT" ]; then
             DETAIL="Vercel Security Checkpoint (défi anti-bot — app non atteinte)"
-            CAUSE="> **Cause identifiée : « Vercel Security Checkpoint » (Attack Challenge Mode Vercel).** Le défi anti-bot répond à la place de l'application pour tout trafic non-navigateur : l'app reste accessible aux humains (le navigateur résout le défi) mais le healthcheck reçoit HTTP 429 sans jamais atteindre l'app. **Correctif au choix :** (1) Vercel → projet → Firewall → désactiver « Attack Challenge Mode » ; ou (2) conserver la protection et configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection → Protection Bypass for Automation → générer le secret) puis ajouter le secret GitHub `VERCEL_PROTECTION_BYPASS` avec cette valeur."
+            CAUSE="> **Cause identifiée : « Vercel Security Checkpoint » (Attack Challenge Mode Vercel).** Le défi anti-bot répond à la place de l'application pour tout trafic non-navigateur : l'app reste accessible aux humains (le navigateur résout le défi) mais le healthcheck reçoit HTTP 429 sans jamais atteindre l'app. **Correctif au choix :** (1) Vercel → projet → Firewall → désactiver « Attack Challenge Mode » ; ou (2) conserver la protection et configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection → Protection Bypass for Automation → générer le secret) puis ajouter le secret GitHub \`VERCEL_PROTECTION_BYPASS\` avec cette valeur."
           else
             DETAIL="défaut applicatif ou réseau"
             CAUSE=""
