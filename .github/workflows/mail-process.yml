@@ -14,6 +14,13 @@
 # Secrets requis (Settings → Secrets and variables → Actions) :
 #   VERCEL_APP_URL  ex. https://suivi-sante.vercel.app (sans / final)
 #   CRON_SECRET     même valeur que la variable Vercel (openssl rand -hex 32)
+# Secret optionnel : VERCEL_PROTECTION_BYPASS — si « Attack Challenge Mode »
+#   est activé côté Vercel (Firewall), tout trafic non-navigateur reçoit un
+#   défi 429 (« Vercel Security Checkpoint ») à la place de l'app. Configurer
+#   « Protection Bypass for Automation » (Vercel → Settings → Deployment
+#   Protection) et reporter la valeur générée dans ce secret : l'entête
+#   x-vercel-protection-bypass est alors envoyée ici. Alternative : désactiver
+#   « Attack Challenge Mode » (les crons Vercel internes passent toujours).
 
 name: Mail Queue Processor
 
@@ -67,19 +74,31 @@ jobs:
         env:
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
+          HEADER_BYPASS=()
+          if [ -n "$VERCEL_PROTECTION_BYPASS" ]; then
+            HEADER_BYPASS=(-H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}")
+            echo "Contournement automation Vercel : ACTIF (secret configuré, valeur masquée)."
+          fi
+
           HTTP_CODE=$(curl -sS -o /tmp/reponse.json -w '%{http_code}' \
             --max-time 60 \
             -X POST "${VERCEL_APP_URL}/api/mail/process" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
+            "${HEADER_BYPASS[@]}" \
             -d '{"purge": false}')
 
           echo "Code HTTP : ${HTTP_CODE}"
-          cat /tmp/reponse.json || true
+          head -c 400 /tmp/reponse.json || true
 
           if [ "${HTTP_CODE}" != "200" ]; then
-            echo "::error::L'endpoint /api/mail/process a répondu HTTP ${HTTP_CODE} (attendu : 200). Vérifier VERCEL_APP_URL / CRON_SECRET / les logs Vercel."
+            if grep -q "Vercel Security Checkpoint" /tmp/reponse.json 2>/dev/null; then
+              echo "::error::HTTP ${HTTP_CODE} = « Vercel Security Checkpoint » (Attack Challenge Mode) — la requête n'atteint pas l'app, le CRON_SECRET n'est PAS en cause. Correctif : désactiver « Attack Challenge Mode » (Vercel → projet → Firewall) OU configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection) puis le secret GitHub VERCEL_PROTECTION_BYPASS."
+            else
+              echo "::error::L'endpoint /api/mail/process a répondu HTTP ${HTTP_CODE} (attendu : 200). Vérifier VERCEL_APP_URL / CRON_SECRET / les logs Vercel."
+            fi
             exit 1
           fi
 

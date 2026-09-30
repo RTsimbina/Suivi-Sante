@@ -15,6 +15,10 @@
 #   VERCEL_APP_URL  ex. https://suivi-sante.vercel.app (sans / final)
 #   MAIL_API_KEY    clé machine (openssl rand -hex 32), variable Vercel
 #                   MAIL_API_KEY configurée à la même valeur
+# Secret optionnel : VERCEL_PROTECTION_BYPASS — contournement « Attack
+#   Challenge Mode » (Vercel → Settings → Deployment Protection → Protection
+#   Bypass for Automation) si le défi anti-bot « Vercel Security Checkpoint »
+#   bloque l'automation (HTTP 429 sans atteindre l'app).
 
 name: Mail Test Send
 
@@ -114,20 +118,32 @@ jobs:
         env:
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
           MAIL_API_KEY: ${{ secrets.MAIL_API_KEY }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
+          HEADER_BYPASS=()
+          if [ -n "$VERCEL_PROTECTION_BYPASS" ]; then
+            HEADER_BYPASS=(-H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}")
+            echo "Contournement automation Vercel : ACTIF (secret configuré, valeur masquée)."
+          fi
+
           HTTP_CODE=$(curl -sS -o /tmp/reponse.json -w '%{http_code}' \
             --max-time 30 \
             -X POST "${VERCEL_APP_URL}/api/mail/send" \
             -H "Authorization: Bearer ${MAIL_API_KEY}" \
             -H "Content-Type: application/json" \
+            "${HEADER_BYPASS[@]}" \
             --data-binary @/tmp/body.json)
 
           echo "Code HTTP : ${HTTP_CODE}"
-          cat /tmp/reponse.json || true
+          head -c 400 /tmp/reponse.json || true
 
           if [ "${HTTP_CODE}" != "202" ]; then
-            echo "::error::L'endpoint /api/mail/send a répondu HTTP ${HTTP_CODE} (attendu : 202)."
-            echo "  400 → demande invalide · 401/403 → MAIL_API_KEY refusée · 422 → rejet anti-abus · 429 → quota atteint"
+            if grep -q "Vercel Security Checkpoint" /tmp/reponse.json 2>/dev/null; then
+              echo "::error::HTTP ${HTTP_CODE} = « Vercel Security Checkpoint » (Attack Challenge Mode) — la requête n'atteint pas l'app. Désactiver « Attack Challenge Mode » (Vercel → Firewall) OU configurer « Protection Bypass for Automation » + secret GitHub VERCEL_PROTECTION_BYPASS."
+            else
+              echo "::error::L'endpoint /api/mail/send a répondu HTTP ${HTTP_CODE} (attendu : 202)."
+              echo "  400 → demande invalide · 401/403 → MAIL_API_KEY refusée · 422 → rejet anti-abus · 429 → quota atteint"
+            fi
             exit 1
           fi
 

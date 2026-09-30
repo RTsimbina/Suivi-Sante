@@ -22,8 +22,19 @@
 # Vercel restent actifs ; ce workflow couvre la disponibilité applicative
 # vue de l'extérieur ET la joignabilité de la base (Neon).
 #
-# Secret requis : VERCEL_APP_URL (pas de secret d'auth : /api/health est
+# ⚠️ « Vercel Security Checkpoint » (Attack Challenge Mode) : quand ce mode
+# est activé (Firewall Vercel), TOUT trafic non-navigateur (curl) reçoit un
+# défi 429 À LA PLACE de l'app — les humains passent (le navigateur résout
+# le défi), l'automation non. Deux correctifs possibles :
+#   1. Désactiver « Attack Challenge Mode » (Vercel → projet → Firewall) ;
+#   2. Conserver la protection et configurer « Protection Bypass for
+#      Automation » (Vercel → Settings → Deployment Protection) puis ajouter
+#      le secret GitHub VERCEL_PROTECTION_BYPASS avec la valeur générée :
+#      l'entête x-vercel-protection-bypass est alors envoyé par ce workflow.
+#
+# Secrets requis : VERCEL_APP_URL (pas de secret d'auth : /api/health est
 # public et volontairement muet — aucune information sensible exposée).
+# Secret optionnel : VERCEL_PROTECTION_BYPASS (contournement automation).
 
 name: Healthcheck
 
@@ -58,23 +69,47 @@ jobs:
           fi
 
       # ── 2. Appeler /api/health ─────────────────────────────────────────────
-      # Timeout 15 s ; seul le code HTTP est capturé (corps ignoré).
+      # Timeout 15 s ; code HTTP capturé + corps sauvegardé pour distinguer
+      # une vraie panne applicative du « Vercel Security Checkpoint »
+      # (défi anti-bot 429 qui répond à la place de l'app).
       # Échec réseau curl → HTTP_CODE="000" (panne DNS / réseau / timeout).
       - name: Appeler /api/health
         if: steps.secrets.outputs.skip != 'true'
         id: sonde
         env:
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
-          HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' \
+          CORPS=/tmp/health-corps.html
+          HEADER_BYPASS=()
+          if [ -n "$VERCEL_PROTECTION_BYPASS" ]; then
+            HEADER_BYPASS=(-H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}")
+            echo "Contournement automation Vercel : ACTIF (secret configuré, valeur masquée)."
+          else
+            echo "Contournement automation Vercel : absent (secret VERCEL_PROTECTION_BYPASS non configuré)."
+          fi
+
+          HTTP_CODE=$(curl -sS -o "$CORPS" -w '%{http_code}' \
             --max-time 15 \
+            "${HEADER_BYPASS[@]}" \
             "${VERCEL_APP_URL}/api/health") || HTTP_CODE="000"
 
           echo "Code HTTP : ${HTTP_CODE}"
           echo "code=${HTTP_CODE}" >> "$GITHUB_OUTPUT"
 
+          # « Vercel Security Checkpoint » = défi anti-bot : l'app n'est pas atteinte
+          VERROU="APPLICATIF"
+          if [ "${HTTP_CODE}" != "200" ] && grep -q "Vercel Security Checkpoint" "$CORPS" 2>/dev/null; then
+            VERROU="CHECKPOINT"
+          fi
+          echo "verrou=${VERROU}" >> "$GITHUB_OUTPUT"
+
           if [ "${HTTP_CODE}" != "200" ]; then
-            echo "::error::Healthcheck en échec — HTTP ${HTTP_CODE} sur ${VERCEL_APP_URL}/api/health"
+            if [ "${VERROU}" = "CHECKPOINT" ]; then
+              echo "::error::HTTP ${HTTP_CODE} = « Vercel Security Checkpoint » (Attack Challenge Mode) — l'app n'est pas atteinte (elle répond normalement aux navigateurs). Correctif : désactiver « Attack Challenge Mode » (Vercel → projet → Firewall) OU configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection) puis le secret GitHub VERCEL_PROTECTION_BYPASS."
+            else
+              echo "::error::Healthcheck en échec — HTTP ${HTTP_CODE} sur ${VERCEL_APP_URL}/api/health"
+            fi
             exit 1
           fi
 
@@ -89,8 +124,17 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
           CODE_HTTP: ${{ steps.sonde.outputs.code }}
+          VERROU: ${{ steps.sonde.outputs.verrou }}
         run: |
           DATE_UTC="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
+          if [ "${VERROU}" = "CHECKPOINT" ]; then
+            DETAIL="Vercel Security Checkpoint (défi anti-bot — app non atteinte)"
+            CAUSE="> **Cause identifiée : « Vercel Security Checkpoint » (Attack Challenge Mode Vercel).** Le défi anti-bot répond à la place de l'application pour tout trafic non-navigateur : l'app reste accessible aux humains (le navigateur résout le défi) mais le healthcheck reçoit HTTP 429 sans jamais atteindre l'app. **Correctif au choix :** (1) Vercel → projet → Firewall → désactiver « Attack Challenge Mode » ; ou (2) conserver la protection et configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection → Protection Bypass for Automation → générer le secret) puis ajouter le secret GitHub `VERCEL_PROTECTION_BYPASS` avec cette valeur."
+          else
+            DETAIL="défaut applicatif ou réseau"
+            CAUSE=""
+          fi
 
           # Les labels doivent exister avant gh issue create (dépôt vierge)
           gh label create incident   --color D93F0B --description "Incident détecté par la surveillance automatisée" || true
@@ -101,19 +145,36 @@ jobs:
             --search '[Incident] Healthcheck in:title' \
             --json number --jq '.[].number' | head -n 1)
 
-          if [ -z "${NUMERO}" ]; then
-            gh issue create \
-              --title "[Incident] Healthcheck en échec — HTTP ${CODE_HTTP} — ${DATE_UTC}" \
-              --label "incident,monitoring" \
-              --body "$(cat <<EOF
+          if [ -n "${NUMERO}" ]; then
+            # ── Anti-spam : pas de nouveau commentaire si le dernier date de moins de 6 h ──
+            DERNIER=$(gh issue view "${NUMERO}" --json comments --jq '.comments[-1].createdAt' 2>/dev/null || echo "")
+            if [ -n "${DERNIER}" ]; then
+              ECOULE=$(( $(date -u +%s) - $(date -u -d "${DERNIER}" +%s) ))
+              if [ "${ECOULE}" -lt 21600 ]; then
+                echo "Issue #${NUMERO} : dernier commentaire il y a $((ECOULE/60)) min (< 6 h) — pas de nouveau commentaire (anti-spam)."
+                exit 0
+              fi
+            fi
+            gh issue comment "${NUMERO}" --body "Toujours en échec — HTTP ${CODE_HTTP} (${DETAIL}) à ${DATE_UTC}"
+            echo "Issue #${NUMERO} déjà ouverte — commentaire ajouté."
+            exit 0
+          fi
+
+          gh issue create \
+            --title "[Incident] Healthcheck en échec — HTTP ${CODE_HTTP} — ${DATE_UTC}" \
+            --label "incident,monitoring" \
+            --body "$(cat <<EOF
           ## Incident Healthcheck
 
           | Champ | Valeur |
           |-------|--------|
           | URL sondée | \`${VERCEL_APP_URL}/api/health\` |
           | Code HTTP | \`${CODE_HTTP}\` |
+          | Nature | ${DETAIL} |
           | Détecté | ${DATE_UTC} |
           | Run | ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} |
+
+          ${CAUSE}
 
           \`000\` = le runner n'a pas pu joindre l'application (DNS, réseau ou timeout > 15 s).
           \`503\` = l'application répond mais la base de données est injoignable.
@@ -126,10 +187,6 @@ jobs:
           EOF
           )"
             echo "Issue d'incident créée."
-          else
-            gh issue comment "${NUMERO}" --body "Toujours en échec — HTTP ${CODE_HTTP} à ${DATE_UTC}"
-            echo "Issue #${NUMERO} déjà ouverte — commentaire ajouté."
-          fi
 
       # ── 4. Fermer les issues d'incident résolues ──────────────────────────
       # Healthcheck OK + issue(s) [Incident] ouverte(s) → commentaire de
