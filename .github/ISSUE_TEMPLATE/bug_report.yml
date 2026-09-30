@@ -1,0 +1,71 @@
+name: Rapport de bug
+description: Signaler un comportement incorrect ou inattendu
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de remplir ce rapport. Plus les informations
+        sont précises, plus le diagnostic et le correctif seront rapides.
+        N'incluez jamais de secret, de mot de passe ou de jeton dans ce formulaire.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du problème
+      description: Résumé clair du comportement incorrect.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      placeholder: |
+        1. Se connecter avec le rôle …
+        2. Ouvrir …
+        3. Cliquer sur …
+        4. Constater l'erreur …
+    validations:
+      required: true
+  - type: textarea
+    id: attendu
+    attributes:
+      label: Comportement attendu
+    validations:
+      required: true
+  - type: textarea
+    id: observe
+    attributes:
+      label: Comportement observé
+    validations:
+      required: true
+  - type: dropdown
+    id: environnement
+    attributes:
+      label: Environnement
+      options:
+        - Production (Vercel)
+        - Développement local
+        - CI GitHub Actions
+        - Autre / non pertinent
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Rôle de l'utilisateur concerné
+      options:
+        - Administrateur
+        - Gestionnaire
+        - Prestataire (portail)
+        - Client (portail)
+        - Non connecté / public
+        - Non pertinent
+    validations:
+      required: false
+  - type: textarea
+    id: journaux
+    attributes:
+      label: Journaux, captures d'écran, extraits de réponse HTTP
+      description: Sans jamais inclure de secret, de mot de passe ou de jeton.
+    validations:
+      required: false

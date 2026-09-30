@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation du projet
+    url: https://github.com/RTsimbina/Suivi-Sante/tree/main/docs
+    about: Procédures de déploiement, workflows GitHub Actions, service de messagerie — consultez-la avant d'ouvrir une issue.
+  - name: Signaler une vulnérabilité
+    url: https://github.com/RTsimbina/Suivi-Sante/security/advisories/new
+    about: N'utilisez pas les issues publiques pour les vulnérabilités — passez par le signalement privé (voir SECURITY.md).

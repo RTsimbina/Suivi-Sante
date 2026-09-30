@@ -1,0 +1,47 @@
+name: Demande de fonctionnalité
+description: Proposer une amélioration ou une nouvelle fonctionnalité
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Décrivez d'abord le besoin métier, puis la solution envisagée : cela
+        permet d'évaluer la demande indépendamment d'une implémentation précise.
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Problème à résoudre
+      description: Quel besoin, quelle frustration, quel scénario d'usage actuel ?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+      description: Ce que vous imaginez, du point de vue de l'utilisateur.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: Autres pistes ou contournements évalués.
+    validations:
+      required: false
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module concerné
+      options:
+        - Référentiels (sociétés, prestataires, assurés)
+        - Dossiers et suivis
+        - Contrats / appels de fonds
+        - Service technique (barèmes, exclusions, imports ISA)
+        - Comptabilité (imports Sage / Suivi)
+        - Messagerie
+        - Reporting / tableaux de bord
+        - Assistant IA
+        - Sécurité / comptes utilisateurs
+        - Autre
+    validations:
+      required: true

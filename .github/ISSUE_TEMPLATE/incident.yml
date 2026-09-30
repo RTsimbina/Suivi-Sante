@@ -1,0 +1,56 @@
+name: Incident
+description: Indisponibilité ou dégradation d'exploitation — les incidents Healthcheck sont déjà ouverts automatiquement
+labels: [incident]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Avant de continuer** : si cet incident a été détecté par le workflow
+        Healthcheck, une issue intitulée `[Incident] …` existe déjà — commentez
+        celle-ci au lieu d'en ouvrir une nouvelle. Ce formulaire sert aux
+        incidents détectés manuellement ou signalés par un utilisateur.
+  - type: dropdown
+    id: composant
+    attributes:
+      label: Composant concerné
+      options:
+        - Disponibilité applicative (/api/health)
+        - Messagerie (file d'attente, envoi)
+        - Base de données (Neon / migrations)
+        - Déploiement Vercel
+        - Workflows GitHub Actions
+        - Autre
+    validations:
+      required: true
+  - type: dropdown
+    id: gravite
+    attributes:
+      label: Gravité
+      options:
+        - S1 — service indisponible pour tous les utilisateurs
+        - S2 — fonctionnalité majeure dégradée
+        - S3 — gêne sans impact métier majeur
+        - À évaluer
+    validations:
+      required: true
+  - type: input
+    id: horodatage
+    attributes:
+      label: Horodatage de début (UTC)
+      placeholder: "2026-09-14 13:13 UTC"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description et observations
+      description: Symptômes, codes HTTP observés, liens vers les runs GitHub Actions concernés.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact et utilisateurs concernés
+      description: Qui est touché, depuis quand, quel périmètre fonctionnel.
+    validations:
+      required: false
