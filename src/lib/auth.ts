@@ -1,8 +1,8 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
+import { ROLES } from '@/lib/referentiels';
 import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
 import { resoudreLiaisonPrestataireAvecControle } from '@/lib/liaison-prestataire';
 import { getClientIp } from '@/lib/rate-limit';
@@ -69,13 +69,13 @@ async function updateLastLogin(userId: string) {
 }
 
 // ─── Configuration NextAuth ────────────────────────────────────────────────
+// P0 : GoogleProvider SUPPRIMÉ. L'authentification de la plateforme est
+// exclusivement par identifiants (e-mail + mot de passe) : un compte Google
+// n'a aucun rôle dans notre base et déclenchait le repli historique vers
+// 'ADMINISTRATEUR' dans le callback jwt (escalade de privilèges complète).
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    }),
     CredentialsProvider({
       name: 'Identifiants',
       credentials: {
@@ -116,6 +116,17 @@ export const authOptions: NextAuthOptions = {
 
         if (!user || !user.actif) {
           await recordFailedLogin(ip, email);
+          return null;
+        }
+
+        // P0 — fail-closed sur le rôle : un compte dont le rôle est absent ou
+        // inconnu (hors référentiel des 8 rôles) ne se connecte PAS. Aucune
+        // exception : c'est la 1re couche de défense avant le callback jwt.
+        if (!user.role || !(ROLES as readonly string[]).includes(user.role)) {
+          console.warn(
+            `[AUTH] Compte "${email}" : rôle ${user.role ? `inconnu ("${user.role}")` : 'absent'} — ` +
+              `connexion refusée (fail-closed). Corriger le rôle en base.`,
+          );
           return null;
         }
 
@@ -210,9 +221,21 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // P0 — PLUS AUCUN repli de rôle. L'ancien `user.role || 'ADMINISTRATEUR'`
+      // transformait toute identité sans rôle (ex. compte OAuth) en admin.
+      // Deux couches de défense :
+      //   1. authorize() ne renvoie que des comptes à rôle valide (référentiel) ;
+      //   2. ICI : re-vérification stricte — sinon la session est REFUSÉE.
       if (user) {
+        const role = (user as { role?: string }).role;
+        if (!role || !(ROLES as readonly string[]).includes(role)) {
+          throw new Error(
+            `[AUTH] Session refusée : rôle absent ou invalide pour ` +
+              `${user.email ?? user.id} (fail-closed).`,
+          );
+        }
         token.id = user.id;
-        token.role = user.role || 'ADMINISTRATEUR';
+        token.role = role;
         token.nom = (user as any).nom || (user as any).name || '';
         token.email = user.email || '';
         // Stocker les identifiants de portail pour les rôles externes
@@ -220,6 +243,11 @@ export const authOptions: NextAuthOptions = {
         if (userAny.assureId) token.assureId = userAny.assureId;
         if (userAny.societeId) token.societeId = userAny.societeId;
         if (userAny.prestataireId) token.prestataireId = userAny.prestataireId;
+      } else if (!token.role || !(ROLES as readonly string[]).includes(String(token.role))) {
+        // Défense en profondeur : un token préexistant sans rôle valide
+        // (corrompu ou émis avant correctif) est invalidé — pas de rôle,
+        // pas de privilèges. Le porteur doit se reconnecter.
+        throw new Error('[AUTH] Token sans rôle valide — session invalidée (fail-closed).');
       }
       return token;
     },
