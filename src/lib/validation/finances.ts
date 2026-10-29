@@ -85,10 +85,21 @@ const baremeLigneSchema = z.object({
   active: z.boolean().optional(),
 });
 
-/** POST /api/baremes */
-export const baremeCreateSchema = baremeLigneSchema.extend({
-  societeId: idSchema,
-});
+/** POST /api/baremes — avec validité datée (P1 « Validité datée des barèmes »). */
+export const baremeCreateSchema = baremeLigneSchema
+  .extend({
+    societeId: idSchema,
+    // Début de validité OBLIGATOIRE côté métier (défaut = maintenant appliqué
+    // par la route si absent) ; fin FACULTATIVE (NULL = version en cours).
+    valideDu: dateOptionnelle,
+    valideAu: dateOptionnelle,
+    // Motif de la modification, tracé dans le journal d'audit (facultatif).
+    motif: texteOptionnel(500),
+  })
+  .refine(
+    (d) => !d.valideDu || !d.valideAu || d.valideAu.getTime() >= d.valideDu.getTime(),
+    { message: "La fin de validité doit être postérieure ou égale au début de validité" }
+  );
 
 /** PATCH /api/baremes — activation / désactivation. */
 export const baremePatchSchema = z.object({
@@ -112,6 +123,9 @@ export const techniqueBaremeSchema = z.object({
   montantReclame: montantPositif,
   assureId: idOptionnel,
   prestataireId: idOptionnel,
+  // P1 : date de la prestation (ISO) — sélection du barème valide à cette
+  // date. Absente → maintenant (comportement historique).
+  datePrestation: texteCourt(40, "La date de prestation").optional(),
 });
 
 /** POST /api/technique/societes — création avec barèmes initiaux.
