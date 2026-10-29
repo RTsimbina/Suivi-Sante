@@ -41,6 +41,7 @@ const dbMocks = vi.hoisted(() => ({
   dossierCount: vi.fn(),
   dossierFindMany: vi.fn(),
   dossierGroupBy: vi.fn(),
+  dossierQueryRaw: vi.fn(),
   baremeFindMany: vi.fn(),
   assureFindMany: vi.fn(),
 }));
@@ -59,6 +60,7 @@ vi.mock('@/lib/db', () => ({
       findMany: dbMocks.dossierFindMany,
       groupBy: dbMocks.dossierGroupBy,
     },
+    $queryRaw: dbMocks.dossierQueryRaw,
     bareme: { findMany: dbMocks.baremeFindMany },
     assure: { findMany: dbMocks.assureFindMany },
   },
@@ -114,6 +116,10 @@ beforeEach(() => {
   dbMocks.dossierCount.mockResolvedValue(0);
   dbMocks.dossierFindMany.mockResolvedValue([]);
   dbMocks.dossierGroupBy.mockResolvedValue([]);
+  dbMocks.dossierQueryRaw.mockResolvedValue([{
+    facturesemises: 0, facturesreglees: 0, facturesrejetees: 0,
+    montantfacture: 0, montantregule: 0, montantrestant: 0,
+  }]);
   dbMocks.baremeFindMany.mockResolvedValue([]);
   dbMocks.assureFindMany.mockResolvedValue([]);
 });
@@ -167,6 +173,15 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
     for (const call of dbMocks.dossierGroupBy.mock.calls) {
       expect(call[0].where.prestataireId).toBe(PREST_A);
     }
+    // $queryRaw (KPI factures) : le SQL contient la contrainte de périmètre
+    // avec le prestataireId du serveur en paramètre lié (jamais interpolé)
+    expect(dbMocks.dossierQueryRaw).toHaveBeenCalled();
+    for (const call of dbMocks.dossierQueryRaw.mock.calls) {
+      const sql = call[0] as { strings: string[]; values: unknown[] };
+      expect(sql.strings.join('?')).toContain('"prestataireId" =');
+      expect(sql.values).toContain(PREST_A);
+      expect(sql.values).not.toContain(PREST_B);
+    }
     expect(body.kpis.actesRealises).toBe(3);
   });
 
@@ -179,6 +194,7 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
     expect(dbMocks.prestataireFindUnique).not.toHaveBeenCalled();
     expect(dbMocks.dossierFindMany).not.toHaveBeenCalled();
     expect(dbMocks.dossierCount).not.toHaveBeenCalled();
+    expect(dbMocks.dossierQueryRaw).not.toHaveBeenCalled();
     // L'erreur ne révèle rien sur B
     expect(JSON.stringify(body)).not.toContain(PREST_B);
   });

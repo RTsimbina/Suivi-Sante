@@ -39,6 +39,7 @@ export interface Kpis {
   facturesEmises: number;
   facturesEnAttente: number;
   facturesRegles: number;
+  facturesRejetees: number;
   montantFacture: number;
   montantRegule: number;
   montantRestant: number;

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Sparkles, LogOut, Stethoscope, Scale, Receipt, FileText, AlertTriangle, RefreshCw, Bot,
+  Sparkles, LogOut, Stethoscope, Scale, Receipt, FileText, AlertTriangle, RefreshCw, Bot, Users,
 } from 'lucide-react';
 import AssistantView from '@/components/suivisante/assistant-view';
 import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
@@ -18,6 +18,7 @@ import { DashboardTab } from '@/components/suivisante/portail-prestataire/dashbo
 import { BaremesTab } from '@/components/suivisante/portail-prestataire/baremes-tab';
 import { ActesTab } from '@/components/suivisante/portail-prestataire/actes-tab';
 import { FacturesTab } from '@/components/suivisante/portail-prestataire/factures-tab';
+import { AssuresTab } from '@/components/suivisante/portail-prestataire/assures-tab';
 import type { DonneesPortail, SocieteBaremes } from '@/components/suivisante/portail-prestataire/types';
 
 // ─── Portail Prestataire ────────────────────────────────────────────────────
@@ -225,6 +226,10 @@ function ContenuPortailPrestataire() {
                 <FileText className='h-3.5 w-3.5' />
                 Actes médicaux
               </TabsTrigger>
+              <TabsTrigger value='assures' className='gap-1.5 text-xs'>
+                <Users className='h-3.5 w-3.5' />
+                Assurés
+              </TabsTrigger>
               <TabsTrigger value='factures' className='gap-1.5 text-xs'>
                 <Receipt className='h-3.5 w-3.5' />
                 Factures / Règlements
@@ -243,6 +248,9 @@ function ContenuPortailPrestataire() {
             </TabsContent>
             <TabsContent value='actes'>
               <ActesTab societes={societes} qsPeriode={qsPeriode} refreshKey={refreshKey} />
+            </TabsContent>
+            <TabsContent value='assures'>
+              <AssuresTab societes={societes} qsPeriode={qsPeriode} refreshKey={refreshKey} />
             </TabsContent>
             <TabsContent value='factures'>
               <FacturesTab societes={societes} qsPeriode={qsPeriode} refreshKey={refreshKey} />

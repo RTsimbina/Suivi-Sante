@@ -4,12 +4,11 @@ import { enNombre, versDecimal } from '@/lib/money';
 import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
 import { getPrestationLabel } from '@/lib/prestations';
 import { TYPE_LABELS as TYPES_PRESTATAIRE_LABELS } from '@/components/suivisante/prestataires/types';
-import { soldeFacture } from '@/lib/portail-prestataire';
 import {
   resoudreIdentitePortailPrestataire,
   estPrestataire,
 } from '@/lib/portail-prestataire-server';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 // ─── GET : Données du portail prestataire ──────────────────────────────────
 // Renvoie le profil du prestataire connecté, ses sociétés clientes
@@ -18,7 +17,10 @@ import type { Prisma } from '@prisma/client';
 // résolu depuis le JWT — aucune donnée d'un autre prestataire n'est accessible,
 // même en manipulant l'URL, les ids ou les paramètres.
 
-const LIMITE_FACTURES_KPI = 2000;
+const KPI_FACTURES_VIDE = [{
+  facturesemises: 0, facturesreglees: 0, facturesrejetees: 0,
+  montantfacture: 0, montantregule: 0, montantrestant: 0,
+}];
 
 export async function GET(request: NextRequest) {
   try {
@@ -83,37 +85,68 @@ export async function GET(request: NextRequest) {
     // Factures (vue financière) : dossiers de règlement prestataire —
     // c'est le prestataire qui est payé directement. Les dossiers
     // REMBOURSEMENT_ASSURE sont réglés à l'assuré (vue Actes uniquement).
-    const whereFactures: Prisma.DossierWhereInput = {
-      prestataireId,
-      categorieDossier: 'REGLEMENT_PRESTATAIRE',
-    };
-    Object.assign(whereFactures, filtreDateChamp('dateReception', plage));
-
-    const factures = await db.dossier.findMany({
-      where: whereFactures,
-      select: {
-        statut: true,
-        montantReclame: true,
-        montantValide: true,
-        montantPaye: true,
-      },
-      take: LIMITE_FACTURES_KPI,
-    });
-
-    let montantFacture = 0;
-    let montantRegule = 0;
-    let montantRestant = 0;
-    let facturesEmises = 0;
-    let facturesEnAttente = 0;
-    let facturesRegles = 0;
-    for (const f of factures) {
-      facturesEmises += 1;
-      if (f.statut !== 'PAYE' && f.statut !== 'REJETE') facturesEnAttente += 1;
-      if (f.statut === 'PAYE') facturesRegles += 1;
-      montantFacture += enNombre(versDecimal(f.montantReclame)) ?? 0;
-      montantRegule += enNombre(versDecimal(f.montantPaye)) ?? 0;
-      montantRestant += enNombre(soldeFacture(f)) ?? 0;
+    //
+    // CONSOLIDATION — KPI par agrégat SQL unique (précision monétaire Decimal
+    // conservée côté base) : remplace un findMany plafonné à 2000 lignes,
+    // qui rendait les compteurs et sommes inexacts au-delà de ce volume.
+    // Les compteurs dérivent EXACTEMENT la logique de deriveStatutFacture
+    // (src/lib/portail-prestataire.ts) :
+    //   REJETEE              ← statut REJETE (préempte tout)
+    //   PARTIELLEMENT_REGLEE ← 0 < payé < dû, dû = COALESCE(validé, réclamé) (préempte tout)
+    //   REGLEE               ← statut PAYE ou payé ≥ dû (hors partielle)
+    // Une facture partiellement réglée est donc comptée « en attente » :
+    // il lui reste un solde à encaisser (cohérent avec montantRestant).
+    // Le SQL est entièrement paramétré ($queryRaw tagué) ; le périmètre
+    // prestataireId et la catégorie sont des constantes serveur — aucune
+    // entrée navigateur n'entre dans la requête (la période vient de
+    // plageDepuisParams, dates serveur).
+    const filtresFactures = [
+      Prisma.sql`d."prestataireId" = ${prestataireId}`,
+      Prisma.sql`d."categorieDossier" = 'REGLEMENT_PRESTATAIRE'`,
+    ];
+    if (plage) {
+      filtresFactures.push(
+        Prisma.sql`d."dateReception" >= ${plage.debut}`,
+        Prisma.sql`d."dateReception" < ${plage.fin}` // fin exclusive (PlagePeriode)
+      );
     }
+
+    const [kpiFactures] = await db.$queryRaw<{
+      facturesemises: number | bigint;
+      facturesreglees: number | bigint;
+      facturesrejetees: number | bigint;
+      montantfacture: string | number | bigint | null;
+      montantregule: string | number | bigint | null;
+      montantrestant: string | number | bigint | null;
+    }>(Prisma.sql`
+      WITH f AS (
+        SELECT d."statut", d."montantReclame", d."montantValide", d."montantPaye",
+               COALESCE(d."montantValide", d."montantReclame", 0) AS "du"
+        FROM "Dossier" d
+        WHERE ${Prisma.join(filtresFactures, ' AND ')}
+      )
+      SELECT
+        COUNT(*)::int AS facturesemises,
+        COUNT(*) FILTER (
+          WHERE "statut" <> 'REJETE'
+            AND NOT ("montantPaye" IS NOT NULL AND "montantPaye" > 0 AND "montantPaye" < "du")
+            AND ("statut" = 'PAYE' OR ("montantPaye" IS NOT NULL AND "montantPaye" >= "du"))
+        )::int AS facturesreglees,
+        COUNT(*) FILTER (WHERE "statut" = 'REJETE')::int AS facturesrejetees,
+        COALESCE(SUM("montantReclame"), 0) AS montantfacture,
+        COALESCE(SUM("montantPaye"), 0) AS montantregule,
+        COALESCE(SUM(CASE WHEN "statut" = 'REJETE' THEN 0
+                          ELSE GREATEST("du" - COALESCE("montantPaye", 0), 0) END), 0) AS montantrestant
+      FROM f
+    `) ?? KPI_FACTURES_VIDE;
+
+    const facturesEmises = Number(kpiFactures.facturesemises);
+    const facturesRegles = Number(kpiFactures.facturesreglees);
+    const facturesRejetees = Number(kpiFactures.facturesrejetees);
+    const facturesEnAttente = Math.max(0, facturesEmises - facturesRegles - facturesRejetees);
+    const montantFacture = Math.round(enNombre(kpiFactures.montantfacture) * 100) / 100;
+    const montantRegule = Math.round(enNombre(kpiFactures.montantregule) * 100) / 100;
+    const montantRestant = Math.round(enNombre(kpiFactures.montantrestant) * 100) / 100;
 
     // Derniers actes (aperçu tableau de bord, même périmètre + période).
     const derniersActes = await db.dossier.findMany({
@@ -151,9 +184,10 @@ export async function GET(request: NextRequest) {
         facturesEmises,
         facturesEnAttente,
         facturesRegles,
-        montantFacture: Math.round(montantFacture * 100) / 100,
-        montantRegule: Math.round(montantRegule * 100) / 100,
-        montantRestant: Math.round(montantRestant * 100) / 100,
+        facturesRejetees,
+        montantFacture,
+        montantRegule,
+        montantRestant,
       },
       derniersActes: derniersActes.map(d => ({
         id: d.id,
