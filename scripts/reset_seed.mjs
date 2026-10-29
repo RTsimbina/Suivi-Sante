@@ -111,6 +111,19 @@ async function purge() {
 
 async function main() {
   console.log('🌱 RÉINITIALISATION — JEU DE DONNÉES PAR SOCIÉTÉ (JAN → SEP 2026)\n');
+
+  // Existence PRÉ-purge des comptes « conservés » : un compte réel peut avoir
+  // été supprimé/changé par son propriétaire depuis la dernière initialisation
+  // — dans ce cas la vérification finale est informatique, jamais bloquante
+  // (le seed ne recrée JAMAIS un compte personnel). Seuls les comptes qui
+  // existaient AVANT doivent SURVIVRE au purge (garantie anti-suppression).
+  const comptesAvant = new Set(
+    (await db.utilisateur.findMany({
+      where: { email: { in: EMAILS_A_CONSERVER } },
+      select: { email: true },
+    })).map((u) => u.email.toLowerCase())
+  );
+
   await purge();
 
   const pwdInt = await hash(PWD_INTERNE, 12);
@@ -798,6 +811,13 @@ async function main() {
   chk('liaison prestataire : e-mails de facturation portés par les fiches Prestataire', (await db.prestataire.count({ where: { email: { in: ['facturation@hopital-principal.mg', 'contact@clinique-saintemarie.mg'], mode: 'insensitive' } } })) === 2);
   for (const e of EMAILS_A_CONSERVER) {
     const pref = e.split('@')[0] + '@';
+    if (!comptesAvant.has(e.toLowerCase())) {
+      // Compte absent AVANT le purge : rien à préserver (supprimé par son
+      // propriétaire, ou environnement neuf) — information, pas un échec.
+      checks.push([`compte conservé : ${e}`, true]);
+      console.log(`  ℹ️  ${e} : absent avant le seed — vérification de conservation ignorée (non recréé)`);
+      continue;
+    }
     chk(`compte conservé : ${e}`, (await db.utilisateur.count({ where: { email: { startsWith: pref, mode: 'insensitive' } } })) >= 1);
   }
   // anciens dossiers disparus
