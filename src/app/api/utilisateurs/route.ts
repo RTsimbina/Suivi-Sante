@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
+import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 import { liaisonContactEntrepriseExiste } from '@/lib/liaison-externe';
 import { liaisonPrestataireExiste } from '@/lib/liaison-prestataire';
 import { parseJsonBody } from '@/lib/validation/parse';
@@ -296,6 +297,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // ─── Audit (socle Gestion — pilier Audit) : FON-002 « traces dans le
+    // journal d'audit ». JAMAIS de mot de passe dans le journal (ni clair,
+    // ni hashé) — seul le fait de la création est tracé.
+    const { nom: auteurNom, id: auteurId } = await getUserInfoFromRequest(request);
+    await logParametreChange({
+      entite: 'Utilisateur',
+      entiteId: utilisateur.id,
+      champ: 'CREATION',
+      ancienneValeur: null,
+      nouvelleValeur: `${utilisateur.email} (${utilisateur.nom}) — rôle ${utilisateur.role}`,
+      modifiePar: auteurNom,
+      modifieParId: auteurId,
+      objet: utilisateur.email,
+      request,
+    });
+
     return NextResponse.json({
       message: 'Utilisateur cree avec succes.',
       utilisateur: { ...utilisateur, roleLabel: ROLE_LABELS[utilisateur.role] || utilisateur.role },
@@ -416,6 +433,38 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    // ─── Audit (socle Gestion — pilier Audit) : chaque champ réellement
+    // modifié est tracé. Le mot de passe n'est JAMAIS journalisé (ni l'ancien
+    // hash, ni le nouveau) — le changement est tracé en tant que fait
+    // (« (modifié) »), pour répondre à « qui a changé ce mot de passe ».
+    const { nom: auteurNom, id: auteurId } = await getUserInfoFromRequest(request);
+    const modifications: { champ: string; ancienne: unknown; nouvelle: unknown }[] = [];
+    if (data.nom !== undefined && existing.nom !== data.nom) {
+      modifications.push({ champ: 'nom', ancienne: existing.nom, nouvelle: data.nom });
+    }
+    if (data.email !== undefined && existing.email !== data.email) {
+      modifications.push({ champ: 'email', ancienne: existing.email, nouvelle: data.email });
+    }
+    if (data.role !== undefined && existing.role !== data.role) {
+      modifications.push({ champ: 'role', ancienne: existing.role, nouvelle: data.role });
+    }
+    if (data.password !== undefined) {
+      modifications.push({ champ: 'password', ancienne: '(hash existant)', nouvelle: '(modifié)' });
+    }
+    for (const m of modifications) {
+      await logParametreChange({
+        entite: 'Utilisateur',
+        entiteId: id,
+        champ: m.champ,
+        ancienneValeur: m.ancienne,
+        nouvelleValeur: m.nouvelle,
+        modifiePar: auteurNom,
+        modifieParId: auteurId,
+        objet: existing.email,
+        request,
+      });
+    }
+
     return NextResponse.json({
       message: 'Utilisateur mis a jour avec succes.',
       utilisateur: { ...utilisateur, roleLabel: ROLE_LABELS[utilisateur.role] || utilisateur.role },
@@ -462,6 +511,22 @@ export async function PATCH(request: NextRequest) {
         avatar: true,
         updatedAt: true,
       },
+    });
+
+    // ─── Audit (socle Gestion — pilier Audit) : l'activation / désactivation
+    // d'un compte est un événement de sécurité majeur — toujours tracée avec
+    // l'auteur réel (la désactivation coupe l'accès au portail immédiatement).
+    const { nom: auteurNom, id: auteurId } = await getUserInfoFromRequest(request);
+    await logParametreChange({
+      entite: 'Utilisateur',
+      entiteId: id,
+      champ: 'actif',
+      ancienneValeur: existing.actif,
+      nouvelleValeur: actif,
+      modifiePar: auteurNom,
+      modifieParId: auteurId,
+      objet: existing.email,
+      request,
     });
 
     return NextResponse.json({
@@ -515,17 +580,21 @@ export async function DELETE(request: NextRequest) {
 
     await db.utilisateur.delete({ where: { id } });
 
-    // Audit log
+    // Audit log — auteur RÉEL (l'administrateur qui supprime), pas « SYSTEM » :
+    // le journal doit répondre « qui a supprimé ce compte ». Non bloquant :
+    // la suppression est déjà effective.
     try {
-      await db.historiqueParametre.create({
-        data: {
-          entite: 'Utilisateur',
-          entiteId: id,
-          champ: 'SUPPRESSION',
-          ancienneValeur: `${existing.nom} (${existing.email}), Role: ${existing.role}`,
-          nouvelleValeur: null,
-          modifiePar: 'SYSTEM',
-        },
+      const { nom: auteurNom, id: auteurId } = await getUserInfoFromRequest(request);
+      await logParametreChange({
+        entite: 'Utilisateur',
+        entiteId: id,
+        champ: 'SUPPRESSION',
+        ancienneValeur: `${existing.nom} (${existing.email}), Rôle : ${existing.role}`,
+        nouvelleValeur: null,
+        modifiePar: auteurNom || 'SYSTEM',
+        modifieParId: auteurId,
+        objet: existing.email,
+        request,
       });
     } catch { /* ne pas bloquer */ }
 

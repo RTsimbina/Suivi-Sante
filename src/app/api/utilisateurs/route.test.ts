@@ -18,6 +18,7 @@ const dbMocks = vi.hoisted(() => ({
   utilisateurCount: vi.fn(),
   utilisateurCreate: vi.fn(),
   utilisateurUpdate: vi.fn(),
+  utilisateurDelete: vi.fn().mockResolvedValue({}),
   assureFindFirst: vi.fn(),
   assureFindMany: vi.fn(),
   contactFindFirst: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/lib/db', () => ({
       count: dbMocks.utilisateurCount,
       create: dbMocks.utilisateurCreate,
       update: dbMocks.utilisateurUpdate,
+      delete: dbMocks.utilisateurDelete,
     },
     assure: {
       findFirst: dbMocks.assureFindFirst,
@@ -64,12 +66,29 @@ vi.mock('@/lib/authorize', () => ({
   checkAuth: vi.fn().mockResolvedValue(null),
 }));
 
+const auditMocks = vi.hoisted(() => ({
+  logParametreChange: vi.fn().mockResolvedValue(undefined),
+  getUserInfoFromRequest: vi
+    .fn()
+    .mockResolvedValue({ nom: 'Admin', id: 'u-admin', role: 'ADMINISTRATEUR' }),
+}));
+
+vi.mock('@/lib/audit-log', () => ({
+  logParametreChange: auditMocks.logParametreChange,
+  getUserInfoFromRequest: auditMocks.getUserInfoFromRequest,
+}));
+
+// DELETE lit le JWT pour interdire l'auto-suppression
+vi.mock('next-auth/jwt', () => ({
+  getToken: vi.fn().mockResolvedValue({ id: 'u-autre', role: 'ADMINISTRATEUR' }),
+}));
+
 vi.mock('bcryptjs', () => ({
   hash: vi.fn().mockResolvedValue('$2a$12$hashed'),
   compare: vi.fn(),
 }));
 
-import { GET, POST, PUT } from './route';
+import { GET, POST, PUT, PATCH, DELETE } from './route';
 
 function requetePost(body: unknown): NextRequest {
   return new Request('http://localhost/api/utilisateurs', {
@@ -336,5 +355,110 @@ describe('GET /api/utilisateurs — visibilité de la liaison', () => {
     expect(body.pagination.total).toBe(2);
     expect(body.utilisateurs[0].liaisonExterne).toBeNull(); // badge dégradé (inconnu)
     expect(body.utilisateurs[0].roleLabel).toBe('Portail Client');
+  });
+});
+
+// ═══ Socle Gestion — pilier Audit : toute écriture sur les comptes est ═════
+// tracée dans le journal (FON-002), avec l'auteur réel, jamais le mot de passe.
+const UTILISATEUR_EXISTANT = {
+  id: 'u-ex', email: 'agent@suivisante.mg', nom: 'Agent Test',
+  role: 'ACCUEIL', actif: true, avatar: null, createdAt: new Date(),
+};
+
+function requetePatch(body: unknown): NextRequest {
+  return new Request('http://localhost/api/utilisateurs', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }) as unknown as NextRequest;
+}
+
+function requeteDelete(id: string): NextRequest {
+  return new Request(`http://localhost/api/utilisateurs?id=${id}`, {
+    method: 'DELETE',
+  }) as unknown as NextRequest;
+}
+
+describe('Pilier Audit — /api/utilisateurs', () => {
+  beforeEach(() => {
+    auditMocks.logParametreChange.mockClear();
+    auditMocks.getUserInfoFromRequest.mockResolvedValue({
+      nom: 'Admin', id: 'u-admin', role: 'ADMINISTRATEUR',
+    });
+  });
+
+  it('POST → audit CREATION avec auteur réel, sans mot de passe', async () => {
+    dbMocks.assureFindFirst.mockResolvedValue({ id: 'assure-1' });
+
+    await POST(requetePost(PAYLOAD_PORTAIL));
+
+    expect(auditMocks.logParametreChange).toHaveBeenCalledTimes(1);
+    const appel = auditMocks.logParametreChange.mock.calls[0][0];
+    expect(appel).toMatchObject({
+      entite: 'Utilisateur',
+      entiteId: 'u1',
+      champ: 'CREATION',
+      modifiePar: 'Admin',
+      modifieParId: 'u-admin',
+      objet: 'client@exemple.com',
+    });
+    const journalise = JSON.stringify(appel);
+    expect(journalise).not.toContain('motdepasse1');
+    expect(journalise).not.toContain('$2a$12$hashed');
+  });
+
+  it('PATCH (désactivation) → audit champ actif true → false avec auteur réel', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue(UTILISATEUR_EXISTANT);
+    dbMocks.utilisateurUpdate.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: false });
+
+    const res = await PATCH(requetePatch({ id: 'u-ex', actif: false }));
+    expect(res.status).toBe(200);
+
+    expect(auditMocks.logParametreChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entite: 'Utilisateur',
+        entiteId: 'u-ex',
+        champ: 'actif',
+        ancienneValeur: true,
+        nouvelleValeur: false,
+        modifiePar: 'Admin',
+      })
+    );
+  });
+
+  it('DELETE → audit SUPPRESSION avec l\'auteur RÉEL (plus jamais « SYSTEM »)', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue(UTILISATEUR_EXISTANT);
+
+    await DELETE(requeteDelete('u-ex'));
+
+    expect(auditMocks.logParametreChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entite: 'Utilisateur',
+        champ: 'SUPPRESSION',
+        modifiePar: 'Admin',
+        modifieParId: 'u-admin',
+        objet: 'agent@suivisante.mg',
+      })
+    );
+    expect(auditMocks.logParametreChange.mock.calls[0][0].ancienneValeur).toContain('Agent Test');
+  });
+
+  it('PUT (changement de rôle + mot de passe) → audit par champ, mot de passe jamais journalisé', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue(UTILISATEUR_EXISTANT);
+    dbMocks.utilisateurUpdate.mockResolvedValue({
+      ...UTILISATEUR_EXISTANT, role: 'TECHNIQUE',
+    });
+
+    await PUT(requetePut({ id: 'u-ex', role: 'TECHNIQUE', password: 'nouveaumdp1' }));
+
+    const champs = auditMocks.logParametreChange.mock.calls.map((c) => c[0]);
+    expect(champs.map((a) => a.champ).sort()).toEqual(['password', 'role']);
+    const role = champs.find((a) => a.champ === 'role');
+    expect(role).toMatchObject({ ancienneValeur: 'ACCUEIL', nouvelleValeur: 'TECHNIQUE' });
+    const pwd = champs.find((a) => a.champ === 'password');
+    expect(pwd).toMatchObject({ ancienneValeur: '(hash existant)', nouvelleValeur: '(modifié)' });
+    const tout = JSON.stringify(champs);
+    expect(tout).not.toContain('nouveaumdp1');
+    expect(tout).not.toContain('$2a$12$hashed');
   });
 });
