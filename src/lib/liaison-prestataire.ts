@@ -70,7 +70,7 @@ export async function resoudreLiaisonPrestataireAvecControle(
       `jamais de service d'une fiche imprévisible). Corriger les e-mails des fiches ` +
       `concernées (GESTION → Prestataires) ou utiliser un e-mail distinct par établissement.`
     );
-    return { statut: 'AMBIGU', nbFiches: fiches.length };
+    return { statut: 'AMBIGU', nbFiches: fiches.length, prestataireId: fiches[0].id };
   }
 
   return { statut: 'OK', prestataireId: fiches[0].id };
