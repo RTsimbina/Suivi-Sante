@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
-import { buildContext, validerParams, extrairePeriode, isRoleExterne, verifierAutorisationParam } from '@/lib/assistant/context';
+import { buildContext, validerParams, extrairePeriode, isRoleExterne } from '@/lib/assistant/context';
 import { listerQuestions, executerQuestion } from '@/lib/assistant/engine';
 import type { AssistantContext, ParamOption } from '@/lib/assistant/types';
 import { AssistantError } from '@/lib/assistant/types';
