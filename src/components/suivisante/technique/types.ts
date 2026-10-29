@@ -50,6 +50,11 @@ export interface BaremeRow {
   tauxCouverture: number;
   plafond: number;
   description: string;
+  // ─── P1 « Validité datée » : versionnement et période (affichés côté UI) ──
+  id?: string;
+  version?: number;
+  valideDu?: string | Date | null;
+  valideAu?: string | Date | null;
 }
 
 export interface Societe {

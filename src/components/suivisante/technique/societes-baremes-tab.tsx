@@ -243,14 +243,24 @@ export default function SocietesBaremesTab({
                     <TableHead>Type de prestation</TableHead>
                     <TableHead className="text-center">Taux de couverture</TableHead>
                     <TableHead className="text-right">Plafond (Ar)</TableHead>
+                    <TableHead className="hidden lg:table-cell">Validité (v)</TableHead>
                     <TableHead className="hidden md:table-cell">Description</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {baremesFiltres.map((b) => {
                     const hasValues = b.tauxCouverture > 0 || b.plafond > 0;
+                    // P1 : chaque ligne = une VERSION du barème, avec sa période
+                    // de validité — l'historique des taux reste consultable.
+                    const fmtDate = (d?: string | Date | null) => {
+                      if (!d) return null;
+                      const dt = typeof d === 'string' ? new Date(d) : d;
+                      return Number.isNaN(dt.getTime()) ? null : dt.toLocaleDateString('fr-FR');
+                    };
+                    const du = fmtDate(b.valideDu);
+                    const au = fmtDate(b.valideAu);
                     return (
-                      <TableRow key={b.prestation} className={!hasValues ? 'opacity-50' : ''}>
+                      <TableRow key={b.id ?? `${b.prestation}-${b.version ?? 1}`} className={!hasValues ? 'opacity-50' : ''}>
                         <TableCell className="font-medium">
                           <Badge variant={hasValues ? 'default' : 'secondary'} className={hasValues ? (PRESTATION_COLORS[b.prestation] || '') : ''}>
                             {PRESTATION_LABELS[b.prestation] || b.prestation}
@@ -265,6 +275,11 @@ export default function SocietesBaremesTab({
                           <span className={hasValues ? 'font-medium' : 'text-muted-foreground'}>
                             {b.plafond > 0 ? formatMontant(b.plafond) : '—'}
                           </span>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
+                          {du || au
+                            ? `du ${du ?? '—'} → ${au ?? 'en cours'}${b.version ? ` (v${b.version})` : ''}`
+                            : b.version ? `v${b.version}` : '—'}
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                           {b.description || '—'}
