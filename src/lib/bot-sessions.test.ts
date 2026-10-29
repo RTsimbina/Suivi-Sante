@@ -200,13 +200,16 @@ describe('sessions bot en base (plan P3)', () => {
 
   it('F2 : deux assurés sur le même suffixe → refus fail-closed, AUCUN choix arbitraire', async () => {
     dbMocks.botSessionFindUnique.mockResolvedValue(null);
+    // Deux fiches assurés partagent le MÊME numéro (formats différents mais
+    // mêmes chiffres) : l'ancien code aurait choisi arbitrairement le
+    // premier (findFirst). Le suffixe des DEUX correspond à la cible.
     dbMocks.assureFindMany.mockResolvedValue([
       {
-        id: 'assure-1', nom: 'Rakoto', prenom: 'Jean', telephone: '0341234567',
+        id: 'assure-1', nom: 'Rakoto', prenom: 'Jean', telephone: '+261 34 12 345 67',
         societeId: 'soc-1', actif: true, societe: { id: 'soc-1', nom: 'Société A' },
       },
       {
-        id: 'assure-2', nom: 'Rabe', prenom: 'Marie', telephone: '+261341234567',
+        id: 'assure-2', nom: 'Rabe', prenom: 'Marie', telephone: '0261341234567',
         societeId: 'soc-2', actif: true, societe: { id: 'soc-2', nom: 'Société B' },
       },
     ]);
@@ -218,7 +221,7 @@ describe('sessions bot en base (plan P3)', () => {
       texte: '/mesdossiers',
     });
 
-    // L'ancien code aurait choisi arbitrairement le premier (findFirst)
+    // Les deux chiffres normalisés finissent par '261341234567' → ambiguïté
     expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
     expect(reponse).toContain('/verifier');
   });
