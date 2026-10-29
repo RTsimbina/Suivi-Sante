@@ -55,6 +55,18 @@ const jour = (m, j) => D(`${ANNEE}-${String(m).padStart(2, '0')}-${String(j).pad
 const addJours = (d, n) => new Date(d.getTime() + n * 86400000);
 const fmtDate = (d) => d.toISOString();
 
+// Normalisation identique à src/lib/prestataire-doublons.ts (et à la formule
+// SQL du backfill unaccent) — remplit les colonnes nomNormalise créées par
+// les migrations 20260924110000 (Prestataire) et 20261029100000 (Societe),
+// pour que l'unicité insensible casse/accents soit effective dès le seed.
+const normaliserNom = (nom) => nom
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
+  .replace(/\s+/g, ' ');
+
 // RNG déterministe (mulberry32) — le « hasard » est reproductible.
 function rng(seedStr) {
   let h = 1779033703 ^ seedStr.length;
@@ -86,8 +98,15 @@ async function purge() {
   }
   const u = await db.utilisateur.deleteMany({ where: { email: { in: EMAILS_DEMO } } });
   console.log(`  - utilisateurs démo     ${u.count} supprimés (conservés : admin + comptes réels)`);
-  const hist = await db.historiqueParametre.deleteMany({});
-  console.log(`  - historiqueParametre   ${hist.count} supprimés (journal de test)`);
+  // Journal d'audit : CONSERVÉ. Immuable en base depuis la migration
+  // 20260924110000 (déclencheur PostgreSQL interdisant UPDATE et DELETE sur
+  // HistoriqueParametre — FON-024). Toute réinitialisation y ajoute ses
+  // propres entrées ; l'historique des jeux de test précédents reste
+  // consultable. (Avant ce correctif, le purge échouait ici avec
+  // « Journal d'audit immuable : DELETE interdit » APRÈS avoir supprimé tout
+  // le métier — état à moitié vide. Détecté par la validation locale pglocal.)
+  await db.historiqueParametre.count(); // vérifie l'accès (client généré)
+  console.log('  - historiqueParametre   CONSERVÉ (journal immuable — FON-024)');
 }
 
 async function main() {
@@ -274,10 +293,12 @@ async function main() {
   for (const cfg of SOCIETES) {
     const s = await db.societe.create({
       data: {
-        nom: cfg.nom, adresse: cfg.adresse, telephone: cfg.tel, nif: cfg.nif,
+        nom: cfg.nom, nomNormalise: normaliserNom(cfg.nom) || null,
+        adresse: cfg.adresse, telephone: cfg.tel, nif: cfg.nif,
         email: cfg.email ?? null,
         contactPrincipal: cfg.contactPrincipal,
         emailContactPrincipal: cfg.emailContactPrincipal ?? null,
+        actif: true,
       },
     });
     societes[cfg.key] = s;
@@ -339,7 +360,7 @@ async function main() {
   console.log('\n🏥 PRESTATAIRES');
   // stat = Numéro Statistique (Madagascar), statutJuridique = forme juridique
   const P = (nom, type, tel, email, adr, nif, actif = true, rib = null, stat = null, statutJuridique = null) => db.prestataire.create({
-    data: { nom, type, telephone: tel, email, adresse: adr, nif, actif, statut: actif ? 'CONVENTIONNE' : 'SUSPENDU', rib, stat, statutJuridique },
+    data: { nom, nomNormalise: normaliserNom(nom) || null, type, telephone: tel, email, adresse: adr, nif, actif, statut: actif ? 'CONVENTIONNE' : 'SUSPENDU', rib, stat, statutJuridique },
   });
   const pHop = await P('Hôpital Principal HJ Anosy', 'HOPITAL', '020 22 345 67', 'facturation@hopital-principal.mg', 'Avenue de la Libération, Anosy, Antananarivo', '4002345678', true, '000 12345 67890 12 3', '6512 311 2001 01234', 'SA');
   const pCli = await P('Clinique Sainte Marie', 'CLINIQUE', '032 12 345 67', 'contact@clinique-saintemarie.mg', 'Lot VJ 34 Antanimena, Antananarivo', '4001234567', true, '000 23456 78901 23 4', '6512 311 2002 02345', 'SARL');
