@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
           prestation: true,
           tauxCouverture: true,
           plafond: true,
+          description: true,
           active: true,
           valideDu: true,
           valideAu: true,

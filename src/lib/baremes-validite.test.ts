@@ -193,7 +193,7 @@ describe('dedupliquerEnVigueur — une seule version par combinaison', () => {
 describe('trouverBaremeValide — sélection datée (requête Prisma)', () => {
   it('construit une requête à la DATE DE PRESTATION avec tri version la plus récente', async () => {
     const findFirst = vi.fn().mockResolvedValue(null);
-    const db = { bareme: { findFirst } };
+    const db = { bareme: { findFirst, findMany: vi.fn() } };
     const date = D('2026-06-15T10:00:00Z');
     await trouverBaremeValide(db, { societeId: 's1', prestation: ' pharmacie ', date });
 
@@ -213,7 +213,7 @@ describe('trouverBaremeValide — sélection datée (requête Prisma)', () => {
 
   it('renvoie la version sélectionnée (justification du remboursement)', async () => {
     const v1 = bareme({ id: 'v1', version: 1, tauxCouverture: 80, valideAu: D('2026-06-30') });
-    const db = { bareme: { findFirst: vi.fn().mockResolvedValue(v1) } };
+    const db = { bareme: { findFirst: vi.fn().mockResolvedValue(v1), findMany: vi.fn() } };
     const result = await trouverBaremeValide(db, {
       societeId: 's1', prestation: 'PHARMACIE', date: D('2026-06-15'),
     });
@@ -222,7 +222,7 @@ describe('trouverBaremeValide — sélection datée (requête Prisma)', () => {
   });
 
   it('aucune version couvrante → null (fail-closed : acte non couvert)', async () => {
-    const db = { bareme: { findFirst: vi.fn().mockResolvedValue(null) } };
+    const db = { bareme: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn() } };
     const result = await trouverBaremeValide(db, {
       societeId: 's1', prestation: 'PHARMACIE', date: D('2026-06-15'),
     });
@@ -233,7 +233,7 @@ describe('trouverBaremeValide — sélection datée (requête Prisma)', () => {
 describe('chargerVersionsCombinaison — toutes versions (y compris retirées)', () => {
   it('ne filtre PAS supprime : les numéros de version consommés sont préservés', async () => {
     const findMany = vi.fn().mockResolvedValue([]);
-    const db = { bareme: { findMany } };
+    const db = { bareme: { findMany, findFirst: vi.fn() } };
     await chargerVersionsCombinaison(db, { societeId: 's1', prestation: 'pharmacie' });
     const args = findMany.mock.calls[0][0];
     expect(args.where).toEqual({ societeId: 's1', prestation: 'PHARMACIE' });

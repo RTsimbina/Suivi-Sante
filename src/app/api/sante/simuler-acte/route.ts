@@ -4,7 +4,7 @@ import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { simulerActeSchema } from '@/lib/validation';
 import { trouverBaremeValide, dedupliquerEnVigueur } from '@/lib/baremes-validite';
-import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, reliquat as calculerReliquat, formaterAr, formaterNombre, formaterPourcent } from '@/lib/money';
+import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, reliquat as calculerReliquat, formaterAr, formaterNombre, formaterPourcent, versDecimal } from '@/lib/money';
 
 export async function POST(request: NextRequest) {
   const authError = await checkAuth(request);
@@ -165,7 +165,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Plafond acte > 70%
-    if (!bareme.plafond.isZero() && superieurOuEgal(consommeActe.mul(100), bareme.plafond.mul(70))) {
+    // P1 : conversion Decimal du plafond de la version (Decimal | number).
+    const plafondActeDec = versDecimal(bareme.plafond) ?? new Decimal(0);
+    if (!plafondActeDec.isZero() && superieurOuEgal(consommeActe.mul(100), plafondActeDec.mul(70))) {
       alertes.push({
         type: 'warning',
         message: `Plafond ${typeActe} à ${formaterPourcent(consommeActe, bareme.plafond)}.`,

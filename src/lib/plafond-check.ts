@@ -14,7 +14,7 @@
  */
 
 import { db } from './db';
-import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, plus, reliquat as calculerReliquat, formaterAr, formaterPourcent } from './money';
+import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, plus, reliquat as calculerReliquat, formaterAr, formaterPourcent, versDecimal } from './money';
 import { dedupliquerEnVigueur, trouverBaremeValide, type BaremeDated } from './baremes-validite';
 
 /** Taux de consommation en % : consommé / plafond × 100 (Decimal exact). */
@@ -282,7 +282,9 @@ export async function verifierPlafondAnnuel(opts: {
   }
 
   // 5e. Plafond acte > 70% → avertissement
-  const tauxActe = tauxConsommation(consommeActe, bareme.plafond);
+  // P1 : le plafond de la version peut être un number (mocks) — conversion
+  // Decimal pour le calcul du taux de consommation.
+  const tauxActe = tauxConsommation(consommeActe, versDecimal(bareme.plafond) ?? new Decimal(0));
   if (tauxActe !== null && superieurOuEgal(tauxActe, 70)) {
     alertes.push({
       type: 'warning',
