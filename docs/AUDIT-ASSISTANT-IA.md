@@ -123,6 +123,26 @@ apparaît. *Optionnel.*
 repli). Conforme à l'assumption documentée du cahier V2.0 chapitre 6 (« envoi
 limité texte + nom »). Les 160 questions et `/api/ia` **n'appellent aucun LLM**.
 
+### 🟢 F6 — Import mort dans la route API (corrigé)
+
+`src/app/api/assistant/route.ts` importait `verifierAutorisationParam`
+(sans l'utiliser) : la fonction reste vivante dans `context.ts` et testée
+directement (`assistant.test.ts`), mais aucun handler de la route ne la
+consomme — les identifiants SOCIETE/PRESTATAIRE/ASSURE des rôles internes
+sont vérifiés contre la base par les implémentations elles-mêmes.
+**Corrigé** : import retiré (hygiène, zéro impact fonctionnel).
+
+### 🟢 F7 — Helpers de scope morts dans results.ts (corrigés)
+
+`filtresScopeDossier` et `filtresScopeSql` (dont le commentaire affirmait à
+tort qu'ils étaient « le seul endroit où le scope est traduit en condition
+Prisma ») n'étaient appelés nulle part : chaque fichier de questions applique
+son scope localement (`whereFamille` / `whereSociete` / `wherePrestataire`),
+ce qui est plus lisible et vérifiable. Aucun usage, aucun test.
+**Corrigés** : suppression (ainsi que l'import `AssistantContext` devenu
+inutile) ; `familleAssureIds` et `societesDuPrestataire`, eux réellement
+utilisés, sont conservés.
+
 ## 5. Bots multi-canaux — conformité
 
 - Sessions **persistées en base** (`BotSession`), TTL **4 h** avec purge
@@ -150,7 +170,16 @@ Le sous-système Assistant IA est **complet et conforme** : 160/160 questions
 opérationnelles, chaîne de sécurité intégrale, isolation vérifiée ligne à
 ligne sur les trois catalogues externes, bots cloisonnés en lecture, socle LLM
 sans fuite. Les recommandations F2/F3/F4 sont des durcissements de confort à
-planifier ; aucune correction immédiate n'est requise.
+planifier ; les hygiènes F6/F7 sont corrigées (aucun impact fonctionnel).
+
+**Vérification croisée indépendante (29/10/2026, session 2)** : relecture
+intégrale indépendante du sous-système (catalogue, moteur, contexte, portée,
+périodes, route API, bots, socle LLM) confirmant l'ensemble des constats
+ci-dessus — comptage 8 × 20 = 160 exact, chaîne moteur dans l'ordre,
+isolation des trois rôles externes appel par appel, zéro `fetch()` dans
+`src/lib/assistant` (FON-022 : aucune donnée métier vers l'extérieur),
+`/api/ia` verrouillé aux 5 rôles internes dans `authorize.ts`. Seuls ajouts :
+les findings F6/F7 (hygiène), corrigés dans la foulée.
 
 *Contrôles réalisés par lecture statique + comptages structurels (rg) ;
 conformité runtime attestée par la CI (> 660 tests verts, dont
