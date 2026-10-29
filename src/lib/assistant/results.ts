@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { Prisma } from '@prisma/client';
-import type { AssistantResultCore, ResultColonne, ResultKpi, AssistantContext } from './types';
+import type { AssistantResultCore, ResultColonne, ResultKpi } from './types';
 import type { PeriodeResolue } from './types';
 import { periodeSqlFrag } from './periods';
 
@@ -267,55 +267,4 @@ export async function societesDuPrestataire(prestataireId: string): Promise<stri
     select: { societeId: true },
   });
   return rows.map((r) => r.societeId);
-}
-
-/**
- * Construit le filtre de périmètre Dossier pour un contexte donné.
- * C'est le seul endroit où le scope est traduit en condition Prisma :
- *   - rôles internes : aucun filtre (comportement plateforme) ;
- *   - CONTACT_ENTREPRISE : societeId forcé ;
- *   - PORTAIL_CLIENT : assureId ∈ famille (résolu côté serveur) ;
- *   - PRESTATAIRE : prestataireId forcé.
- */
-export async function filtresScopeDossier(ctx: AssistantContext): Promise<Record<string, unknown>> {
-  switch (ctx.role) {
-    case 'CONTACT_ENTREPRISE': {
-      if (!ctx.societeId) throw new Error('Société non rattachée');
-      return { societeId: ctx.societeId };
-    }
-    case 'PORTAIL_CLIENT': {
-      if (!ctx.assureId) throw new Error('Assuré non rattaché');
-      const ids = await familleAssureIds(ctx.assureId);
-      return { assureId: { in: ids } };
-    }
-    case 'PRESTATAIRE': {
-      if (!ctx.prestataireId) throw new Error('Prestataire non rattaché');
-      return { prestataireId: ctx.prestataireId };
-    }
-    default:
-      return {};
-  }
-}
-
-/**
- * Filtre de périmètre en SQL brut (fragment Prisma) — même sémantique que
- * filtresScopeDossier mais pour les requêtes $queryRaw.
- */
-export async function filtresScopeSql(ctx: AssistantContext, colonneAssure = 'assureId'): Promise<Prisma.Sql> {
-  switch (ctx.role) {
-    case 'CONTACT_ENTREPRISE':
-      if (!ctx.societeId) throw new Error('Société non rattachée');
-      return Prisma.sql`AND "societeId" = ${ctx.societeId}`;
-    case 'PORTAIL_CLIENT': {
-      if (!ctx.assureId) throw new Error('Assuré non rattaché');
-      const ids = await familleAssureIds(ctx.assureId);
-      const inList = Prisma.join(ids, ', ');
-      return Prisma.sql`AND "${Prisma.raw(colonneAssure)}" IN (${inList})`;
-    }
-    case 'PRESTATAIRE':
-      if (!ctx.prestataireId) throw new Error('Prestataire non rattaché');
-      return Prisma.sql`AND "prestataireId" = ${ctx.prestataireId}`;
-    default:
-      return Prisma.empty;
-  }
 }
