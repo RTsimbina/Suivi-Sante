@@ -1,0 +1,205 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Vercel Firewall — Attack Challenge Mode (ACM)
+# ─────────────────────────────────────────────────────────────────────────────
+# Bascule push-button du « Attack Challenge Mode » (Firewall Vercel) via l'API
+# officielle Vercel — sans jamais manipuler le token en clair (secret GitHub,
+# masqué automatiquement dans les logs par la plateforme).
+#
+# Contexte : quand l'ACM est actif, TOUT trafic non-navigateur (curl, GitHub
+# Actions, moniteurs externes) reçoit un défi HTTP 429 « Vercel Security
+# Checkpoint » au lieu de la réponse de l'application. Le healthcheck
+# (healthcheck.yml) et les workflows d'exploitation (mail-process,
+# mail-test-send) échouent alors même que l'application est saine — l'app
+# n'est jamais atteinte par les sondes.
+#
+# Endpoints utilisés (spécification OpenAPI officielle Vercel) :
+#   POST https://api.vercel.com/v1/security/attack-mode
+#        corps : { "projectId": "...", "attackModeEnabled": false }
+#   GET  https://api.vercel.com/v1/security/firewall/config?projectId=...
+#        (statut courant — champ attackModeEnabled si exposé)
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   VERCEL_TOKEN        jeton Vercel (vercel.com → Settings → Tokens) —
+#                       portée minimaliste : le projet cible, droit Firewall
+#                       en écriture. Utilisé en header Bearer, jamais affiché.
+#   VERCEL_PROJECT_ID   Project ID (Vercel → Settings → General → Project ID).
+# Secrets optionnels :
+#   VERCEL_TEAM_ID      requis uniquement si le projet vit dans une Team.
+#   VERCEL_APP_URL      si définie : sonde finale /api/health pour confirmer
+#                       la fin des 429 (secret déjà configuré sur ce dépôt).
+#
+# Usage : Actions → « Vercel Firewall — Attack Challenge Mode » →
+#         Run workflow → action = « desactiver » (ou « statut » lecture seule).
+#
+# Alternative permanente si l'ACM doit rester ACTIVÉ : configurer
+# « Protection Bypass for Automation » (Vercel → Settings → Deployment
+# Protection) puis le secret GitHub VERCEL_PROTECTION_BYPASS — les workflows
+# healthcheck.yml, mail-process.yml et mail-test-send.yml envoient déjà
+# l'en-tête x-vercel-protection-bypass quand ce secret existe.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Vercel Firewall — Attack Challenge Mode
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action à mener sur l'Attack Challenge Mode"
+        type: choice
+        required: true
+        default: desactiver
+        options:
+          - desactiver
+          - statut
+
+permissions: {} # aucun droit GitHub nécessaire (appels API Vercel via curl)
+
+concurrency:
+  group: vercel-firewall
+  cancel-in-progress: false
+
+jobs:
+  bascule:
+    name: Attack Challenge Mode — ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+
+    steps:
+      - name: Garde-fou — secrets requis présents
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::error::Secret VERCEL_TOKEN absent. Le créer dans Settings → Secrets and variables → Actions avec un jeton généré sur vercel.com → Settings → Tokens (portée : le projet ciblé, droit Firewall en écriture)."
+            exit 1
+          fi
+          if [ -z "${VERCEL_PROJECT_ID}" ]; then
+            echo "::error::Secret VERCEL_PROJECT_ID absent. Le créer avec l'identifiant du projet (Vercel → Settings → General → Project ID)."
+            exit 1
+          fi
+          echo "Configuration présente (valeurs masquées automatiquement dans les logs)."
+
+      - name: Construire le paramètre teamId (si Team)
+        run: |
+          if [ -n "${VERCEL_TEAM_ID}" ]; then
+            echo "TEAM_Q=&teamId=${VERCEL_TEAM_ID}" >> "$GITHUB_ENV"
+          else
+            echo "TEAM_Q=" >> "$GITHUB_ENV"
+          fi
+
+      - name: Statut AVANT (GET firewall/config)
+        run: |
+          set +e
+          CODE=$(curl -sS -o /tmp/config_avant.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v1/security/firewall/config?projectId=${VERCEL_PROJECT_ID}${TEAM_Q}")
+          RC=$?
+          set -e
+          [ $RC -ne 0 ] && CODE="000"
+          echo "GET /v1/security/firewall/config → HTTP ${CODE}"
+          if [ "${CODE}" != "200" ]; then
+            echo "::error::Lecture de la configuration impossible (HTTP ${CODE}). Vérifier VERCEL_TOKEN (portée), VERCEL_PROJECT_ID et VERCEL_TEAM_ID."
+            head -c 400 /tmp/config_avant.json 2>/dev/null; echo
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          try:
+              cfg = json.load(open('/tmp/config_avant.json'))
+          except Exception as e:
+              print(f"Réponse illisible : {e}")
+              raise SystemExit(0)
+          acm = cfg.get('attackModeEnabled')
+          if acm is None:
+              print("Champ attackModeEnabled non exposé par l'API (statut non déterminé) — le sondage final /api/health fera foi.")
+          elif acm:
+              print("Statut AVANT : Attack Challenge Mode = ACTIF (d'où les 429 « Vercel Security Checkpoint »)")
+          else:
+              print("Statut AVANT : Attack Challenge Mode = inactif")
+          until_ = cfg.get('attackModeActiveUntil')
+          if until_:
+              print(f"attackModeActiveUntil = {until_}")
+          PY
+
+      - name: Désactivation (POST attack-mode)
+        if: inputs.action == 'desactiver'
+        run: |
+          set +e
+          CODE=$(curl -sS -o /tmp/post.json -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"projectId\":\"${VERCEL_PROJECT_ID}\",\"attackModeEnabled\":false}" \
+            "https://api.vercel.com/v1/security/attack-mode${TEAM_Q}")
+          RC=$?
+          set -e
+          [ $RC -ne 0 ] && CODE="000"
+          echo "POST /v1/security/attack-mode → HTTP ${CODE}"
+          if [ "${CODE}" != "200" ] && [ "${CODE}" != "201" ]; then
+            echo "::error::Échec de la désactivation (HTTP ${CODE}) — réponse de l'API :"
+            head -c 500 /tmp/post.json 2>/dev/null; echo
+            exit 1
+          fi
+          echo "Désactivation acceptée par l'API Vercel."
+
+      - name: Statut APRÈS (GET firewall/config)
+        if: inputs.action == 'desactiver'
+        run: |
+          set +e
+          CODE=$(curl -sS -o /tmp/config_apres.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v1/security/firewall/config?projectId=${VERCEL_PROJECT_ID}${TEAM_Q}")
+          RC=$?
+          set -e
+          [ $RC -ne 0 ] && CODE="000"
+          echo "GET /v1/security/firewall/config → HTTP ${CODE}"
+          if [ "${CODE}" = "200" ]; then
+            python3 - <<'PY'
+            import json
+            try:
+                cfg = json.load(open('/tmp/config_apres.json'))
+            except Exception:
+                raise SystemExit(0)
+            acm = cfg.get('attackModeEnabled')
+            if acm is False:
+                print("Statut APRÈS : Attack Challenge Mode = inactif ✅")
+            elif acm is True:
+                print("::warning::Statut APRÈS : attackModeEnabled encore à true — la propagation peut prendre quelques secondes ; re-sonder avant de conclure.")
+            else:
+                print("Champ attackModeEnabled non exposé — confirmer via le sondage final.")
+            PY
+          fi
+
+      - name: Sonde finale /api/health (fin des 429 ?)
+        if: inputs.action == 'desactiver' && env.VERCEL_APP_URL != ''
+        run: |
+          echo "Propagation (5 s)…"
+          sleep 5
+          set +e
+          CODE=$(curl -sS -o /tmp/health.html -w '%{http_code}' --max-time 15 "${VERCEL_APP_URL}/api/health")
+          RC=$?
+          set -e
+          [ $RC -ne 0 ] && CODE="000"
+          echo "GET ${VERCEL_APP_URL}/api/health → HTTP ${CODE}"
+          if [ "${CODE}" = "200" ]; then
+            echo "✅ L'application répond de nouveau aux sondes non-navigateur — le healthcheck repassera au vert au prochain cycle (issue d'incident fermée automatiquement)."
+          elif grep -q "Vercel Security Checkpoint" /tmp/health.html 2>/dev/null; then
+            echo "::warning::Le défi anti-bot répond encore (HTTP ${CODE}) — la levée peut prendre quelques instants ; relancer ce workflow avec action = « statut » ou re-sonder avant de conclure."
+          else
+            echo "::warning::HTTP ${CODE} inattendu — si le défi persiste, vérifier le Firewall côté Vercel (Dashboard → projet → Firewall) ; sinon inspecter les logs de l'application."
+          fi
+
+      - name: Résumé
+        run: |
+          {
+            echo "### Attack Challenge Mode — ${{ inputs.action }}"
+            echo ""
+            echo "| Élément | Valeur |"
+            echo "|---|---|"
+            echo "| Projet Vercel | \`${VERCEL_PROJECT_ID}\` |"
+            echo "| Team | ${VERCEL_TEAM_ID:+configurée}${VERCEL_TEAM_ID:-non (compte personnel)} |"
+            echo "| Sonde finale | ${VERCEL_APP_URL:-non configurée} |"
+          } >> "$GITHUB_STEP_SUMMARY"

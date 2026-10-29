@@ -1,9 +1,13 @@
 # Workflows GitHub Actions — Suivi Santé
 
-> Documentation complète des 4 workflows du dépôt : le CI classique (tests) et
-> les 3 workflows d'exploitation ajoutés autour du service de messagerie et de
-> la disponibilité applicative. Le détail du service de messagerie lui-même
-> (file d'attente, retries, anti-abus) est documenté dans [MESSAGERIE.md](./MESSAGERIE.md).
+> Documentation des workflows d'exploitation du dépôt : le CI classique (tests)
+> et les workflows d'exploitation autour du service de messagerie, de la
+> disponibilité applicative et du Firewall Vercel. Le détail du service de
+> messagerie lui-même (file d'attente, retries, anti-abus) est documenté dans
+> [MESSAGERIE.md](./MESSAGERIE.md). Les workflows `migrate.yml`, `seed.yml` et
+> `rotation-neon.yml` (exploitation base de données) sont documentés dans les
+> en-têtes de chaque fichier, et la rotation des secrets dans
+> [ROTATION-SECRETS.md](./ROTATION-SECRETS.md).
 
 ---
 
@@ -15,6 +19,7 @@
 | Mail Queue Processor | `.github/workflows/mail-process.yml` | cron quotidien 17:00 UTC + manuel | Traite la file d'attente des e-mails (filet de secours au cron Vercel) |
 | Healthcheck | `.github/workflows/healthcheck.yml` | cron toutes les 30 min + manuel | Sondage `/api/health`, ouvre/ferme automatiquement des issues `[Incident]` |
 | Mail Test Send | `.github/workflows/mail-test-send.yml` | manuel uniquement | Envoie un e-mail de test avec paramétrage interactif (destinataire, template) |
+| Vercel Firewall | `.github/workflows/vercel-firewall.yml` | manuel uniquement | Bascule push-button du « Attack Challenge Mode » (Firewall Vercel) via l'API officielle — §5 |
 
 Les trois workflows d'exploitation partagent le même garde-fou : si les secrets
 ne sont pas encore configurés, ils ne plantent pas inutilement (warning + skip)
@@ -30,6 +35,10 @@ forcer l'opérateur à corriger la configuration.
 | `VERCEL_APP_URL` | URL publique de l'application, **sans** `/` final | ex. `https://suivi-sante.vercel.app` |
 | `CRON_SECRET` | Secret partagé des crons (header `Authorization: Bearer`), **identique** à la variable Vercel `CRON_SECRET` | générer : `openssl rand -hex 32` |
 | `MAIL_API_KEY` | Clé machine pour `/api/mail/send`, **identique** à la variable Vercel `MAIL_API_KEY` | générer : `openssl rand -hex 32` |
+| `VERCEL_TOKEN` | Jeton API Vercel — bascule du Firewall (§5) et mise à jour automatique de `DATABASE_URL` par la rotation Neon (`rotation-neon.yml`) | vercel.com → Settings → Tokens |
+| `VERCEL_PROJECT_ID` | Identifiant du projet Vercel (accompagne `VERCEL_TOKEN`) | Vercel → Settings → General → **Project ID** |
+| `VERCEL_TEAM_ID` | **Optionnel** — requis uniquement si le projet vit dans une Team Vercel | Vercel → Team Settings → General → Team ID |
+| `VERCEL_PROTECTION_BYPASS` | **Optionnel** — si l'Attack Challenge Mode doit rester activé : valeur du « Protection Bypass for Automation », envoyée en en-tête `x-vercel-protection-bypass` par healthcheck / mail-process / mail-test-send | Vercel → Settings → Deployment Protection |
 
 Génération d'un secret (à faire **une seule fois par secret**, les deux canaux
 GitHub et Vercel doivent porter la même valeur) :
@@ -216,6 +225,63 @@ sans attendre le cron — et la catégorie `TEST_GH_ACTIONS` (repérable dans
 
 L'onglet **Summary** du run affiche destinataire, template, ID message et
 statut (`ENVOYE` attendu avec `traiter: true`).
+
+---
+
+## §5 — Vercel Firewall (`vercel-firewall.yml`)
+
+### Rôle
+
+Bascule **push-button** du « Attack Challenge Mode » (Firewall Vercel) via
+l'API officielle Vercel, sans jamais manipuler le jeton en clair. Ce mode,
+quand il est activé (souvent pour parer une attaque, puis oublié), répond un
+défi HTTP 429 « Vercel Security Checkpoint » à **tout trafic non-navigateur** :
+le healthcheck, les crons mail et tout moniteur externe échouent alors que
+l'application reste saine et accessible aux navigateurs.
+
+Endpoints utilisés (spécification OpenAPI officielle Vercel) :
+
+- `POST https://api.vercel.com/v1/security/attack-mode` avec
+  `{"projectId": "…", "attackModeEnabled": false}` — désactivation ;
+- `GET https://api.vercel.com/v1/security/firewall/config?projectId=…` —
+  lecture du statut courant (champ `attackModeEnabled` quand exposé).
+
+### Usage
+
+Onglet **Actions → Vercel Firewall — Attack Challenge Mode → Run workflow** :
+
+| Input | Valeurs | Effet |
+|---|---|---|
+| `action` | `desactiver` (défaut) | Lecture du statut AVANT → POST de désactivation → statut APRÈS → sonde finale `/api/health` |
+| | `statut` | Lecture seule : affiche l'état courant sans rien modifier |
+
+Secrets requis : `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` (optionnels :
+`VERCEL_TEAM_ID` si le projet vit dans une Team ; `VERCEL_APP_URL`, déjà
+configuré, pour la sonde finale). En l'absence des secrets requis, le workflow
+échoue immédiatement avec un message indiquant exactement quoi créer — aucune
+requête n'est envoyée.
+
+### Alternative quand l'ACM doit rester activé
+
+Si une attaque réelle justifie de laisser le mode actif, configurer plutôt
+« **Protection Bypass for Automation** » (Vercel → Settings → Deployment
+Protection → Protection Bypass for Automation → générer le secret), puis créer
+le secret GitHub `VERCEL_PROTECTION_BYPASS` avec cette valeur : les workflows
+`healthcheck.yml`, `mail-process.yml` et `mail-test-send.yml` envoient déjà
+l'en-tête `x-vercel-protection-bypass` quand ce secret existe — les sondes
+franchissent le Firewall sans le désactiver pour tout le monde.
+
+### Équivalent en ligne de commande
+
+Le script `scripts/vercel-acm-off.sh` reproduit la même séquence localement
+(lire le statut, désactiver, re-sonder) pour un opérateur qui préfère agir
+depuis son terminal avec son propre jeton :
+
+```bash
+export VERCEL_TOKEN=… VERCEL_PROJECT_ID=… [VERCEL_TEAM_ID=…] [VERCEL_APP_URL=…]
+./scripts/vercel-acm-off.sh            # désactive
+./scripts/vercel-acm-off.sh statut     # lecture seule
+```
 
 ---
 
