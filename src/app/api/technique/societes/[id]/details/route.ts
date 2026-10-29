@@ -29,10 +29,11 @@ export async function GET(
 
     // Récupérer les 3 ensembles en parallèle
     const [baremes, assures, prestataires] = await Promise.all([
-      // Barèmes de la société
+      // Barèmes de la société — TOUTES les versions vivantes (P1) : l'écran
+      // de détail affiche les périodes de validité et l'historique.
       db.bareme.findMany({
-        where: { societeId: id },
-        orderBy: { prestation: 'asc' },
+        where: { societeId: id, supprime: false },
+        orderBy: [{ prestation: 'asc' }, { version: 'asc' }],
       }),
 
       // Assurés de la société

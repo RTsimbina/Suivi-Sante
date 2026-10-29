@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
-import { Prisma } from '@prisma/client';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { societeTechniqueUpdateSchema } from '@/lib/validation';
 import {
@@ -14,6 +13,11 @@ import {
   motifsBlocageSuppression,
   normaliserNom,
 } from '@/lib/societe-service';
+import {
+  chargerVersionsCombinaison,
+  normaliserPrestation,
+  prochaineVersion,
+} from '@/lib/baremes-validite';
 
 // ─── GET : Récupérer une société avec ses barèmes ─────────────────────────────
 
@@ -30,7 +34,13 @@ export async function GET(
     const societe = await db.societe.findUnique({
       where: { id },
       include: {
-        baremes: { orderBy: { prestation: 'asc' } },
+        // P1 : toutes les VERSIONS vivantes (l'écran affiche les périodes de
+        // validité et l'historique des taux) — les barèmes retirés
+        // (soft-supprimés) restent exclus.
+        baremes: {
+          where: { supprime: false },
+          orderBy: [{ prestation: 'asc' }, { version: 'asc' }],
+        },
         _count: { select: { dossiers: true, contrats: true } },
       },
     });
@@ -152,91 +162,105 @@ export async function PUT(
       }
     }
 
-    // Préparer les opérations de barèmes (upsert par prestation)
-    let baremesOperations: Prisma.BaremeCreateWithoutSocieteInput[] | undefined;
-    if (baremes && baremes.length > 0) {
-      baremesOperations = baremes.map((b) => ({
-        prestation: b.prestation,
-        tauxCouverture: b.tauxCouverture,
-        plafond: b.plafond,
-        description: b.description ?? null,
-        active: b.active ?? true,
-      }));
-    }
+    // ─── P1 « Validité datée des barèmes » : VERSIONNEMENT (plus d'upsert) ──
+    // Un changement de taux/plafond CLÔTURE la version courante et CRÉE une
+    // nouvelle version — les anciens taux ne sont jamais écrasés. Les barèmes
+    // retirés de la liste sont SOFT-supprimés (consultables, jamais perdus).
+    // Les périodes d'évolution sont implicites : remplacement instantané à
+    // l'instant courant (clôture à now − 1 ms : continuité sans chevauchement).
+    const dateEvolution = new Date();
+    const clotureInstantanee = new Date(dateEvolution.getTime() - 1);
+    const baremesFournis = baremes && baremes.length > 0;
 
-    // Mettre à jour la société et ses barèmes (upsert par prestation)
+    // Mettre à jour la société et ses barèmes (versionnement)
     const updatedSociete = await db.$transaction(async (tx) => {
-      // Si des barèmes sont fournis, les mettre à jour via upsert
-      if (baremes && baremesOperations) {
-        // D'abord supprimer les barèmes existants qui ne sont plus dans la liste
-        const prestationsEnvoyees = baremes.map((b) => b.prestation);
-        const removedBaremes = existing.baremes.filter(
-          (eb) => !prestationsEnvoyees.includes(eb.prestation)
+      if (baremesFournis && baremes) {
+        const prestationsEnvoyees = baremes.map((b) => normaliserPrestation(b.prestation));
+
+        // 1) Retraits : soft-delete des barèmes vivants absents de la liste
+        //    (les versions passées et les justifications des remboursements
+        //    restent intactes — plus aucun deleteMany).
+        const retirables = existing.baremes.filter(
+          (eb) => !eb.supprime && !prestationsEnvoyees.includes(normaliserPrestation(eb.prestation)),
         );
-
-        await tx.bareme.deleteMany({
-          where: {
-            societeId: id,
-            prestation: { notIn: prestationsEnvoyees },
-          },
-        });
-
-        // Puis upsert chaque barème
-        for (const b of baremesOperations) {
-          const existingBareme = existing.baremes.find(
-            (eb) => eb.prestation === b.prestation
-          );
-
-          await tx.bareme.upsert({
-            where: {
-              societeId_prestation: {
-                societeId: id,
-                prestation: b.prestation,
-              },
-            },
-            update: {
-              tauxCouverture: b.tauxCouverture,
-              plafond: b.plafond,
-              description: b.description ?? null,
-              active: b.active ?? true,
-            },
-            create: {
-              societeId: id,
-              prestation: b.prestation,
-              tauxCouverture: b.tauxCouverture,
-              plafond: b.plafond,
-              description: b.description ?? null,
-              active: b.active ?? true,
-            },
+        for (const rb of retirables) {
+          await tx.bareme.update({
+            where: { id: rb.id },
+            data: { supprime: true, active: false, valideAu: rb.valideAu ?? clotureInstantanee },
           });
-
-          // Audit log pour chaque barème modifié/créé
-          if (existingBareme) {
-            if (String(existingBareme.tauxCouverture) !== String(b.tauxCouverture)) {
-              await logParametreChange({
-                entite: 'Bareme', entiteId: existingBareme.id, champ: 'tauxCouverture',
-                ancienneValeur: existingBareme.tauxCouverture, nouvelleValeur: b.tauxCouverture,
-                modifiePar: userName, modifieParId: userId, societeId: id, objet: b.prestation, request,
-              });
-            }
-            if (String(existingBareme.plafond) !== String(b.plafond)) {
-              await logParametreChange({
-                entite: 'Bareme', entiteId: existingBareme.id, champ: 'plafond',
-                ancienneValeur: existingBareme.plafond, nouvelleValeur: b.plafond,
-                modifiePar: userName, modifieParId: userId, societeId: id, objet: b.prestation, request,
-              });
-            }
-          }
-        }
-
-        // Audit log pour les barèmes supprimés
-        for (const rb of removedBaremes) {
           await logParametreChange({
-            entite: 'Bareme', entiteId: rb.id, champ: 'SUPPRESSION',
-            ancienneValeur: `${rb.prestation} (taux: ${rb.tauxCouverture}%, plafond: ${rb.plafond})`,
+            entite: 'Bareme', entiteId: rb.id, champ: 'RETRAIT',
+            ancienneValeur: `v${rb.version} ${rb.prestation} (taux: ${rb.tauxCouverture}%, plafond: ${rb.plafond})`,
             nouvelleValeur: null,
             modifiePar: userName, modifieParId: userId, societeId: id, objet: rb.prestation, request,
           });
+        }
+
+        // 2) Évolution de chaque barème fourni (versionnement par prestation)
+        for (const b of baremes) {
+          const prestationNorm = normaliserPrestation(b.prestation);
+          const versions = await chargerVersionsCombinaison(tx, { societeId: id, prestation: prestationNorm });
+          const courante = versions.find((v) => !v.supprime && v.valideAu === null);
+          const tauxInchange = courante && String(courante.tauxCouverture) === String(b.tauxCouverture);
+          const plafondInchange = courante && String(courante.plafond) === String(b.plafond);
+
+          if (courante && tauxInchange && plafondInchange) {
+            // Tarif inchangé : mise à jour administrative simple (description,
+            // statut actif) — la période de validité est conservée.
+            await tx.bareme.update({
+              where: { id: courante.id },
+              data: { description: b.description ?? null, active: b.active ?? true },
+            });
+          } else if (courante) {
+            // Changement de tarif : clôture instantanée puis nouvelle version.
+            await tx.bareme.update({
+              where: { id: courante.id },
+              data: { valideAu: clotureInstantanee },
+            });
+            const nouvelle = await tx.bareme.create({
+              data: {
+                societeId: id,
+                prestation: prestationNorm,
+                tauxCouverture: b.tauxCouverture,
+                plafond: b.plafond,
+                description: b.description ?? null,
+                active: b.active ?? true,
+                valideDu: dateEvolution,
+                version: prochaineVersion(versions),
+              },
+            });
+            // Audit : ancien taux → nouveau taux, avec numéros de versions
+            await logParametreChange({
+              entite: 'Bareme', entiteId: nouvelle.id, champ: 'tauxCouverture',
+              ancienneValeur: courante.tauxCouverture, nouvelleValeur: b.tauxCouverture,
+              modifiePar: userName, modifieParId: userId, societeId: id, objet: prestationNorm,
+              metadonnees: {
+                versionPrecedente: courante.version, nouvelleVersion: nouvelle.version,
+                plafondPrecedent: String(courante.plafond), plafondNouveau: String(b.plafond),
+              },
+              request,
+            });
+          } else {
+            // Première version (ou réajout après retrait) : création v+1.
+            const cree = await tx.bareme.create({
+              data: {
+                societeId: id,
+                prestation: prestationNorm,
+                tauxCouverture: b.tauxCouverture,
+                plafond: b.plafond,
+                description: b.description ?? null,
+                active: b.active ?? true,
+                valideDu: dateEvolution,
+                version: prochaineVersion(versions),
+              },
+            });
+            await logParametreChange({
+              entite: 'Bareme', entiteId: cree.id, champ: 'CREATION',
+              ancienneValeur: null,
+              nouvelleValeur: `taux: ${cree.tauxCouverture}%, plafond: ${cree.plafond}, période: ${cree.valideDu.toISOString()} → en cours (v${cree.version})`,
+              modifiePar: userName, modifieParId: userId, societeId: id, objet: prestationNorm, request,
+            });
+          }
         }
       }
 
