@@ -11,8 +11,8 @@
 charges : consultation déterministe (requêtes prédéfinies, zéro SQL libre),
 non-source-de-vérité (jamais d'écriture), isolation serveur intégrale
 (vérifiée implémentation par implémentation), aucune donnée métier sortante
-vers le LLM. Trois recommandations mineures et une consolidation de robustesse
-sont listées en §4 ; aucune ne bloque.
+vers le LLM. Les durcissements F2/F3/F4 et les hygiènes F6/F7 listés en §4
+sont **tous corrigés** (voir chaque finding) ; rien d'ouvert.
 
 ## 2. Catalogue — complétude 160/160
 
@@ -93,27 +93,50 @@ manquantes, charge des gestionnaires) ne sont donc jamais exposées hors
 interne. Le commentaire en tête de `authorize.ts` documente ce choix.
 **Aucune action** — la défense est en profondeur (middleware + route).
 
-### 🟠 F2 — Bot : correspondance téléphone partielle (mineur)
+### 🟢 F2 — Bot : correspondance téléphone partielle (corrigée)
 
-`bot-service.ts#identifierExpediteur` identifie un expéditeur par
-`telephone: { contains: chiffresExtraits }`. Un numéro court ou partiel
-pourrait correspondre à plusieurs assurés (le `findFirst` choisit arbitrairement).
-Risque faible (l'expéditeur WhatsApp/Telegram est déjà authentifié par le canal),
-mais un **match par suffixe ≥ 8 chiffres** (ou normalisation E.164) leverait
-l'ambiguïté. *Recommandé, non bloquant.*
+`bot-service.ts#identifierExpediteur` identifiait un expéditeur par
+`telephone: { contains: chiffresExtraits }` + `findFirst` — une sous-chaîne
+courte pouvait correspondre à plusieurs assurés (choix arbitraire du premier)
+ou à un numéro plus long (faux positif).
+**Corrigé** (commit `60832ec`) : l'identifiant expéditeur doit porter au moins
+**8 chiffres** pour être exploitable (chatId/senderId Telegram/Messenger et
+numéros courts ne déclenchent même plus de requête) ; les candidats (superset
+tolérant au format stocké) sont re-filtrés en JS par **suffixe** sur les
+chiffres normalisés des deux côtés ; **plusieurs correspondants → refus
+fail-closed**, aucun choix arbitraire — l'expéditeur passe par `/verifier`
+[NSS] qui reste disponible. 4 tests verrouillent le comportement (fixture
+d'ambiguïté corrigée en `2d3edec` — la CI a intercepté une donnée de test
+erronée, le code était juste).
 
-### 🟠 F3 — `/verifier` NSS sans rate limiting (mineur, connu)
+### 🟢 F3 — `/verifier` NSS sans rate limiting (corrigé)
 
-Le brute-force de NSS par `/verifier [NSS]` n'est pas borné. Figure déjà au
-registre de sécurité du cahier des charges V2.0 (restent ouverts). *Suivre la
-décision globale de rate limiting plateforme.*
+Le brute-force de NSS par `/verifier [NSS]` n'était pas borné (déjà au
+registre de sécurité du cahier des charges V2.0).
+**Corrigé** (commit `062d1b3`) : **5 essais max / 15 minutes / expéditeur**, avec
+compteur fondé **en base** (journal `MessageBot` écrit par les webhooks après
+traitement) pour rester correct sur serverless — un compteur en mémoire du
+processus serait perdu entre deux requêtes réparties sur des instances. La
+tentative courante n'étant pas encore journalisée au moment du comptage, le
+seuil autorise 5 essais et bloque le 6ᵉ. Refus par réponse **générique**
+(aucun oracle sur la validité d'un NSS essayé) ; préfixe insensible à la casse
+(`mode: 'insensitive'`). 3 tests verrouillent le seuil, la fenêtre et la
+forme de la requête de comptage.
 
-### ℹ️ F4 — Consultations assistant non tracées (information)
+### 🟢 F4 — Consultations assistant tracées (corrigé)
 
-`POST /api/assistant` n'écrit pas d'entrée `AuditLog`. L'assistant étant en
-lecture seule, c'est acceptable ; tracer `(userId, questionId, date)` — sans
-données métier — renforcerait l'observabilité si un besoin d'investigation
-apparaît. *Optionnel.*
+`POST /api/assistant` n'écrivait pas d'entrée `AuditLog`.
+**Corrigé** (commit `dc23abf`) : chaque consultation **réussie** écrit UNE
+ligne dans le journal d'audit immuable — QUI (token signé : nom, id, rôle
+figé), QUOI (`questionId` + **clés** de paramètres uniquement), QUAND, avec
+contexte requête (IP / navigateur / session). **Aucune donnée métier** : ni
+valeurs de paramètres, ni résultats. L'action `CONSULTATION` rejoint
+`AuditAction` (colonne `action` = String, aucune migration) avec label,
+filtre et pastille dédiés dans le journal (`journal-view.tsx`). Un refus
+(403/404) n'est pas journalisé comme consultation ; un échec d'audit ne fait
+jamais échouer la consultation (double filet try/catch). 4 tests de route
+(`route.test.ts`) verrouillent l'absence totale de données métier dans la
+trace.
 
 ### ℹ️ F5 — Données transmises au LLM (conforme, à rappeler)
 
@@ -169,8 +192,9 @@ Le code mort `verifierLLM` a été supprimé.
 Le sous-système Assistant IA est **complet et conforme** : 160/160 questions
 opérationnelles, chaîne de sécurité intégrale, isolation vérifiée ligne à
 ligne sur les trois catalogues externes, bots cloisonnés en lecture, socle LLM
-sans fuite. Les recommandations F2/F3/F4 sont des durcissements de confort à
-planifier ; les hygiènes F6/F7 sont corrigées (aucun impact fonctionnel).
+sans fuite. Les durcissements F2/F3/F4 sont **traités** (session 3 du
+29/10/2026) ; les hygiènes F6/F7 sont corrigées (aucun impact fonctionnel).
+Il ne reste **aucun finding ouvert**.
 
 **Vérification croisée indépendante (29/10/2026, session 2)** : relecture
 intégrale indépendante du sous-système (catalogue, moteur, contexte, portée,
