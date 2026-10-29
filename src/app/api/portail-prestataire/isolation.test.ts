@@ -337,11 +337,11 @@ describe('GET /api/portail-prestataire/factures — isolation', () => {
     expect(sql).toContain('OFFSET');
     expect(sql).toContain('LIMIT');
     const valeurs = (dbMocks.dossierQueryRaw.mock.calls[0][0] as { values: unknown[] }).values;
-    expect(valeurs).toContain(100); // (3-1) × limite bornée à 50
-    expect(valeurs).toContain(50);  // borne max
+    expect(valeurs).toContain(200); // (3-1) × limite bornée à 100
+    expect(valeurs).toContain(100); // borne max (LIMITES_PAGE.max)
     const body = await res.json();
     expect(body.pagination.total).toBe(201);
-    expect(body.pagination.totalPages).toBe(Math.ceil(201 / 50));
+    expect(body.pagination.totalPages).toBe(Math.ceil(201 / 100));
   });
 
   it('la dérivation SQL conserve la précédence de deriveStatutFacture (tripwire)', async () => {

@@ -61,13 +61,17 @@ describe('resoudreLiaisonPrestataireAvecControle', () => {
     );
   });
 
-  it('deux fiches → AMBIGU avec le nombre de fiches + trace serveur actionnable', async () => {
+  it('deux fiches → AMBIGU, choix déterministe conservé (la plus ancienne) + trace serveur', async () => {
     dbMocks.prestataireFindMany.mockResolvedValue([
       { id: 'p-ancien', createdAt: new Date('2020-01-01') },
       { id: 'p-recent', createdAt: new Date('2021-01-01') },
     ]);
     const resultat = await resoudreLiaisonPrestataireAvecControle(EMAIL);
-    expect(resultat).toEqual({ statut: 'AMBIGU', nbFiches: 2 });
+    expect(resultat).toEqual({
+      statut: 'AMBIGU',
+      nbFiches: 2,
+      prestataireId: 'p-ancien',
+    });
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('partagé par 2 fiches')
     );
@@ -89,15 +93,20 @@ describe('resoudreLiaisonPrestataire (délégation historique)', () => {
     });
   });
 
-  it('AUCUNE ou AMBIGU → null (comportement historique inchangé)', async () => {
+  it('AUCUNE → null ; AMBIGU → la plus ancienne (comportement historique inchangé)', async () => {
     dbMocks.prestataireFindMany.mockResolvedValue([]);
     expect(await resoudreLiaisonPrestataire(EMAIL)).toBeNull();
 
     dbMocks.prestataireFindMany.mockResolvedValue([
-      { id: 'p1', createdAt: new Date('2020-01-01') },
-      { id: 'p2', createdAt: new Date('2021-01-01') },
+      { id: 'p-ancien', createdAt: new Date('2020-01-01') },
+      { id: 'p-recent', createdAt: new Date('2021-01-01') },
     ]);
-    expect(await resoudreLiaisonPrestataire(EMAIL)).toBeNull();
+    // Historique préservé : la fiche la plus ancienne — les appelants critiques
+    // (portail, création de compte) consultent AMBIGU pour refuser au lieu de servir.
+    expect(await resoudreLiaisonPrestataire(EMAIL)).toEqual({
+      prestataireId: 'p-ancien',
+      source: 'PRESTATAIRE_EMAIL',
+    });
   });
 
   it('liaisonPrestataireExiste : true dès qu une fiche porte l e-mail', async () => {

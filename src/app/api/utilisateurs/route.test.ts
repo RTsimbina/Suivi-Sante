@@ -285,6 +285,10 @@ describe('PRESTATAIRE — garde d ambiguïté de la liaison (miroir SPEC-6)', ()
       }
     );
     dbMocks.prestataireFindMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
+    dbMocks.utilisateurUpdate.mockResolvedValue({
+      id: 'u-prest', email: 'groupe@presta.mg', nom: 'Clinique', role: 'PRESTATAIRE', actif: true,
+      avatar: null, createdAt: new Date(), updatedAt: new Date(),
+    });
     const res = await PUT(requetePut({ id: 'u-prest', email: 'groupe@presta.mg' }));
     expect(res.status).toBe(409);
     expect(dbMocks.utilisateurUpdate).not.toHaveBeenCalled();

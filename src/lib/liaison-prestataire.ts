@@ -30,7 +30,7 @@ export type LiaisonPrestataire =
 /** Résolution contrôlée : résultat déterministe + détection d'ambiguïté. */
 export type LiaisonPrestataireControlee =
   | { statut: 'OK'; prestataireId: string }
-  | { statut: 'AMBIGU'; nbFiches: number }
+  | { statut: 'AMBIGU'; nbFiches: number; prestataireId: string }
   | { statut: 'AUCUNE' };
 
 /** Correspondance d'e-mail insensible à la casse (les e-mails sont trimés). */
@@ -41,10 +41,11 @@ const parEmail = (email: string) => ({ equals: email, mode: 'insensitive' as con
  * e-mail :
  *   - AUCUNE  — aucune fiche ne porte cet e-mail ;
  *   - OK      — résolution déterministe (fiche la plus ancienne) ;
- *   - AMBIGU  — plusieurs fiches partagent l'e-mail : la résolution reste
- *               déterministe (la plus ancienne) mais les appelants critiques
- *               (portail, création de compte) doivent REFUSER plutôt que de
- *               servir une fiche potentiellement inattendue.
+ *   - AMBIGU  — plusieurs fiches partagent l'e-mail : le résultat porte
+ *               quand même le choix déterministe (la plus ancienne, comme
+ *               l'historique) MAIS les appelants critiques (portail,
+ *               création de compte) doivent REFUSER plutôt que de servir
+ *               une fiche potentiellement inattendue.
  * Toute ambiguïté est tracée côté serveur (console.error actionnable) pour
  * l'exploitation — sans jamais révéler d'information à l'utilisateur final.
  */
@@ -69,6 +70,7 @@ export async function resoudreLiaisonPrestataireAvecControle(
       `jamais de service d'une fiche imprévisible). Corriger les e-mails des fiches ` +
       `concernées (GESTION → Prestataires) ou utiliser un e-mail distinct par établissement.`
     );
+    return { statut: 'AMBIGU', nbFiches: fiches.length };
   }
 
   return { statut: 'OK', prestataireId: fiches[0].id };
@@ -83,9 +85,10 @@ export async function resoudreLiaisonPrestataire(
   email: string
 ): Promise<LiaisonPrestataire> {
   const controlee = await resoudreLiaisonPrestataireAvecControle(email);
-  return controlee.statut === 'OK'
-    ? { prestataireId: controlee.prestataireId, source: 'PRESTATAIRE_EMAIL' }
-    : null;
+  if (controlee.statut === 'OK' || controlee.statut === 'AMBIGU') {
+    return { prestataireId: controlee.prestataireId, source: 'PRESTATAIRE_EMAIL' };
+  }
+  return null;
 }
 
 /** La liaison existe-t-elle pour cet e-mail (fiche Prestataire) ? */
