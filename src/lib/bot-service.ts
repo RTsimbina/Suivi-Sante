@@ -96,17 +96,53 @@ async function ecrireSession(
   purgerSessionsExpirees();
 }
 
+// ─── F2 (audit Assistant IA) : identification téléphone sans ambiguïté ──────
+//
+// L'ancienne correspondance `telephone: { contains: id }` + findFirst posait
+// deux risques : une sous-chaîne courte pouvait correspondre à plusieurs
+// assurés (le findFirst choisissait arbitrairement), et le match « contient »
+// n'imposait aucune position dans le numéro. Désormais :
+//   1. l'identifiant expéditeur doit porter au moins 8 chiffres pour être
+//      exploitable (un préfixe plus court n'est pas discriminant) ;
+//   2. les candidats (superset tolérant au format stocké « +261 34 … ») sont
+//      re-filtrés en JS par SUFFIXE sur les chiffres normalisés des deux côtés ;
+//   3. plusieurs correspondants → AUCUN choix arbitraire : refus fail-closed,
+//      l'expéditeur passe par /verifier [NSS] qui reste disponible.
+const TEL_MIN_CHIFFRES = 8;
+
+/** Ne conserve que les chiffres (tolère +, espaces, tirets, séparateurs). */
+function chiffresSeuls(valeur: string): string {
+  return valeur.replace(/\D+/g, '');
+}
+
 async function identifierExpediteur(msg: MessageBotIncoming): Promise<SessionBot | null> {
   const cached = await lireSession(msg.expeditieurId);
   if (cached) return cached;
-  const assure = await db.assure.findFirst({
-    where: { telephone: { contains: msg.expeditieurId.replace(/[^\d+]/g, '') }, actif: true },
+
+  const cible = chiffresSeuls(msg.expeditieurId);
+  // ChatId/senderId (Telegram/Messenger) ou numéro trop court : la
+  // correspondance téléphonique ne serait pas discriminante → pas d'auto-id.
+  if (cible.length < TEL_MIN_CHIFFRES) return null;
+
+  const candidats = await db.assure.findMany({
+    where: { telephone: { contains: cible }, actif: true },
     include: { societe: { select: { id: true, nom: true } } },
+    take: 20,
   });
-  if (assure) {
+  const correspondants = candidats.filter(
+    (a) => chiffresSeuls(a.telephone ?? '').endsWith(cible)
+  );
+
+  if (correspondants.length === 1) {
+    const assure = correspondants[0];
     const session = { assureId: assure.id, assureNom: assure.prenom ? `${assure.prenom} ${assure.nom}` : assure.nom, societeId: assure.societeId };
     await ecrireSession(msg.canal, msg.expeditieurId, session);
     return session;
+  }
+  if (correspondants.length > 1) {
+    console.warn(
+      `[BOT] Téléphone ambigu (${msg.canal}) : ${correspondants.length} assurés pour cet expéditeur — identification refusée (fail-closed)`
+    );
   }
   return null;
 }

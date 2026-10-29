@@ -13,7 +13,9 @@ const dbMocks = vi.hoisted(() => ({
   botSessionUpsert: vi.fn(),
   botSessionDeleteMany: vi.fn(),
   assureFindFirst: vi.fn(),
+  assureFindMany: vi.fn(),
   dossierFindFirst: vi.fn(),
+  dossierFindMany: vi.fn(),
   messageBotCreate: vi.fn(),
 }));
 
@@ -24,8 +26,8 @@ vi.mock('@/lib/db', () => ({
       upsert: dbMocks.botSessionUpsert,
       deleteMany: dbMocks.botSessionDeleteMany,
     },
-    assure: { findFirst: dbMocks.assureFindFirst },
-    dossier: { findFirst: dbMocks.dossierFindFirst },
+    assure: { findFirst: dbMocks.assureFindFirst, findMany: dbMocks.assureFindMany },
+    dossier: { findFirst: dbMocks.dossierFindFirst, findMany: dbMocks.dossierFindMany },
     messageBot: { create: dbMocks.messageBotCreate },
   },
 }));
@@ -56,6 +58,7 @@ beforeEach(() => {
   dbMocks.messageBotCreate.mockResolvedValue({});
   dbMocks.botSessionDeleteMany.mockResolvedValue({ count: 0 });
   dbMocks.botSessionUpsert.mockResolvedValue({});
+  dbMocks.dossierFindMany.mockResolvedValue([]);
 });
 
 describe('sessions bot en base (plan P3)', () => {
@@ -167,6 +170,92 @@ describe('sessions bot en base (plan P3)', () => {
 
     expect(reponse).toContain('non reconnu');
     expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
+  });
+
+  // ─── F2 (audit Assistant IA) : identification téléphone sans ambiguïté ────
+
+  it('F2 : un numéro UNIQUE correspondant par suffixe identifie l\'assuré et crée la session', async () => {
+    dbMocks.botSessionFindUnique.mockResolvedValue(null);
+    dbMocks.assureFindMany.mockResolvedValue([
+      {
+        id: 'assure-1', nom: 'Rakoto', prenom: 'Jean', telephone: '+261 34 12 345 67',
+        societeId: 'soc-1', actif: true, societe: { id: 'soc-1', nom: 'Société A' },
+      },
+    ]);
+
+    const reponse = await traiterMessageBot({
+      canal: 'WHATSAPP',
+      expeditieurId: '261341234567',
+      expeditieurNom: 'Jean',
+      texte: '/mesdossiers',
+    });
+
+    // Session créée à partir de l'assuré trouvé
+    expect(dbMocks.botSessionUpsert).toHaveBeenCalledTimes(1);
+    expect(dbMocks.botSessionUpsert.mock.calls[0][0].create.assureId).toBe('assure-1');
+    expect(reponse).toContain("vous n'avez aucun dossier");
+  });
+
+  it('F2 : deux assurés sur le même suffixe → refus fail-closed, AUCUN choix arbitraire', async () => {
+    dbMocks.botSessionFindUnique.mockResolvedValue(null);
+    dbMocks.assureFindMany.mockResolvedValue([
+      {
+        id: 'assure-1', nom: 'Rakoto', prenom: 'Jean', telephone: '0341234567',
+        societeId: 'soc-1', actif: true, societe: { id: 'soc-1', nom: 'Société A' },
+      },
+      {
+        id: 'assure-2', nom: 'Rabe', prenom: 'Marie', telephone: '+261341234567',
+        societeId: 'soc-2', actif: true, societe: { id: 'soc-2', nom: 'Société B' },
+      },
+    ]);
+
+    const reponse = await traiterMessageBot({
+      canal: 'WHATSAPP',
+      expeditieurId: '261341234567',
+      expeditieurNom: 'X',
+      texte: '/mesdossiers',
+    });
+
+    // L'ancien code aurait choisi arbitrairement le premier (findFirst)
+    expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
+    expect(reponse).toContain('/verifier');
+  });
+
+  it('F2 : un identifiant de moins de 8 chiffres (chatId, senderId) ne touche même pas la base', async () => {
+    dbMocks.botSessionFindUnique.mockResolvedValue(null);
+
+    const reponse = await traiterMessageBot({
+      canal: 'TELEGRAM',
+      expeditieurId: 'chat-42',
+      expeditieurNom: 'Jean',
+      texte: '/mesdossiers',
+    });
+
+    expect(dbMocks.assureFindMany).not.toHaveBeenCalled();
+    expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
+    expect(reponse).toContain('/verifier');
+  });
+
+  it('F2 : une sous-chaîne contenue mais qui n\'est PAS un suffixe n\'identifie personne', async () => {
+    dbMocks.botSessionFindUnique.mockResolvedValue(null);
+    // L'ancien code (`contains` seul) aurait identifié cet assuré :
+    // '0341234567' est CONTENU dans '034123456789' mais n'en est pas la fin.
+    dbMocks.assureFindMany.mockResolvedValue([
+      {
+        id: 'assure-9', nom: 'Autre', prenom: 'Personne', telephone: '034123456789',
+        societeId: 'soc-9', actif: true, societe: { id: 'soc-9', nom: 'Société 9' },
+      },
+    ]);
+
+    const reponse = await traiterMessageBot({
+      canal: 'WHATSAPP',
+      expeditieurId: '0341234567',
+      expeditieurNom: 'X',
+      texte: '/mesdossiers',
+    });
+
+    expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
+    expect(reponse).toContain('/verifier');
   });
 
   it('la re-vérification NSS éCRASE l\'ancienne session (upsert, pas de doublon possible)', async () => {
