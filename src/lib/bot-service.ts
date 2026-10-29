@@ -157,6 +157,29 @@ async function verifierNSS(nss: string, canal: CanalBot, expediteurId: string): 
   return `Identite confirmée. Bienvenue ${assure.prenom || ''} ${assure.nom} (${assure.societe.nom}).\n\nVous pouvez maintenant consulter la situation de vos dossiers avec :\n• /mesdossiers — Voir tous vos dossiers\n• /dossier [numéro] — Suivre un dossier précis`;
 }
 
+// ─── F3 (audit Assistant IA) : garde-fou anti brute-force sur /verifier ─────
+//
+// Le NSS est le secret d'identification du bot : sans borne, /verifier [NSS]
+// permettait l'énumération systématique. Le compteur est fondé EN BASE
+// (journal MessageBot écrit par les webhooks APRÈS traitement) pour rester
+// correct sur serverless — un compteur en mémoire du processus serait perdu
+// entre deux requêtes réparties sur des instances différentes. La tentative
+// courante n'étant pas encore journalisée au moment du comptage, ce seuil
+// autorise N essais par fenêtre et bloque le N+1ᵉ.
+const VERIF_ESSAIS_MAX = 5;
+const VERIF_FENETRE_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Nombre de tentatives /verifier journalisées pour cet expéditeur dans la fenêtre glissante. */
+async function essaisVerifierRecents(expeditieurId: string): Promise<number> {
+  return db.messageBot.count({
+    where: {
+      expeditieurId,
+      message: { startsWith: '/verifier', mode: 'insensitive' },
+      createdAt: { gte: new Date(Date.now() - VERIF_FENETRE_MS) },
+    },
+  });
+}
+
 // ─── Consultation des dossiers d'un assuré (STATUT UNIQUEMENT) ───────────────
 
 const STATUT_LABELS: Record<string, string> = Object.fromEntries(
@@ -425,6 +448,15 @@ export async function traiterMessageBot(msg: MessageBotIncoming): Promise<string
 
   // ─── Commande /verifier [NSS] ─────────────────────────────────────────
   if (lowerText.startsWith('/verifier ')) {
+    // F3 : garde anti brute-force NSS (compteur en base, cf. essaisVerifierRecents)
+    const essais = await essaisVerifierRecents(msg.expeditieurId);
+    if (essais >= VERIF_ESSAIS_MAX) {
+      console.warn(
+        `[BOT] Rate limit /verifier : ${essais} essais sur la fenêtre de 15 min (${msg.canal}/${msg.expeditieurId})`
+      );
+      // Réponse générique : aucun indice sur la validité d'un NSS éventuel.
+      return 'Trop de tentatives de vérification. Veuillez patienter quelques minutes avant de réessayer.';
+    }
     const nss = texte.slice('/verifier '.length).trim();
     return await verifierNSS(nss, msg.canal, msg.expeditieurId);
   }

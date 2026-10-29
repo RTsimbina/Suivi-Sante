@@ -17,6 +17,7 @@ const dbMocks = vi.hoisted(() => ({
   dossierFindFirst: vi.fn(),
   dossierFindMany: vi.fn(),
   messageBotCreate: vi.fn(),
+  messageBotCount: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -28,7 +29,7 @@ vi.mock('@/lib/db', () => ({
     },
     assure: { findFirst: dbMocks.assureFindFirst, findMany: dbMocks.assureFindMany },
     dossier: { findFirst: dbMocks.dossierFindFirst, findMany: dbMocks.dossierFindMany },
-    messageBot: { create: dbMocks.messageBotCreate },
+    messageBot: { create: dbMocks.messageBotCreate, count: dbMocks.messageBotCount },
   },
 }));
 
@@ -56,6 +57,7 @@ const SESSION_VALIDE = {
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.messageBotCreate.mockResolvedValue({});
+  dbMocks.messageBotCount.mockResolvedValue(0);
   dbMocks.botSessionDeleteMany.mockResolvedValue({ count: 0 });
   dbMocks.botSessionUpsert.mockResolvedValue({});
   dbMocks.dossierFindMany.mockResolvedValue([]);
@@ -256,6 +258,64 @@ describe('sessions bot en base (plan P3)', () => {
 
     expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
     expect(reponse).toContain('/verifier');
+  });
+
+  // ─── F3 (audit Assistant IA) : rate limiting /verifier ───────────────────
+
+  it('F3 : au-delà de 5 tentatives /verifier récentes, la suivante est refusée SANS interroger les assurés', async () => {
+    dbMocks.messageBotCount.mockResolvedValue(5);
+
+    const reponse = await traiterMessageBot({
+      canal: 'WHATSAPP',
+      expeditieurId: '261340000099',
+      expeditieurNom: 'X',
+      texte: '/verifier 123456789',
+    });
+
+    // Réponse générique, aucun oracle sur la validité du NSS essayé
+    expect(reponse).toContain('Trop de tentatives');
+    expect(dbMocks.assureFindFirst).not.toHaveBeenCalled();
+    expect(dbMocks.botSessionUpsert).not.toHaveBeenCalled();
+  });
+
+  it('F3 : sous le seuil, la vérification NSS reste possible', async () => {
+    dbMocks.messageBotCount.mockResolvedValue(4);
+    dbMocks.assureFindFirst.mockResolvedValue({
+      id: 'assure-3',
+      nom: 'Rasoa',
+      prenom: 'Lala',
+      societeId: 'soc-3',
+      actif: true,
+      societe: { id: 'soc-3', nom: 'Société C' },
+    });
+
+    const reponse = await traiterMessageBot({
+      canal: 'WHATSAPP',
+      expeditieurId: '261340000098',
+      expeditieurNom: 'Lala',
+      texte: '/verifier 555555555',
+    });
+
+    expect(reponse).toContain('Identite confirmée');
+    expect(dbMocks.botSessionUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('F3 : la fenêtre de comptage est expéditeur-scopée, /verifier (casse libre), bornée à 15 minutes', async () => {
+    await traiterMessageBot({
+      canal: 'TELEGRAM',
+      expeditieurId: 'chat-9000',
+      expeditieurNom: 'X',
+      texte: '/verifier 111222333',
+    });
+
+    expect(dbMocks.messageBotCount).toHaveBeenCalledTimes(1);
+    const appel = dbMocks.messageBotCount.mock.calls[0][0];
+    expect(appel.where.expeditieurId).toBe('chat-9000');
+    expect(appel.where.message).toEqual({ startsWith: '/verifier', mode: 'insensitive' });
+    const gte = appel.where.createdAt.gte as Date;
+    const ecartMs = Date.now() - gte.getTime();
+    expect(ecartMs).toBeGreaterThanOrEqual(15 * 60 * 1000 - 2000);
+    expect(ecartMs).toBeLessThanOrEqual(15 * 60 * 1000 + 2000);
   });
 
   it('la re-vérification NSS éCRASE l\'ancienne session (upsert, pas de doublon possible)', async () => {
