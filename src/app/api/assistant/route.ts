@@ -6,6 +6,7 @@ import { listerQuestions, executerQuestion } from '@/lib/assistant/engine';
 import type { AssistantContext, ParamOption } from '@/lib/assistant/types';
 import { AssistantError } from '@/lib/assistant/types';
 import { societesDuPrestataire } from '@/lib/assistant/results';
+import { logParametreChange } from '@/lib/audit-log';
 import { PARENT_TYPES } from '@/lib/prestations';
 import type { RoleType } from '@/lib/auth-context';
 
@@ -137,6 +138,35 @@ export async function POST(request: NextRequest) {
     // paramètre SOCIETE/PRESTATAIRE/ASSURE, les identifiants sont vérifiés
     // en base dans les implémentations ; ici on borne le volume des valeurs.
     const resultat = await executerQuestion(ctx, body.questionId, parametres);
+
+    // ─── F4 (audit Assistant IA) : traçabilité des consultations ────────────
+    // UNE ligne par consultation réussie : QUI (token signé), QUOI
+    // (questionId + CLÉS de paramètres), QUAND. AUCUNE donnée métier — ni
+    // valeurs de paramètres, ni résultats : l'assistant est en lecture
+    // seule, la trace ne sert qu'à l'observabilité et à l'investigation.
+    // Le double filet try/catch garantit qu'un échec d'audit ne fait
+    // jamais échouer la consultation (logParametreChange avale déjà ses
+    // propres erreurs en interne).
+    try {
+      await logParametreChange({
+        entite: 'AssistantIA',
+        entiteId: body.questionId,
+        champ: 'CONSULTATION',
+        action: 'CONSULTATION',
+        niveau: 'INFO',
+        module: 'Assistant IA',
+        objet: body.questionId,
+        ancienneValeur: null,
+        nouvelleValeur: null,
+        modifiePar: ctx.nom || ctx.email || 'inconnu',
+        modifieParId: ctx.userId,
+        roleUtilisateur: ctx.role,
+        metadonnees: JSON.stringify({ questionId: body.questionId, params: Object.keys(parametres) }),
+        request,
+      });
+    } catch (e) {
+      console.error('[ASSISTANT] Trace de consultation échouée :', e);
+    }
 
     return NextResponse.json(resultat);
   } catch (error) {

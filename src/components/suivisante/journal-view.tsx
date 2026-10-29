@@ -81,6 +81,7 @@ const ACTION_OPTIONS = [
   { value: 'MODIFICATION', label: '✏️ Modification' },
   { value: 'SUPPRESSION', label: '🗑 Suppression' },
   { value: 'EXCEPTION_DOUBLON', label: '⚠️ Exception doublon' },
+  { value: 'CONSULTATION', label: '🔍 Consultation' },
 ];
 
 const NIVEAU_OPTIONS = [
@@ -102,6 +103,7 @@ const ACTION_CONFIG: Record<string, { icon: string; bg: string; text: string }> 
   CREATION:     { icon: '➕', bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400' },
   MODIFICATION: { icon: '✏️', bg: 'bg-blue-50 dark:bg-blue-950/40',    text: 'text-blue-700 dark:text-blue-400' },
   SUPPRESSION:  { icon: '🗑', bg: 'bg-red-50 dark:bg-red-950/40',       text: 'text-red-700 dark:text-red-400' },
+  CONSULTATION: { icon: '🔍', bg: 'bg-slate-100 dark:bg-slate-950/40',  text: 'text-slate-600 dark:text-slate-400' },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

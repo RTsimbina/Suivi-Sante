@@ -329,7 +329,9 @@ export const STATUT_IMPORT_VALEURS: string[] = STATUTS_IMPORT.map((s) => s.valeu
 
 // ─── Journal d'audit : actions et niveaux ───────────────────────────────────
 
-export type AuditAction = 'CREATION' | 'MODIFICATION' | 'SUPPRESSION' | 'EXCEPTION_DOUBLON';
+// CONSULTATION : lecture tracée (Assistant IA, audit F4) — n'affecte aucune
+// donnée, journalisée pour l'observabilité/investigation uniquement.
+export type AuditAction = 'CREATION' | 'MODIFICATION' | 'SUPPRESSION' | 'EXCEPTION_DOUBLON' | 'CONSULTATION';
 export type AuditNiveau = 'INFO' | 'STANDARD' | 'SENSIBLE' | 'CRITIQUE';
 
 export const AUDIT_ACTION_ITEMS: { value: AuditAction; label: string }[] = [
@@ -337,6 +339,7 @@ export const AUDIT_ACTION_ITEMS: { value: AuditAction; label: string }[] = [
   { value: 'MODIFICATION', label: 'Modification' },
   { value: 'SUPPRESSION', label: 'Suppression' },
   { value: 'EXCEPTION_DOUBLON', label: 'Exception doublon' },
+  { value: 'CONSULTATION', label: 'Consultation' },
 ];
 
 export const AUDIT_NIVEAU_ITEMS: { value: AuditNiveau; label: string; color: string }[] = [
