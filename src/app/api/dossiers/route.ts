@@ -177,6 +177,24 @@ export async function POST(request: NextRequest) {
 
     const userId = request.headers.get('x-user-id') || '';
 
+    // ─── SPEC-5 : société active exigée pour un NOUVEAU dossier ─────────────
+    // Une société inactive reste consultable (historique, dossiers existants)
+    // mais n'accepte plus de création. Contrôle AVANT la transaction — refus
+    // motivé 422 (jamais une erreur FK brute en aval si l'ID est inconnu).
+    const societeCible = await db.societe.findUnique({
+      where: { id: societeId },
+      select: { id: true, nom: true, actif: true },
+    });
+    if (!societeCible) {
+      return NextResponse.json({ erreur: 'Société introuvable.' }, { status: 422 });
+    }
+    if (!societeCible.actif) {
+      return NextResponse.json(
+        { erreur: `La société « ${societeCible.nom} » est inactive : elle n'accepte plus de nouveaux dossiers.` },
+        { status: 422 }
+      );
+    }
+
     // ─── Historique initial ────────────────────────────────────────────────
     const historiqueEntries: Record<string, unknown>[] = [
       { date: new Date().toISOString(), statut: "RECU", commentaire: "Dossier créé manuellement" },

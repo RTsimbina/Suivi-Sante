@@ -163,6 +163,9 @@ export default function SocietesView({ userRole }: Props) {
                 activeTab={list.activeTab}
                 onTabChange={list.setActiveTab}
                 canManageContacts={canManageContacts}
+                canWrite={canWrite}
+                basculerLoading={list.basculerLoadingId === list.selectedSociete.id}
+                onToggleActif={() => { if (list.selectedSociete) list.basculerActif(list.selectedSociete); }}
                 rapportLoading={list.rapportLoading}
                 onDownloadRapport={list.handleDownloadRapport}
                 filteredBaremes={list.filteredBaremes}

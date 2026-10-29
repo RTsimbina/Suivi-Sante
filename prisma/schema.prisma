@@ -27,6 +27,16 @@ model Utilisateur {
 model Societe {
   id        String    @id @default(cuid())
   nom       String
+  // Nom normalisé (minuscules, sans accents, ponctuation → espaces) — support
+  // de l'unicité insensible à la casse et aux accents (index unique partiel,
+  // migration 20261029100000). Même normalisation que les prestataires
+  // (src/lib/prestataire-doublons.ts → normaliserNom).
+  nomNormalise String?
+  // Cycle de vie : une société inactive reste consultable (historique, dossiers
+  // existants) mais n'accepte plus de nouveaux dossiers ni de nouveaux assurés.
+  // Le frontend affiche déjà le badge (societe-detail.tsx) et la carte
+  // « Sociétés actives » (use-societes-list.ts) — colonne requise.
+  actif     Boolean   @default(true)
   adresse   String?
   telephone  String?
   email     String?
@@ -45,6 +55,8 @@ model Societe {
   prestataires PrestataireSociete[]
   modeCalculAppelFonds ModeCalculAppelFonds?
   createdAt DateTime  @default(now())
+
+  @@index([nomNormalise])
 }
 
 model Gestionnaire {

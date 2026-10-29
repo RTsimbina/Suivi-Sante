@@ -68,12 +68,23 @@ export const utilisateurPatchSchema = z.object({
 
 // ─── Sociétés (/api/societes) ───────────────────────────────────────────────
 
+/** POST /api/societes — SPEC-7 : aligné sur le socle de la route technique
+ *  (mêmes primitives partagées : téléphone, NIF, e-mails validés). La
+ *  détection de doublon de nom (normalisée) est faite par la route, pas ici. */
 export const societeCreateSchema = z.object({
   nom: z
     .string()
     .trim()
     .min(2, "Le nom de la société doit contenir au moins 2 caractères")
     .max(200, "Le nom de la société ne peut pas dépasser 200 caractères"),
+  adresse: texteOptionnel(300),
+  telephone: telephoneLibreSchema,
+  email: emailOptionnel,
+  nif: nifSchema,
+  contactPrincipal: texteOptionnel(200),
+  // Liaison au compte portail CONTACT_ENTREPRISE (cf. liaison-externe.ts)
+  emailContactPrincipal: emailOptionnel,
+  actif: z.boolean().optional(),
 });
 
 // ─── Prestataires (/api/prestataires) ───────────────────────────────────────

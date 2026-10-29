@@ -213,11 +213,45 @@ export function useSocietesList() {
     }
   }
 
+  // ─── Bascule actif / inactif (SPEC-5, audité côté serveur) ───────────────
+  // Une société inactive reste consultable mais n'accepte plus de nouveaux
+  // dossiers ni de nouveaux assurés (contrôles serveur, refus 422 motivés).
+  const [basculerLoadingId, setBasculerLoadingId] = useState<string | null>(null);
+
+  async function basculerActif(s: Societe) {
+    setBasculerLoadingId(s.id);
+    try {
+      const res = await fetch(`/api/technique/societes/${s.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actif: !s.actif }),
+      });
+      if (res.ok) {
+        toast.success(
+          s.actif
+            ? `« ${s.nom} » est desormais inactive — plus de nouveaux dossiers ni assurés.`
+            : `« ${s.nom} » est de nouveau active.`
+        );
+        fetchSocietes();
+      } else {
+        let data: Record<string, unknown> = {};
+        try { data = await res.json(); } catch { /* corps non JSON */ }
+        toast.error((typeof data.erreur === 'string' && data.erreur) || 'Erreur lors de la modification du statut.');
+      }
+    } catch {
+      toast.error('Erreur reseau');
+    } finally {
+      setBasculerLoadingId(null);
+    }
+  }
+
   // ─── Dérivés ────────────────────────────────────────────────────────────
   const totalDossiers = societes.reduce((s, soc) => s + soc._count.dossiers, 0);
   const totalAssures = societes.reduce((s, soc) => s + soc._count.assures, 0);
   const totalContrats = societes.reduce((s, soc) => s + soc._count.contrats, 0);
   const totalBaremes = societes.reduce((s, soc) => s + soc._count.baremes, 0);
+  // SPEC-5 : le champ actif existe en base (migration 20261029100000) —
+  // la carte « Sociétés actives » reflète désormais l'état réel.
   const societesActives = societes.filter(s => s.actif).length;
 
   const selectedSociete = societes.find(s => s.id === selectedId);
@@ -293,6 +327,9 @@ export function useSocietesList() {
     openEdit,
     handleSave,
     handleDelete,
+    // Bascule actif / inactif (SPEC-5)
+    basculerActif,
+    basculerLoadingId,
     formNom,
     setFormNom,
     formAdresse,

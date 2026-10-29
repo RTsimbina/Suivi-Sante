@@ -148,6 +148,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SPEC-5 : société active exigée pour un NOUVEL assuré (l'historique des
+    // assurés existants reste consultable et modifiable).
+    if (!societe.actif) {
+      return NextResponse.json(
+        { erreur: `La société « ${societe.nom} » est inactive : elle n'accepte plus de nouveaux assurés.` },
+        { status: 422 }
+      );
+    }
+
     // Vérifier l'unicité du NSS
     if (nSS) {
       const existingNSS = await db.assure.findUnique({ where: { nSS } });

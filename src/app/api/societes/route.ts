@@ -10,6 +10,12 @@ import { logParametreChange, getUserInfoFromRequest } from "@/lib/audit-log";
 import { messageErreurBase } from "@/lib/erreur-migration";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { societeCreateSchema } from "@/lib/validation";
+import {
+  detecterConflitNom,
+  detecterConflitLiaisonEmail,
+  messageConflitNom,
+  normaliserNom,
+} from "@/lib/societe-service";
 
 // GET — Lister les sociétés
 //
@@ -39,7 +45,7 @@ export async function GET(request: NextRequest) {
       where: avecPerimetreSocieteCourante({}, perimetre),
       orderBy: { nom: "asc" },
       include: {
-        _count: { select: { dossiers: true, contrats: true, baremes: true } },
+        _count: { select: { dossiers: true, contrats: true, baremes: true, assures: true } },
       },
     });
     return NextResponse.json({ societes });
@@ -53,6 +59,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST — Créer une société
+//
+// ─── RÈGLES MÉTIER (SPEC-7 : convergence avec /api/technique/societes) ──────
+//   Même détection de doublon normalisé (SPEC-1), même garde d'ambiguïté de
+//   la liaison portail (SPEC-6), même audit de création (SPEC-3). Les deux
+//   routes partagent le même socle : une seule source de vérité des règles.
 export async function POST(request: NextRequest) {
   try {
     const authError = await checkAuth(request);
@@ -60,19 +71,47 @@ export async function POST(request: NextRequest) {
 
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
 
-    // ─── Validation Zod centralisée (nom ≥ 2 caractères) ───────────────────
+    // ─── Validation Zod centralisée (nom ≥ 2, NIF / téléphone / e-mails
+    //     validés par les primitives partagées — SPEC-2) ─────────────────────
     const parsed = await parseJsonBody(request, societeCreateSchema);
     if (!parsed.success) return parsed.response;
-    const nom = parsed.data.nom;
+    const { nom, adresse, telephone, email, nif, contactPrincipal, emailContactPrincipal, actif } = parsed.data;
 
-    // Vérifier doublon
-    const existing = await db.societe.findFirst({ where: { nom } });
-    if (existing) {
-      return NextResponse.json({ erreur: "Une société avec ce nom existe déjà" }, { status: 409 });
+    // ─── SPEC-1 : unicité du nom normalisée (auparavant : findFirst exact,
+    //     sensible à la casse — « techno » passait face à « Techno ») ────────
+    const existantes = await db.societe.findMany({
+      select: { id: true, nom: true, nomNormalise: true, emailContactPrincipal: true },
+    });
+    const conflitNom = detecterConflitNom(nom, existantes);
+    if (conflitNom) {
+      return NextResponse.json({ erreur: messageConflitNom(conflitNom) }, { status: 409 });
+    }
+
+    // ─── SPEC-6 : e-mail de contact principal non ambigu ────────────────────
+    if (emailContactPrincipal) {
+      const conflitLiaison = detecterConflitLiaisonEmail(emailContactPrincipal, existantes);
+      if (conflitLiaison) {
+        return NextResponse.json(
+          {
+            erreur: `Cet e-mail de contact principal est déjà rattaché à la société « ${conflitLiaison.nom} » — un e-mail de contact ne peut lier qu'une seule société (liaison du portail entreprise).`,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const societe = await db.societe.create({
-      data: { nom },
+      data: {
+        nom,
+        nomNormalise: normaliserNom(nom) || null,
+        actif: actif ?? true,
+        ...(adresse ? { adresse } : {}),
+        ...(telephone ? { telephone } : {}),
+        ...(email ? { email } : {}),
+        ...(nif ? { nif } : {}),
+        ...(contactPrincipal ? { contactPrincipal } : {}),
+        ...(emailContactPrincipal ? { emailContactPrincipal } : {}),
+      },
     });
 
     // Audit log : création
@@ -85,6 +124,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ societe }, { status: 201 });
   } catch (error) {
     console.error("Erreur création société:", error);
+
+    // Rempart dernier niveau : index unique partiel Societe_nomNormalise_unique
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code: string }).code === 'P2002'
+    ) {
+      return NextResponse.json(
+        { erreur: 'Une société avec ce nom existe déjà (insensible à la casse et aux accents)' },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json({ erreur: "Erreur lors de la création" }, { status: 500 });
   }
 }

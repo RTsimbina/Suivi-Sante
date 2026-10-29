@@ -10,10 +10,12 @@ import {
   montantNonNegatif,
   montantNonNegatifOptionnel,
   montantPositif,
+  nifSchema,
   prestationBaremeSchema,
   statutAppelFondsSchema,
   statutContratSchema,
   tauxCouvertureSchema,
+  telephoneLibreSchema,
   texteOptionnel,
   texteCourt,
 } from "./common";
@@ -112,18 +114,23 @@ export const techniqueBaremeSchema = z.object({
   prestataireId: idOptionnel,
 });
 
-/** POST /api/technique/societes — création avec barèmes initiaux. */
+/** POST /api/technique/societes — création avec barèmes initiaux.
+ *  Spécification Sociétés clientes (SPEC-2) : mêmes primitives partagées que
+ *  les prestataires — téléphone, NIF et e-mails validés, client ET serveur. */
 export const societeTechniqueCreateSchema = z
   .object({
     nom: texteCourt(200, "Le nom de la société"),
     adresse: texteOptionnel(300),
-    telephone: texteOptionnel(50),
+    telephone: telephoneLibreSchema,
     email: emailOptionnel,
-    nif: texteOptionnel(50),
+    nif: nifSchema,
     contactPrincipal: texteOptionnel(200),
     // E-mail du contact principal — sert de liaison au compte portail
     // CONTACT_ENTREPRISE (cf. src/lib/liaison-externe.ts).
     emailContactPrincipal: emailOptionnel,
+    // Cycle de vie (SPEC-5) : création directe en état inactif possible
+    // (rare mais légitime — société signée non encore entrée en vigueur).
+    actif: z.boolean().optional(),
     baremes: z.array(baremeLigneSchema).max(50, "50 barèmes maximum").optional(),
   });
 

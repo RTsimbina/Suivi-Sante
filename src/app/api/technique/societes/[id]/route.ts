@@ -5,6 +5,15 @@ import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 import { Prisma } from '@prisma/client';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { societeTechniqueUpdateSchema } from '@/lib/validation';
+import {
+  detecterConflitNom,
+  detecterConflitLiaisonEmail,
+  differencesSociete,
+  messageConflitNom,
+  messageSuppressionBloquee,
+  motifsBlocageSuppression,
+  normaliserNom,
+} from '@/lib/societe-service';
 
 // ─── GET : Récupérer une société avec ses barèmes ─────────────────────────────
 
@@ -44,6 +53,15 @@ export async function GET(
 }
 
 // ─── PUT : Mettre à jour une société et/ou ses barèmes ────────────────────────
+//
+// ─── RÈGLES MÉTIER (spécifications Sociétés clientes — figées par tests) ────
+//   SPEC-1 : collision de nom normalisé (hors fiche en cours) → 409.
+//   SPEC-3 : chaque champ réellement modifié est audité (nom, adresse,
+//            téléphone, e-mail, NIF, contact principal, e-mail de liaison
+//            portail, actif) — rôle figé + operationId. La liaison portail
+//            (emailContactPrincipal) est auditée comme les autres : le
+//            journal doit répondre « qui a changé la liaison du portail ».
+//   SPEC-6 : un e-mail de contact principal ne peut lier qu'UNE société.
 
 export async function PUT(
   request: NextRequest,
@@ -56,10 +74,11 @@ export async function PUT(
     const { nom: userName, id: userId } = await getUserInfoFromRequest(request);
     const { id } = await params;
 
-    // ─── Validation Zod centralisée (whitelist, barèmes : enum, taux, plafond) ─
+    // ─── Validation Zod centralisée (whitelist, NIF/téléphone/e-mails, barèmes
+    //     : enum, taux, plafond) ──────────────────────────────────────────────
     const parsed = await parseJsonBody(request, societeTechniqueUpdateSchema);
     if (!parsed.success) return parsed.response;
-    const { nom, adresse, telephone, email, nif, contactPrincipal, emailContactPrincipal, baremes } = parsed.data;
+    const { nom, adresse, telephone, email, nif, contactPrincipal, emailContactPrincipal, actif, baremes } = parsed.data;
 
     // Vérifier que la société existe
     const existing = await db.societe.findUnique({
@@ -73,6 +92,52 @@ export async function PUT(
         { status: 404 }
       );
     }
+
+    // ─── SPEC-1 / SPEC-6 : collisions de nom et d'e-mail de liaison ─────────
+    // Chargées si le nom change (collision nom) OU si l'e-mail de liaison
+    // change (garde d'ambiguïté) — les deux contrôles sont indépendants.
+    const nomChange = nom !== undefined && nom !== existing.nom;
+    const liaisonChange = emailContactPrincipal !== undefined &&
+      (emailContactPrincipal ?? null) !== existing.emailContactPrincipal;
+    if (nomChange || liaisonChange) {
+      const existantes = await db.societe.findMany({
+        select: { id: true, nom: true, nomNormalise: true, emailContactPrincipal: true },
+      });
+
+      if (nomChange) {
+        const conflitNom = detecterConflitNom(nom, existantes, id);
+        if (conflitNom) {
+          return NextResponse.json({ erreur: messageConflitNom(conflitNom) }, { status: 409 });
+        }
+      }
+
+      // ─── SPEC-6 : e-mail de contact principal non ambigu ────────────────
+      if (emailContactPrincipal) {
+        const conflitLiaison = detecterConflitLiaisonEmail(emailContactPrincipal, existantes, id);
+        if (conflitLiaison) {
+          return NextResponse.json(
+            {
+              erreur: `Cet e-mail de contact principal est déjà rattaché à la société « ${conflitLiaison.nom} » — un e-mail de contact ne peut lier qu'une seule société (liaison du portail entreprise).`,
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
+    // ─── SPEC-3 : audit des champs de la fiche (avant écriture) ─────────────
+    // Les valeurs nulles explicites (null) signifient « vider le champ » —
+    // elles sont auditées comme une modification à part entière.
+    const modificationsFiche = differencesSociete(existing, {
+      ...(nom !== undefined ? { nom } : {}),
+      ...(adresse !== undefined ? { adresse } : {}),
+      ...(telephone !== undefined ? { telephone } : {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(nif !== undefined ? { nif } : {}),
+      ...(contactPrincipal !== undefined ? { contactPrincipal } : {}),
+      ...(emailContactPrincipal !== undefined ? { emailContactPrincipal } : {}),
+      ...(actif !== undefined ? { actif } : {}),
+    });
 
     // Vérifier les doublons de prestation dans le tableau (les types, taux et
     // plafonds sont déjà garantis par le schéma Zod)
@@ -178,13 +243,16 @@ export async function PUT(
       return tx.societe.update({
         where: { id },
         data: {
-          ...(nom !== undefined ? { nom } : {}),
+          ...(nom !== undefined
+            ? { nom, nomNormalise: normaliserNom(nom) || null }
+            : {}),
           ...(adresse !== undefined ? { adresse: adresse ?? null } : {}),
           ...(telephone !== undefined ? { telephone: telephone ?? null } : {}),
           ...(email !== undefined ? { email: email ?? null } : {}),
           ...(nif !== undefined ? { nif: nif ?? null } : {}),
           ...(contactPrincipal !== undefined ? { contactPrincipal: contactPrincipal ?? null } : {}),
           ...(emailContactPrincipal !== undefined ? { emailContactPrincipal: emailContactPrincipal ?? null } : {}),
+          ...(actif !== undefined ? { actif } : {}),
         },
         include: {
           baremes: { orderBy: { prestation: 'asc' } },
@@ -193,12 +261,19 @@ export async function PUT(
       });
     });
 
-    // Audit log : modifications de la société elle-même
-    if (nom !== undefined && nom !== existing.nom) {
+    // ─── SPEC-3 : audit champ par champ de la fiche société ─────────────────
+    for (const diff of modificationsFiche) {
       await logParametreChange({
-        entite: 'Societe', entiteId: id, champ: 'nom',
-        ancienneValeur: existing.nom, nouvelleValeur: nom,
-        modifiePar: userName, modifieParId: userId, objet: existing.nom, societeId: id, request,
+        entite: 'Societe',
+        entiteId: id,
+        champ: diff.champ,
+        ancienneValeur: diff.ancienne,
+        nouvelleValeur: diff.nouvelle,
+        modifiePar: userName,
+        modifieParId: userId,
+        objet: existing.nom,
+        societeId: id,
+        request,
       });
     }
 
@@ -216,7 +291,7 @@ export async function PUT(
       (error as { code: string }).code === 'P2002'
     ) {
       return NextResponse.json(
-        { erreur: 'Une société avec ce nom existe déjà.' },
+        { erreur: 'Une société avec ce nom existe déjà (insensible à la casse et aux accents).' },
         { status: 409 }
       );
     }
@@ -229,6 +304,17 @@ export async function PUT(
 }
 
 // ─── DELETE : Supprimer une société ───────────────────────────────────────────
+//
+// ─── RÈGLES MÉTIER (spécifications Sociétés clientes — figées par tests) ────
+//   SPEC-4 : refus 409 MOTIVÉ si dossiers, assurés, appels de fonds (sur les
+//            contrats) ou paramétrage d'appels de fonds rattachés — JAMAIS de
+//            violation de clé étrangère brute (500) et JAMAIS de suppression
+//            silencieuse de données comptables. Les contrats ne partent qu'en
+//            l'absence totale d'appels de fonds ; barèmes, conventions
+//            prestataires (cascade) et contacts (cascade) partent avec la
+//            société ; les courriels sont détachés (SET NULL).
+//   SPEC-3 : l'audit est écrit AVANT la suppression (l'entrée doit survivre à
+//            la fiche supprimée) et porte les comptes de dépendances.
 
 export async function DELETE(
   request: NextRequest,
@@ -246,7 +332,7 @@ export async function DELETE(
       where: { id },
       include: {
         baremes: true,
-        _count: { select: { dossiers: true, contrats: true } },
+        _count: { select: { dossiers: true, contrats: true, assures: true } },
       },
     });
 
@@ -257,17 +343,32 @@ export async function DELETE(
       );
     }
 
-    // Vérifier qu'aucun dossier n'est lié
-    if (societe._count.dossiers > 0) {
+    // ─── SPEC-4 : mesurer TOUTES les dépendances qui bloquent ───────────────
+    // Appels de fonds rattachés aux contrats de la société (les contrats
+    // seraient supprimés par le nettoyage — leurs appels doivent d'abord
+    // empêcher la suppression) + paramétrage ModeCalculAppelFonds (FK
+    // RESTRICT en base : sans contrôle applicatif → 500 brut).
+    const [appelsDeFonds, modeCalcul] = await Promise.all([
+      db.appelDeFonds.count({ where: { contrat: { societeId: id } } }),
+      db.modeCalculAppelFonds.count({ where: { societeId: id } }),
+    ]);
+
+    const blocages = motifsBlocageSuppression({
+      dossiers: societe._count.dossiers,
+      assures: societe._count.assures,
+      appelsDeFonds,
+      modeCalculAppelFonds: modeCalcul,
+    });
+
+    if (blocages.length > 0) {
       return NextResponse.json(
-        {
-          erreur: `Impossible de supprimer cette société : ${societe._count.dossiers} dossier(s) y sont rattaché(s). Supprimez ou réaffectez les dossiers avant de supprimer la société.`,
-        },
+        { erreur: messageSuppressionBloquee(blocages), blocages },
         { status: 409 }
       );
     }
 
-    // Audit log : suppression avec le détail des barèmes
+    // ─── SPEC-3 : audit AVANT la suppression (l'entrée d'audit doit survivre
+    //     à la fiche supprimée) — enrichie avec les comptes de dépendances.
     await logParametreChange({
       entite: 'Societe', entiteId: id, champ: 'SUPPRESSION',
       ancienneValeur: `${societe.nom} (${societe.baremes.length} barème(s), ${societe._count.contrats} contrat(s))`,
@@ -275,8 +376,10 @@ export async function DELETE(
       modifiePar: userName, modifieParId: userId, objet: societe.nom, societeId: id, request,
     });
 
-    // Supprimer la société (les barèmes et contrats seront supprimés en cascade par Prisma si configuré)
-    // Pour SQLite, on supprime d'abord les barèmes et contrats manuellement
+    // Suppression ordonnée respectant les FK : barèmes puis contrats (aucun
+    // appel de fonds à ce stade — contrôlé ci-dessus) puis la société. Les
+    // conventions prestataires et contacts partent en cascade, les courriels
+    // sont détachés (SET NULL).
     await db.$transaction(async (tx) => {
       await tx.bareme.deleteMany({ where: { societeId: id } });
       await tx.contrat.deleteMany({ where: { societeId: id } });

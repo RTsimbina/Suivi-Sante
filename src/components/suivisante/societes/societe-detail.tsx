@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Building2, Users, FileText, Loader2, CheckCircle2, Stethoscope, Percent,
-  Phone, Mail, Download, DollarSign, BookOpen,
+  Phone, Mail, Download, DollarSign, BookOpen, Power,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +28,9 @@ export default function SocieteDetail({
   activeTab,
   onTabChange,
   canManageContacts,
+  canWrite,
+  basculerLoading,
+  onToggleActif,
   rapportLoading,
   onDownloadRapport,
   filteredBaremes,
@@ -55,6 +58,10 @@ export default function SocieteDetail({
   activeTab: DetailTab;
   onTabChange: (t: DetailTab) => void;
   canManageContacts: boolean;
+  /** SPEC-5 : bascule actif / inactif (réservée aux rôles en écriture). */
+  canWrite: boolean;
+  basculerLoading: boolean;
+  onToggleActif: () => void;
   rapportLoading: boolean;
   onDownloadRapport: () => void;
   filteredBaremes: SocieteDetails['baremes'];
@@ -121,6 +128,33 @@ export default function SocieteDetail({
             <Badge variant="outline" className="text-xs gap-1"><Users className="h-3 w-3" />{societe._count.assures} assurés</Badge>
             <Badge variant="outline" className="text-xs gap-1"><Percent className="h-3 w-3" />{societe._count.baremes} barèmes</Badge>
             <Badge variant="outline" className="text-xs gap-1"><FileText className="h-3 w-3" />{societe._count.dossiers} dossiers</Badge>
+            {/* SPEC-5 : bascule actif / inactif — l'opération est auditée côté
+                serveur ; une société inactive n'accepte plus de nouveaux
+                dossiers ni de nouveaux assurés (refus 422 motivés). */}
+            {canWrite && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  'h-7 text-xs gap-1',
+                  !societe.actif && 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400'
+                )}
+                onClick={onToggleActif}
+                disabled={basculerLoading}
+                title={
+                  societe.actif
+                    ? 'Désactiver : plus de nouveaux dossiers ni assurés (historique conservé)'
+                    : 'Réactiver : la société accepte de nouveau les dossiers et assurés'
+                }
+              >
+                {basculerLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Power className="h-3 w-3" />
+                )}
+                {societe.actif ? 'Désactiver' : 'Réactiver'}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
