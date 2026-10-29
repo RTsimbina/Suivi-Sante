@@ -234,10 +234,10 @@ export async function PUT(
               entite: 'Bareme', entiteId: nouvelle.id, champ: 'tauxCouverture',
               ancienneValeur: courante.tauxCouverture, nouvelleValeur: b.tauxCouverture,
               modifiePar: userName, modifieParId: userId, societeId: id, objet: prestationNorm,
-              metadonnees: {
+              metadonnees: JSON.stringify({
                 versionPrecedente: courante.version, nouvelleVersion: nouvelle.version,
                 plafondPrecedent: String(courante.plafond), plafondNouveau: String(b.plafond),
-              },
+              }),
               request,
             });
           } else {

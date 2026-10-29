@@ -28,13 +28,17 @@
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+import type { Decimal } from './money';
+
 /** Champs minimum requis par les fonctions de validité (Prisma ou mock). */
 export interface BaremeDated {
   id: string;
   societeId: string;
   prestation: string;
   tauxCouverture: number;
-  plafond: unknown; // Decimal | number — les calculs restent côté appelant
+  // Plafond : Decimal côté Prisma, number dans les mocks de tests — les
+  // calculs (sommer, minDecimal, reliquat…) acceptent ValeurMontant.
+  plafond: Decimal | number;
   description: string | null;
   active: boolean;
   valideDu: Date;
@@ -44,15 +48,18 @@ export interface BaremeDated {
 }
 
 /**
- * Délégate Prisma minimal (client ou transaction `tx`). Les arguments sont
- * typés largement (any) volontairement : le délégué généré par Prisma est
- * générique et ne serait pas assigné à une signature stricte — le typage
- * STRICT s'applique aux RETOURS (BaremeDated) consommés par les calculs.
+ * Accès BAREME minimal sur un client ou une transaction Prisma (structure :
+ * `db.bareme` / `tx.bareme`). Les arguments et retours sont typés largement
+ * (any) volontairement : le délégué généré par Prisma est générique et ne
+ * serait pas assigné à une signature stricte — le typage STRICT est assumé
+ * par les signatures des fonctions ci-dessous (BaremeDated).
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface BaremeDelegate {
-  findFirst(args: any): Promise<BaremeDated | null>;
-  findMany(args: any): Promise<BaremeDated[]>;
+export interface BaremeClientLike {
+  bareme: {
+    findFirst(args: any): Promise<any>;
+    findMany(args: any): Promise<any[]>;
+  };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -174,7 +181,7 @@ export function dedupliquerEnVigueur(baremes: BaremeDated[], date: Date): Bareme
  * l'appelant répond « non couvert » (fail-closed, comme avant le P1).
  */
 export async function trouverBaremeValide(
-  db: BaremeDelegate,
+  db: BaremeClientLike,
   params: { societeId: string; prestation: string; date: Date },
 ): Promise<BaremeDated | null> {
   return db.bareme.findFirst({
@@ -215,7 +222,7 @@ export function filtreEnVigueur(date: Date = new Date()): Record<string, unknown
  * selon l'usage (courante = !supprime && valideAu === null).
  */
 export async function chargerVersionsCombinaison(
-  db: BaremeDelegate,
+  db: BaremeClientLike,
   params: { societeId: string; prestation: string },
 ): Promise<BaremeDated[]> {
   return db.bareme.findMany({

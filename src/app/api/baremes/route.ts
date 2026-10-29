@@ -209,10 +209,10 @@ export async function POST(request: NextRequest) {
           ancienneValeur: ancienne.tauxCouverture, nouvelleValeur: bareme.tauxCouverture,
           modifiePar: userName, modifieParId: userId, societeId, objet: prestationNorm,
           motif: motif || undefined,
-          metadonnees: {
+          metadonnees: JSON.stringify({
             versionPrecedente: ancienne.version, nouvelleVersion: bareme.version,
             valideDu: bareme.valideDu, valideAu: bareme.valideAu ?? null,
-          },
+          }),
           request,
         });
       }
@@ -222,10 +222,10 @@ export async function POST(request: NextRequest) {
           ancienneValeur: ancienne.plafond, nouvelleValeur: bareme.plafond,
           modifiePar: userName, modifieParId: userId, societeId, objet: prestationNorm,
           motif: motif || undefined,
-          metadonnees: {
+          metadonnees: JSON.stringify({
             versionPrecedente: ancienne.version, nouvelleVersion: bareme.version,
             valideDu: bareme.valideDu, valideAu: bareme.valideAu ?? null,
-          },
+          }),
           request,
         });
       }
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
         ancienneValeur: ancienne.valideAu ?? 'en cours', nouvelleValeur: ancienne.valideAu,
         modifiePar: userName, modifieParId: userId, societeId, objet: prestationNorm,
         motif: motif || undefined,
-        metadonnees: { nouvelleVersion: bareme.version },
+        metadonnees: JSON.stringify({ nouvelleVersion: bareme.version }),
         request,
       });
     } else {

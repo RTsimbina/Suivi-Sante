@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
           valideDu: true,
           valideAu: true,
           version: true,
+          supprime: true,
         },
       }),
       new Date(),
