@@ -111,14 +111,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [kpiFactures] = await db.$queryRaw<{
+    const lignesKpi = await db.$queryRaw<{
       facturesemises: number | bigint;
       facturesreglees: number | bigint;
       facturesrejetees: number | bigint;
-      montantfacture: string | number | bigint | null;
-      montantregule: string | number | bigint | null;
-      montantrestant: string | number | bigint | null;
-    }>(Prisma.sql`
+      montantfacture: Prisma.Decimal | string | number | null;
+      montantregule: Prisma.Decimal | string | number | null;
+      montantrestant: Prisma.Decimal | string | number | null;
+    }[]>(Prisma.sql`
       WITH f AS (
         SELECT d."statut", d."montantReclame", d."montantValide", d."montantPaye",
                COALESCE(d."montantValide", d."montantReclame", 0) AS "du"
@@ -138,15 +138,16 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN "statut" = 'REJETE' THEN 0
                           ELSE GREATEST("du" - COALESCE("montantPaye", 0), 0) END), 0) AS montantrestant
       FROM f
-    `) ?? KPI_FACTURES_VIDE;
+    `);
 
+    const kpiFactures = lignesKpi[0] ?? KPI_FACTURES_VIDE[0];
     const facturesEmises = Number(kpiFactures.facturesemises);
     const facturesRegles = Number(kpiFactures.facturesreglees);
     const facturesRejetees = Number(kpiFactures.facturesrejetees);
     const facturesEnAttente = Math.max(0, facturesEmises - facturesRegles - facturesRejetees);
-    const montantFacture = Math.round(enNombre(kpiFactures.montantfacture) * 100) / 100;
-    const montantRegule = Math.round(enNombre(kpiFactures.montantregule) * 100) / 100;
-    const montantRestant = Math.round(enNombre(kpiFactures.montantrestant) * 100) / 100;
+    const montantFacture = Math.round((enNombre(kpiFactures.montantfacture) ?? 0) * 100) / 100;
+    const montantRegule = Math.round((enNombre(kpiFactures.montantregule) ?? 0) * 100) / 100;
+    const montantRestant = Math.round((enNombre(kpiFactures.montantrestant) ?? 0) * 100) / 100;
 
     // Derniers actes (aperçu tableau de bord, même périmètre + période).
     const derniersActes = await db.dossier.findMany({
