@@ -1,0 +1,175 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Rotation du secret Neon (mot de passe du rôle propriétaire de la base)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Contexte (registre de sécurité cahier des charges V2.0) : trois mots de
+# passe Neon ont été exposés dans un dépôt local — la rotation est requise.
+#
+# Ce workflow fait, dans l'ordre :
+#   1. Découvre la branche de production et le rôle propriétaire (API Neon) ;
+#   2. Réinitialise son mot de passe (rotation : l'ancien devient invalide
+#      IMMÉDIATEMENT) — la nouvelle URI est masquée dans les logs ;
+#   3. Met à jour le secret GitHub DATABASE_URL (chiffrement géré par gh CLI,
+#      jeton GH_SECRETS_WRITER — GITHUB_TOKEN n'a pas ce droit) ;
+#   4. Met à jour les variables Vercel si VERCEL_TOKEN est défini
+#      (sinon message actionnable : dashboard Vercel + redeploy) ;
+#   5. Optionnel : déclenche la migration pour valider la connectivité.
+#
+# ⚠️ ORDRE DE MISE EN PRODUCTION : la rotation invalide l'ancien mot de passe
+# instantanément. L'application Vercel cesse de se connecter à la base tant
+# que ses variables d'environnement n'ont pas la nouvelle URI + redeploy.
+# Procédure complète : docs/ROTATION-SECRETS.md.
+#
+# Secrets requis :
+#   NEON_API_KEY       (déjà configuré)
+#   GH_SECRETS_WRITER  (PAT avec droit d'écriture des secrets du dépôt)
+# Secrets optionnels :
+#   VERCEL_TOKEN + VERCEL_PROJECT_ID (met à jour DATABASE_URL côté Vercel)
+#
+name: Rotation secret Neon
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmer:
+        description: 'Taper ROTATION pour confirmer (irréversible, ancien mot de passe invalide immédiatement)'
+        required: true
+        default: ''
+      verifier_migrate:
+        description: 'Déclencher la migration après rotation pour valider la connexion'
+        type: boolean
+        required: false
+        default: true
+
+permissions: {}
+
+jobs:
+  rotation:
+    if: ${{ github.event.inputs.confirmer == 'ROTATION' }}
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: green-moon-61901921
+      REPO: ${{ github.repository }}
+    outputs:
+      statut: ${{ steps.resume.outputs.statut }}
+    steps:
+      - name: Découvrir la branche de production et le rôle propriétaire
+        run: |
+          set -euo pipefail
+          API="https://console.neon.tech/api/v2"
+          AUTH="Authorization: Bearer ${NEON_API_KEY}"
+          BRANCH=$(curl -sf -H "$AUTH" "$API/projects/$NEON_PROJECT_ID/branches" \
+            | jq -r '.branches[] | select(.default==true) | .id')
+          ROLE=$(curl -sf -H "$AUTH" \
+            "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/roles" \
+            | jq -r '[.roles[].name] | if . | index("neondb_owner") then "neondb_owner" else .[0] end')
+          if [ -z "$BRANCH" ] || [ -z "$ROLE" ]; then
+            echo "KO : branche ou rôle introuvable sur le projet $NEON_PROJECT_ID"; exit 1
+          fi
+          echo "Branche production : $BRANCH — rôle : $ROLE"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+          echo "ROLE=$ROLE" >> "$GITHUB_ENV"
+
+      - name: Réinitialiser le mot de passe (rotation)
+        run: |
+          set -euo pipefail
+          API="https://console.neon.tech/api/v2"
+          RESP=$(curl -sf -X POST \
+            -H "Authorization: Bearer ${NEON_API_KEY}" \
+            -H "Content-Type: application/json" \
+            "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/roles/$ROLE/reset_password" \
+            -d '{}')
+          URI=$(echo "$RESP" | jq -r '.connection_uri // .connection_string // empty')
+          if [ -z "$URI" ]; then
+            echo "KO : la réponse de rotation ne contient pas d'URI"; exit 1
+          fi
+          # Masquage systématique (URI complète ET mot de passe seul)
+          echo "::add-mask::$URI"
+          PASSWD=$(printf '%s' "$URI" | sed -n 's|^[a-z]*://[^:]*:\([^@]*\)@.*|\1|p')
+          [ -n "$PASSWD" ] && echo "::add-mask::$PASSWD"
+          # URI pooled pour le runtime Vercel : hôte « -pooler » + pgbouncer
+          URI_POOLED=$(printf '%s' "$URI" \
+            | sed -E 's|\.aws\.neon\.tech(/|$)|-pooler.aws.neon.tech\1|')
+          URI_POOLED="${URI_POOLED%%\?*}?sslmode=require"
+          echo "::add-mask::$URI_POOLED"
+          # Écriture dans des fichiers temporaires (jamais en env global de job)
+          echo "$URI"      > /tmp/uri_direct.txt
+          echo "$URI_POOLED" > /tmp/uri_pooled.txt
+          chmod 600 /tmp/uri_direct.txt /tmp/uri_pooled.txt
+          echo "Rotation effectuée : nouvelle URI directe et pooled générées (masquées)."
+
+      - name: Mettre à jour le secret GitHub DATABASE_URL (connexion directe)
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_WRITER }}
+        run: |
+          set -euo pipefail
+          gh secret set DATABASE_URL --repo "$REPO" --body "$(cat /tmp/uri_direct.txt)"
+          echo "Secret GitHub DATABASE_URL mis à jour (connexion directe, sans -pooler)."
+          rm -f /tmp/uri_direct.txt
+
+      - name: Mettre à jour les variables Vercel (si VERCEL_TOKEN configuré)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          GH_TOKEN: ${{ secrets.GH_SECRETS_WRITER }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN}" ] || [ -z "${VERCEL_PROJECT_ID}" ]; then
+            echo "════════════════════════════════════════════════════════════"
+            echo "ACTION MANUELLE REQUISE (aucun VERCEL_TOKEN/VERCEL_PROJECT_ID) :"
+            echo "  1. Vercel → Settings → Environment Variables → DATABASE_URL"
+            echo "     → coller l'URI POOLED ci-dessous (masquée dans les logs :"
+            echo "     récupérez-la dans Neon Console → Dashboard → Connection"
+            echo "     Details, mot de passe déjà rotaté)."
+            echo "  2. Redéployer l'application (Deployments → Redeploy)."
+            echo "     Sans cela, l'application ne peut plus accéder à la base."
+            echo "  3. Pour automatiser à la prochaine rotation : ajouter les"
+            echo "     secrets VERCEL_TOKEN et VERCEL_PROJECT_ID sur ce dépôt."
+            echo "════════════════════════════════════════════════════════════"
+            rm -f /tmp/uri_pooled.txt
+            exit 0
+          fi
+          VALUE=$(cat /tmp/uri_pooled.txt)
+          echo "::add-mask::$VALUE"
+          # Mettre à jour DATABASE_URL sur production/preview/development
+          ENV_IDS=$(curl -sf -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env" \
+            | jq -r '.envs[] | select(.key=="DATABASE_URL") | "\(.id) \(.target|join(","))"' || true)
+          if [ -z "$ENV_IDS" ]; then
+            echo "DATABASE_URL n'existe pas encore côté Vercel — création (production)."
+            curl -sf -X POST -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env" \
+              -d "{\"key\":\"DATABASE_URL\",\"value\":\"$VALUE\",\"target\":[\"production\"]}" \
+              > /dev/null
+          else
+            while read -r ENV_ID TARGETS; do
+              [ -z "$ENV_ID" ] && continue
+              curl -sf -X PATCH -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$ENV_ID?upsert=true" \
+                -d "{\"value\":\"$VALUE\",\"target\":$(echo "$TARGETS" | tr ',' '\n' | jq -R . | jq -s .)}" \
+                > /dev/null && echo "DATABASE_URL mise à jour (cible : $TARGETS)."
+            done <<< "$ENV_IDS"
+          fi
+          rm -f /tmp/uri_pooled.txt
+          echo "⚠️ Un REDEPLOY Vercel est nécessaire pour prendre effet."
+          echo "   (ou laissez le prochain deploy le faire — à coordonner)"
+
+      - name: Valider la connectivité (migration)
+        if: ${{ github.event.inputs.verifier_migrate == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_WRITER }}
+        run: |
+          set -euo pipefail
+          gh workflow run "Migration base de données" --repo "$REPO" \
+            --ref "${{ github.ref_name }}" || \
+            echo "Déclenchement migrate impossible (vérifiez manuellement)."
+          echo "Migration déclenchée : vérifiez son run pour confirmer la connexion."
+
+      - name: Résumé
+        id: resume
+        run: |
+          echo "statut=Rotation Neon effectuée : secret GitHub DATABASE_URL mis à jour" >> "$GITHUB_OUTPUT"
+          echo "✅ Rotation terminée. Consultez les étapes ci-dessus pour l'état Vercel."
