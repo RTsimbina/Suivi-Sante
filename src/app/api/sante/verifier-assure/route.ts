@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { verifierAssureSchema } from '@/lib/validation';
+import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { enNombre, sommer, Decimal, appliquerTaux, reliquat as calculerReliquat } from '@/lib/money';
 
 export async function POST(request: NextRequest) {
@@ -55,10 +56,13 @@ export async function POST(request: NextRequest) {
     // ── 2. Vérifier que l'assuré est actif ──
     const estActif = assure.actif;
 
-    // ── 3. Récupérer les barèmes de la société ──
-    const baremes = await db.bareme.findMany({
-      where: { societeId: assure.societeId, active: true },
+    // ── 3. Récupérer les barèmes EN VIGUEUR de la société (P1 : dédupliqués
+    // par prestation — les versions historiques ne gonflent ni le plafond
+    // global ni la consommation par acte) ──
+    const toutesVersions = await db.bareme.findMany({
+      where: { societeId: assure.societeId, supprime: false },
     });
+    const baremes = dedupliquerEnVigueur(toutesVersions, new Date());
 
     // Plafond annuel global = somme EXACTE des plafonds de prestation (plan P3)
     const plafondAnnuelGlobal = sommer(baremes.map(b => b.plafond));

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import type { ParamValeurs, QuestionDef } from '../types';
 import { AssistantError } from '../types';
+import { filtreEnVigueur } from '@/lib/baremes-validite';
 import {
   resultatNombre, resultatTableau, resultatListe, resultatVide,
   round2, enNombre, fmtNb, LIMITE_LISTE,
@@ -179,9 +180,9 @@ export const questionsTechnique: QuestionDef[] = [
     presentation: 'NOMBRE',
     note: 'Actes présents dans au moins un barème (paramétrage réel de la plateforme).',
     async impl() {
-      const rows = await db.bareme.groupBy({ by: ['prestation'] });
+      const rows = await db.bareme.groupBy({ by: ['prestation'], where: filtreEnVigueur() });
       return resultatNombre(T('Actes médicaux paramétrés'), rows.length,
-        `${fmtNb(rows.length)} acte(s) médical/aux distinct(s) paramétré(s) dans les barèmes.`);
+        `${fmtNb(rows.length)} acte(s) médical/aux distinct(s) paramétré(s) dans les barèmes en vigueur.`);
     },
   },
   {
@@ -194,7 +195,7 @@ export const questionsTechnique: QuestionDef[] = [
     async impl() {
       const rows = await db.bareme.groupBy({
         by: ['prestation'],
-        where: { active: true },
+        where: filtreEnVigueur(),
         _count: { societeId: true },
       });
       if (rows.length === 0) return resultatVide(T('Actes actifs'));
@@ -221,6 +222,7 @@ export const questionsTechnique: QuestionDef[] = [
     async impl() {
       const rows = await db.bareme.groupBy({
         by: ['prestation'],
+        where: filtreEnVigueur(),
         _count: { societeId: true },
         _avg: { tauxCouverture: true, plafond: true },
       });
@@ -254,9 +256,9 @@ export const questionsTechnique: QuestionDef[] = [
     presentation: 'LISTE',
     async impl() {
       const [total, baremes] = await Promise.all([
-        db.bareme.count({ where: { active: true } }),
+        db.bareme.count({ where: filtreEnVigueur() }),
         db.bareme.findMany({
-          where: { active: true },
+          where: filtreEnVigueur(),
           orderBy: [{ societe: { nom: 'asc' } }, { prestation: 'asc' }],
           take: LIMITE_LISTE,
           select: {
@@ -296,9 +298,9 @@ export const questionsTechnique: QuestionDef[] = [
       const societeId = params.SOCIETE;
       if (!societeId) throw new AssistantError('Société requise.');
       const baremes = await db.bareme.findMany({
-        where: { societeId },
+        where: { societeId, ...filtreEnVigueur() },
         orderBy: { prestation: 'asc' },
-        select: { prestation: true, tauxCouverture: true, plafond: true, active: true },
+        select: { prestation: true, tauxCouverture: true, plafond: true, active: true, version: true },
       });
       if (baremes.length === 0) return resultatVide(T('Barèmes de la société'));
       return resultatListe(
@@ -313,7 +315,7 @@ export const questionsTechnique: QuestionDef[] = [
           acte: b.prestation,
           taux: Math.round(enNombre(b.tauxCouverture) * 100),
           plafond: round2(b.plafond),
-          actif: b.active ? 'Oui' : 'Non',
+          actif: `Oui (v${b.version})`,
         })),
         baremes.length,
         `${baremes.length} barème(s) paramétré(s) pour cette société.`
@@ -338,7 +340,7 @@ export const questionsTechnique: QuestionDef[] = [
       const societeIds = liaisons.map((l) => l.societeId);
       if (societeIds.length === 0) return resultatVide(T('Actes disponibles pour le prestataire'));
       const baremes = await db.bareme.findMany({
-        where: { societeId: { in: societeIds }, active: true },
+        where: { societeId: { in: societeIds }, ...filtreEnVigueur() },
         select: { prestation: true, societe: { select: { nom: true } } },
         orderBy: { prestation: 'asc' },
       });
@@ -376,7 +378,7 @@ export const questionsTechnique: QuestionDef[] = [
       const acte = params.ACTE;
       if (!acte) throw new AssistantError('Acte requis.');
       const baremes = await db.bareme.findMany({
-        where: { prestation: acte, active: true },
+        where: { prestation: acte, ...filtreEnVigueur() },
         select: { societeId: true },
       });
       const societeIds = [...new Set(baremes.map((b) => b.societeId))];
@@ -526,7 +528,7 @@ export const questionsTechnique: QuestionDef[] = [
       const societes = await db.societe.findMany({
         select: {
           id: true, nom: true,
-          _count: { select: { baremes: true } },
+          _count: { select: { baremes: { where: { supprime: false } } } },
           modeCalculAppelFonds: { select: { id: true } },
         },
         orderBy: { nom: 'asc' },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { enNombre, versDecimal } from '@/lib/money';
+import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { PARENT_TYPES, PARENT_LABELS } from '@/lib/prestations';
 import {
   resoudreIdentitePortailPrestataire,
@@ -38,11 +39,13 @@ export async function GET(request: NextRequest) {
       orderBy: { societe: { nom: 'asc' } },
     });
 
-    // Barèmes de ses sociétés clientes (un seul appel, regroupé ensuite).
+    // Barèmes de ses sociétés clientes (un seul appel, dédupliqué ensuite).
+    // P1 : une version par (société, prestation) — la version EN VIGUEUR.
     const societeIds = conventions.map(c => c.societe.id);
-    const baremes = societeIds.length
-      ? await db.bareme.findMany({ where: { societeId: { in: societeIds } } })
+    const toutesVersions = societeIds.length
+      ? await db.bareme.findMany({ where: { societeId: { in: societeIds }, supprime: false } })
       : [];
+    const baremes = dedupliquerEnVigueur(toutesVersions, new Date());
 
     const baremesParSociete = new Map<string, Map<string, (typeof baremes)[number]>>();
     for (const b of baremes) {

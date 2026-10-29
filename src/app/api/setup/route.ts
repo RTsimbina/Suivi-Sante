@@ -351,11 +351,18 @@ CREATE TABLE IF NOT EXISTS "Bareme" (
     "plafond" DOUBLE PRECISION NOT NULL,
     "description" TEXT,
     "active" BOOLEAN NOT NULL DEFAULT true,
+    "valideDu" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "valideAu" TIMESTAMP(3),
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "supprime" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "Bareme_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "Bareme_societeId_prestation_key" ON "Bareme"("societeId", "prestation");
+-- P1 : unicité par VERSION (l'ancienne clé societeId+prestation empêchait le
+-- versionnement) + index de sélection datée.
+CREATE UNIQUE INDEX IF NOT EXISTS "Bareme_societeId_prestation_version_key" ON "Bareme"("societeId", "prestation", "version");
+CREATE INDEX IF NOT EXISTS "Bareme_societeId_prestation_valideDu_idx" ON "Bareme"("societeId", "prestation", "valideDu");
 
 CREATE TABLE IF NOT EXISTS "ImportDossier" (
     "id" TEXT NOT NULL,

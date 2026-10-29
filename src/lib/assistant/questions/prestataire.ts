@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { AssistantContext, ParamValeurs, QuestionDef } from '../types';
 import { AssistantError } from '../types';
 import { resolvePeriode } from '../periods';
+import { filtreEnVigueur } from '@/lib/baremes-validite';
 import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
@@ -428,7 +429,7 @@ export const questionsPrestataire: QuestionDef[] = [
       }).then((rows) => rows.map((r) => r.societeId));
       if (societeIds.length === 0) return resultatVide(T('Barèmes applicables'));
       const baremes = await db.bareme.findMany({
-        where: { societeId: { in: societeIds }, active: true },
+        where: { societeId: { in: societeIds }, ...filtreEnVigueur() },
         include: { societe: { select: { nom: true } } },
         orderBy: [{ societe: { nom: 'asc' } }, { prestation: 'asc' }],
         take: LIMITE_LISTE,
@@ -475,7 +476,7 @@ export const questionsPrestataire: QuestionDef[] = [
       }).then((rows) => rows.map((r) => r.societeId));
       if (societeIds.length === 0) return resultatVide(T(`Tarif de l\u2019acte ${acte}`));
       const baremes = await db.bareme.findMany({
-        where: { societeId: { in: societeIds }, prestation: acte, active: true },
+        where: { societeId: { in: societeIds }, prestation: acte, ...filtreEnVigueur() },
         include: { societe: { select: { nom: true } } },
         orderBy: { societe: { nom: 'asc' } },
         take: LIMITE_LISTE,
@@ -509,7 +510,7 @@ export const questionsPrestataire: QuestionDef[] = [
       const societeId = await societeAutoriseePrestataire(ctx, params);
       if (!societeId) throw new AssistantError('Société requise.');
       const baremes = await db.bareme.findMany({
-        where: { societeId, active: true },
+        where: { societeId, ...filtreEnVigueur() },
         select: { prestation: true, tauxCouverture: true, plafond: true },
         orderBy: { prestation: 'asc' },
       });

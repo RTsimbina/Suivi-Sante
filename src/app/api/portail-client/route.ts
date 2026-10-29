@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 import { enNombre, sommer } from '@/lib/money';
+import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
 import type { Prisma } from '@prisma/client';
 import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
@@ -157,10 +158,13 @@ export async function GET(request: NextRequest) {
         take: 100,
       });
 
-      // Récupérer les barèmes de la société
-      const baremes = await db.bareme.findMany({
-        where: { societeId: assure.societeId, active: true },
+      // Récupérer les barèmes EN VIGUEUR de la société (P1 : une version par
+      // prestation — les versions historiques restent consultables côté
+      // gestion mais ne dupliquent pas les garanties du portail client)
+      const toutesVersions = await db.bareme.findMany({
+        where: { societeId: assure.societeId, supprime: false },
       });
+      const baremes = dedupliquerEnVigueur(toutesVersions, new Date());
 
       // Stats rapides — sommes EXACTES en Decimal (plan P3)
       const totalDossiers = dossiers.length;

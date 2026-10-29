@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { getParentType } from '@/lib/prestations';
+import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { enNombre, minDecimal, appliquerTaux, moins, superieurA } from '@/lib/money';
 
 /**
@@ -42,16 +43,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ exclusions: [], summary: { depassements: 0, exclusions: 0, rejetes: 0, montantNonCouvert: 0 } });
     }
 
-    // 2. Récupérer tous les barèmes actifs, groupés par societeId
-    const allBaremes = await db.bareme.findMany({
-      where: { active: true },
-      select: {
-        societeId: true,
-        prestation: true,
-        tauxCouverture: true,
-        plafond: true,
-      },
-    });
+    // 2. Récupérer les barèmes EN VIGUEUR, groupés par societeId (P1 :
+    // dédupliqués — une seule version par (société, prestation) ; l'analyse
+    // porte sur la tarification courante des dossiers traités).
+    const allBaremes = dedupliquerEnVigueur(
+      await db.bareme.findMany({
+        where: { supprime: false },
+        select: {
+          societeId: true,
+          prestation: true,
+          tauxCouverture: true,
+          plafond: true,
+          active: true,
+          valideDu: true,
+          valideAu: true,
+          version: true,
+        },
+      }),
+      new Date(),
+    );
 
     // Index : baremesBySociete[societeId][prestation] = { tauxCouverture, plafond }
     const baremesBySociete: Record<string, Record<string, { tauxCouverture: number; plafond: number }>> = {};

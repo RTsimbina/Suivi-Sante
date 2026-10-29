@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { simulerActeSchema } from '@/lib/validation';
+import { trouverBaremeValide, dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, reliquat as calculerReliquat, formaterAr, formaterNombre, formaterPourcent } from '@/lib/money';
 
 export async function POST(request: NextRequest) {
@@ -51,9 +52,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Récupérer le barème pour ce type d'acte
-    const bareme = await db.bareme.findFirst({
-      where: { societeId: assure.societeId, prestation: typeActe, active: true },
+    // Récupérer le barème VALIDE À LA DATE DU JOUR (P1 — simulation courante)
+    const bareme = await trouverBaremeValide(db, {
+      societeId: assure.societeId,
+      prestation: typeActe,
+      date: new Date(),
     });
 
     if (!bareme) {
@@ -85,7 +88,10 @@ export async function POST(request: NextRequest) {
     const reliquatActe = calculerReliquat(bareme.plafond, consommeActe) ?? new Decimal(0);
 
     // Calculer la consommation globale
-    const baremes = await db.bareme.findMany({ where: { societeId: assure.societeId, active: true } });
+    // P1 : plafond global = barèmes EN VIGUEUR (une version par prestation,
+    // dédupliquée) — les versions historiques ne doivent pas le multiplier.
+    const toutesVersions = await db.bareme.findMany({ where: { societeId: assure.societeId, supprime: false } });
+    const baremes = dedupliquerEnVigueur(toutesVersions, new Date());
     const plafondGlobal = sommer(baremes.map(b => b.plafond));
 
     const dossiersGlobal = await db.dossier.findMany({

@@ -404,7 +404,15 @@ describe('Garde d ambiguïté de la liaison e-mail PRESTATAIRE', () => {
 describe('GET /api/portail-prestataire/baremes — isolation', () => {
   it('barèmes limités aux conventions du prestataire connecté', async () => {
     dbMocks.baremeFindMany.mockResolvedValue([
-      { id: 'b1', societeId: 'soc-A', prestation: 'CONSULTATION', tauxCouverture: 80, plafond: '50000', description: null, active: true },
+      {
+        id: 'b1', societeId: 'soc-A', prestation: 'CONSULTATION',
+        tauxCouverture: 80, plafond: '50000', description: null, active: true,
+        // P1 : validité datée + versionnement (v1 en cours)
+        valideDu: new Date('2020-01-01T00:00:00Z'),
+        valideAu: null,
+        version: 1,
+        supprime: false,
+      },
     ]);
     const res = await GET_BAREMES(requete('/api/portail-prestataire/baremes'));
     expect(res.status).toBe(200);

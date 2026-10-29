@@ -3,6 +3,7 @@ import { callLLM } from './llm';
 import { getPrestationLabel, getParentType } from './prestations';
 import { enNombre, sommer, moins, minDecimal, appliquerTaux, formaterAr, formaterNombre, superieurA, inferieurA } from './money';
 import { DOSSIER_STATUTS } from './statuts';
+import { estValideALaDate } from './baremes-validite';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type CanalBot = 'WHATSAPP' | 'TELEGRAM' | 'MESSENGER';
@@ -279,7 +280,8 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
         select: {
           id: true, nom: true,
           baremes: {
-            where: { active: true },
+            where: { active: true, supprime: false },
+            orderBy: [{ valideDu: 'asc' }, { version: 'asc' }],
             },
         },
       },
@@ -330,8 +332,18 @@ async function expliquerCalcul(numero: string, expediteurId: string): Promise<st
   }
 
   // 3. Recherche du barème applicable (match parent type or sous-type)
-  const bareme = dossier.societe.baremes.find(b => b.prestation === dossier.typeDossier)
-    || dossier.societe.baremes.find(b => b.prestation === getParentType(dossier.typeDossier));
+  // P1 : la version retenue est celle VALIDE À LA DATE DE LA PRESTATION
+  // (dossier.dateSoins, à défaut dateReception) — la plus récente couvrant
+  // la date ; repli : la version en cours (comportement historique).
+  const datePrestationDossier = dossier.dateSoins ?? dossier.dateReception ?? new Date();
+  const parPrestation = (prestation: string) =>
+    dossier.societe.baremes
+      .filter((b) => b.prestation === prestation && estValideALaDate(b, datePrestationDossier))
+      .sort((a, b) => b.valideDu.getTime() - a.valideDu.getTime() || b.version - a.version)[0]
+    ?? dossier.societe.baremes.find((b) => b.prestation === prestation && b.valideAu === null)
+    ?? dossier.societe.baremes.find((b) => b.prestation === prestation);
+  const bareme = parPrestation(dossier.typeDossier)
+    || parPrestation(getParentType(dossier.typeDossier));
   if (bareme) {
     reponse += '\n─────────────────────';
     reponse += `\nBarème applicable (${getPrestationLabel(dossier.typeDossier)}) :`;

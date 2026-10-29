@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import type { AssistantContext, ParamValeurs, QuestionDef } from '../types';
 import { AssistantError } from '../types';
 import { resolvePeriode } from '../periods';
+import { filtreEnVigueur } from '@/lib/baremes-validite';
 import { extrairePeriode } from '../context';
 import {
   resultatNombre, resultatMontant, resultatTableau, resultatListe,
@@ -85,7 +86,7 @@ export const questionsAssure: QuestionDef[] = [
       const { societeId } = await scopeAssure(ctx);
       if (!societeId) return resultatVide(T('Mes garanties'));
       const baremes = await db.bareme.findMany({
-        where: { societeId, active: true },
+        where: { societeId, ...filtreEnVigueur() },
         orderBy: { prestation: 'asc' },
         take: LIMITE_LISTE,
       });
@@ -118,7 +119,7 @@ export const questionsAssure: QuestionDef[] = [
       const { societeId } = await scopeAssure(ctx);
       if (!societeId) return resultatVide(T('Actes couverts'));
       const baremes = await db.bareme.findMany({
-        where: { societeId, active: true },
+        where: { societeId, ...filtreEnVigueur() },
         select: { prestation: true, description: true },
         orderBy: { prestation: 'asc' },
         take: LIMITE_LISTE,
