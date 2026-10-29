@@ -166,6 +166,8 @@ export async function POST(request: NextRequest) {
               typeActe: existingDossier.typeDossier,
               montantDemande: enNombre(existingDossier.montantReclame) ?? 0,
               excludeDossierId: existingDossier.id,
+              // P1 : tarification à la date de prestation du dossier importé.
+              datePrestation: existingDossier.dateSoins ?? existingDossier.dateReception,
             });
 
             if (!plafondResult.autorise) {

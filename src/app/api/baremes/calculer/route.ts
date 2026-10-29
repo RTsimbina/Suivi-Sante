@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { baremeCalculerSchema } from "@/lib/validation";
+import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { enNombre, appliquerTaux, moins, inferieurOuEgal, formaterAr, formaterNombre } from "@/lib/money";
 
 /**
@@ -31,10 +32,12 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const { societeId, prestation, montantReclame } = parsed.data;
 
-    // Récupérer le barème avec le nom de la société
-    const bareme = await db.bareme.findUnique({
-      where: { societeId_prestation: { societeId, prestation } },
-      include: { societe: { select: { nom: true } } },
+    // Récupérer le barème VALIDE À LA DATE DE LA PRESTATION (P1) — défaut :
+    // maintenant (simulation courante).
+    const bareme = await trouverBaremeValide(db, {
+      societeId,
+      prestation,
+      date: new Date(),
     });
 
     if (!bareme || !bareme.active) {
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
         societeId,
         prestation,
         montantReclame,
-        message: `Aucun barème actif trouvé pour cette prestation dans cette société.`,
+        message: `Aucun barème valide trouvé pour cette prestation dans cette société à la date du jour.`,
       });
     }
 
@@ -73,12 +76,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       found: true,
       societeId,
-      societeNom: bareme.societe?.nom,
+      societeNom: (bareme as unknown as { societe?: { nom: string } }).societe?.nom,
       prestation,
       bareme: {
         tauxCouverture: bareme.tauxCouverture,
         plafond: bareme.plafond,
         description: bareme.description,
+        version: bareme.version,
+        valideDu: bareme.valideDu,
+        valideAu: bareme.valideAu,
       },
       montantReclame,
       montantCouvert,

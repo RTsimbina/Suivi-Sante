@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { verifierPlafondAnnuel, type PlafondCheckResult } from '@/lib/plafond-check';
+import { trouverBaremeValide } from '@/lib/baremes-validite';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { techniqueBaremeSchema } from '@/lib/validation';
 import { Decimal, enNombre, superieurA, minDecimal, appliquerTaux, moins, formaterNombre } from '@/lib/money';
@@ -37,20 +38,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rechercher le barème actif correspondant à la prestation
-    const bareme = await db.bareme.findUnique({
-      where: {
-        societeId_prestation: {
-          societeId,
-          prestation: prestation.toUpperCase(),
-        },
-      },
+    // Rechercher le barème VALIDE À LA DATE DE PRESTATION (P1) : version
+    // couvrant la période, vivante et administrativement active. La date
+    // optionnelle du corps est utilisée (simulation d'une prestation passée
+    // ou future) ; défaut : maintenant.
+    const datePrestation = parsed.data.datePrestation
+      ? new Date(parsed.data.datePrestation)
+      : new Date();
+    if (Number.isNaN(datePrestation.getTime())) {
+      return NextResponse.json(
+        { erreur: 'datePrestation invalide (format ISO attendu).' },
+        { status: 400 }
+      );
+    }
+    const bareme = await trouverBaremeValide(db, {
+      societeId,
+      prestation: prestation.toUpperCase(),
+      date: datePrestation,
     });
 
     if (!bareme) {
       return NextResponse.json(
         {
-          erreur: `Aucun barème trouvé pour la prestation "${prestation}" dans la société "${societe.nom}".`,
+          erreur: `Aucun barème trouvé pour la prestation "${prestation}" dans la société "${societe.nom}" à la date de la prestation.`,
           societe: { id: societe.id, nom: societe.nom },
         },
         { status: 404 }
@@ -70,6 +80,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Le plafond annuel est vérifié à la MÊME date de prestation que la
+    // sélection du barème (cohérence temporelle complète du calcul, P1).
+
     // ─── Vérification du plafond annuel (si assureId fourni) ────────────────
     let plafondCheck: PlafondCheckResult | null = null;
     // montantCouvertFinal reste en Decimal jusqu'aux conversions d'affichage
@@ -83,6 +96,7 @@ export async function POST(request: NextRequest) {
           typeActe: prestation.toUpperCase(),
           montantDemande: montantReclame,
           prestataireId: prestataireId || undefined,
+          datePrestation,
         });
 
         // Si le plafond annuel est vérifié, utiliser le montant couvert
@@ -139,6 +153,12 @@ export async function POST(request: NextRequest) {
         tauxCouverture: bareme.tauxCouverture,
         plafond: bareme.plafond,
         description: bareme.description ?? null,
+        // ─── P1 : traçabilité de la version utilisée pour ce calcul ────────
+        id: bareme.id,
+        version: bareme.version,
+        valideDu: bareme.valideDu,
+        valideAu: bareme.valideAu,
+        datePrestation,
       },
       calcul: {
         montantReclame,

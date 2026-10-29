@@ -15,6 +15,7 @@
 
 import { db } from './db';
 import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, plus, reliquat as calculerReliquat, formaterAr, formaterPourcent } from './money';
+import { dedupliquerEnVigueur, trouverBaremeValide, type BaremeDated } from './baremes-validite';
 
 /** Taux de consommation en % : consommé / plafond × 100 (Decimal exact). */
 function tauxConsommation(consomme: Decimal, plafond: Decimal): Decimal | null {
@@ -50,6 +51,15 @@ export interface PlafondCheckResult {
     reliquatGlobal?: number | null;
     nbActesIdentiques?: number;
     prestataireActifPourSociete?: boolean;
+    /** Version du barème appliquée (P1) — figée sur le dossier au calcul. */
+    baremeApplique?: {
+      id: string;
+      version: number;
+      tauxCouverture: number;
+      plafond: string;
+      valideDu: string;
+      valideAu: string | null;
+    } | null;
   };
   /** Alertes info/warning (non bloquantes) */
   alertes: { type: 'info' | 'warning' | 'danger'; message: string }[];
@@ -68,6 +78,8 @@ export interface PlafondCheckResult {
  *   - prestataireId : optionnel, vérifie si le prestataire est actif pour cette société
  *   - excludeDossierId : optionnel, exclure un dossier de la consommation
  *     (utile lors de la mise à jour d'un dossier existant)
+ *   - datePrestation : optionnel (P1) — date à laquelle le tarif doit être
+ *     valide (dossier.dateSoins, à défaut dateReception). Défaut : maintenant.
  */
 export async function verifierPlafondAnnuel(opts: {
   assureId?: string;
@@ -76,8 +88,10 @@ export async function verifierPlafondAnnuel(opts: {
   montantDemande: number;
   prestataireId?: string;
   excludeDossierId?: string;
+  datePrestation?: Date;
 }): Promise<PlafondCheckResult> {
   const { assureId, societeId, typeActe, montantDemande, prestataireId, excludeDossierId } = opts;
+  const datePrestation = opts.datePrestation ?? new Date();
 
   // ─── 1. Récupérer l'assuré (si fourni) ───────────────────────────────────
   let assureActif = true;
@@ -125,19 +139,33 @@ export async function verifierPlafondAnnuel(opts: {
   }
 
   // ─── 3. Récupérer le barème ───────────────────────────────────────────────
-  const bareme = await db.bareme.findFirst({
-    where: { societeId, prestation: typeActe, active: true },
+  const bareme: BaremeDated | null = await trouverBaremeValide(db, {
+    societeId,
+    prestation: typeActe,
+    date: datePrestation,
   });
 
   if (!bareme) {
     return {
       autorise: false,
       raison: 'ACTE_NON_COVERT',
-      message: `L'acte "${typeActe}" n'est pas couvert par un barème actif pour cette société.`,
+      message: `L'acte "${typeActe}" n'est pas couvert par un barème valide pour cette société à la date de la prestation.`,
       details: { prestation: typeActe },
       alertes: [],
     };
   }
+
+  // Version appliquée, sérialisée pour la traçabilité (P1, point 8) : les
+  // appelants (création de dossier) figent ces valeurs sur le dossier pour
+  // que le montant calculé reste justifiable après évolution du barème.
+  const baremeApplique = {
+    id: bareme.id,
+    version: bareme.version,
+    tauxCouverture: bareme.tauxCouverture,
+    plafond: String(bareme.plafond),
+    valideDu: bareme.valideDu.toISOString(),
+    valideAu: bareme.valideAu ? bareme.valideAu.toISOString() : null,
+  };
 
   // ─── 4. Calculer la consommation annuelle ────────────────────────────────
   const debutAnnee = new Date(new Date().getFullYear(), 0, 1);
@@ -182,8 +210,11 @@ export async function verifierPlafondAnnuel(opts: {
     dossiersGlobal.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
   );
 
-  // Plafond global = somme de tous les barèmes actifs de la société
-  const baremes = await db.bareme.findMany({ where: { societeId, active: true } });
+  // Plafond global = somme des barèmes EN VIGUEUR à la date de référence
+  // (une seule version par combinaison — dédupliquée, P1) : sans
+  // déduplication, les versions historiques multiplieraient le plafond.
+  const toutesVersions = await db.bareme.findMany({ where: { societeId, supprime: false } });
+  const baremes = dedupliquerEnVigueur(toutesVersions, datePrestation);
   const plafondGlobal = sommer(baremes.map(b => b.plafond));
   const reliquatGlobal = calculerReliquat(plafondGlobal, consommeGlobal) ?? new Decimal(0);
 
@@ -206,6 +237,7 @@ export async function verifierPlafondAnnuel(opts: {
         plafondGlobal: enNombre(plafondGlobal),
         consommeGlobal: enNombre(consommeGlobal),
         reliquatGlobal: enNombre(reliquatGlobal),
+        baremeApplique,
       },
       alertes: [{
         type: 'danger',
@@ -292,6 +324,7 @@ export async function verifierPlafondAnnuel(opts: {
       consommeGlobal: enNombre(consommeGlobal),
       reliquatGlobal: enNombre(reliquatGlobal),
       nbActesIdentiques: dossiersActe.length,
+      baremeApplique,
     },
     alertes,
   };

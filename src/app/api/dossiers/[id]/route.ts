@@ -91,6 +91,8 @@ export async function PATCH(
             montantDemande: enNombre(existing.montantReclame) ?? 0,
             prestataireId: prestataireId || existing.prestataireId || undefined,
             excludeDossierId: id,
+            // P1 : tarification à la date de la prestation du dossier.
+            datePrestation: existing.dateSoins ?? existing.dateReception,
           });
 
           // Bloquer si plafond épuisé
@@ -158,6 +160,8 @@ export async function PATCH(
           typeActe: existing.typeDossier,
           montantDemande: newMontantValide,
           excludeDossierId: id,
+          // P1 : tarification à la date de la prestation du dossier.
+          datePrestation: existing.dateSoins ?? existing.dateReception,
         });
         if (!plafondRecheck.autorise &&
             ['PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT'].includes(plafondRecheck.raison)) {

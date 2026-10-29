@@ -9,6 +9,7 @@ import {
 } from "@/lib/data-isolation";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
+import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { sommer, superieurOuEgal, enNombre, appliquerTaux, moins } from "@/lib/money";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { dossierCreateSchema } from "@/lib/validation";
@@ -154,12 +155,15 @@ export async function POST(request: NextRequest) {
     // Ce contrôle est le même que simuler-acte, appliqué automatiquement.
     let plafondResult: PlafondCheckResult | null = null;
     if (assureId && societeId && typeDossier && montantReclame) {
+      // P1 : le contrôle de plafond utilise la version du barème valide À LA
+      // DATE DE LA PRESTATION (dateSoins, à défaut dateReception).
       plafondResult = await verifierPlafondAnnuel({
         assureId,
         societeId,
         typeActe: typeDossier,
         montantDemande: montantReclame,
         prestataireId: prestataireId || undefined,
+        datePrestation: dateSoins ?? dateReception,
       });
 
       // Bloquer si le plafond est atteint (assuré inactif, plafond acte/global épuisé)
@@ -227,6 +231,15 @@ export async function POST(request: NextRequest) {
       finalTicketModerateur = enNombre(moins(montantCouvert, finalMontantValide)) ?? 0;
     }
 
+    // ─── P1 : référence du barème à FIGER sur le dossier ───────────────────
+    // Le dossier conserve la version exacte utilisée au calcul (id, taux,
+    // plafond, période) : le montant reste justifiable même après évolution
+    // ou retrait du barème. Aucune rétroactivité sur les dossiers existants.
+    // Préférence : la version sélectionnée par le contrôle de plafond (même
+    // date de prestation) ; à défaut, celle relue dans la transaction.
+    let baremeReference: NonNullable<PlafondCheckResult['details']['baremeApplique']> | null =
+      plafondResult?.details.baremeApplique ?? null;
+
     // Transaction : numéro de dossier généré côté serveur, verrou FOR UPDATE
     // sur le barème (sérialise les créations concurrentes d'un même plafond)
     // et re-vérification du plafond — le tout ATOMIQUE. En cas de collision
@@ -241,7 +254,21 @@ export async function POST(request: NextRequest) {
       db.$transaction(async (tx) => {
         // Re-vérifier le plafond dans la transaction
         if (assureId && societeId && typeDossier && montantReclame) {
-          const baremeTx = await tx.bareme.findFirst({ where: { societeId, prestation: typeDossier, active: true } });
+          const baremeTx = await trouverBaremeValide(tx, {
+            societeId,
+            prestation: typeDossier,
+            date: dateSoins ?? dateReception,
+          });
+          if (baremeTx && !baremeReference) {
+            baremeReference = {
+              id: baremeTx.id,
+              version: baremeTx.version,
+              tauxCouverture: baremeTx.tauxCouverture,
+              plafond: String(baremeTx.plafond),
+              valideDu: baremeTx.valideDu.toISOString(),
+              valideAu: baremeTx.valideAu ? baremeTx.valideAu.toISOString() : null,
+            };
+          }
           if (baremeTx) {
             // FOR UPDATE : la 2e transaction concurrente attend le commit de
             // la 1re, puis relit un total consommé à jour (READ COMMITTED)
@@ -283,6 +310,13 @@ export async function POST(request: NextRequest) {
         nSS: nSS ?? null,
         prestataireId: prestataireId ?? null,
         dateSoins: dateSoins ?? null,
+        // ─── P1 : justification du remboursement (version du barème figée) ──
+        baremeId: baremeReference?.id ?? null,
+        baremePrestation: baremeReference ? typeDossier : null,
+        baremeTaux: baremeReference?.tauxCouverture ?? null,
+        baremePlafond: baremeReference?.plafond ?? null,
+        baremeValideDu: baremeReference ? new Date(baremeReference.valideDu) : null,
+        baremeValideAu: baremeReference?.valideAu ? new Date(baremeReference.valideAu) : null,
         moyenPaiement: moyenPaiement ?? null,
         observations: observations ?? null,
         statut: "RECU",

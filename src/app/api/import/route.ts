@@ -216,6 +216,8 @@ export async function POST(request: NextRequest) {
                 societeId: societe.id,
                 typeActe: typeDossier || 'CONSULTATION',
                 montantDemande: montantReclame,
+                // P1 : tarification à la date de réception de la ligne importée.
+                datePrestation: dateReception ?? new Date(),
               });
 
               if (!plafondResult.autorise) {
