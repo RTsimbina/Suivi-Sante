@@ -129,6 +129,18 @@ model Dossier {
   ticketModerateur          Decimal?   @db.Decimal(18, 2)
   partPatient               Decimal?   @db.Decimal(18, 2)
   partEntreprise            Decimal?   @db.Decimal(18, 2)
+  // ─── Référence du barème appliqué (P1 « Validité datée ») ────────────────
+  // Fige la VERSION du barème utilisée au calcul du remboursement, avec les
+  // valeurs nécessaires à la justification du montant (taux, plafond,
+  // période de validité). Capturé à la création du dossier ; NULL pour les
+  // dossiers antérieurs au correctif (jamais rétroactif). La capture des
+  // valeurs rend la justification immédiate même si le barème évolue.
+  baremeId                  String?    // version du barème appliquée
+  baremePrestation          String?    // dénormalisé : prestation visée
+  baremeTaux                Float?     // taux appliqué au calcul
+  baremePlafond             Decimal?   @db.Decimal(18, 2)
+  baremeValideDu            DateTime?  // période de validité de la version
+  baremeValideAu            DateTime?
   gestionnaireTechniqueId   String?
   gestionnaireTechnique     Gestionnaire? @relation("GestionnaireTechnique", fields: [gestionnaireTechniqueId], references: [id])
   motifRejet                String?
@@ -195,11 +207,27 @@ model Bareme {
   tauxCouverture  Float
   plafond         Decimal  @db.Decimal(18, 2)
   description     String?
+  // Statut ADMINISTRATIF (suspension/réactivation par l'opérateur) —
+  // DISTINCT de la validité temporelle ci-dessous (P1 « Validité datée »).
   active          Boolean  @default(true)
+  // ─── Validité datée + versionnement (P1) ────────────────────────────────
+  // valideDu : début de validité OBLIGATOIRE (backfill migration = createdAt,
+  // doc : un barème est réputé valide depuis sa création initiale).
+  // valideAu : fin de validité FACULTATIVE — NULL = version en cours.
+  // version  : n° de version par combinaison (societeId, prestation) — une
+  //   modification de taux/plafond CLÔTURE la version courante (valideAu =
+  //   veille du nouveau début) et CRÉE une nouvelle version : les anciens
+  //   taux ne sont jamais écrasés, les remboursements passés restent
+  //   justifiables. Aucun hard-delete : flag supprime.
+  valideDu        DateTime @default(now())
+  valideAu        DateTime?
+  version         Int      @default(1)
+  supprime        Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([societeId, prestation])
+  @@unique([societeId, prestation, version])
+  @@index([societeId, prestation, valideDu])
 }
 
 model ImportDossier {
