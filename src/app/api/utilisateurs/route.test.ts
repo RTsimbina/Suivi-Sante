@@ -251,6 +251,46 @@ describe('POST /api/utilisateurs — liaison des rôles externes', () => {
   });
 });
 
+describe('PRESTATAIRE — garde d ambiguïté de la liaison (miroir SPEC-6)', () => {
+  const PAYLOAD_PRESTATAIRE = {
+    email: 'groupe@presta.mg',
+    nom: 'Clinique Groupe',
+    password: 'motdepasse1',
+    role: 'PRESTATAIRE',
+  };
+
+  it('POST 409 si l e-mail est partagé par plusieurs fiches prestataire', async () => {
+    dbMocks.prestataireFindMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
+    const res = await POST(requetePost(PAYLOAD_PRESTATAIRE));
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.erreur).toMatch(/ambigu/i);
+    expect(dbMocks.utilisateurCreate).not.toHaveBeenCalled();
+  });
+
+  it('POST 201 si l e-mail ne porte que sur une seule fiche', async () => {
+    dbMocks.prestataireFindMany.mockResolvedValue([{ id: 'p1' }]);
+    const res = await POST(requetePost(PAYLOAD_PRESTATAIRE));
+    expect(res.status).toBe(201);
+    expect(dbMocks.utilisateurCreate).toHaveBeenCalled();
+  });
+
+  it('PUT 409 si le nouvel e-mail d un compte PRESTATAIRE devient ambigu', async () => {
+    dbMocks.utilisateurFindUnique.mockImplementation(
+      async (args: { where: { id?: string; email?: string } }) => {
+        if (args.where.id) {
+          return { id: 'u-prest', email: 'ancien@presta.mg', nom: 'Clinique', role: 'PRESTATAIRE', actif: true };
+        }
+        return null; // unicité e-mail côté comptes : OK
+      }
+    );
+    dbMocks.prestataireFindMany.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
+    const res = await PUT(requetePut({ id: 'u-prest', email: 'groupe@presta.mg' }));
+    expect(res.status).toBe(409);
+    expect(dbMocks.utilisateurUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('PUT /api/utilisateurs — liaison des rôles externes', () => {
   const EXISTANT_INTERNE = { id: 'u1', email: 'agent@exemple.com', nom: 'Agent', role: 'ACCUEIL', actif: true };
   const EXISTANT_PORTAIL = { id: 'u2', email: 'client@exemple.com', nom: 'Client', role: 'PORTAIL_CLIENT', actif: true };

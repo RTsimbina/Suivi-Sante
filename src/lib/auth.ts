@@ -4,7 +4,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import { compare } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
-import { resoudreLiaisonPrestataire } from '@/lib/liaison-prestataire';
+import { resoudreLiaisonPrestataireAvecControle } from '@/lib/liaison-prestataire';
 import { getClientIp } from '@/lib/rate-limit';
 import {
   evaluateLoginAttempt,
@@ -173,9 +173,17 @@ export const authOptions: NextAuthOptions = {
           }
         } else if (user.role === 'PRESTATAIRE') {
           // Résoudre la fiche Prestataire par e-mail (liaison par facturation).
-          const liaison = await resoudreLiaisonPrestataire(emailLiaison);
-          if (liaison) {
+          // Garde d'ambiguïté : un e-mail partagé par plusieurs fiches (exception
+          // de doublon validée) ne produit AUCUNE liaison dans le token — le
+          // portail refusera (403) tant que l'ambiguïté n'est pas corrigée.
+          const liaison = await resoudreLiaisonPrestataireAvecControle(emailLiaison);
+          if (liaison.statut === 'OK') {
             prestataireId = liaison.prestataireId;
+          } else if (liaison.statut === 'AMBIGU') {
+            console.warn(
+              `[AUTH] Compte PRESTATAIRE "${user.email}" : e-mail partagé par ${liaison.nbFiches} fiches ` +
+              `Prestataire — liaison refusée (fail-closed). Corriger les fiches (GESTION → Prestataires).`
+            );
           } else {
             console.warn(
               `[AUTH] Compte PRESTATAIRE "${user.email}" : aucun Prestataire en base avec cet e-mail. ` +

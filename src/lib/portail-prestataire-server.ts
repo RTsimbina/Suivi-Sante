@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
-import { resoudreLiaisonPrestataire } from '@/lib/liaison-prestataire';
+import { resoudreLiaisonPrestataireAvecControle } from '@/lib/liaison-prestataire';
 import { ERREUR_SANS_PRESTATAIRE } from '@/lib/data-isolation';
 
 export interface IdentitePrestataire {
@@ -86,9 +86,25 @@ export async function resoudreIdentitePortailPrestataire(
 
   // Re-résolution par e-mail si le token ne porte pas la liaison
   // (session ouverte avant la création/correction de la fiche).
+  // Garde d'ambiguïté : un e-mail partagé par plusieurs fiches (exception de
+  // doublon validée par un admin) rend la liaison imprévisible — REFUS
+  // fail-closed plutôt que service silencieux d'une fiche incertaine.
   if (!prestataireId && emailToken) {
-    const liaison = await resoudreLiaisonPrestataire(emailToken);
-    prestataireId = liaison?.prestataireId;
+    const liaison = await resoudreLiaisonPrestataireAvecControle(emailToken);
+    if (liaison.statut === 'AMBIGU') {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            erreur:
+              `Votre e-mail est partagé par plusieurs fiches prestataire : la liaison de votre compte est ambiguë. ` +
+              `Demandez la correction des fiches (GESTION → Prestataires) — un e-mail distinct par établissement.`,
+          },
+          { status: 403 }
+        ),
+      };
+    }
+    prestataireId = liaison.statut === 'OK' ? liaison.prestataireId : undefined;
   }
 
   if (!prestataireId) {
@@ -128,15 +144,28 @@ export async function resoudreIdentitePortailPrestataire(
   }
 
   // Ancrer l'identité : la fiche doit exister (id périmé → re-résolution par
-  // e-mail). Si l'ancrage est impossible, 403 actionnable — jamais de service
-  // de données sans identité vérifiée.
+  // e-mail, avec la même garde d'ambiguïté). Si l'ancrage est impossible,
+  // 403 actionnable — jamais de service de données sans identité vérifiée.
   let fiche = await db.prestataire.findUnique({
     where: { id: prestataireId },
     select: { id: true },
   });
   if (!fiche && emailToken) {
-    const liaison = await resoudreLiaisonPrestataire(emailToken);
-    if (liaison && liaison.prestataireId !== prestataireId) {
+    const liaison = await resoudreLiaisonPrestataireAvecControle(emailToken);
+    if (liaison.statut === 'AMBIGU') {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          {
+            erreur:
+              `Votre e-mail est partagé par plusieurs fiches prestataire : la liaison de votre compte est ambiguë. ` +
+              `Demandez la correction des fiches (GESTION → Prestataires) — un e-mail distinct par établissement.`,
+          },
+          { status: 403 }
+        ),
+      };
+    }
+    if (liaison.statut === 'OK' && liaison.prestataireId !== prestataireId) {
       fiche = await db.prestataire.findUnique({
         where: { id: liaison.prestataireId },
         select: { id: true },

@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { logParametreChange, getUserInfoFromRequest } from '@/lib/audit-log';
 import { liaisonContactEntrepriseExiste } from '@/lib/liaison-externe';
-import { liaisonPrestataireExiste } from '@/lib/liaison-prestataire';
+import { liaisonPrestataireExiste, resoudreLiaisonPrestataireAvecControle } from '@/lib/liaison-prestataire';
 import { parseJsonBody } from '@/lib/validation/parse';
 import {
   utilisateurCreateSchema,
@@ -62,6 +62,29 @@ function erreurLiaisonExterne(role: string, email: string): string {
     return `Aucun prestataire n'a l'e-mail « ${email} » : ce compte Prestataire afficherait une erreur de liaison. Saisissez cet e-mail sur la fiche du prestataire dans GESTION → Prestataires (champ Adresse e-mail), ou corrigez l'e-mail saisi.`;
   }
   return `Aucun contact d'entreprise n'a l'e-mail « ${email} » : ce compte Contact Entreprise afficherait une erreur de liaison. Saisissez cet e-mail comme « Contact principal » dans Modifier la société, sélectionnez la société ci-dessous, ou créez le contact dans Sociétés → Contacts.`;
+}
+
+/**
+ * PRESTATAIRE — garde d'ambiguïté de la liaison (miroir SPEC-6 des sociétés) :
+ * un e-mail partagé par plusieurs fiches (exception de doublon validée par un
+ * administrateur, ex. groupe d'établissements) rendrait la liaison portail
+ * imprévisible — la résolution prend silencieusement la fiche la plus ancienne.
+ * Refus 409 : l'admin corrige les fiches (e-mail distinct par établissement)
+ * ou choisit un e-mail présent sur une seule fiche.
+ */
+async function refuserSiLiaisonPrestataireAmbigue(
+  email: string
+): Promise<NextResponse | null> {
+  const controlee = await resoudreLiaisonPrestataireAvecControle(email);
+  if (controlee.statut !== 'AMBIGU') return null;
+  return NextResponse.json(
+    {
+      erreur:
+        `L'e-mail « ${email} » est partagé par ${controlee.nbFiches} fiches prestataire : la liaison du portail serait ambiguë (fiche la plus ancienne, sans garantie d'être la bonne). ` +
+        `Corrigez les fiches dans GESTION → Prestataires (un e-mail distinct par établissement) ou utilisez un e-mail présent sur une seule fiche.`,
+    },
+    { status: 409 }
+  );
 }
 
 /**
@@ -274,6 +297,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // PRESTATAIRE : la liaison existe mais ne doit pas être ambiguë (409).
+    if (role === 'PRESTATAIRE') {
+      const refus = await refuserSiLiaisonPrestataireAmbigue(emailTrimmed);
+      if (refus) return refus;
+    }
+
     // Hasher le mot de passe
     const hashedPassword = await hash(password, 12);
 
@@ -411,6 +440,12 @@ export async function PUT(request: NextRequest) {
             { status: 422 }
           );
         }
+      }
+
+      // PRESTATAIRE : la liaison (re)validée ne doit pas être ambiguë (409).
+      if (roleFinal === 'PRESTATAIRE') {
+        const refus = await refuserSiLiaisonPrestataireAmbigue(emailFinal);
+        if (refus) return refus;
       }
     }
 

@@ -37,6 +37,7 @@ const jwtMocks = vi.hoisted(() => ({ getToken: vi.fn() }));
 const dbMocks = vi.hoisted(() => ({
   prestataireFindUnique: vi.fn(),
   prestataireFindFirst: vi.fn(),
+  prestataireFindMany: vi.fn(),
   prestataireSocieteFindMany: vi.fn(),
   dossierCount: vi.fn(),
   dossierFindMany: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('@/lib/db', () => ({
     prestataire: {
       findUnique: dbMocks.prestataireFindUnique,
       findFirst: dbMocks.prestataireFindFirst,
+      findMany: dbMocks.prestataireFindMany,
     },
     prestataireSociete: { findMany: dbMocks.prestataireSocieteFindMany },
     dossier: {
@@ -94,15 +96,6 @@ const CONVENTIONS_A = [{
   societe: { id: 'soc-A', nom: 'Société A' },
 }];
 
-const LIGNE_FACTURE = (over: Record<string, unknown>) => ({
-  id: 'd1', numeroDossier: 'DOS-2026-000101', dateReception: new Date('2026-03-10T09:00:00Z'),
-  datePaiement: null, referencePaiement: null, statut: 'VALIDE',
-  montantReclame: '100000', montantValide: null, montantPaye: null,
-  typeDossier: 'CONSULTATION_SIMPLE',
-  societe: { id: 'soc-A', nom: 'Société A' },
-  ...over,
-});
-
 function requete(path: string): NextRequest {
   return new Request(`http://localhost${path}`) as unknown as NextRequest;
 }
@@ -112,6 +105,7 @@ beforeEach(() => {
   jwtMocks.getToken.mockResolvedValue(TOKEN_A);
   dbMocks.prestataireFindUnique.mockResolvedValue(FICHE_A);
   dbMocks.prestataireFindFirst.mockResolvedValue({ id: PREST_A });
+  dbMocks.prestataireFindMany.mockResolvedValue([{ id: PREST_A, createdAt: new Date('2020-01-01') }]);
   dbMocks.prestataireSocieteFindMany.mockResolvedValue(CONVENTIONS_A);
   dbMocks.dossierCount.mockResolvedValue(0);
   dbMocks.dossierFindMany.mockResolvedValue([]);
@@ -206,7 +200,7 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
 
   it('FAIL-CLOSED : compte PRESTATAIRE sans fiche rattachée → 403 actionnable', async () => {
     jwtMocks.getToken.mockResolvedValue({ id: 'uX', role: 'PRESTATAIRE', email: 'orphelin@x.mg' });
-    dbMocks.prestataireFindFirst.mockResolvedValue(null);
+    dbMocks.prestataireFindMany.mockResolvedValue([]); // aucune fiche ne porte cet e-mail
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(403);
     const body = await res.json();
@@ -217,13 +211,13 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
     jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg' });
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(200);
-    expect(dbMocks.prestataireFindFirst).toHaveBeenCalled();
+    expect(dbMocks.prestataireFindMany).toHaveBeenCalled(); // résolution contrôlée par e-mail
   });
 
   it('id périmé (fiche supprimée) + liaison irretrouvable → 403 (jamais 200 vide)', async () => {
     jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg', prestataireId: 'prest-mort' });
     dbMocks.prestataireFindUnique.mockResolvedValue(null);
-    dbMocks.prestataireFindFirst.mockResolvedValue(null);
+    dbMocks.prestataireFindMany.mockResolvedValue([]); // re-résolution impossible
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(403);
   });
@@ -273,47 +267,137 @@ describe('GET /api/portail-prestataire/actes — isolation', () => {
 });
 
 describe('GET /api/portail-prestataire/factures — isolation', () => {
-  it('factures = dossiers de règlement prestataire DU prestataire connecté', async () => {
-    dbMocks.dossierFindMany.mockResolvedValue([]);
-    await GET_FACTURES(requete('/api/portail-prestataire/factures'));
-    const where = dbMocks.dossierFindMany.mock.calls[0][0].where;
-    expect(where.prestataireId).toBe(PREST_A);
-    expect(where.categorieDossier).toBe('REGLEMENT_PRESTATAIRE');
+  // Ligne renvoyée par la requête SQL de page (statut dérivé EN BASE).
+  const LIGNE_SQL = (over: Record<string, unknown> = {}) => ({
+    id: 'r1', numeroDossier: 'DOS-2026-000101',
+    dateReception: new Date('2026-03-10T09:00:00Z'), datePaiement: null,
+    referencePaiement: null, statut: 'VALIDE',
+    montantReclame: '100000', montantValide: null, montantPaye: null,
+    typeDossier: 'CONSULTATION_SIMPLE', statutFacture: 'VALIDEE', solde: '100000',
+    societeId: 'soc-A', societeNom: 'Société A', total: 1,
+    ...over,
   });
 
-  it('filtre statut dérivé : statutFacture=REGLEE ne renvoie que les réglées', async () => {
-    dbMocks.dossierFindMany.mockResolvedValue([
-      LIGNE_FACTURE({ id: 'r1', statut: 'PAYE', montantReclame: '100000', montantPaye: '100000' }),
-      LIGNE_FACTURE({ id: 'r2', statut: 'VALIDE', montantReclame: '200000', montantValide: '160000' }),
-      LIGNE_FACTURE({ id: 'r3', statut: 'VALIDE', montantReclame: '300000', montantValide: '240000', montantPaye: '100000' }),
-      LIGNE_FACTURE({ id: 'r4', statut: 'REJETE', montantReclame: '50000' }),
-    ]);
+  const TOTAUX_SQL = (over: Record<string, unknown> = {}) => [
+    { totalFacture: '100000', totalRegle: '0', totalSolde: '100000', ...over },
+  ];
+
+  /** Simule les DEUX requêtes SQL (page avec COUNT(*) OVER, totaux avec SUM). */
+  const simulerSql = (lignes: Record<string, unknown>[], totaux = TOTAUX_SQL()) => {
+    dbMocks.dossierQueryRaw.mockImplementation(async (sql: { strings: string[] }) => {
+      const texte = sql.strings.join('?');
+      return texte.includes('SUM(') ? totaux : lignes;
+    });
+  };
+
+  it('factures = dossiers de règlement prestataire DU prestataire connecté (SQL paramétré)', async () => {
+    simulerSql([LIGNE_SQL()]);
+    const res = await GET_FACTURES(requete('/api/portail-prestataire/factures'));
+    expect(res.status).toBe(200);
+    expect(dbMocks.dossierQueryRaw).toHaveBeenCalled();
+    for (const call of dbMocks.dossierQueryRaw.mock.calls) {
+      const sql = call[0] as { strings: string[]; values: unknown[] };
+      const texte = sql.strings.join('?');
+      expect(texte).toContain('"prestataireId" =');
+      expect(texte).toContain("'REGLEMENT_PRESTATAIRE'");
+      expect(sql.values).toContain(PREST_A);
+      expect(sql.values).not.toContain(PREST_B);
+    }
+  });
+
+  it('filtre statut dérivé appliqué EN BASE (paramètre lié, liste blanche)', async () => {
+    simulerSql([LIGNE_SQL({ statutFacture: 'REGLEE', statut: 'PAYE', montantPaye: '100000', solde: '0' })]);
     const res = await GET_FACTURES(requete('/api/portail-prestataire/factures?statutFacture=REGLEE'));
     expect(res.status).toBe(200);
+    for (const call of dbMocks.dossierQueryRaw.mock.calls) {
+      const sql = call[0] as { strings: string[]; values: unknown[] };
+      expect(sql.strings.join('?')).toContain('WHERE "statutFacture" =');
+      expect(sql.values).toContain('REGLEE');
+    }
     const body = await res.json();
-    expect(body.pagination.total).toBe(1);
-    expect(body.factures[0].id).toBe('r1');
     expect(body.factures[0].statutFacture).toBe('REGLEE');
+    expect(body.factures[0].statutFactureLabel).toBe('Réglée');
     expect(body.totaux.montantFacture).toBe(100000);
   });
 
-  it('sans filtre : les 4 statuts dérivés sont corrects', async () => {
-    dbMocks.dossierFindMany.mockResolvedValue([
-      LIGNE_FACTURE({ id: 'r1', statut: 'RECU' }),
-      LIGNE_FACTURE({ id: 'r2', statut: 'EN_ANALYSE' }),
-      LIGNE_FACTURE({ id: 'r3', statut: 'VALIDE', montantReclame: '300000', montantValide: '240000', montantPaye: '100000' }),
-      LIGNE_FACTURE({ id: 'r4', statut: 'REJETE' }),
-    ]);
-    const res = await GET_FACTURES(requete('/api/portail-prestataire/factures'));
+  it('statut dérivé invalide → filtre ignoré (jamais interpolé brut)', async () => {
+    simulerSql([LIGNE_SQL()]);
+    const res = await GET_FACTURES(requete('/api/portail-prestataire/factures?statutFacture=PIRATE'));
+    expect(res.status).toBe(200);
+    for (const call of dbMocks.dossierQueryRaw.mock.calls) {
+      expect(sqlTexte(call)).not.toContain('WHERE "statutFacture"');
+    }
+  });
+
+  it('pagination EN BASE (OFFSET/LIMIT bornés) + total exact de l ensemble filtré', async () => {
+    simulerSql([LIGNE_SQL({ total: 201 })]);
+    const res = await GET_FACTURES(requete('/api/portail-prestataire/factures?page=3&limit=999'));
+    expect(res.status).toBe(200);
+    const sql = sqlTexte(dbMocks.dossierQueryRaw.mock.calls[0]);
+    expect(sql).toContain('OFFSET');
+    expect(sql).toContain('LIMIT');
+    const valeurs = (dbMocks.dossierQueryRaw.mock.calls[0][0] as { values: unknown[] }).values;
+    expect(valeurs).toContain(100); // (3-1) × limite bornée à 50
+    expect(valeurs).toContain(50);  // borne max
     const body = await res.json();
-    expect(body.factures.map((f: { statutFacture: string }) => f.statutFacture))
-      .toEqual(['SOUMISE', 'EN_TRAITEMENT', 'PARTIELLEMENT_REGLEE', 'REJETEE']);
+    expect(body.pagination.total).toBe(201);
+    expect(body.pagination.totalPages).toBe(Math.ceil(201 / 50));
+  });
+
+  it('la dérivation SQL conserve la précédence de deriveStatutFacture (tripwire)', async () => {
+    simulerSql([]);
+    await GET_FACTURES(requete('/api/portail-prestataire/factures'));
+    const sql = sqlTexte(dbMocks.dossierQueryRaw.mock.calls[0]);
+    // REJETEE préempte tout, puis PARTIELLEMENT_REGLEE, puis REGLEE
+    const posRejetee = sql.indexOf("THEN 'REJETEE'");
+    const posPartielle = sql.indexOf("THEN 'PARTIELLEMENT_REGLEE'");
+    const posReglee = sql.indexOf("THEN 'REGLEE'");
+    expect(posRejetee).toBeGreaterThan(-1);
+    expect(posPartielle).toBeGreaterThan(posRejetee);
+    expect(posReglee).toBeGreaterThan(posPartielle);
+    // dû = COALESCE(validé, réclamé, 0) — même définition que montantDu()
+    expect(sql).toContain('COALESCE(d."montantValide", d."montantReclame", 0)');
   });
 
   it('?prestataireId=B → 403, aucune requête DB', async () => {
     const res = await GET_FACTURES(requete(`/api/portail-prestataire/factures?prestataireId=${PREST_B}`));
     expect(res.status).toBe(403);
+    expect(dbMocks.dossierQueryRaw).not.toHaveBeenCalled();
+  });
+});
+
+/** Concatène le SQL d'un appel $queryRaw (strings + placeholders unifiés). */
+function sqlTexte(call: unknown[]): string {
+  return (call[0] as { strings: string[] }).strings.join('?');
+}
+
+// ─── Garde d'ambiguïté de la liaison e-mail (miroir SPEC-6 sociétés) ────────
+
+describe('Garde d ambiguïté de la liaison e-mail PRESTATAIRE', () => {
+  it('portail : token sans prestataireId + e-mail partagé par 2 fiches → 403 fail-closed', async () => {
+    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'groupe@presta.mg' });
+    dbMocks.prestataireFindMany.mockResolvedValue([
+      { id: PREST_A, createdAt: new Date('2020-01-01') },
+      { id: PREST_B, createdAt: new Date('2021-01-01') },
+    ]);
+    const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.erreur).toMatch(/ambigu/i);
+    // Aucune donnée servie tant que la liaison est ambiguë
     expect(dbMocks.dossierFindMany).not.toHaveBeenCalled();
+    expect(dbMocks.dossierQueryRaw).not.toHaveBeenCalled();
+    // Ne révèle aucune identité de fiche
+    expect(JSON.stringify(body)).not.toContain(PREST_A);
+    expect(JSON.stringify(body)).not.toContain(PREST_B);
+  });
+
+  it('portail : e-mail unique → auto-réparation par e-mail conservée', async () => {
+    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg' });
+    dbMocks.prestataireFindMany.mockResolvedValue([{ id: PREST_A, createdAt: new Date('2020-01-01') }]);
+    const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
+    expect(res.status).toBe(200);
+    expect(dbMocks.prestataireFindUnique).toHaveBeenCalled(); // ancrage sur la fiche résolue
   });
 });
 
