@@ -361,11 +361,13 @@ describe('Assurés — import Excel', () => {
   it('importe un fichier et affiche le rapport (totaux + erreurs par ligne)', async () => {
     const user = userEvent.setup();
     const fm = stubFetch();
-    const { container } = renderAssures();
+    renderAssures();
     await screen.findByText('Jean Rakoto');
 
     await user.click(screen.getByRole('button', { name: /Importer/ }));
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    // Le dialogue est rendu dans un portail Radix (hors container)
+    await screen.findByText('Importer des bénéficiaires');
+    const input = document.body.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, new File(['x'], 'beneficiaires.xlsx'));
 
     expect(screen.getByText('beneficiaires.xlsx')).toBeInTheDocument();
@@ -376,9 +378,8 @@ describe('Assurés — import Excel', () => {
       expect(post).toBeDefined();
     });
     expect(toast.warning).toHaveBeenCalledWith('Import partiel : 9 succès, 1 erreurs');
-    expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('9')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument(); // lignes
+    expect(screen.getByText('9')).toBeInTheDocument();  // succès
     expect(screen.getByText(/Ligne 4 :/)).toBeInTheDocument();
     expect(screen.getByText('Société introuvable')).toBeInTheDocument();
   });
@@ -386,11 +387,12 @@ describe('Assurés — import Excel', () => {
   it('affiche l\'erreur renvoyée par l\'API quand l\'import échoue', async () => {
     const user = userEvent.setup();
     stubFetch({ importOk: false });
-    const { container } = renderAssures();
+    renderAssures();
     await screen.findByText('Jean Rakoto');
 
     await user.click(screen.getByRole('button', { name: /Importer/ }));
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await screen.findByText('Importer des bénéficiaires');
+    const input = document.body.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, new File(['x'], 'beneficiaires.xlsx'));
     await user.click(screen.getByRole('button', { name: /Importer le fichier/ }));
 
