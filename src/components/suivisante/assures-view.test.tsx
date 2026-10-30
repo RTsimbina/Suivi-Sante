@@ -21,7 +21,17 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: v
 
 const societes = [{ id: 's1', nom: 'CNAPS' }, { id: 's2', nom: 'MNS' }];
 
-function assure(p: Partial<typeof assures[number]> & { id: string; nom: string }) {
+type AssureTest = {
+  id: string; nom: string; prenom: string | null; nSS: string | null;
+  matricule: string | null; typeBeneficiaire: string; assurePrincipalId: string | null;
+  codeFamille: string | null; dateNaissance: string | null; sexe: string | null;
+  dateEffet: string | null; bareme: number | null; telephone: string | null;
+  email: string | null; adresse: string | null; actif: boolean;
+  societe: { id: string; nom: string }; _count: { dossiers: number };
+  createdAt: string; updatedAt: string;
+};
+
+function assure(p: Partial<AssureTest> & { id: string; nom: string }): AssureTest {
   return {
     prenom: null, nSS: null, matricule: null, typeBeneficiaire: 'ASSURE',
     assurePrincipalId: null, codeFamille: null, dateNaissance: null, sexe: null,
@@ -31,7 +41,7 @@ function assure(p: Partial<typeof assures[number]> & { id: string; nom: string }
   };
 }
 
-const assures = [
+const assures: AssureTest[] = [
   assure({
     id: 'p1', nom: 'Rakoto', prenom: 'Jean', nSS: 'SS-001', matricule: '74735',
     codeFamille: 'Famille 12', dateNaissance: '1980-01-15T00:00:00Z', sexe: 'M',
@@ -41,7 +51,7 @@ const assures = [
   assure({ id: 'p2', nom: 'Randria', prenom: 'Be', matricule: '74740', _count: { dossiers: 0 } }),
 ];
 
-const ayantsDroitMap: Record<string, typeof assures> = {
+const ayantsDroitMap: Record<string, AssureTest[]> = {
   p1: [
     assure({
       id: 'ad1', nom: 'Rakoto', prenom: 'Rasoa', matricule: '74735-C',
