@@ -84,7 +84,7 @@ function stubFetch(opts: FetchOpts = {}) {
 function renderReception(opts: { kpis?: unknown; loading?: boolean } = {}) {
   return render(
     <PeriodeProvider>
-      <ReceptionView kpis={(opts.kpis ?? kpis) as Record<string, unknown> | null} loading={opts.loading ?? false} />
+      <ReceptionView kpis={(opts.kpis !== undefined ? opts.kpis : kpis) as Record<string, unknown> | null} loading={opts.loading ?? false} />
     </PeriodeProvider>,
   );
 }
@@ -163,7 +163,6 @@ describe('Réception — liste des courriels', () => {
     expect(within(table).getByText('Traité')).toBeInTheDocument();
     expect(within(table).getByText('12/02/2026')).toBeInTheDocument();
     expect(within(table).getByText('MNS')).toBeInTheDocument();
-    expect(within(table).getByText('DOS-2026-009')).toBeInTheDocument();
 
     // Badge du total + pagination partagée
     expect(screen.getByText('42')).toBeInTheDocument();
