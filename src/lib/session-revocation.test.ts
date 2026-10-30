@@ -176,14 +176,12 @@ describe('authorize() — connexion', () => {
     // Diagnostic temporaire : identifier le chemin de retour null en CI.
     console.log('[DEBUG authorize]', JSON.stringify({
       queryRawAppels: dbMock.$queryRaw.mock.calls.length,
-      queryRawRetour: dbMock.$queryRaw.mock.results[0]?.value,
       evaluateAppels: loginPolicyMock.evaluateLoginAttempt.mock.calls.length,
-      evaluateRetour: loginPolicyMock.evaluateLoginAttempt.mock.results[0]?.value,
-      lockoutAppels: lockoutMock.isLockedOut.mock.calls.length,
-      lockoutRetour: lockoutMock.isLockedOut.mock.results[0]?.value,
+      normalizeAppels: loginPolicyMock.normalizeEmail.mock.calls.length,
       compareAppels: bcryptMock.compare.mock.calls.length,
-      compareArgs: bcryptMock.compare.mock.calls[0]?.[1],
-      compareRetour: bcryptMock.compare.mock.results[0]?.value,
+      providerCles: Object.keys(provider),
+      authorizeType: typeof provider.authorize,
+      authorizeSrc: (provider.authorize as unknown as { toString(): string }).toString().slice(0, 300),
     }));
     expect(resultat).not.toBeNull();
     expect(resultat?.sessionVersion).toBe(3); // figée dans le JWT par le callback
