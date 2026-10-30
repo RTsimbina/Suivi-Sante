@@ -14,7 +14,7 @@
  *   (fail-closed 503), mode dégradé (colonne absente → actif seul).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import {
   estSessionRevoquee,
   verifierSessionUtilisateur,
@@ -81,23 +81,25 @@ describe('estSessionRevoquee — scénarios P1', () => {
 
 // ─── 2. Refus de connexion d'un utilisateur désactivé (authorize) ───────────
 
-describe('authorize() — connexion', () => {
-  // auth.ts est importé après les mocks (hoist).
-  beforeEach(() => {
-    vi.resetModules();
-  });
+// Mock '@/lib/db' PARTAGÉ au niveau module : vi.doMock persiste à travers
+// vi.resetModules() (le registre des mocks n'est PAS vidé), les describes
+// authorize() et authorizeRequest() réutilisent donc le MÊME enregistrement
+// et reconfigurent les vi.fn() selon le scénario.
+const dbMock = {
+  $queryRaw: vi.fn(),
+  $executeRaw: vi.fn(),
+  assure: { findFirst: vi.fn() },
+  entrepriseContact: { findFirst: vi.fn() },
+  // Relecture d'état du compte (verifierSessionUtilisateur / authorizeRequest)
+  utilisateur: { findUnique: vi.fn() },
+};
 
-  it('refuse la connexion d\'un utilisateur désactivé (actif=false)', async () => {
-    // vi.doMock + import dynamique : de simples vi.fn() suffisent (pas de
-    // vi.hoisted, qui serait hoisté au niveau module et entrerait en collision).
-    const dbMock = {
-      $queryRaw: vi.fn().mockResolvedValue([
-        { id: 'u1', email: 'desactive@exemple.com', nom: 'Désactivé', password: '$2a$12$x', role: 'ACCUEIL', actif: false, avatar: null },
-      ]),
-      $executeRaw: vi.fn().mockResolvedValue(1),
-      assure: { findFirst: vi.fn() },
-      entrepriseContact: { findFirst: vi.fn() },
-    };
+describe('authorize() — connexion', () => {
+  // Chaque test reconfigure les vi.fn() mutables. Aucun vi.hoisted
+  // (vi.hoisted hoisterait la déclaration au niveau module et entrerait en
+  // collision entre deux it).
+
+  beforeAll(() => {
     vi.doMock('@/lib/db', () => ({ db: dbMock }));
     vi.doMock('bcryptjs', () => ({ compare: vi.fn().mockResolvedValue(true), hash: vi.fn() }));
     vi.doMock('@/lib/login-policy', () => ({
@@ -116,6 +118,18 @@ describe('authorize() — connexion', () => {
     vi.doMock('@/lib/liaison-prestataire', () => ({
       resoudreLiaisonPrestataireAvecControle: vi.fn(),
     }));
+  });
+
+  beforeEach(() => {
+    vi.resetModules();
+    dbMock.$queryRaw.mockReset();
+    dbMock.$executeRaw.mockReset();
+  });
+
+  it('refuse la connexion d\'un utilisateur désactivé (actif=false)', async () => {
+    dbMock.$queryRaw.mockResolvedValue([
+      { id: 'u1', email: 'desactive@exemple.com', nom: 'Désactivé', password: '$2a$12$x', role: 'ACCUEIL', actif: false, avatar: null },
+    ]);
 
     const { authOptions } = await import('./auth');
     const provider = authOptions.providers[0] as { authorize: (c: unknown) => Promise<unknown> };
@@ -127,32 +141,10 @@ describe('authorize() — connexion', () => {
   });
 
   it('autorise la connexion d\'un utilisateur actif et fige sa sessionVersion', async () => {
-    const dbMock = {
-      $queryRaw: vi.fn().mockResolvedValue([
-        { id: 'u2', email: 'actif@exemple.com', nom: 'Actif', password: '$2a$12$x', role: 'ACCUEIL', actif: true, avatar: null, sessionVersion: 3 },
-      ]),
-      $executeRaw: vi.fn().mockResolvedValue(1),
-      assure: { findFirst: vi.fn() },
-      entrepriseContact: { findFirst: vi.fn() },
-    };
-    vi.doMock('@/lib/db', () => ({ db: dbMock }));
-    vi.doMock('bcryptjs', () => ({ compare: vi.fn().mockResolvedValue(true), hash: vi.fn() }));
-    vi.doMock('@/lib/login-policy', () => ({
-      evaluateLoginAttempt: vi.fn().mockResolvedValue({ allowed: true, reason: '', count: 0, resetSeconds: 0 }),
-      recordFailedLogin: vi.fn().mockResolvedValue(undefined),
-      resetLoginCounters: vi.fn().mockResolvedValue(undefined),
-      normalizeEmail: (e: string) => e.trim().toLowerCase(),
-    }));
-    vi.doMock('@/lib/account-lockout', () => ({
-      isLockedOut: vi.fn().mockResolvedValue({ locked: false, remainingMs: 0 }),
-      recordFailedAttempt: vi.fn().mockResolvedValue({ locked: false }),
-      resetAttempts: vi.fn().mockResolvedValue(undefined),
-      MAX_ATTEMPTS: 5,
-    }));
-    vi.doMock('@/lib/liaison-externe', () => ({ resoudreLiaisonContactEntreprise: vi.fn() }));
-    vi.doMock('@/lib/liaison-prestataire', () => ({
-      resoudreLiaisonPrestataireAvecControle: vi.fn(),
-    }));
+    dbMock.$queryRaw.mockResolvedValue([
+      { id: 'u2', email: 'actif@exemple.com', nom: 'Actif', password: '$2a$12$x', role: 'ACCUEIL', actif: true, avatar: null, sessionVersion: 3 },
+    ]);
+    dbMock.$executeRaw.mockResolvedValue(1);
 
     const { authOptions } = await import('./auth');
     const provider = authOptions.providers[0] as { authorize: (c: unknown) => Promise<unknown> };
@@ -252,32 +244,31 @@ describe('verifierSessionUtilisateur — relecture à chaque accès protégé', 
   });
 });
 
-// ─── 6. authorizeRequest — accès API protégé avec JWT obsolète ──────────────
+// ─── 6. authorizeRequest — accès API protégé avec JWT obsolète ─────────────
 
+// Le mock '@/lib/db' (enregistré dans le describe précédent, le registre des
+// vi.doMock persiste) est RÉUTILISÉ ici : seules les vi.fn() sont reconfigurées.
 describe('authorizeRequest — porte de révocation centralisée', () => {
+  const jwtMock = { getToken: vi.fn() };
+
+  beforeAll(() => {
+    vi.doMock('next-auth/jwt', () => jwtMock);
+  });
+
   beforeEach(() => {
     vi.resetModules();
+    jwtMock.getToken.mockReset();
+    dbMock.utilisateur.findUnique.mockReset();
   });
 
   async function chargerAuthorizeRequest(opts: {
     jeton: Record<string, unknown> | null;
     compte: Record<string, unknown> | null;
   }) {
-    // vi.doMock + import dynamique : vi.fn() simples (pas de vi.hoisted).
-    const jwtMock = { getToken: vi.fn() };
-    const dbMock = {
-      db: {
-        utilisateur: { findUnique: vi.fn() },
-        $queryRaw: vi.fn(),
-        $executeRaw: vi.fn(),
-      },
-    };
-    vi.doMock('next-auth/jwt', () => jwtMock);
-    vi.doMock('@/lib/db', () => dbMock);
     jwtMock.getToken.mockResolvedValue(opts.jeton);
-    dbMock.db.utilisateur.findUnique.mockResolvedValue(opts.compte);
+    dbMock.utilisateur.findUnique.mockReset().mockResolvedValue(opts.compte);
     const { authorizeRequest } = await import('./authorize');
-    return { authorizeRequest, jwtMock, dbMock };
+    return { authorizeRequest };
   }
 
   function requete(pathname: string) {
