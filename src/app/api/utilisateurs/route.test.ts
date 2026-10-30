@@ -33,7 +33,8 @@ const dbMocks = vi.hoisted(() => {
   };
   // Client db mocké : $transaction exécute le callback avec le même objet
   // (le tx partage les délégués — comportement Prisma simplifié pour tests).
-  const dbClient = {
+  // dbClient porte la STRUCTURE attendue par la route (db.utilisateur…).
+  const dbClient: Record<string, unknown> = {
     utilisateur: {
       findUnique: delegues.utilisateurFindUnique,
       findMany: delegues.utilisateurFindMany,
@@ -61,14 +62,16 @@ const dbMocks = vi.hoisted(() => {
       findMany: delegues.prestataireFindMany,
     },
   };
+  dbClient.$transaction = vi.fn((cb: (tx: unknown) => unknown) => cb(dbClient));
   return {
     ...delegues,
-    $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(dbClient)),
+    $transaction: dbClient.$transaction,
+    dbClient,
   };
 });
 
 vi.mock('@/lib/db', () => ({
-  db: dbMocks,
+  db: dbMocks.dbClient,
 }));
 
 vi.mock('@/lib/authorize', () => ({

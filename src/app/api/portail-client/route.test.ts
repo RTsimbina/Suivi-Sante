@@ -109,6 +109,7 @@ describe('GET /api/portail-client — authentification et rôles', () => {
 describe('GET /api/portail-client — mode PORTAIL_CLIENT', () => {
   it('auto-répare un token sans assureId via re-résolution par e-mail (liaison créée après connexion)', async () => {
     jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
       id: 'u1', role: 'PORTAIL_CLIENT', email: 'client@exemple.com', // pas d'assureId
     });
     dbMocks.assureFindFirst.mockResolvedValue({ id: 'assure-1', societeId: 'soc-1' });
@@ -130,6 +131,7 @@ describe('GET /api/portail-client — mode PORTAIL_CLIENT', () => {
 
   it('répare un assureId périmé (assuré supprimé puis recréé) au lieu de renvoyer 404', async () => {
     jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
       id: 'u1', role: 'PORTAIL_CLIENT', email: 'client@exemple.com', assureId: 'ancien-id',
     });
     // 1er findUnique (ancien-id) → introuvable ; 2e (nouveau-id) → trouvé
@@ -150,6 +152,7 @@ describe('GET /api/portail-client — mode PORTAIL_CLIENT', () => {
   it('403 actionnable avec e-mail recherché quand aucun assuré ne porte cet e-mail', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
       id: 'u1', role: 'PORTAIL_CLIENT', email: 'sans.liaison@exemple.com',
     });
     dbMocks.assureFindFirst.mockResolvedValue(null);
@@ -182,6 +185,7 @@ describe('GET /api/portail-client — mode PORTAIL_CLIENT', () => {
 describe('GET /api/portail-client — mode CONTACT_ENTREPRISE', () => {
   it('auto-répare un token sans societeId via le contact d\'entreprise', async () => {
     jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
       id: 'u2', role: 'CONTACT_ENTREPRISE', email: 'contact@entreprise.mg', // pas de societeId
     });
     dbMocks.contactFindFirst.mockResolvedValue({ societeId: 'soc-1' });
@@ -203,6 +207,7 @@ describe('GET /api/portail-client — mode CONTACT_ENTREPRISE', () => {
   it('403 actionnable quand aucun contact d\'entreprise ne porte cet e-mail', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
       id: 'u2', role: 'CONTACT_ENTREPRISE', email: 'orphelin@entreprise.mg',
     });
     dbMocks.contactFindFirst.mockResolvedValue(null);

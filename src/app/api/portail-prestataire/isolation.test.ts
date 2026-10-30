@@ -86,7 +86,7 @@ import { authorizeRequest } from '@/lib/authorize';
 const PREST_A = 'prest-A';
 const PREST_B = 'prest-B'; // identité d'AUTRUI (manipulée par A)
 
-const TOKEN_A = { id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg', prestataireId: PREST_A };
+const TOKEN_A = { id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg', prestataireId: PREST_A, sessionVersion: 1 };
 
 const FICHE_A = {
   id: PREST_A, nom: 'Clinique A', type: 'CLINIQUE', telephone: null, email: 'a@presta.mg',
