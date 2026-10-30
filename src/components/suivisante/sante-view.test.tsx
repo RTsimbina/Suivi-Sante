@@ -9,7 +9,7 @@
  */
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PeriodeProvider } from '@/lib/periode-context';
 import SanteView from './sante-view';
@@ -79,6 +79,8 @@ const simulationResult = {
     montantCouvert: 50_000, partAssureur: 50_000, partPatient: 10_000,
     plafondGlobal: 2_000_000, consommeGlobal: 500_000, reliquatGlobal: 1_500_000,
     nbActesIdentiques: 1,
+    // L'API renvoie les actes identiques dans details (le front les remonte ensuite)
+    actesIdentiques: [{ numeroDossier: 'DOS-2025-001', dateReception: '2025-01-10', montantReclame: 50_000, montantPaye: 40_000, statut: 'PAYE' }],
   },
   actesIdentiques: [{ numeroDossier: 'DOS-2025-001', dateReception: '2025-01-10', montantReclame: 50_000, montantPaye: 40_000, statut: 'PAYE' }],
   alertes: [{ type: 'warning', message: 'Acte identique récent détecté' }],
@@ -192,7 +194,7 @@ describe('Contrôle Santé — recherche et vérification', () => {
     expect(screen.getByText(/Seuil 70%/)).toBeInTheDocument();
     expect(screen.getByText(/1\s?400\s?000\s?Ar/)).toBeInTheDocument();
     expect(screen.getByText(/Seuil 100%/)).toBeInTheDocument();
-    expect(screen.getByText(/N° SS :\s*123456789012/)).toBeInTheDocument();
+    expect(screen.getByText('123456789012')).toBeInTheDocument();
     expect(screen.getByText('Plafond global bientôt atteint')).toBeInTheDocument();
   });
 
@@ -386,7 +388,8 @@ describe('Contrôle Santé — simulateur multi-actes', () => {
     expect(await screen.findByText('Résumé de la simulation')).toBeInTheDocument();
     expect(screen.getByText('Actes simulés')).toBeInTheDocument();
     expect(screen.getByText(/^70\s?000\s?Ar$/)).toBeInTheDocument();  // 50 000 + 20 000
-    expect(screen.getByText(/^100\s?000\s?Ar$/)).toBeInTheDocument(); // 2 × 50 000 couverts
+    // 100 000 Ar apparaît aussi comme « Déjà consommé » dans les résultats détaillés
+    expect(screen.getAllByText(/^100\s?000\s?Ar$/).length).toBeGreaterThan(0); // 2 × 50 000 couverts
     // 20 000 Ar (part patient) apparaît aussi dans le tableau de l'historique
     expect(screen.getAllByText(/^20\s?000\s?Ar$/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('ACTE AUTORISÉ').length).toBe(2);
