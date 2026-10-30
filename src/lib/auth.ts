@@ -52,6 +52,7 @@ interface UserRow {
   role: string;
   actif: boolean;
   avatar: string | null;
+  sessionVersion?: number;
 }
 
 async function findUserByEmail(email: string): Promise<UserRow | null> {
@@ -60,6 +61,18 @@ async function findUserByEmail(email: string): Promise<UserRow | null> {
     FROM "Utilisateur" WHERE "email" = ${email} LIMIT 1
   `;
   return rows[0] ?? null;
+}
+
+// ─── Version de session (P1 révocation) ────────────────────────────────────
+// Figée dans le JWT à la connexion ; comparée à la valeur du compte à chaque
+// accès protégé (src/lib/session-revocation.ts). Requête SÉPARÉE et
+// résiliente : si la colonne n'existe pas (base non migrée), le login
+// continue avec 0 (mode dégradé — l'état `actif` reste contrôlé partout).
+async function lireSessionVersion(userId: string): Promise<number> {
+  const rows = await db.$queryRaw<{ sessionVersion: number }[]>`
+    SELECT "sessionVersion" FROM "Utilisateur" WHERE id = ${userId} LIMIT 1
+  `.catch(() => []);
+  return rows[0]?.sessionVersion ?? 0;
 }
 
 async function updateLastLogin(userId: string) {
@@ -206,12 +219,18 @@ export const authOptions: NextAuthOptions = {
         // Mettre à jour la dernière connexion
         await updateLastLogin(user.id);
 
+        // P1 : figer la version de session au login — le JWT portera cette
+        // valeur ; toute désactivation/réactivation ultérieure (incrément)
+        // la rend invalide pour les accès protégés (révocation immédiate).
+        const sessionVersion = await lireSessionVersion(user.id);
+
         return {
           id: user.id,
           email: user.email,
           nom: user.nom,
           role: user.role,
           avatar: user.avatar,
+          sessionVersion,
           assureId,
           societeId,
           prestataireId,
@@ -238,6 +257,8 @@ export const authOptions: NextAuthOptions = {
         token.role = role;
         token.nom = (user as any).nom || (user as any).name || '';
         token.email = user.email || '';
+        // P1 : version de session figée au login (révocation côté serveur).
+        token.sessionVersion = (user as { sessionVersion?: number }).sessionVersion ?? 0;
         // Stocker les identifiants de portail pour les rôles externes
         const userAny = user as any;
         if (userAny.assureId) token.assureId = userAny.assureId;
@@ -337,6 +358,7 @@ declare module 'next-auth' {
     nom: string;
     role: string;
     avatar?: string | null;
+    sessionVersion?: number;
     assureId?: string;
     societeId?: string;
     prestataireId?: string;
@@ -350,6 +372,8 @@ declare module 'next-auth/jwt' {
     nom: string;
     role: string;
     avatar?: string | null;
+    /** P1 : figée au login, comparée à Utilisateur.sessionVersion à chaque accès protégé. */
+    sessionVersion?: number;
     assureId?: string;
     societeId?: string;
     prestataireId?: string;

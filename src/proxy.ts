@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
-import { matchPermission } from '@/lib/authorize';
+import { matchPermission } from '@/lib/api-permissions';
 import { enTeteEgalSecret } from '@/lib/mail/api-auth';
 import type { RoleType } from '@/lib/auth-context';
 
