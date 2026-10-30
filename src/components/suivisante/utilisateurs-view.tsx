@@ -1,415 +1,39 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  Users, Plus, Pencil, Trash2, Search, Loader2, X, Shield, Eye, EyeOff,
-  CheckCircle, XCircle, UserCog, Lock, Unlock, AlertTriangle, Info,
-} from 'lucide-react';
+/**
+ * Vue Gestion Utilisateurs (refactoring P2 : le monolithe de 798 lignes est
+ * découpé dans le dossier `utilisateurs/`).
+ *
+ * Rôle de cette page principale :
+ *  - orchestration : le hook useUtilisateursData centralise l'état et les
+ *    traitements (listing filtré, CRUD, activation, liaison en direct) ;
+ *  - affichage transverse : barre de filtres avec bouton de création ;
+ *  - délégation : statistiques (stats-cards), tableau (utilisateurs-table)
+ *    et formulaire (utilisateur-form-dialog).
+ */
+import { Search, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ROLES as ROLES_REFERENTIEL, ROLE_LABELS, ROLE_COLORS } from '@/lib/referentiels';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { toast } from 'sonner';
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface Utilisateur {
-  id: string;
-  email: string;
-  nom: string;
-  role: string;
-  roleLabel: string;
-  actif: boolean;
-  avatar: string | null;
-  dernierLogin: string | null;
-  failedAttempts: number | null;
-  lockoutUntil: string | null;
-  createdAt: string;
-  updatedAt: string;
-  // Rôles externes uniquement : true = assuré/contact avec cet e-mail trouvé,
-  // false = liaison manquante (le portail affichera une erreur), null = interne.
-  liaisonExterne?: boolean | null;
-}
-
-interface FormData {
-  email: string;
-  nom: string;
-  password: string;
-  role: string;
-  // CONTACT_ENTREPRISE uniquement : société à lier si aucun contact
-  // d'entreprise n'existe encore avec cet e-mail (création en une étape).
-  societeId: string;
-}
-
-// Société (référentiel, pour la liaison des comptes Contact Entreprise)
-interface SocieteRef {
-  id: string;
-  nom: string;
-  contactPrincipal?: string | null;
-  emailContactPrincipal?: string | null;
-}
-
-// Résultat de la vérification de liaison en direct (rôles externes)
-interface LiaisonInfo {
-  etat: 'VERIFIE' | 'TROUVE' | 'CREABLE' | 'BLOQUE';
-  detail: string;
-}
-
-// ─── Constantes ──────────────────────────────────────────────────────────────
-
-// Rôles — délégués au référentiel central (libellés avec accents, couleurs canoniques)
-const ROLES: { value: string; label: string; color: string }[] = ROLES_REFERENTIEL.map((r) => ({
-  value: r,
-  label: ROLE_LABELS[r] || r,
-  color: ROLE_COLORS[r] || 'bg-muted text-muted-foreground',
-}));
-const EMPTY_FORM: FormData = { email: '', nom: '', password: '', role: 'ACCUEIL', societeId: '' };
-
-function formatDate(d: string | null): string {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-}
-
-/* ─── Select natif (evite l'erreur Radix SelectItem value="") ─── */
-function FilterSelect({ value, onChange, options, className, placeholder }: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  className?: string;
-  placeholder?: string;
-}) {
-  return (
-    <select
-      value={value || ''}
-      onChange={e => onChange(e.target.value)}
-      className={cn(
-        'h-9 text-sm rounded-md border border-input bg-background px-3 py-1 ring-offset-background',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer',
-        className
-      )}
-    >
-      <option value="">{placeholder || 'Tous'}</option>
-      {options.map(o => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  );
-}
-
-// ─── Composant principal ────────────────────────────────────────────────────
+import { Card, CardContent } from '@/components/ui/card';
+import { useUtilisateursData } from './utilisateurs/use-utilisateurs-data';
+import StatsCards from './utilisateurs/stats-cards';
+import FilterSelect from './utilisateurs/filter-select';
+import UtilisateursTable from './utilisateurs/utilisateurs-table';
+import UtilisateurFormDialog from './utilisateurs/utilisateur-form-dialog';
+import { ROLES } from './utilisateurs/types';
 
 export default function UtilisateursView() {
-  const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filtreRole, setFiltreRole] = useState('');
-  const [filtreActif, setFiltreActif] = useState('');
-
-  // Dialog etat
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<Utilisateur | null>(null);
-  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Liaison CONTACT_ENTREPRISE : référentiel sociétés + vérification en direct
-  const [societes, setSocietes] = useState<SocieteRef[]>([]);
-  const [liaison, setLiaison] = useState<LiaisonInfo | null>(null);
-
-  // Suppression
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  // ─── Fetch ────────────────────────────────────────────────────────────────
-
-  const fetchUtilisateurs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (search) params.set('q', search);
-      if (filtreRole) params.set('role', filtreRole);
-      if (filtreActif !== '') params.set('actif', filtreActif);
-
-      const res = await fetch(`/api/utilisateurs?${params.toString()}`);
-      if (res.status === 401 || res.status === 403) return;
-      // Ne JAMAIS vider la liste sur une erreur serveur : un 500 ici
-      // (« Aucun utilisateur trouvé » pour tous les comptes, sept. 2026)
-      // doit rester visible comme une erreur, pas comme une liste vide.
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        toast.error(
-          data && typeof data === 'object'
-            ? messageErreur(data as Record<string, unknown>, 'Erreur lors du chargement des utilisateurs')
-            : `Erreur ${res.status} lors du chargement des utilisateurs`
-        );
-        return;
-      }
-      setUtilisateurs(Array.isArray(data?.utilisateurs) ? data.utilisateurs : []);
-    } catch {
-      toast.error('Erreur de chargement des utilisateurs');
-    } finally {
-      setLoading(false);
-    }
-  }, [search, filtreRole, filtreActif]);
-
-  useEffect(() => { fetchUtilisateurs(); }, [fetchUtilisateurs]);
-
-  // ─── Actions ──────────────────────────────────────────────────────────────
-
-  // Référentiel sociétés (chargé une fois, pour la liaison Contact Entreprise)
-  async function ensureSocietes() {
-    if (societes.length > 0) return;
-    try {
-      const res = await fetch('/api/societes');
-      if (res.ok) {
-        const data = await res.json();
-        setSocietes(Array.isArray(data.societes) ? data.societes : []);
-      }
-    } catch { /* silencieux : le sélecteur restera vide */ }
-  }
-
-  // Vérification de liaison en direct pour CONTACT_ENTREPRISE : l'e-mail saisi
-  // correspond-il à un contact d'entreprise existant ? (débounce 400 ms)
-  useEffect(() => {
-    if (!dialogOpen || formData.role !== 'CONTACT_ENTREPRISE') {
-      setLiaison(null);
-      return;
-    }
-    const email = formData.email.trim();
-    if (!email) {
-      setLiaison({ etat: 'VERIFIE', detail: '' });
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/entreprise-contacts');
-        if (!res.ok) {
-          setLiaison(null);
-          return;
-        }
-        const data = await res.json();
-        const contacts = Array.isArray(data.contacts) ? data.contacts : [];
-        const trouve = contacts.find(
-          (c: { email?: string | null }) => (c.email || '').trim().toLowerCase() === email.toLowerCase()
-        );
-        if (trouve) {
-          const nomSociete = trouve.societe?.nom || 'société inconnue';
-          setLiaison({ etat: 'TROUVE', detail: `Contact existant : ${trouve.prenom ? trouve.prenom + ' ' : ''}${trouve.nom} — ${nomSociete}` });
-        } else if (formData.societeId) {
-          setLiaison({ etat: 'CREABLE', detail: "Aucun contact avec cet e-mail : le contact sera créé automatiquement dans la société sélectionnée à l'enregistrement." });
-        } else {
-          setLiaison({ etat: 'BLOQUE', detail: "Aucun contact d'entreprise avec cet e-mail : sélectionnez la société du représentant ci-dessous pour créer la liaison automatiquement." });
-        }
-      } catch {
-        setLiaison(null);
-      }
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [dialogOpen, formData.role, formData.email, formData.societeId]);
-
-  function openCreateDialog() {
-    setEditingUser(null);
-    setFormData(EMPTY_FORM);
-    setShowPassword(false);
-    setLiaison(null);
-    setDialogOpen(true);
-    ensureSocietes();
-  }
-
-  function openEditDialog(user: Utilisateur) {
-    setEditingUser(user);
-    setFormData({
-      email: user.email,
-      nom: user.nom,
-      password: '',
-      role: user.role,
-      societeId: '',
-    });
-    setShowPassword(false);
-    setLiaison(null);
-    setDialogOpen(true);
-    ensureSocietes();
-  }
-
-  /** Message d'erreur lisible : gère {erreur} (routes métier) ET
-   *  {error, details[]} (validation Zod — auparavant avalé par le toast). */
-  function messageErreur(data: Record<string, unknown>, defaut: string): string {
-    if (typeof data?.erreur === 'string' && data.erreur) return data.erreur;
-    if (typeof data?.error === 'string' && data.error) {
-      const details = Array.isArray(data.details) ? data.details : [];
-      const premier = details[0] as { champ?: string; message?: string } | undefined;
-      if (premier?.message) {
-        const champ = premier.champ && premier.champ !== '(racine)' ? `${premier.champ} : ` : '';
-        return `${data.error} — ${champ}${premier.message}`;
-      }
-      return data.error;
-    }
-    return defaut;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-
-    try {
-      const isEdit = !!editingUser;
-      const url = '/api/utilisateurs';
-      const method = isEdit ? 'PUT' : 'POST';
-
-      const body: Record<string, unknown> = {
-        email: formData.email,
-        nom: formData.nom,
-        role: formData.role,
-      };
-
-      // CONTACT_ENTREPRISE : transmettre la société pour la création en une
-      // étape du contact lié (ignoré par l'API si un contact existe déjà).
-      if (formData.role === 'CONTACT_ENTREPRISE' && formData.societeId) {
-        body.societeId = formData.societeId;
-      }
-
-      if (isEdit) {
-        body.id = editingUser.id;
-        if (formData.password) body.password = formData.password;
-      } else {
-        body.password = formData.password;
-      }
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(messageErreur(data, "Erreur lors de l'operation"));
-        return;
-      }
-
-      toast.success(data.message || (isEdit ? 'Utilisateur modifie.' : 'Utilisateur cree.'));
-      setDialogOpen(false);
-      fetchUtilisateurs();
-    } catch {
-      toast.error('Erreur reseau');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function toggleActif(user: Utilisateur) {
-    const newActif = !user.actif;
-    const action = newActif ? 'activer' : 'desactiver';
-
-    try {
-      const res = await fetch('/api/utilisateurs', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id, actif: newActif }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.erreur || `Erreur lors de l'${action}ion`);
-        return;
-      }
-      toast.success(data.message || `Utilisateur ${action}.`);
-      fetchUtilisateurs();
-    } catch {
-      toast.error('Erreur reseau');
-    }
-  }
-
-  async function handleDelete(id: string) {
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/utilisateurs?id=${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.erreur || 'Erreur lors de la suppression');
-        return;
-      }
-      toast.success(data.message || 'Utilisateur supprime.');
-      setDeleteConfirm(null);
-      fetchUtilisateurs();
-    } catch {
-      toast.error('Erreur reseau');
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  // ─── Stats rapides ────────────────────────────────────────────────────────
-
-  const totalUsers = utilisateurs.length;
-  const actifs = utilisateurs.filter(u => u.actif).length;
-  const inactifs = totalUsers - actifs;
-  const lockedUsers = utilisateurs.filter(
-    u => u.lockoutUntil && new Date(u.lockoutUntil) > new Date()
-  ).length;
-
-  // ─── Rendu ────────────────────────────────────────────────────────────────
+  const d = useUtilisateursData();
 
   return (
     <div className="space-y-4">
       {/* Stats rapides */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-emerald-600" />
-              <div>
-                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{totalUsers}</p>
-                <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Total comptes</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-blue-600" />
-              <div>
-                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{actifs}</p>
-                <p className="text-[10px] text-blue-600 dark:text-blue-400">Actifs</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-amber-600" />
-              <div>
-                <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{inactifs}</p>
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">Inactifs</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/40 dark:to-red-900/20">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-red-600" />
-              <div>
-                <p className="text-lg font-bold text-red-700 dark:text-red-300">{lockedUsers}</p>
-                <p className="text-[10px] text-red-600 dark:text-red-400">Verrouilles</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsCards
+        totalUsers={d.totalUsers}
+        actifs={d.actifs}
+        inactifs={d.inactifs}
+        lockedUsers={d.lockedUsers}
+      />
 
       {/* Barre de filtres + bouton creation */}
       <Card className="border shadow-sm">
@@ -419,31 +43,31 @@ export default function UtilisateursView() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Rechercher par nom ou e-mail..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
+                value={d.search}
+                onChange={e => d.setSearch(e.target.value)}
                 className="pl-8 h-9 text-sm"
               />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+              {d.search && (
+                <button onClick={() => d.setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2">
                   <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                 </button>
               )}
             </div>
             <FilterSelect
-              value={filtreRole}
-              onChange={v => setFiltreRole(v)}
+              value={d.filtreRole}
+              onChange={v => d.setFiltreRole(v)}
               placeholder="Tous les roles"
               options={ROLES.map(r => ({ value: r.value, label: r.label }))}
               className="w-full md:w-44"
             />
             <FilterSelect
-              value={filtreActif}
-              onChange={v => setFiltreActif(v)}
+              value={d.filtreActif}
+              onChange={v => d.setFiltreActif(v)}
               placeholder="Statut"
               options={[{ value: 'true', label: 'Actif' }, { value: 'false', label: 'Inactif' }]}
               className="w-full md:w-32"
             />
-            <Button onClick={openCreateDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm shrink-0">
+            <Button onClick={d.openCreateDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm shrink-0">
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Nouvel utilisateur
             </Button>
@@ -452,346 +76,31 @@ export default function UtilisateursView() {
       </Card>
 
       {/* Tableau */}
-      <Card className="border shadow-sm">
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-            </div>
-          ) : utilisateurs.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm font-medium">Aucun utilisateur trouve</p>
-              <p className="text-xs mt-1">Modifiez les filtres ou creez un nouvel utilisateur</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-muted-foreground uppercase">Utilisateur</th>
-                    <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-muted-foreground uppercase">Role</th>
-                    <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-muted-foreground uppercase">Statut</th>
-                    <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-muted-foreground uppercase hidden md:table-cell">Derniere connexion</th>
-                    <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-muted-foreground uppercase hidden lg:table-cell">Cree le</th>
-                    <th className="text-right py-2.5 px-3 text-[11px] font-semibold text-muted-foreground uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {utilisateurs.map(user => {
-                    const isLocked = user.lockoutUntil && new Date(user.lockoutUntil) > new Date();
-                    const roleInfo = ROLES.find(r => r.value === user.role);
-                    return (
-                      <tr key={user.id} className={cn(
-                        'hover:bg-muted/20 transition-colors',
-                        !user.actif && 'opacity-60'
-                      )}>
-                        {/* Nom + email */}
-                        <td className="py-2.5 px-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className={cn(
-                              'h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                              user.actif ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                       : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                            )}>
-                              {user.nom.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{user.nom}</p>
-                              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Role */}
-                        <td className="py-2.5 px-3">
-                          <Badge className={cn('text-[10px] font-medium', roleInfo?.color || '')}>
-                            {user.roleLabel}
-                          </Badge>
-                          {isLocked && (
-                            <Badge className="ml-1 text-[10px] bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                              <Lock className="h-2.5 w-2.5 mr-0.5" /> Verrouille
-                            </Badge>
-                          )}
-                          {user.liaisonExterne === false && (
-                            <Badge
-                              className="ml-1 text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 cursor-help"
-                              title="Aucun assuré / contact d'entreprise n'a cet e-mail : le portail affichera « Aucun assuré lié à votre compte ». Corrigez l'e-mail de l'assuré (ou du contact) ou celui de ce compte."
-                            >
-                              <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> Liaison manquante
-                            </Badge>
-                          )}
-                        </td>
-
-                        {/* Statut */}
-                        <td className="py-2.5 px-3">
-                          <button
-                            onClick={() => toggleActif(user)}
-                            className={cn(
-                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer',
-                              user.actif
-                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60'
-                                : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60'
-                            )}
-                            title={user.actif ? 'Cliquer pour desactiver' : 'Cliquer pour activer'}
-                          >
-                            {user.actif ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                            {user.actif ? 'Actif' : 'Inactif'}
-                          </button>
-                        </td>
-
-                        {/* Derniere connexion */}
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground hidden md:table-cell">
-                          {user.dernierLogin || 'Jamais'}
-                        </td>
-
-                        {/* Cree le */}
-                        <td className="py-2.5 px-3 text-xs text-muted-foreground hidden lg:table-cell">
-                          {formatDate(user.createdAt)}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-2.5 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-                              onClick={() => openEditDialog(user)}
-                              title="Modifier"
-                              aria-label="Modifier l'utilisateur"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            {deleteConfirm === user.id ? (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  className="h-7 text-[10px] px-2"
-                                  onClick={() => handleDelete(user.id)}
-                                  disabled={deleting}
-                                >
-                                  {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Oui'}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => setDeleteConfirm(null)}
-                                  aria-label="Annuler la suppression"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                                onClick={() => setDeleteConfirm(user.id)}
-                                title="Supprimer"
-                                aria-label="Supprimer l'utilisateur"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <UtilisateursTable
+        utilisateurs={d.utilisateurs}
+        loading={d.loading}
+        onToggleActif={d.toggleActif}
+        onEdit={d.openEditDialog}
+        onDelete={d.supprimer}
+        deleteConfirm={d.deleteConfirm}
+        setDeleteConfirm={d.setDeleteConfirm}
+        deleting={d.deleting}
+      />
 
       {/* Dialog Creation / Modification */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {editingUser ? (
-                <><Pencil className="h-4 w-4 text-emerald-600" /> Modifier l'utilisateur</>
-              ) : (
-                <><UserCog className="h-4 w-4 text-emerald-600" /> Nouvel utilisateur</>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Nom */}
-            <div className="space-y-1.5">
-              <Label htmlFor="user-nom" className="text-sm font-medium">Nom complet</Label>
-              <Input
-                id="user-nom"
-                placeholder="Ex: Jean Dupont"
-                value={formData.nom}
-                onChange={e => setFormData(f => ({ ...f, nom: e.target.value }))}
-                required
-                className="h-9"
-              />
-            </div>
-
-            {/* Email */}
-            <div className="space-y-1.5">
-              <Label htmlFor="user-email" className="text-sm font-medium">Adresse e-mail</Label>
-              <Input
-                id="user-email"
-                type="email"
-                placeholder="nom@suivisante.mg"
-                value={formData.email}
-                onChange={e => setFormData(f => ({ ...f, email: e.target.value }))}
-                required
-                className="h-9"
-              />
-            </div>
-
-            {/* Role */}
-            <div className="space-y-1.5">
-              <Label htmlFor="user-role" className="text-sm font-medium">Role</Label>
-              <Select value={formData.role} onValueChange={v => setFormData(f => ({ ...f, role: v }))}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Choisir un role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map(r => (
-                    <SelectItem key={r.value} value={r.value}>
-                      <span className="flex items-center gap-2">
-                        <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-blue-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-violet-500' : 'bg-indigo-500')} />
-                        {r.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formData.role === 'PORTAIL_CLIENT' && (
-                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  L'e-mail doit correspondre a un assure existant dans la base.
-                </p>
-              )}
-              {formData.role === 'CONTACT_ENTREPRISE' && liaison && liaison.detail && (
-                <p className={cn(
-                  'text-[11px] mt-1 flex items-start gap-1',
-                  liaison.etat === 'TROUVE' && 'text-emerald-600 dark:text-emerald-400',
-                  liaison.etat === 'CREABLE' && 'text-blue-600 dark:text-blue-400',
-                  liaison.etat === 'BLOQUE' && 'text-amber-600 dark:text-amber-400',
-                  liaison.etat === 'VERIFIE' && 'text-muted-foreground',
-                )}>
-                  {liaison.etat === 'TROUVE'
-                    ? <CheckCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                    : liaison.etat === 'BLOQUE'
-                      ? <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                      : <Info className="h-3 w-3 mt-0.5 shrink-0" />}
-                  {liaison.detail}
-                </p>
-              )}
-              {formData.role === 'CONTACT_ENTREPRISE' && !liaison && (
-                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  L'e-mail doit correspondre a un contact d'entreprise existant.
-                </p>
-              )}
-            </div>
-
-            {/* Société (CONTACT_ENTREPRISE uniquement) : permet la création
-                en une étape du compte + du contact d'entreprise lié */}
-            {formData.role === 'CONTACT_ENTREPRISE' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="user-societe" className="text-sm font-medium">
-                  Societe du representant
-                </Label>
-                <Select
-                  value={formData.societeId || undefined}
-                  onValueChange={v => setFormData(f => {
-                    const soc = societes.find(x => x.id === v);
-                    // Contact Entreprise = contact principal de la société :
-                    // préremplir l'e-mail (et le nom) s'ils sont encore vides.
-                    const prefillEmail = !f.email.trim() && soc?.emailContactPrincipal ? soc.emailContactPrincipal : f.email;
-                    const prefillNom = !f.nom.trim() && soc?.contactPrincipal ? soc.contactPrincipal : f.nom;
-                    return { ...f, societeId: v, email: prefillEmail, nom: prefillNom };
-                  })}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Choisir la société à rattacher" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {societes.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">Aucune societe disponible</div>
-                    ) : (
-                      societes.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.nom}</SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {(() => {
-                  const soc = societes.find(x => x.id === formData.societeId);
-                  if (soc?.contactPrincipal || soc?.emailContactPrincipal) {
-                    return (
-                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                        <Info className="h-3 w-3" />
-                        Contact principal : {soc.contactPrincipal || '—'}{soc.emailContactPrincipal ? ` (${soc.emailContactPrincipal})` : ''}
-                      </p>
-                    );
-                  }
-                  return (
-                    <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                      <Info className="h-3 w-3" />
-                      Astuce : saisissez d'abord le contact principal et son e-mail dans Modifier la société.
-                    </p>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Mot de passe */}
-            <div className="space-y-1.5">
-              <Label htmlFor="user-password" className="text-sm font-medium">
-                Mot de passe {editingUser && <span className="text-muted-foreground font-normal">(laisser vide pour ne pas modifier)</span>}
-              </Label>
-              <div className="relative">
-                <Input
-                  id="user-password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder={editingUser ? 'Nouveau mot de passe (optionnel)' : 'Minimum 8 caracteres, lettres + chiffres'}
-                  value={formData.password}
-                  onChange={e => setFormData(f => ({ ...f, password: e.target.value }))}
-                  required={!editingUser}
-                  minLength={8}
-                  className="h-9 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </button>
-              </div>
-              {!editingUser && (
-                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  Au moins 8 caractères, avec au moins une lettre et un chiffre.
-                </p>
-              )}
-            </div>
-
-            <DialogFooter className="gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>
-                Annuler
-              </Button>
-              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={submitting}>
-                {submitting && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                {editingUser ? 'Enregistrer' : 'Creer l\'utilisateur'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <UtilisateurFormDialog
+        open={d.dialogOpen}
+        onOpenChange={d.setDialogOpen}
+        editing={d.editingUser}
+        formData={d.formData}
+        setFormData={d.setFormData}
+        submitting={d.submitting}
+        showPassword={d.showPassword}
+        setShowPassword={d.setShowPassword}
+        societes={d.societes}
+        liaison={d.liaison}
+        onSubmit={d.enregistrer}
+      />
     </div>
   );
 }
