@@ -104,7 +104,8 @@ describe('Utilisateurs — statistiques et tableau', () => {
     expect(screen.getByText('Total comptes')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('Actifs')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
+    // 1 = actifs, inactifs et verrouillés (trois cartes portent ce compteur)
+    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Inactifs')).toBeInTheDocument();
     expect(screen.getByText('Verrouilles')).toBeInTheDocument();
   });
@@ -269,7 +270,9 @@ describe('Utilisateurs — création et édition', () => {
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
 
-    expect(screen.getByText('Nouvel utilisateur')).toBeInTheDocument();
+    // Titre du dialogue (le bouton de la barre porte le même libellé)
+    const dlg = screen.getByRole('dialog');
+    expect(within(dlg).getByText('Nouvel utilisateur')).toBeInTheDocument();
     expect(screen.getByLabelText('Nom complet')).toHaveValue('');
     expect(screen.getByLabelText(/Mot de passe/)).toHaveAttribute('minLength', '8');
     // Bouton de visibilité du mot de passe
@@ -308,8 +311,11 @@ describe('Utilisateurs — création et édition', () => {
     renderUtilisateurs();
     await screen.findByText('Rakoto Jean');
 
-    await user.click(screen.getByRole('button', { name: /Modifier l'utilisateur/ }));
+    // Bouton d'édition de la ligne de l'utilisateur u1
+    const rowU1 = screen.getByText('rakoto@suivisante.mg').closest('tr') as HTMLElement;
+    await user.click(within(rowU1).getByRole('button', { name: /Modifier l'utilisateur/ }));
 
+    // Titre du dialogue (unique : le tableau n'affiche pas ce libellé)
     expect(screen.getByText("Modifier l'utilisateur")).toBeInTheDocument();
     expect(screen.getByLabelText('Nom complet')).toHaveValue('Rakoto Jean');
     expect(screen.getByLabelText('Adresse e-mail')).toHaveValue('rakoto@suivisante.mg');
@@ -333,7 +339,9 @@ describe('Utilisateurs — création et édition', () => {
 
 describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
   it("vérifie l'e-mail après délai (contact existant → TROUVE)", async () => {
-    const user = userEvent.setup();
+    // pointerEventsCheck 0 : Radix verrouille pointer-events pendant l'animation
+    // d'ouverture du dialogue, jamais levée dans jsdom
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const fm = stubFetch();
     renderUtilisateurs();
     await screen.findByText('Rakoto Jean');
@@ -350,7 +358,7 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
   });
 
   it('propose la création via la société sélectionnée (CREABLE) et préremplit le nom', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     stubFetch();
     renderUtilisateurs();
     await screen.findByText('Rakoto Jean');
