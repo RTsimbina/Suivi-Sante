@@ -88,14 +88,16 @@ describe('authorize() — connexion', () => {
   });
 
   it('refuse la connexion d\'un utilisateur désactivé (actif=false)', async () => {
-    const dbMock = vi.hoisted(() => ({
+    // vi.doMock + import dynamique : de simples vi.fn() suffisent (pas de
+    // vi.hoisted, qui serait hoisté au niveau module et entrerait en collision).
+    const dbMock = {
       $queryRaw: vi.fn().mockResolvedValue([
         { id: 'u1', email: 'desactive@exemple.com', nom: 'Désactivé', password: '$2a$12$x', role: 'ACCUEIL', actif: false, avatar: null },
       ]),
       $executeRaw: vi.fn().mockResolvedValue(1),
       assure: { findFirst: vi.fn() },
       entrepriseContact: { findFirst: vi.fn() },
-    }));
+    };
     vi.doMock('@/lib/db', () => ({ db: dbMock }));
     vi.doMock('bcryptjs', () => ({ compare: vi.fn().mockResolvedValue(true), hash: vi.fn() }));
     vi.doMock('@/lib/login-policy', () => ({
@@ -125,14 +127,14 @@ describe('authorize() — connexion', () => {
   });
 
   it('autorise la connexion d\'un utilisateur actif et fige sa sessionVersion', async () => {
-    const dbMock = vi.hoisted(() => ({
+    const dbMock = {
       $queryRaw: vi.fn().mockResolvedValue([
         { id: 'u2', email: 'actif@exemple.com', nom: 'Actif', password: '$2a$12$x', role: 'ACCUEIL', actif: true, avatar: null, sessionVersion: 3 },
       ]),
       $executeRaw: vi.fn().mockResolvedValue(1),
       assure: { findFirst: vi.fn() },
       entrepriseContact: { findFirst: vi.fn() },
-    }));
+    };
     vi.doMock('@/lib/db', () => ({ db: dbMock }));
     vi.doMock('bcryptjs', () => ({ compare: vi.fn().mockResolvedValue(true), hash: vi.fn() }));
     vi.doMock('@/lib/login-policy', () => ({
@@ -261,14 +263,15 @@ describe('authorizeRequest — porte de révocation centralisée', () => {
     jeton: Record<string, unknown> | null;
     compte: Record<string, unknown> | null;
   }) {
-    const jwtMock = vi.hoisted(() => ({ getToken: vi.fn() }));
-    const dbMock = vi.hoisted(() => ({
+    // vi.doMock + import dynamique : vi.fn() simples (pas de vi.hoisted).
+    const jwtMock = { getToken: vi.fn() };
+    const dbMock = {
       db: {
         utilisateur: { findUnique: vi.fn() },
         $queryRaw: vi.fn(),
         $executeRaw: vi.fn(),
       },
-    }));
+    };
     vi.doMock('next-auth/jwt', () => jwtMock);
     vi.doMock('@/lib/db', () => dbMock);
     jwtMock.getToken.mockResolvedValue(opts.jeton);
