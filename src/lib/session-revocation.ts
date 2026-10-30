@@ -59,7 +59,7 @@ export interface JetonSession {
 
 export interface ResultatVerificationSession {
   ok: boolean;
-  statut: 401 | 503;
+  statut: 200 | 401 | 503;
   erreur: string;
 }
 
