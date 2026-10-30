@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       await db.bareme.findMany({
         where: { supprime: false },
         select: {
+          id: true,
           societeId: true,
           prestation: true,
           tauxCouverture: true,
