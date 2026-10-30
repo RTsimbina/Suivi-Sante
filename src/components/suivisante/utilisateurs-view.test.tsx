@@ -349,10 +349,11 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
     // Attendre le montage du formulaire (portail Radix)
     await screen.findByLabelText('Nom complet');
-    // Trigger Radix Select du rôle : le bouton affichant la valeur courante
-    // (« Accueil »). Ouverture au clavier, plus fiable que le pointeur dans
-    // un dialogue en jsdom.
-    const triggerRole = screen.getByRole('button', { name: 'Accueil' });
+    // Trigger Radix Select du rôle : combobox SANS nom accessible (le
+    // SelectValue reste vide tant que les items ne sont pas montés) — 3e
+    // combobox du DOM après les 2 filtres natifs. Ouverture au clavier,
+    // plus fiable que le pointeur dans un dialogue en jsdom.
+    const triggerRole = screen.getAllByRole('combobox')[2];
     triggerRole.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
@@ -371,7 +372,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
     await screen.findByLabelText('Nom complet');
-    const triggerRole = screen.getByRole('button', { name: 'Accueil' });
+    // Trigger du rôle : 3e combobox (2 filtres natifs + Radix rôle)
+    const triggerRole = screen.getAllByRole('combobox')[2];
     triggerRole.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
@@ -380,8 +382,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await user.type(screen.getByLabelText('Adresse e-mail'), 'autre@cnaps.mg');
     expect(await screen.findByText(/Aucun contact d'entreprise avec cet e-mail/, {}, { timeout: 2500 })).toBeInTheDocument();
 
-    // Trigger de la société : bouton affichant son placeholder
-    const triggerSociete = screen.getByRole('button', { name: 'Choisir la société à rattacher' });
+    // Trigger de la société : 4e combobox (présent depuis le choix du rôle)
+    const triggerSociete = screen.getAllByRole('combobox')[3];
     triggerSociete.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'CNAPS' }));
