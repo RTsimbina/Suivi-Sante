@@ -119,7 +119,8 @@ describe('Assurés — statistiques', () => {
 
     expect(screen.getByText('Total bénéficiaires')).toBeInTheDocument();
     expect(screen.getByText('25')).toBeInTheDocument(); // 12 + 5 + 8
-    expect(screen.getByText('Assurés principaux')).toBeInTheDocument();
+    // La carte ET l'option du filtre type portent ce libellé
+    expect(screen.getAllByText('Assurés principaux').length).toBeGreaterThan(0);
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('Conjoints')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
@@ -279,7 +280,9 @@ describe('Assurés — création, édition, suppression (rôle ADMINISTRATEUR)',
     renderAssures();
     await screen.findByText('Jean Rakoto');
 
-    await user.click(screen.getByRole('button', { name: /Modifier l'assuré/ }));
+    // Bouton d'édition de la ligne du principal p1 (chaque principal en a un)
+    const rowP1 = screen.getByText('Jean Rakoto').closest('tr') as HTMLElement;
+    await user.click(within(rowP1).getByRole('button', { name: /Modifier l'assuré/ }));
 
     expect(screen.getByText('Modifier le bénéficiaire')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Rakoto')).toHaveValue('Rakoto');
