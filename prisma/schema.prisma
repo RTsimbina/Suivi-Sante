@@ -14,6 +14,14 @@ model Utilisateur {
   password      String
   role          String    @default("UTILISATEUR")
   actif         Boolean   @default(true)
+  // ─── Révocation des sessions (P1) ───────────────────────────────────────
+  // Sessions NextAuth = JWT signé (8 h) : un jeton émis AVANT une
+  // désactivation resterait valide jusqu'à expiration. sessionVersion est
+  // INCRÉMENTÉE à chaque désactivation ET réactivation (PATCH actif) : tout
+  // jeton dont la version ne correspond pas à celle du compte est REFUSÉ
+  // côté serveur (voir src/lib/session-revocation.ts) — révocation
+  // immédiate de toutes les sessions ouvertes, sans cookie ni cache.
+  sessionVersion Int      @default(1)
   avatar        String?
   dernierLogin    DateTime?
   failedAttempts  Int       @default(0)

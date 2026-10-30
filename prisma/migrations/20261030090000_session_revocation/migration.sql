@@ -1,0 +1,35 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- P1 « Révocation des sessions à la désactivation d'un utilisateur »
+-- Migration PROGRESSIVE et NON DESTRUCTIVE
+-- ───────────────────────────────────────────────────────────────────────────
+-- PROBLÈME : les sessions NextAuth sont des JWT signés (maxAge 8 h). La
+-- désactivation d'un compte (PATCH /api/utilisateurs) ne révoquait PAS les
+-- jetons déjà émis : un utilisateur désactivé conservait tous ses droits
+-- jusqu'à expiration du jeton (8 h max).
+--
+-- SOLUTION : versionnement de session vérifié côté serveur.
+--   - sessionVersion : incrémentée à chaque désactivation ET réactivation
+--     (transactionnel avec le changement d'`actif`).
+--   - Le JWT fige la version du compte AU MOMENT de la connexion.
+--   - Chaque accès API protégé relit { actif, sessionVersion } en base
+--     (src/lib/session-revocation.ts) et refuse tout jeton dont la version
+--     diffère → révocation IMMÉDIATE de toutes les sessions ouvertes.
+--   - Incrément aussi à la RÉACTIVATION : un jeton volé avant la
+--     désactivation ne redevient jamais valide après.
+--
+-- VALEURS INITIALES (documentées) :
+--   - sessionVersion = 1 pour tous les comptes existants (DEFAULT).
+--   - Les jetons émis avant le déploiement ne portent PAS de version : ils
+--     sont refusés (fail-closed) à la première requête protégée → chaque
+--     utilisateur actif devra se reconnecter UNE fois après le déploiement
+--     (effet unique, équivalent à une rotation NEXTAUTH_SECRET).
+--
+-- SÉCURITÉ / RETOUR ARRIÈRE :
+--   - Aucune donnée existante n'est modifiée ni supprimée : ajout d'une
+--     seule colonne NOT NULL avec valeur par défaut.
+--   - ROLLBACK :
+--       ALTER TABLE "Utilisateur" DROP COLUMN "sessionVersion";
+--     (le code déployé correspondant ne doit plus être en service).
+-- ═══════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE "Utilisateur" ADD COLUMN "sessionVersion" INTEGER NOT NULL DEFAULT 1;
