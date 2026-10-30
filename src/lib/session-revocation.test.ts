@@ -173,6 +173,18 @@ describe('authorize() — connexion', () => {
       email: 'actif@exemple.com',
       password: 'motdepasse',
     })) as { sessionVersion?: number } | null;
+    // Diagnostic temporaire : identifier le chemin de retour null en CI.
+    console.log('[DEBUG authorize]', JSON.stringify({
+      queryRawAppels: dbMock.$queryRaw.mock.calls.length,
+      queryRawRetour: dbMock.$queryRaw.mock.results[0]?.value,
+      evaluateAppels: loginPolicyMock.evaluateLoginAttempt.mock.calls.length,
+      evaluateRetour: loginPolicyMock.evaluateLoginAttempt.mock.results[0]?.value,
+      lockoutAppels: lockoutMock.isLockedOut.mock.calls.length,
+      lockoutRetour: lockoutMock.isLockedOut.mock.results[0]?.value,
+      compareAppels: bcryptMock.compare.mock.calls.length,
+      compareArgs: bcryptMock.compare.mock.calls[0]?.[1],
+      compareRetour: bcryptMock.compare.mock.results[0]?.value,
+    }));
     expect(resultat).not.toBeNull();
     expect(resultat?.sessionVersion).toBe(3); // figée dans le JWT par le callback
   });
