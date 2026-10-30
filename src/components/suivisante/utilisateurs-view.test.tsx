@@ -347,10 +347,12 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await screen.findByText('Rakoto Jean');
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
-    // Trigger Radix Select du rôle (aria-haspopup="listbox" — le trigger
-    // n'expose pas role=combobox dans cette version). Ouverture au clavier,
-    // plus fiable que le pointeur dans un dialogue en jsdom.
-    const triggerRole = document.body.querySelectorAll('[aria-haspopup="listbox"]')[0] as HTMLElement;
+    // Attendre le montage du formulaire (portail Radix)
+    await screen.findByLabelText('Nom complet');
+    // Trigger Radix Select du rôle : le bouton affichant la valeur courante
+    // (« Accueil »). Ouverture au clavier, plus fiable que le pointeur dans
+    // un dialogue en jsdom.
+    const triggerRole = screen.getByRole('button', { name: 'Accueil' });
     triggerRole.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
@@ -368,7 +370,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await screen.findByText('Rakoto Jean');
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
-    const triggerRole = document.body.querySelectorAll('[aria-haspopup="listbox"]')[0] as HTMLElement;
+    await screen.findByLabelText('Nom complet');
+    const triggerRole = screen.getByRole('button', { name: 'Accueil' });
     triggerRole.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
@@ -377,8 +380,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await user.type(screen.getByLabelText('Adresse e-mail'), 'autre@cnaps.mg');
     expect(await screen.findByText(/Aucun contact d'entreprise avec cet e-mail/, {}, { timeout: 2500 })).toBeInTheDocument();
 
-    // Trigger de la société : 2e trigger Radix (présent depuis le choix du rôle)
-    const triggerSociete = document.body.querySelectorAll('[aria-haspopup="listbox"]')[1] as HTMLElement;
+    // Trigger de la société : bouton affichant son placeholder
+    const triggerSociete = screen.getByRole('button', { name: 'Choisir la société à rattacher' });
     triggerSociete.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'CNAPS' }));
