@@ -347,8 +347,11 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await screen.findByText('Rakoto Jean');
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
-    // Trigger du rôle : 3e combobox (2 filtres natifs + Radix rôle du dialogue)
-    await user.click(screen.getAllByRole('combobox')[2]);
+    // Trigger du rôle : 3e combobox (2 filtres natifs + Radix rôle du dialogue).
+    // Ouverture au clavier : plus fiable que le pointeur pour un Radix Select
+    // rendu dans un dialogue en jsdom.
+    screen.getAllByRole('combobox')[2].focus();
+    await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
 
     // Saisir l'e-mail d'un contact existant → débounce 400 ms puis GET contacts
@@ -364,7 +367,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await screen.findByText('Rakoto Jean');
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
-    await user.click(screen.getAllByRole('combobox')[2]);
+    screen.getAllByRole('combobox')[2].focus();
+    await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
 
     // Email inconnu → BLOQUE tant qu'aucune société n'est choisie
@@ -372,7 +376,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     expect(await screen.findByText(/Aucun contact d'entreprise avec cet e-mail/, {}, { timeout: 2500 })).toBeInTheDocument();
 
     // Trigger de la société : 4e combobox (présent depuis le choix du rôle)
-    await user.click(screen.getAllByRole('combobox')[3]);
+    screen.getAllByRole('combobox')[3].focus();
+    await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'CNAPS' }));
 
     expect(await screen.findByText(/le contact sera créé automatiquement/)).toBeInTheDocument();
