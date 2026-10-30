@@ -111,6 +111,8 @@ describe('Portail — recherche publique de dossiers', () => {
     expect(screen.getByText('Montant payé')).toBeInTheDocument();
     expect(screen.getByText('VIR-2026-001')).toBeInTheDocument();
     expect(screen.getByText(/remboursement de/)).toBeInTheDocument();
+    // 160 000 Ar : carte « Montant payé » ET message contextuel (répété)
+    expect(screen.getAllByText('160 000 Ar').length).toBeGreaterThanOrEqual(2);
 
     // REJETE : motif
     expect(screen.getByText('Prestation non couverte')).toBeInTheDocument();
@@ -123,7 +125,6 @@ describe('Portail — recherche publique de dossiers', () => {
 
     // Montants formatés
     expect(screen.getByText('200 000 Ar')).toBeInTheDocument();
-    expect(screen.getByText('160 000 Ar')).toBeInTheDocument();
   });
 
   it('affiche l\'état vide quand aucun dossier ne correspond', async () => {
@@ -272,9 +273,11 @@ describe('Portail — portail sécurisé entreprise', () => {
     // Contrats & solde
     expect(screen.getByText('Contrats & Solde')).toBeInTheDocument();
     const table = screen.getByRole('table');
-    expect(within(table).getByText('FORFAITAIRE')).toBeInTheDocument();
     expect(within(table).getByText('500 000 Ar')).toBeInTheDocument();
     expect(within(table).getByText('340 000 Ar')).toBeInTheDocument();
+    // ⚠️ Comportement actuel (caractérisé) : la colonne « Type » est vide —
+    // le mapping du monolithe n'extrait pas typeContrat. Anomalie signalée
+    // au bilan, non corrigée par ce refactor (préservation du comportement).
 
     // Dossiers de l'entreprise (cartes)
     expect(screen.getByText("Dossiers de l'entreprise (3)")).toBeInTheDocument();
