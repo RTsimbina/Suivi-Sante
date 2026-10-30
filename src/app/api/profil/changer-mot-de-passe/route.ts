@@ -4,6 +4,7 @@ import { compare, hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { changerMotDePasseSchema } from '@/lib/validation';
+import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 
 // POST /api/profil/changer-mot-de-passe
 // Exige : ancienMotDePasse, nouveauMotDePasse
@@ -16,6 +17,12 @@ export async function POST(request: NextRequest) {
     });
     if (!token?.email) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
+    }
+
+    // P1 Révocation : état réel du compte relu en base (actif + version).
+    const session = await verifierSessionUtilisateur(db, token);
+    if (!session.ok) {
+      return NextResponse.json({ erreur: session.erreur }, { status: session.statut });
     }
 
     // ─── Validation Zod centralisée (politique mot de passe partagée) ───────

@@ -42,6 +42,8 @@ vi.mock('@/lib/assistant/engine', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    // P1 Révocation : le POST relit l'état du compte (existant + actif + version)
+    utilisateur: { findUnique: vi.fn().mockResolvedValue({ actif: true, sessionVersion: 1 }) },
     societe: { findMany: vi.fn().mockResolvedValue([]) },
     prestataire: { findMany: vi.fn().mockResolvedValue([]) },
     assure: { findMany: vi.fn().mockResolvedValue([]) },
@@ -64,6 +66,7 @@ const TOKEN_INTERNE = {
   role: 'SANTE',
   nom: 'Gestion Santé',
   email: 'sante@suivisante.mg',
+  sessionVersion: 1, // P1 : version de session figée au login
 };
 
 beforeEach(() => {

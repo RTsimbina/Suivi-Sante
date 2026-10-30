@@ -35,6 +35,7 @@ import type { NextRequest } from 'next/server';
 const jwtMocks = vi.hoisted(() => ({ getToken: vi.fn() }));
 
 const dbMocks = vi.hoisted(() => ({
+  utilisateurFindUnique: vi.fn(),
   prestataireFindUnique: vi.fn(),
   prestataireFindFirst: vi.fn(),
   prestataireFindMany: vi.fn(),
@@ -51,6 +52,8 @@ vi.mock('next-auth/jwt', () => ({ getToken: jwtMocks.getToken }));
 
 vi.mock('@/lib/db', () => ({
   db: {
+    // P1 Révocation : les routes relisent l'état du compte (actif + version)
+    utilisateur: { findUnique: dbMocks.utilisateurFindUnique },
     prestataire: {
       findUnique: dbMocks.prestataireFindUnique,
       findFirst: dbMocks.prestataireFindFirst,
@@ -116,6 +119,8 @@ beforeEach(() => {
   }]);
   dbMocks.baremeFindMany.mockResolvedValue([]);
   dbMocks.assureFindMany.mockResolvedValue([]);
+  // P1 Révocation : compte actif, version de session courante (= celle des jetons)
+  dbMocks.utilisateurFindUnique.mockResolvedValue({ actif: true, sessionVersion: 1 });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -130,13 +135,13 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
   });
 
   it('403 pour un rôle interne (défense en profondeur)', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'u1', role: 'ACCUEIL', email: 'x@y.z' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'u1', role: 'ACCUEIL', email: 'x@y.z' });
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(403);
   });
 
   it('ADMINISTRATEUR → mode démonstration (aucune donnée prestataire)', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uAdm', role: 'ADMINISTRATEUR', email: 'adm@x.mg' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uAdm', role: 'ADMINISTRATEUR', email: 'adm@x.mg' });
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -199,7 +204,7 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
   });
 
   it('FAIL-CLOSED : compte PRESTATAIRE sans fiche rattachée → 403 actionnable', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uX', role: 'PRESTATAIRE', email: 'orphelin@x.mg' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uX', role: 'PRESTATAIRE', email: 'orphelin@x.mg' });
     dbMocks.prestataireFindMany.mockResolvedValue([]); // aucune fiche ne porte cet e-mail
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(403);
@@ -208,14 +213,14 @@ describe('GET /api/portail-prestataire — identité serveur et isolation', () =
   });
 
   it('auto-réparation : token sans prestataireId → re-résolution par e-mail', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg' });
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(200);
     expect(dbMocks.prestataireFindMany).toHaveBeenCalled(); // résolution contrôlée par e-mail
   });
 
   it('id périmé (fiche supprimée) + liaison irretrouvable → 403 (jamais 200 vide)', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg', prestataireId: 'prest-mort' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg', prestataireId: 'prest-mort' });
     dbMocks.prestataireFindUnique.mockResolvedValue(null);
     dbMocks.prestataireFindMany.mockResolvedValue([]); // re-résolution impossible
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
@@ -260,7 +265,7 @@ describe('GET /api/portail-prestataire/actes — isolation', () => {
   });
 
   it('ADMINISTRATEUR → 403 (pas de données de prestataire)', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uAdm', role: 'ADMINISTRATEUR', email: 'adm@x.mg' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uAdm', role: 'ADMINISTRATEUR', email: 'adm@x.mg' });
     const res = await GET_ACTES(requete('/api/portail-prestataire/actes'));
     expect(res.status).toBe(403);
   });
@@ -375,7 +380,7 @@ function sqlTexte(call: unknown[]): string {
 
 describe('Garde d ambiguïté de la liaison e-mail PRESTATAIRE', () => {
   it('portail : token sans prestataireId + e-mail partagé par 2 fiches → 403 fail-closed', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'groupe@presta.mg' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uA', role: 'PRESTATAIRE', email: 'groupe@presta.mg' });
     dbMocks.prestataireFindMany.mockResolvedValue([
       { id: PREST_A, createdAt: new Date('2020-01-01') },
       { id: PREST_B, createdAt: new Date('2021-01-01') },
@@ -393,7 +398,7 @@ describe('Garde d ambiguïté de la liaison e-mail PRESTATAIRE', () => {
   });
 
   it('portail : e-mail unique → auto-réparation par e-mail conservée', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uA', role: 'PRESTATAIRE', email: 'a@presta.mg' });
     dbMocks.prestataireFindMany.mockResolvedValue([{ id: PREST_A, createdAt: new Date('2020-01-01') }]);
     const res = await GET_PORTAIL(requete('/api/portail-prestataire'));
     expect(res.status).toBe(200);
@@ -486,7 +491,7 @@ describe('GET /api/portail-prestataire/assures — données minimales et interse
 
 describe('RBAC central (API_PERMISSIONS) — token PRESTATAIRE vs routes existantes', () => {
   const attenduAutorise = async (path: string, method = 'GET', role = 'PRESTATAIRE') => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'uA', role, email: 'a@presta.mg', prestataireId: PREST_A });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'uA', role, email: 'a@presta.mg', prestataireId: PREST_A });
     const req = new Request(`http://localhost${path}`, { method }) as unknown as NextRequest;
     Object.defineProperty(req, 'nextUrl', { value: new URL(`http://localhost${path}`) });
     const result = await authorizeRequest(req);

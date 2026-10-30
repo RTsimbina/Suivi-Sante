@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { avatarUpdateSchema } from '@/lib/validation';
+import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 
 // PATCH /api/profil/avatar
 // Corps : { avatar: "A" | "B" | ... | "H" | null }
@@ -14,6 +15,12 @@ export async function PATCH(request: NextRequest) {
     });
     if (!token?.email) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
+    }
+
+    // P1 Révocation : état réel du compte relu en base (actif + version).
+    const session = await verifierSessionUtilisateur(db, token);
+    if (!session.ok) {
+      return NextResponse.json({ erreur: session.erreur }, { status: session.statut });
     }
 
     // ─── Validation Zod centralisée (avatar ∈ [A-H] | null) ────────────────

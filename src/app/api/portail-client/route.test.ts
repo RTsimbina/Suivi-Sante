@@ -19,6 +19,7 @@ const jwtMocks = vi.hoisted(() => ({
 }));
 
 const dbMocks = vi.hoisted(() => ({
+  utilisateurFindUnique: vi.fn(),
   assureFindUnique: vi.fn(),
   assureFindFirst: vi.fn(),
   assureFindMany: vi.fn(),
@@ -36,6 +37,8 @@ vi.mock('next-auth/jwt', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    // P1 Révocation : la route relit l'état du compte (existant + actif + version)
+    utilisateur: { findUnique: dbMocks.utilisateurFindUnique },
     assure: {
       findUnique: dbMocks.assureFindUnique,
       findFirst: dbMocks.assureFindFirst,
@@ -83,6 +86,8 @@ beforeEach(() => {
   dbMocks.contratFindMany.mockResolvedValue([]);
   dbMocks.dossierFindMany.mockResolvedValue([]);
   dbMocks.baremeFindMany.mockResolvedValue([]);
+  // P1 Révocation : compte actif, version de session courante (= celle des jetons)
+  dbMocks.utilisateurFindUnique.mockResolvedValue({ actif: true, sessionVersion: 1 });
 });
 
 describe('GET /api/portail-client — authentification et rôles', () => {
@@ -93,7 +98,7 @@ describe('GET /api/portail-client — authentification et rôles', () => {
   });
 
   it('403 pour un rôle interne', async () => {
-    jwtMocks.getToken.mockResolvedValue({ id: 'u1', role: 'ACCUEIL', email: 'a@b.c' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'u1', role: 'ACCUEIL', email: 'a@b.c' });
     const res = await GET(requeteGet());
     expect(res.status).toBe(403);
     const body = await res.json();
@@ -161,7 +166,7 @@ describe('GET /api/portail-client — mode PORTAIL_CLIENT', () => {
 
   it('403 sans e-mail dans le token : message générique sans parenthèses vides', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    jwtMocks.getToken.mockResolvedValue({ id: 'u1', role: 'PORTAIL_CLIENT' });
+    jwtMocks.getToken.mockResolvedValue({ sessionVersion: 1, id: 'u1', role: 'PORTAIL_CLIENT' });
     dbMocks.assureFindFirst.mockResolvedValue(null);
 
     const res = await GET(requeteGet());

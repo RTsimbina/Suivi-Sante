@@ -7,6 +7,7 @@ import type { AssistantContext, ParamOption } from '@/lib/assistant/types';
 import { AssistantError } from '@/lib/assistant/types';
 import { societesDuPrestataire } from '@/lib/assistant/results';
 import { logParametreChange } from '@/lib/audit-log';
+import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 import { PARENT_TYPES } from '@/lib/prestations';
 import type { RoleType } from '@/lib/auth-context';
 
@@ -23,6 +24,12 @@ export async function GET(request: NextRequest) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
       return NextResponse.json({ erreur: 'Non authentifié. Veuillez vous reconnecter.' }, { status: 401 });
+    }
+
+    // P1 Révocation : état réel du compte relu en base (actif + version).
+    const session = await verifierSessionUtilisateur(db, token);
+    if (!session.ok) {
+      return NextResponse.json({ erreur: session.erreur }, { status: session.statut });
     }
 
     const ctx = buildContext(token);
@@ -112,6 +119,12 @@ export async function POST(request: NextRequest) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
     if (!token) {
       return NextResponse.json({ erreur: 'Non authentifié. Veuillez vous reconnecter.' }, { status: 401 });
+    }
+
+    // P1 Révocation : état réel du compte relu en base (actif + version).
+    const session = await verifierSessionUtilisateur(db, token);
+    if (!session.ok) {
+      return NextResponse.json({ erreur: session.erreur }, { status: session.statut });
     }
 
     let body: { questionId?: unknown; params?: unknown };

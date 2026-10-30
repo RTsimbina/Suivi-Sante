@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { enNombre, sommer } from '@/lib/money';
 import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
+import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 import type { Prisma } from '@prisma/client';
 import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
 
@@ -53,6 +54,12 @@ export async function GET(request: NextRequest) {
 
     if (!token) {
       return NextResponse.json({ erreur: 'Non authentifié.' }, { status: 401 });
+    }
+
+    // P1 Révocation : état réel du compte relu en base (actif + version).
+    const session = await verifierSessionUtilisateur(db, token);
+    if (!session.ok) {
+      return NextResponse.json({ erreur: session.erreur }, { status: session.statut });
     }
 
     const role = token.role as string;

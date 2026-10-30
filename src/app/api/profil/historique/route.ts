@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
+import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 
 /**
  * GET /api/profil/historique
@@ -17,6 +18,12 @@ export async function GET(request: NextRequest) {
     });
     if (!token?.id) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
+    }
+
+    // P1 Révocation : état réel du compte relu en base (actif + version).
+    const session = await verifierSessionUtilisateur(db, token);
+    if (!session.ok) {
+      return NextResponse.json({ erreur: session.erreur }, { status: session.statut });
     }
 
     const { searchParams } = new URL(request.url);

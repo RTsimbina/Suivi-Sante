@@ -21,6 +21,7 @@ import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
 import { resoudreLiaisonPrestataireAvecControle } from '@/lib/liaison-prestataire';
 import { ERREUR_SANS_PRESTATAIRE } from '@/lib/data-isolation';
+import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 
 export interface IdentitePrestataire {
   prestataireId: string;
@@ -60,6 +61,17 @@ export async function resoudreIdentitePortailPrestataire(
     return {
       ok: false,
       response: NextResponse.json({ erreur: 'Non authentifié.' }, { status: 401 }),
+    };
+  }
+
+  // ─── P1 Révocation des sessions : état réel du compte relu en base ─────
+  // (existant + actif + version de session courante) — un compte désactivé
+  // ou réactivé ne sert AUCUNE donnée, même avec un JWT signé non expiré.
+  const session = await verifierSessionUtilisateur(db, token);
+  if (!session.ok) {
+    return {
+      ok: false,
+      response: NextResponse.json({ erreur: session.erreur }, { status: session.statut }),
     };
   }
 

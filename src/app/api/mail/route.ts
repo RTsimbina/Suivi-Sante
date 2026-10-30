@@ -17,9 +17,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { checkAuth } from '@/lib/authorize';
 import { statistiquesFile } from '@/lib/mail/queue';
 
 export async function GET(request: NextRequest) {
+  // P1 Révocation + RBAC : contrôle complet côté route (la route ne lisait
+  // pas elle-même le JWT — elle dépendait uniquement du middleware Edge).
+  // La vérification intègre l'état réel du compte (existant + actif +
+  // version de session). Les appels machine (Bearer) passent par
+  // /api/mail/send et /api/mail/process — jamais par ce GET d'interface.
+  const auth = await checkAuth(request);
+  if (auth) return auth;
+
   const params = request.nextUrl.searchParams;
   const statut = params.get('statut') || undefined;
   const categorie = params.get('categorie') || undefined;
