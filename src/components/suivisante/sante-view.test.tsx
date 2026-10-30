@@ -100,7 +100,7 @@ function stubFetch(opts: FetchOpts = {}) {
       Promise.resolve({ ok, json: () => Promise.resolve(body) });
 
     if (url.startsWith('/api/sante/verifier-assure')) {
-      if (method === 'GET') return json({ resultats: opts.resultats ?? [] });
+      if (method === 'GET') return json({ resultats: opts.resultats ?? resultatsRecherche });
       if (opts.verification && !opts.verification.ok) return json(opts.verification.body, false);
       return json(opts.verification?.body ?? verificationResult);
     }
