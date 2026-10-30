@@ -149,14 +149,28 @@ describe('estSessionRevoquee — scénarios P1', () => {
 
 // ─── 2. Refus de connexion d'un utilisateur désactivé (authorize) ───────────
 
+/** Extrait l'authorize RÉEL du provider credentials (next-auth 4.24 : options.authorize). */
+function extraireAuthorize(): (c: unknown) => Promise<unknown> {
+  const provider = authOptions.providers[0] as unknown as {
+    options?: { authorize?: (c: unknown) => Promise<unknown> };
+    authorize?: (c: unknown) => Promise<unknown>;
+  };
+  const fn = provider.options?.authorize ?? provider.authorize;
+  if (!fn) throw new Error('Provider credentials sans authorize');
+  return fn;
+}
+
 describe('authorize() — connexion', () => {
   it('refuse la connexion d\'un utilisateur désactivé (actif=false)', async () => {
     dbMock.$queryRaw.mockResolvedValue([
       { id: 'u1', email: 'desactive@exemple.com', nom: 'Désactivé', password: '$2a$12$x', role: 'ACCUEIL', actif: false, avatar: null },
     ]);
 
-    const provider = authOptions.providers[0] as { authorize: (c: unknown) => Promise<unknown> };
-    const resultat = await provider.authorize({
+    // ⚠️ next-auth 4.24 : CredentialsProvider() retourne { authorize: () => null,
+    // options } — l'authorize RÉEL est dans provider.options.authorize (c'est
+    // ce que lit le cœur next-auth au signin). Voir src/lib/auth.ts.
+    const authorizeFn = extraireAuthorize();
+    const resultat = await authorizeFn({
       email: 'desactive@exemple.com',
       password: 'motdepasse',
     });
@@ -168,21 +182,11 @@ describe('authorize() — connexion', () => {
       { id: 'u2', email: 'actif@exemple.com', nom: 'Actif', password: '$2a$12$x', role: 'ACCUEIL', actif: true, avatar: null, sessionVersion: 3 },
     ]);
 
-    const provider = authOptions.providers[0] as { authorize: (c: unknown) => Promise<unknown> };
-    const resultat = (await provider.authorize({
+    const authorizeFn = extraireAuthorize();
+    const resultat = (await authorizeFn({
       email: 'actif@exemple.com',
       password: 'motdepasse',
     })) as { sessionVersion?: number } | null;
-    // Diagnostic temporaire : identifier le chemin de retour null en CI.
-    console.log('[DEBUG authorize]', JSON.stringify({
-      queryRawAppels: dbMock.$queryRaw.mock.calls.length,
-      evaluateAppels: loginPolicyMock.evaluateLoginAttempt.mock.calls.length,
-      normalizeAppels: loginPolicyMock.normalizeEmail.mock.calls.length,
-      compareAppels: bcryptMock.compare.mock.calls.length,
-      providerCles: Object.keys(provider),
-      authorizeType: typeof provider.authorize,
-      authorizeSrc: (provider.authorize as unknown as { toString(): string }).toString().slice(0, 300),
-    }));
     expect(resultat).not.toBeNull();
     expect(resultat?.sessionVersion).toBe(3); // figée dans le JWT par le callback
   });
