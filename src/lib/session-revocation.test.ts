@@ -12,15 +12,83 @@
  *   8. Anciennes sessions invalides après réactivation     → 401.
  * + cas limites : compte supprimé, jeton pré-déploiement, erreur base
  *   (fail-closed 503), mode dégradé (colonne absente → actif seul).
+ *
+ * Pattern de mocking : vi.mock HOISTÉS au top-level avec vi.fn() mutables
+ * (pattern du projet) — reconfigurés par scénario dans chaque test.
  */
 
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ─── Mocks hoistés (partagés par tout le fichier) ────────────────────────────
+
+const dbMock = vi.hoisted(() => ({
+  $queryRaw: vi.fn(),
+  $executeRaw: vi.fn(),
+  assure: { findFirst: vi.fn() },
+  entrepriseContact: { findFirst: vi.fn() },
+  utilisateur: { findUnique: vi.fn() },
+}));
+
+const bcryptMock = vi.hoisted(() => ({
+  compare: vi.fn(),
+  hash: vi.fn(),
+}));
+
+const loginPolicyMock = vi.hoisted(() => ({
+  evaluateLoginAttempt: vi.fn(),
+  recordFailedLogin: vi.fn(),
+  resetLoginCounters: vi.fn(),
+  normalizeEmail: vi.fn((e: string) => e.trim().toLowerCase()),
+}));
+
+const lockoutMock = vi.hoisted(() => ({
+  isLockedOut: vi.fn(),
+  recordFailedAttempt: vi.fn(),
+  resetAttempts: vi.fn(),
+  MAX_ATTEMPTS: 5,
+}));
+
+const liaisonMock = vi.hoisted(() => ({
+  resoudreLiaisonContactEntreprise: vi.fn(),
+  resoudreLiaisonPrestataireAvecControle: vi.fn(),
+}));
+
+const jwtMock = vi.hoisted(() => ({
+  getToken: vi.fn(),
+}));
+
+vi.mock('@/lib/db', () => ({ db: dbMock }));
+vi.mock('bcryptjs', () => ({ compare: bcryptMock.compare, hash: bcryptMock.hash }));
+vi.mock('@/lib/login-policy', () => loginPolicyMock);
+vi.mock('@/lib/account-lockout', () => lockoutMock);
+vi.mock('@/lib/liaison-externe', () => ({
+  resoudreLiaisonContactEntreprise: liaisonMock.resoudreLiaisonContactEntreprise,
+}));
+vi.mock('@/lib/liaison-prestataire', () => ({
+  resoudreLiaisonPrestataireAvecControle: liaisonMock.resoudreLiaisonPrestataireAvecControle,
+}));
+vi.mock('next-auth/jwt', () => ({ getToken: jwtMock.getToken }));
+
+import { authOptions } from './auth';
+import { authorizeRequest } from './authorize';
 import {
   estSessionRevoquee,
   verifierSessionUtilisateur,
   ERREUR_SESSION_INVALIDEE,
   type EtatCompte,
 } from './session-revocation';
+
+// État « par défaut » des mocks : un compte actif, politique de login ouverte.
+beforeEach(() => {
+  vi.clearAllMocks();
+  dbMock.$queryRaw.mockResolvedValue([]);
+  dbMock.$executeRaw.mockResolvedValue(1);
+  bcryptMock.compare.mockResolvedValue(true);
+  loginPolicyMock.evaluateLoginAttempt.mockResolvedValue({ allowed: true, reason: '', count: 0, resetSeconds: 0 });
+  lockoutMock.isLockedOut.mockResolvedValue({ locked: false, remainingMs: 0 });
+  lockoutMock.recordFailedAttempt.mockResolvedValue({ locked: false });
+  dbMock.utilisateur.findUnique.mockResolvedValue({ actif: true, sessionVersion: 1 });
+});
 
 // ─── 1/2. Prédicat pur — les 8 scénarios exigés ─────────────────────────────
 
@@ -81,57 +149,12 @@ describe('estSessionRevoquee — scénarios P1', () => {
 
 // ─── 2. Refus de connexion d'un utilisateur désactivé (authorize) ───────────
 
-// Mock '@/lib/db' PARTAGÉ au niveau module : vi.doMock persiste à travers
-// vi.resetModules() (le registre des mocks n'est PAS vidé), les describes
-// authorize() et authorizeRequest() réutilisent donc le MÊME enregistrement
-// et reconfigurent les vi.fn() selon le scénario.
-const dbMock = {
-  $queryRaw: vi.fn(),
-  $executeRaw: vi.fn(),
-  assure: { findFirst: vi.fn() },
-  entrepriseContact: { findFirst: vi.fn() },
-  // Relecture d'état du compte (verifierSessionUtilisateur / authorizeRequest)
-  utilisateur: { findUnique: vi.fn() },
-};
-
 describe('authorize() — connexion', () => {
-  // Chaque test reconfigure les vi.fn() mutables. Aucun vi.hoisted
-  // (vi.hoisted hoisterait la déclaration au niveau module et entrerait en
-  // collision entre deux it).
-
-  beforeAll(() => {
-    vi.doMock('@/lib/db', () => ({ db: dbMock }));
-    vi.doMock('bcryptjs', () => ({ compare: vi.fn().mockResolvedValue(true), hash: vi.fn() }));
-    vi.doMock('@/lib/login-policy', () => ({
-      evaluateLoginAttempt: vi.fn().mockResolvedValue({ allowed: true, reason: '', count: 0, resetSeconds: 0 }),
-      recordFailedLogin: vi.fn().mockResolvedValue(undefined),
-      resetLoginCounters: vi.fn().mockResolvedValue(undefined),
-      normalizeEmail: (e: string) => e.trim().toLowerCase(),
-    }));
-    vi.doMock('@/lib/account-lockout', () => ({
-      isLockedOut: vi.fn().mockResolvedValue({ locked: false, remainingMs: 0 }),
-      recordFailedAttempt: vi.fn().mockResolvedValue({ locked: false }),
-      resetAttempts: vi.fn().mockResolvedValue(undefined),
-      MAX_ATTEMPTS: 5,
-    }));
-    vi.doMock('@/lib/liaison-externe', () => ({ resoudreLiaisonContactEntreprise: vi.fn() }));
-    vi.doMock('@/lib/liaison-prestataire', () => ({
-      resoudreLiaisonPrestataireAvecControle: vi.fn(),
-    }));
-  });
-
-  beforeEach(() => {
-    vi.resetModules();
-    dbMock.$queryRaw.mockReset();
-    dbMock.$executeRaw.mockReset();
-  });
-
   it('refuse la connexion d\'un utilisateur désactivé (actif=false)', async () => {
     dbMock.$queryRaw.mockResolvedValue([
       { id: 'u1', email: 'desactive@exemple.com', nom: 'Désactivé', password: '$2a$12$x', role: 'ACCUEIL', actif: false, avatar: null },
     ]);
 
-    const { authOptions } = await import('./auth');
     const provider = authOptions.providers[0] as { authorize: (c: unknown) => Promise<unknown> };
     const resultat = await provider.authorize({
       email: 'desactive@exemple.com',
@@ -144,9 +167,7 @@ describe('authorize() — connexion', () => {
     dbMock.$queryRaw.mockResolvedValue([
       { id: 'u2', email: 'actif@exemple.com', nom: 'Actif', password: '$2a$12$x', role: 'ACCUEIL', actif: true, avatar: null, sessionVersion: 3 },
     ]);
-    dbMock.$executeRaw.mockResolvedValue(1);
 
-    const { authOptions } = await import('./auth');
     const provider = authOptions.providers[0] as { authorize: (c: unknown) => Promise<unknown> };
     const resultat = (await provider.authorize({
       email: 'actif@exemple.com',
@@ -244,33 +265,9 @@ describe('verifierSessionUtilisateur — relecture à chaque accès protégé', 
   });
 });
 
-// ─── 6. authorizeRequest — accès API protégé avec JWT obsolète ─────────────
+// ─── 6. authorizeRequest — accès API protégé avec JWT obsolète ──────────────
 
-// Le mock '@/lib/db' (enregistré dans le describe précédent, le registre des
-// vi.doMock persiste) est RÉUTILISÉ ici : seules les vi.fn() sont reconfigurées.
 describe('authorizeRequest — porte de révocation centralisée', () => {
-  const jwtMock = { getToken: vi.fn() };
-
-  beforeAll(() => {
-    vi.doMock('next-auth/jwt', () => jwtMock);
-  });
-
-  beforeEach(() => {
-    vi.resetModules();
-    jwtMock.getToken.mockReset();
-    dbMock.utilisateur.findUnique.mockReset();
-  });
-
-  async function chargerAuthorizeRequest(opts: {
-    jeton: Record<string, unknown> | null;
-    compte: Record<string, unknown> | null;
-  }) {
-    jwtMock.getToken.mockResolvedValue(opts.jeton);
-    dbMock.utilisateur.findUnique.mockReset().mockResolvedValue(opts.compte);
-    const { authorizeRequest } = await import('./authorize');
-    return { authorizeRequest };
-  }
-
   function requete(pathname: string) {
     return {
       nextUrl: new URL(`http://localhost${pathname}`),
@@ -279,30 +276,27 @@ describe('authorizeRequest — porte de révocation centralisée', () => {
   }
 
   it('utilisateur désactivé + JWT signé valide → 401 (aucune opération protégée)', async () => {
-    const { authorizeRequest } = await chargerAuthorizeRequest({
-      jeton: { id: 'u1', role: 'ADMINISTRATEUR', sessionVersion: 1 },
-      compte: { actif: false, sessionVersion: 2 },
-    });
+    jwtMock.getToken.mockResolvedValue({ id: 'u1', role: 'ADMINISTRATEUR', sessionVersion: 1 });
+    dbMock.utilisateur.findUnique.mockResolvedValue({ actif: false, sessionVersion: 2 });
+
     const r = await authorizeRequest(requete('/api/utilisateurs'));
     expect(r.authorized).toBe(false);
     expect(r.status).toBe(401);
   });
 
   it('ancienne session après réactivation (v1 vs v3) → 401', async () => {
-    const { authorizeRequest } = await chargerAuthorizeRequest({
-      jeton: { id: 'u1', role: 'ADMINISTRATEUR', sessionVersion: 1 },
-      compte: { actif: true, sessionVersion: 3 },
-    });
+    jwtMock.getToken.mockResolvedValue({ id: 'u1', role: 'ADMINISTRATEUR', sessionVersion: 1 });
+    dbMock.utilisateur.findUnique.mockResolvedValue({ actif: true, sessionVersion: 3 });
+
     const r = await authorizeRequest(requete('/api/utilisateurs'));
     expect(r.authorized).toBe(false);
     expect(r.status).toBe(401);
   });
 
   it('session courante → autorisée (fonctionnement normal préservé)', async () => {
-    const { authorizeRequest } = await chargerAuthorizeRequest({
-      jeton: { id: 'u1', role: 'ADMINISTRATEUR', sessionVersion: 3 },
-      compte: { actif: true, sessionVersion: 3 },
-    });
+    jwtMock.getToken.mockResolvedValue({ id: 'u1', role: 'ADMINISTRATEUR', sessionVersion: 3 });
+    dbMock.utilisateur.findUnique.mockResolvedValue({ actif: true, sessionVersion: 3 });
+
     const r = await authorizeRequest(requete('/api/utilisateurs'));
     expect(r.authorized).toBe(true);
   });
