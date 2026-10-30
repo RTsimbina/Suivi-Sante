@@ -534,35 +534,67 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const utilisateur = await db.utilisateur.update({
-      where: { id },
-      data: { actif },
-      select: {
-        id: true,
-        email: true,
-        nom: true,
-        role: true,
-        actif: true,
-        avatar: true,
-        updatedAt: true,
-      },
-    });
+    // ─── P1 « Révocation des sessions » ────────────────────────────────────
+    // Un changement RÉEL de statut (désactivation OU réactivation) incrémente
+    // Utilisateur.sessionVersion DANS LA MÊME TRANSACTION : tout jeton JWT
+    // émis avant l'opération porte une version périmée et est REFUSÉ à la
+    // première requête protégée (src/lib/session-revocation.ts) — révocation
+    // immédiate de toutes les sessions ouvertes, y compris les autres
+    // appareils. L'incrément à la RÉACTIVATION garantit qu'un jeton volé
+    // avant la désactivation ne redevient jamais valide après.
+    const changementStatut = existing.actif !== actif;
+    const utilisateur = changementStatut
+      ? await db.$transaction(async (tx) =>
+          tx.utilisateur.update({
+            where: { id },
+            data: { actif, sessionVersion: { increment: 1 } },
+            select: {
+              id: true,
+              email: true,
+              nom: true,
+              role: true,
+              actif: true,
+              avatar: true,
+              updatedAt: true,
+            },
+          }),
+        )
+      : await db.utilisateur.update({
+          where: { id },
+          data: { actif },
+          select: {
+            id: true,
+            email: true,
+            nom: true,
+            role: true,
+            actif: true,
+            avatar: true,
+            updatedAt: true,
+          },
+        });
 
     // ─── Audit (socle Gestion — pilier Audit) : l'activation / désactivation
     // d'un compte est un événement de sécurité majeur — toujours tracée avec
-    // l'auteur réel (la désactivation coupe l'accès au portail immédiatement).
-    const { nom: auteurNom, id: auteurId } = await getUserInfoFromRequest(request);
-    await logParametreChange({
-      entite: 'Utilisateur',
-      entiteId: id,
-      champ: 'actif',
-      ancienneValeur: existing.actif,
-      nouvelleValeur: actif,
-      modifiePar: auteurNom,
-      modifieParId: auteurId,
-      objet: existing.email,
-      request,
-    });
+    // l'auteur réel. La RÉVOCATION des sessions est tracée dans les
+    // métadonnées (numéro de version) — JAMAIS de jeton, cookie ou secret.
+    if (changementStatut) {
+      const { nom: auteurNom, id: auteurId } = await getUserInfoFromRequest(request);
+      await logParametreChange({
+        entite: 'Utilisateur',
+        entiteId: id,
+        champ: 'actif',
+        ancienneValeur: existing.actif,
+        nouvelleValeur: actif,
+        modifiePar: auteurNom,
+        modifieParId: auteurId,
+        objet: existing.email,
+        metadonnees: JSON.stringify({
+          sessionsRevoquees: true,
+          sessionVersion: (utilisateur as { sessionVersion?: number }).sessionVersion ?? null,
+        }),
+        request,
+      });
+    }
 
     return NextResponse.json({
       message: actif ? 'Utilisateur active.' : 'Utilisateur desactive.',

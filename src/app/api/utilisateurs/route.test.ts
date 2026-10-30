@@ -12,54 +12,63 @@ import type { NextRequest } from 'next/server';
 
 // ─── Mocks de modules (hoistés) ──────────────────────────────────────────────
 
-const dbMocks = vi.hoisted(() => ({
-  utilisateurFindUnique: vi.fn(),
-  utilisateurFindMany: vi.fn(),
-  utilisateurCount: vi.fn(),
-  utilisateurCreate: vi.fn(),
-  utilisateurUpdate: vi.fn(),
-  utilisateurDelete: vi.fn().mockResolvedValue({}),
-  assureFindFirst: vi.fn(),
-  assureFindMany: vi.fn(),
-  contactFindFirst: vi.fn(),
-  contactFindMany: vi.fn(),
-  contactCreate: vi.fn(),
-  societeFindUnique: vi.fn(),
-  societeFindFirst: vi.fn(),
-  societeFindMany: vi.fn(),
-  prestataireFindFirst: vi.fn(),
-  prestataireFindMany: vi.fn(),
-}));
-
-vi.mock('@/lib/db', () => ({
-  db: {
+const dbMocks = vi.hoisted(() => {
+  const delegues = {
+    utilisateurFindUnique: vi.fn(),
+    utilisateurFindMany: vi.fn(),
+    utilisateurCount: vi.fn(),
+    utilisateurCreate: vi.fn(),
+    utilisateurUpdate: vi.fn(),
+    utilisateurDelete: vi.fn().mockResolvedValue({}),
+    assureFindFirst: vi.fn(),
+    assureFindMany: vi.fn(),
+    contactFindFirst: vi.fn(),
+    contactFindMany: vi.fn(),
+    contactCreate: vi.fn(),
+    societeFindUnique: vi.fn(),
+    societeFindFirst: vi.fn(),
+    societeFindMany: vi.fn(),
+    prestataireFindFirst: vi.fn(),
+    prestataireFindMany: vi.fn(),
+  };
+  // Client db mocké : $transaction exécute le callback avec le même objet
+  // (le tx partage les délégués — comportement Prisma simplifié pour tests).
+  const dbClient = {
     utilisateur: {
-      findUnique: dbMocks.utilisateurFindUnique,
-      findMany: dbMocks.utilisateurFindMany,
-      count: dbMocks.utilisateurCount,
-      create: dbMocks.utilisateurCreate,
-      update: dbMocks.utilisateurUpdate,
-      delete: dbMocks.utilisateurDelete,
+      findUnique: delegues.utilisateurFindUnique,
+      findMany: delegues.utilisateurFindMany,
+      count: delegues.utilisateurCount,
+      create: delegues.utilisateurCreate,
+      update: delegues.utilisateurUpdate,
+      delete: delegues.utilisateurDelete,
     },
     assure: {
-      findFirst: dbMocks.assureFindFirst,
-      findMany: dbMocks.assureFindMany,
+      findFirst: delegues.assureFindFirst,
+      findMany: delegues.assureFindMany,
     },
     entrepriseContact: {
-      findFirst: dbMocks.contactFindFirst,
-      findMany: dbMocks.contactFindMany,
-      create: dbMocks.contactCreate,
+      findFirst: delegues.contactFindFirst,
+      findMany: delegues.contactFindMany,
+      create: delegues.contactCreate,
     },
     societe: {
-      findUnique: dbMocks.societeFindUnique,
-      findFirst: dbMocks.societeFindFirst,
-      findMany: dbMocks.societeFindMany,
+      findUnique: delegues.societeFindUnique,
+      findFirst: delegues.societeFindFirst,
+      findMany: delegues.societeFindMany,
     },
     prestataire: {
-      findFirst: dbMocks.prestataireFindFirst,
-      findMany: dbMocks.prestataireFindMany,
+      findFirst: delegues.prestataireFindFirst,
+      findMany: delegues.prestataireFindMany,
     },
-  },
+  };
+  return {
+    ...delegues,
+    $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(dbClient)),
+  };
+});
+
+vi.mock('@/lib/db', () => ({
+  db: dbMocks,
 }));
 
 vi.mock('@/lib/authorize', () => ({
@@ -504,5 +513,102 @@ describe('Pilier Audit — /api/utilisateurs', () => {
     const tout = JSON.stringify(champs);
     expect(tout).not.toContain('nouveaumdp1');
     expect(tout).not.toContain('$2a$12$hashed');
+  });
+});
+
+// ─── P1 « Révocation des sessions » — PATCH actif (travaux 3 et 5) ──────────
+describe('P1 Révocation des sessions — PATCH /api/utilisateurs', () => {
+  beforeEach(() => {
+    auditMocks.logParametreChange.mockClear();
+    auditMocks.getUserInfoFromRequest.mockResolvedValue({
+      nom: 'Admin', id: 'u-admin', role: 'ADMINISTRATEUR',
+    });
+  });
+
+  it('désactivation → sessionVersion incrémentée DANS la même transaction', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: true, sessionVersion: 1 });
+    dbMocks.utilisateurUpdate.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: false, sessionVersion: 2 });
+
+    const res = await PATCH(requetePatch({ id: 'u-ex', actif: false }));
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.$transaction).toHaveBeenCalledTimes(1);
+    expect(dbMocks.utilisateurUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'u-ex' },
+        data: { actif: false, sessionVersion: { increment: 1 } },
+      })
+    );
+  });
+
+  it('réactivation → incrément AUSSI (un jeton volé avant désactivation reste invalide)', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: false, sessionVersion: 2 });
+    dbMocks.utilisateurUpdate.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: true, sessionVersion: 3 });
+
+    const res = await PATCH(requetePatch({ id: 'u-ex', actif: true }));
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.$transaction).toHaveBeenCalledTimes(1);
+    expect(dbMocks.utilisateurUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { actif: true, sessionVersion: { increment: 1 } },
+      })
+    );
+  });
+
+  it('PATCH sans changement de statut → PAS d incrément ni d audit de révocation', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: true, sessionVersion: 1 });
+    dbMocks.utilisateurUpdate.mockResolvedValue(UTILISATEUR_EXISTANT);
+
+    const res = await PATCH(requetePatch({ id: 'u-ex', actif: true }));
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.$transaction).not.toHaveBeenCalled();
+    expect(dbMocks.utilisateurUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { actif: true } })
+    );
+    expect(auditMocks.logParametreChange).not.toHaveBeenCalled();
+  });
+
+  it('audit de désactivation : auteur réel + révocation tracée (version), AUCUN secret', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: true, sessionVersion: 1 });
+    dbMocks.utilisateurUpdate.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: false, sessionVersion: 2 });
+
+    await PATCH(requetePatch({ id: 'u-ex', actif: false }));
+
+    expect(auditMocks.logParametreChange).toHaveBeenCalledTimes(1);
+    const appel = auditMocks.logParametreChange.mock.calls[0][0];
+    expect(appel).toMatchObject({
+      entite: 'Utilisateur',
+      entiteId: 'u-ex',
+      champ: 'actif',
+      ancienneValeur: true,
+      nouvelleValeur: false,
+      modifiePar: 'Admin',
+      modifieParId: 'u-admin',
+    });
+    const metadonnees = JSON.parse(appel.metadonnees);
+    expect(metadonnees.sessionsRevoquees).toBe(true);
+    expect(metadonnees.sessionVersion).toBe(2);
+    const tout = JSON.stringify(appel);
+    // Jamais de mot de passe, cookie ou jeton de session dans le journal :
+    expect(tout).not.toContain('session-token');
+    expect(tout).not.toContain('Bearer');
+  });
+
+  it('audit DE réactivation : traçée comme désactivation (critère journalisation)', async () => {
+    dbMocks.utilisateurFindUnique.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: false, sessionVersion: 2 });
+    dbMocks.utilisateurUpdate.mockResolvedValue({ ...UTILISATEUR_EXISTANT, actif: true, sessionVersion: 3 });
+
+    await PATCH(requetePatch({ id: 'u-ex', actif: true }));
+
+    expect(auditMocks.logParametreChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        champ: 'actif',
+        ancienneValeur: false,
+        nouvelleValeur: true,
+        modifiePar: 'Admin',
+      })
+    );
   });
 });
