@@ -347,10 +347,11 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await screen.findByText('Rakoto Jean');
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
-    // Trigger du rôle : 3e combobox (2 filtres natifs + Radix rôle du dialogue).
-    // Ouverture au clavier : plus fiable que le pointeur pour un Radix Select
-    // rendu dans un dialogue en jsdom.
-    screen.getAllByRole('combobox')[2].focus();
+    // Trigger Radix Select du rôle (aria-haspopup="listbox" — le trigger
+    // n'expose pas role=combobox dans cette version). Ouverture au clavier,
+    // plus fiable que le pointeur dans un dialogue en jsdom.
+    const triggerRole = document.body.querySelectorAll('[aria-haspopup="listbox"]')[0] as HTMLElement;
+    triggerRole.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
 
@@ -367,7 +368,8 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await screen.findByText('Rakoto Jean');
 
     await user.click(screen.getByRole('button', { name: /Nouvel utilisateur/ }));
-    screen.getAllByRole('combobox')[2].focus();
+    const triggerRole = document.body.querySelectorAll('[aria-haspopup="listbox"]')[0] as HTMLElement;
+    triggerRole.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'Entreprise Cliente' }));
 
@@ -375,8 +377,9 @@ describe('Utilisateurs — liaison CONTACT_ENTREPRISE en direct', () => {
     await user.type(screen.getByLabelText('Adresse e-mail'), 'autre@cnaps.mg');
     expect(await screen.findByText(/Aucun contact d'entreprise avec cet e-mail/, {}, { timeout: 2500 })).toBeInTheDocument();
 
-    // Trigger de la société : 4e combobox (présent depuis le choix du rôle)
-    screen.getAllByRole('combobox')[3].focus();
+    // Trigger de la société : 2e trigger Radix (présent depuis le choix du rôle)
+    const triggerSociete = document.body.querySelectorAll('[aria-haspopup="listbox"]')[1] as HTMLElement;
+    triggerSociete.focus();
     await user.keyboard('{Enter}');
     await user.click(await screen.findByRole('option', { name: 'CNAPS' }));
 
