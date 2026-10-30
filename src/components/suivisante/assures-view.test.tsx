@@ -122,9 +122,10 @@ describe('Assurés — statistiques', () => {
     // La carte ET l'option du filtre type portent ce libellé
     expect(screen.getAllByText('Assurés principaux').length).toBeGreaterThan(0);
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('Conjoints')).toBeInTheDocument();
+    // Cartes + options du filtre type portent les mêmes libellés
+    expect(screen.getAllByText('Conjoints').length).toBeGreaterThan(0);
     expect(screen.getByText('5')).toBeInTheDocument();
-    expect(screen.getByText('Enfants')).toBeInTheDocument();
+    expect(screen.getAllByText('Enfants').length).toBeGreaterThan(0);
     expect(screen.getByText('8')).toBeInTheDocument();
     expect(screen.getByText('Sociétés couvertes')).toBeInTheDocument();
     // Les familles de la page sont toutes chez CNAPS
