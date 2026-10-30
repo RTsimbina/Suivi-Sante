@@ -9,7 +9,7 @@
 import { Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { Societe } from './types';
+import type { Societe, ImportResult } from './types';
 import ImportDialog from './import-dialog';
 
 interface ToolbarProps {
@@ -23,7 +23,7 @@ interface ToolbarProps {
   canEdit: boolean;
   onNouveau: () => void;
   /** POST FormData de l'import (délégué au hook par la vue mère). */
-  importerFichier: (file: File) => Promise<void>;
+  importerFichier: (file: File) => Promise<ImportResult>;
 }
 
 export default function Toolbar({
