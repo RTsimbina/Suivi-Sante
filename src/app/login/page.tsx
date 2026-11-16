@@ -9,12 +9,39 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-const DEMO_CREDENTIALS = [
-  { email: 'admin@suivisante.mg', role: 'Administrateur', color: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800' },
-  { email: 'accueil@suivisante.mg', role: 'Accueil', color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
-  { email: 'technique@suivisante.mg', role: 'Technique', color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800' },
-  { email: 'compta@suivisante.mg', role: 'Comptabilité', color: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800' },
-  { email: 'sante@suivisante.mg', role: 'Contrôle Santé', color: 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800' },
+// Jeu de données officiel : workflow « Jeu de données de test (reset + seed) »
+// (seed.yml → scripts/reset_seed.mjs). Deux mots de passe distincts, un par
+// groupe — PWD_INTERNE / PWD_EXTERNE de scripts/reset_seed.mjs.
+type CompteDemo = {
+  email: string;
+  role: string;
+  password: string;
+  groupe: 'internes' | 'externes';
+  color: string;
+};
+
+const DEMO_CREDENTIALS: CompteDemo[] = [
+  // ── Comptes internes (personnel de la caisse) — SuiviSante@2026 ──
+  { email: 'admin@suivisante.mg', role: 'Administrateur', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800' },
+  { email: 'accueil@suivisante.mg', role: 'Accueil', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { email: 'technique@suivisante.mg', role: 'Service Technique', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800' },
+  { email: 'compta@suivisante.mg', role: 'Comptabilité', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800' },
+  { email: 'sante@suivisante.mg', role: 'Contrôle Santé', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800' },
+  // ── Comptes externes (portails) — Contact@2026 ──
+  { email: 'portail.sanlam@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes', color: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800' },
+  { email: 'portail.telma@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes', color: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800' },
+  { email: 'contact.sanlam@sanlam.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
+  { email: 'contact.telma@telma.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
+  { email: 'contact.airtel@airtel.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
+  { email: 'contact.bni@bni.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
+  { email: 'j.rakotoarison@jirama.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
+  { email: 'facturation@hopital-principal.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes', color: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800' },
+  { email: 'contact@clinique-saintemarie.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes', color: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800' },
+];
+
+const GROUPES_DEMO: { cle: CompteDemo['groupe']; titre: string }[] = [
+  { cle: 'internes', titre: 'Comptes internes' },
+  { cle: 'externes', titre: 'Comptes externes (entreprises & prestataires)' },
 ];
 
 export default function LoginPage() {
@@ -220,29 +247,40 @@ export default function LoginPage() {
             <p className="text-xs font-medium text-muted-foreground mb-3 text-center">
               Comptes de démonstration
             </p>
-            <div className="space-y-2">
-              {DEMO_CREDENTIALS.map((cred) => (
-                <button
-                  key={cred.email}
-                  type="button"
-                  onClick={() => {
-                    setEmail(cred.email);
-                    setPassword('SuiviSante@2026');
-                    setError('');
-                  }}
-                  className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-all cursor-pointer hover:shadow-sm hover:scale-[1.01] active:scale-[0.99] ${cred.color}`}
-                >
-                  <span className="font-mono text-xs font-medium">
-                    {cred.email}
-                  </span>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-background/60">
-                    {cred.role}
-                  </span>
-                </button>
-              ))}
+            <div className="space-y-4">
+              {GROUPES_DEMO.map((groupe) => {
+                const comptes = DEMO_CREDENTIALS.filter((c) => c.groupe === groupe.cle);
+                return (
+                  <div key={groupe.cle} className="space-y-2">
+                    <p className="text-[11px] font-semibold text-muted-foreground">
+                      {groupe.titre} — mot de passe :{' '}
+                      <code className="font-mono bg-muted px-1.5 py-0.5 rounded">{comptes[0]?.password}</code>
+                    </p>
+                    {comptes.map((cred) => (
+                      <button
+                        key={cred.email}
+                        type="button"
+                        onClick={() => {
+                          setEmail(cred.email);
+                          setPassword(cred.password);
+                          setError('');
+                        }}
+                        className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-all cursor-pointer hover:shadow-sm hover:scale-[1.01] active:scale-[0.99] ${cred.color}`}
+                      >
+                        <span className="font-mono text-xs font-medium">
+                          {cred.email}
+                        </span>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-background/60 whitespace-nowrap">
+                          {cred.role}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
             <p className="text-[11px] text-muted-foreground text-center mt-3">
-              Mot de passe commun : <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">SuiviSante@2026</code>
+              Cliquez sur un compte pour pré-remplir le formulaire de connexion.
             </p>
           </CardContent>
         </Card>
