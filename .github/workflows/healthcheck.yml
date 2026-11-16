@@ -4,12 +4,20 @@
 # l'app ET la base — 503 si la base est injoignable, voir
 # src/app/api/health/route.ts).
 #
-# Comportement :
-#   - HTTP 200        → si des issues [Incident] Healthcheck sont ouvertes,
-#                       elles sont commentées (✅ restauré) puis fermées ;
-#   - HTTP ≠ 200      → ::error:: + exit 1 → l'étape if: failure() s'exécute :
-#                       une issue [Incident] est créée (ou commentée si déjà
-#                       ouverte — jamais de spam d'issues).
+# Comportement (trois états) :
+#   - ok         HTTP 200 → si des issues [Incident] Healthcheck sont ouvertes,
+#                          elles sont commentées (✅ restauré) puis fermées ;
+#   - checkpoint HTTP 429 « Vercel Security Checkpoint » (Attack Challenge
+#                          Mode actif) → ::warning:: + job AU VERT : le défi
+#                          anti-bot répond à la place de l'app, la sonde ne
+#                          conclut RIEN sur l'application — pas d'issue
+#                          d'incident (ce serait un faux positif répété toutes
+#                          les 30 min) ; les issues déjà ouvertes restent
+#                          ouvertes jusqu'à un vrai HTTP 200 ;
+#   - echec      tout autre non-200 (5xx applicatif, 000 réseau, défi reçu
+#                          malgré un contournement configuré) → ::error:: +
+#                          exit 1 → une issue [Incident] est créée (ou
+#                          commentée si déjà ouverte — jamais de spam).
 #
 # Contexte dépôt : ce job n'a PAS d'étape actions/checkout (aucun fichier
 # du dépôt n'est nécessaire). Le CLI gh reçoit donc GH_REPO pour identifier
@@ -82,8 +90,10 @@ jobs:
         run: |
           CORPS=/tmp/health-corps.html
           HEADER_BYPASS=()
+          BYPASS_ACTIF="absent"
           if [ -n "$VERCEL_PROTECTION_BYPASS" ]; then
             HEADER_BYPASS=(-H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}")
+            BYPASS_ACTIF="configure"
             echo "Contournement automation Vercel : ACTIF (secret configuré, valeur masquée)."
           else
             echo "Contournement automation Vercel : absent (secret VERCEL_PROTECTION_BYPASS non configuré)."
@@ -97,19 +107,27 @@ jobs:
           echo "Code HTTP : ${HTTP_CODE}"
           echo "code=${HTTP_CODE}" >> "$GITHUB_OUTPUT"
 
-          # « Vercel Security Checkpoint » = défi anti-bot : l'app n'est pas atteinte
-          VERROU="APPLICATIF"
-          if [ "${HTTP_CODE}" != "200" ] && grep -q "Vercel Security Checkpoint" "$CORPS" 2>/dev/null; then
-            VERROU="CHECKPOINT"
+          # Classification en trois états (voir en-tête du workflow) :
+          # ok = 200 ; checkpoint = défi anti-bot (app non atteinte) ;
+          # echec = tout le reste (vraie panne applicative ou réseau).
+          ETAT="echec"
+          if [ "${HTTP_CODE}" = "200" ]; then
+            ETAT="ok"
+          elif grep -q "Vercel Security Checkpoint" "$CORPS" 2>/dev/null; then
+            ETAT="checkpoint"
           fi
-          echo "verrou=${VERROU}" >> "$GITHUB_OUTPUT"
+          echo "etat=${ETAT}" >> "$GITHUB_OUTPUT"
+          echo "bypass=${BYPASS_ACTIF}" >> "$GITHUB_OUTPUT"
 
-          if [ "${HTTP_CODE}" != "200" ]; then
-            if [ "${VERROU}" = "CHECKPOINT" ]; then
-              echo "::error::HTTP ${HTTP_CODE} = « Vercel Security Checkpoint » (Attack Challenge Mode) — l'app n'est pas atteinte (elle répond normalement aux navigateurs). Correctif : désactiver « Attack Challenge Mode » (Vercel → projet → Firewall) OU configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection) puis le secret GitHub VERCEL_PROTECTION_BYPASS."
+          if [ "${ETAT}" = "checkpoint" ]; then
+            if [ "${BYPASS_ACTIF}" = "configure" ]; then
+              echo "::warning::HTTP ${HTTP_CODE} = « Vercel Security Checkpoint » alors que le secret VERCEL_PROTECTION_BYPASS est configuré — le contournement automation est défaillant (valeur du secret incorrecte ? Protection Bypass non activée ou régénérée côté Vercel ? Attack Challenge Mode actif ?). Job laissé au vert : l'app n'est pas atteinte, la sonde ne conclut rien sur l'application."
             else
-              echo "::error::Healthcheck en échec — HTTP ${HTTP_CODE} sur ${VERCEL_APP_URL}/api/health"
+              echo "::warning::HTTP ${HTTP_CODE} = « Vercel Security Checkpoint » (Attack Challenge Mode) — l'app n'est pas atteinte (elle répond normalement aux navigateurs) : état externe connu, indépendant du code, pas d'issue d'incident (faux positif répété toutes les 30 min). Correctif : désactiver « Attack Challenge Mode » (workflow « Vercel Firewall — Attack Challenge Mode », action = desactiver) OU configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection) puis le secret GitHub VERCEL_PROTECTION_BYPASS."
             fi
+            exit 0
+          elif [ "${ETAT}" = "echec" ]; then
+            echo "::error::Healthcheck en échec — HTTP ${HTTP_CODE} sur ${VERCEL_APP_URL}/api/health"
             exit 1
           fi
 
@@ -117,6 +135,8 @@ jobs:
       # Une seule issue ouverte par incident : si une issue [Incident]
       # Healthcheck est déjà ouverte, on y ajoute un commentaire au lieu
       # d'en créer une nouvelle (pas de spam).
+      # Note : l'état « checkpoint » (défi anti-bot) ne passe JAMAIS ici —
+      # il est traité comme un ::warning:: non bloquant (voir étape 2).
       - name: Créer ou commenter l'issue d'incident
         if: failure() && steps.secrets.outputs.skip != 'true'
         env:
@@ -124,17 +144,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
           CODE_HTTP: ${{ steps.sonde.outputs.code }}
-          VERROU: ${{ steps.sonde.outputs.verrou }}
         run: |
           DATE_UTC="$(date -u '+%Y-%m-%d %H:%M UTC')"
-
-          if [ "${VERROU}" = "CHECKPOINT" ]; then
-            DETAIL="Vercel Security Checkpoint (défi anti-bot — app non atteinte)"
-            CAUSE="> **Cause identifiée : « Vercel Security Checkpoint » (Attack Challenge Mode Vercel).** Le défi anti-bot répond à la place de l'application pour tout trafic non-navigateur : l'app reste accessible aux humains (le navigateur résout le défi) mais le healthcheck reçoit HTTP 429 sans jamais atteindre l'app. **Correctif au choix :** (1) Vercel → projet → Firewall → désactiver « Attack Challenge Mode » ; ou (2) conserver la protection et configurer « Protection Bypass for Automation » (Vercel → Settings → Deployment Protection → Protection Bypass for Automation → générer le secret) puis ajouter le secret GitHub \`VERCEL_PROTECTION_BYPASS\` avec cette valeur."
-          else
-            DETAIL="défaut applicatif ou réseau"
-            CAUSE=""
-          fi
+          DETAIL="défaut applicatif ou réseau"
 
           # Les labels doivent exister avant gh issue create (dépôt vierge)
           gh label create incident   --color D93F0B --description "Incident détecté par la surveillance automatisée" || true
@@ -174,8 +186,6 @@ jobs:
           | Détecté | ${DATE_UTC} |
           | Run | ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} |
 
-          ${CAUSE}
-
           \`000\` = le runner n'a pas pu joindre l'application (DNS, réseau ou timeout > 15 s).
           \`503\` = l'application répond mais la base de données est injoignable.
 
@@ -189,10 +199,11 @@ jobs:
             echo "Issue d'incident créée."
 
       # ── 4. Fermer les issues d'incident résolues ──────────────────────────
-      # Healthcheck OK + issue(s) [Incident] ouverte(s) → commentaire de
-      # restauration + fermeture (traçabilité complète dans l'issue).
+      # Fermeture UNIQUEMENT sur un vrai HTTP 200 (etat=ok) : en état
+      # « checkpoint », le job réussit (exit 0) mais la sonde n'a rien
+      # vérifié — il serait faux d'annoncer « ✅ restauré ».
       - name: Fermer les issues d'incident résolues
-        if: success() && steps.secrets.outputs.skip != 'true'
+        if: success() && steps.sonde.outputs.etat == 'ok' && steps.secrets.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
