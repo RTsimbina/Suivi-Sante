@@ -158,6 +158,12 @@ function extractRequestContext(request: Request) {
  * modification n'est exposée, et la table n'est accessible qu'aux profils
  * autorisés (route GET réservée à ADMINISTRATEUR, cf. API_PERMISSIONS).
  *
+ * L'immuabilité est aussi verrouillée EN BASE : des déclencheurs PostgreSQL
+ * interdisent UPDATE/DELETE (migration 20260924110000) et TRUNCATE
+ * (migration 20261117090000) — quel que soit le client connecté. Test réel
+ * d'échec d'écriture directe : scripts/test-audit-immutability.mjs
+ * (npm run test:audit-immutabilite) ; régression CI : audit-immutabilite.test.ts.
+ *
  * La classification du niveau (INFO/STANDARD/SENSIBLE/CRITIQUE) est automatique
  * sauf si `niveau` est explicitement fourni.
  *
