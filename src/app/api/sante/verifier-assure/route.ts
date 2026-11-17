@@ -172,6 +172,10 @@ export async function POST(request: NextRequest) {
       societeId: assure.societeId,
       beneficiaire: `${assure.prenom || ''} ${assure.nom}`.trim(),
       modifiePar: request.headers.get('x-user-name') || 'inconnu',
+      // P2-03C : la trace exige l'IDENTIFIANT de l'utilisateur (nom + rôle seuls
+      // ne suffisent pas pour l'investigation — l'id est non falsifiable,
+      // injecté par le middleware depuis le JWT).
+      modifieParId: request.headers.get('x-user-id') || undefined,
       roleUtilisateur: userRole ?? undefined,
       motif: 'Consultation Contrôle Santé (vérification assuré)',
       request,
