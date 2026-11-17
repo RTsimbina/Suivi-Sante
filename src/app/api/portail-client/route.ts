@@ -1,49 +1,117 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { db } from '@/lib/db';
-import { enNombre, sommer } from '@/lib/money';
+import { enNombre } from '@/lib/money';
 import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
-import { resoudreLiaisonContactEntreprise } from '@/lib/liaison-externe';
 import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 import type { Prisma } from '@prisma/client';
 import { plageDepuisParams, filtreDateChamp } from '@/lib/periodes';
+import { masquerNss } from '@/lib/nss';
+import {
+  resoudreAssureParEmail,
+  resoudreSocieteIdParEmailContact,
+  chargerAssure,
+} from '@/lib/portail-client-scope';
+
+// ─── P2-02 : paramètres de pagination / recherche / tri des dossiers ────────
+// Tri stable : le second critère `{ id: 'asc' }` garantit un ordre total —
+// aucun doublon ni omission entre les pages même à dates égales.
+const SORTABLE_DOSSIERS = [
+  'numeroDossier', 'statut', 'typeDossier', 'beneficiaire',
+  'dateReception', 'dateSoins', 'montantReclame', 'montantValide', 'montantPaye',
+] as const;
+
+function paramsPaginationDossiers(url: URL) {
+  const params = url.searchParams;
+  const page = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
+  const limit = Math.min(200, Math.max(5, parseInt(params.get('limit') || '50', 10) || 50));
+  const search = (params.get('search') || '').trim().slice(0, 100);
+  const sortByRaw = params.get('sortBy') || 'dateReception';
+  const sortBy = (SORTABLE_DOSSIERS as readonly string[]).includes(sortByRaw)
+    ? (sortByRaw as typeof SORTABLE_DOSSIERS[number])
+    : 'dateReception';
+  const sortOrder = params.get('sortOrder') === 'asc' ? 'asc' : 'desc';
+  const statut = (params.get('statut') || '').trim();
+  return { page, limit, search, sortBy, sortOrder, statut };
+}
+
+/** Applique la recherche et le filtre de statut au where des dossiers. */
+function filtreDossiersPortail(
+  whereDossiers: Prisma.DossierWhereInput,
+  search: string,
+  statut: string,
+): void {
+  if (search) {
+    whereDossiers.OR = [
+      { numeroDossier: { contains: search, mode: 'insensitive' } },
+      { beneficiaire: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+  if (statut === 'en-cours') {
+    whereDossiers.statut = { notIn: ['PAYE', 'REJETE'] };
+  } else if (statut) {
+    whereDossiers.statut = statut;
+  }
+}
+
+type KpisDossiers = {
+  totalDossiers: number;
+  totalReclame: number;
+  totalPaye: number;
+  enCours: number;
+  rejetes: number;
+};
+
+/**
+ * P2-02 : KPIs calculés sur l'ENSEMBLE filtré (agrégations Prisma exactes en
+ * Decimal) — plus jamais sur la page courante : les totaux sont indépendants
+ * de la pagination.
+ */
+async function kpisDossiersFiltres(
+  whereDossiers: Prisma.DossierWhereInput,
+): Promise<KpisDossiers> {
+  const [total, agg, statutsCounts] = await Promise.all([
+    db.dossier.count({ where: whereDossiers }),
+    db.dossier.aggregate({
+      where: whereDossiers,
+      _sum: { montantReclame: true, montantPaye: true },
+    }),
+    db.dossier.groupBy({ by: ['statut'], where: whereDossiers, _count: true }),
+  ]);
+  const paye = enNombre(agg._sum.montantPaye) ?? 0;
+  const payeCount = statutsCounts.find(s => s.statut === 'PAYE')?._count ?? 0;
+  const rejetes = statutsCounts.find(s => s.statut === 'REJETE')?._count ?? 0;
+  return {
+    totalDossiers: total,
+    totalReclame: enNombre(agg._sum.montantReclame) ?? 0,
+    totalPaye: paye,
+    enCours: total - payeCount - rejetes,
+    rejetes,
+  };
+}
+
+/** Métadonnées de pagination renvoyées au frontend (P2-02B). */
+function metaPagination(page: number, limit: number, total: number) {
+  return {
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+    hasNext: page * limit < total,
+    hasPrev: page > 1,
+  };
+}
 
 // ─── GET : Données du portail client ──────────────────────────────────────
 // Renvoie les données filtrées selon le rôle externe connecté :
 //   - PORTAIL_CLIENT : données de l'assuré (avec ayants droit, contrats, dossiers)
 //   - CONTACT_ENTREPRISE : données de la société (assurés, contrats, dossiers)
 //   - ADMINISTRATEUR : toutes les données (pour test)
-
-// ─── Résolution de secours des identifiants de portail ────────────────────
-// Le JWT fige assureId/societeId pour toute la session (8 h). Si la liaison
-// (e-mail assuré / contact d'entreprise) a été créée ou corrigée APRÈS la
-// connexion, le token ne la contient pas — et si l'assuré a été supprimé/
-// recréé, le token pointe vers un id mort. Dans ces deux cas, on re-résout
-// DEPUIS LA BASE à partir de l'e-mail authentifié du token (jamais d'entrée
-// client), ce qui auto-répare le compte sans attendre une reconnexion.
-
-async function resoudreAssureParEmail(email: string) {
-  return db.assure.findFirst({
-    where: { email: { equals: email, mode: 'insensitive' } },
-    select: { id: true, societeId: true },
-  });
-}
-
-async function resoudreSocieteIdParEmailContact(email: string): Promise<string | null> {
-  // Contact déclaré, e-mail du contact principal (« Modifier la société »)
-  // ou e-mail général de la société — cf. src/lib/liaison-externe.ts.
-  const liaison = await resoudreLiaisonContactEntreprise(email);
-  return liaison?.societeId ?? null;
-}
-
-async function chargerAssure(id: string) {
-  return db.assure.findUnique({
-    where: { id },
-    include: {
-      societe: { select: { id: true, nom: true, adresse: true, telephone: true, email: true } },
-    },
-  });
-}
+//
+// Résolution de secours des identifiants de portail : partagée avec l'export
+// via src/lib/portail-client-scope.ts (le JWT fige assureId/societeId pour
+// la session ; si la liaison a été créée/corrigée APRÈS la connexion, on
+// re-résout DEPUIS LA BASE à partir de l'e-mail authentifié du token).
 
 export async function GET(request: NextRequest) {
   try {
@@ -151,19 +219,26 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      // Récupérer les dossiers de toute la famille
+      // ─── P2-02 : dossiers de la famille PAGINÉS / triés / filtrés ────────
+      const { page, limit, search, sortBy, sortOrder, statut } = paramsPaginationDossiers(new URL(request.url));
       const allAssureIds = ayantsDroit.map(a => a.id);
       const whereDossiers: Prisma.DossierWhereInput = { assureId: { in: allAssureIds } };
       Object.assign(whereDossiers, filtreDateChamp('dateReception', plage));
-      const dossiers = await db.dossier.findMany({
-        where: whereDossiers,
-        include: {
-          societe: { select: { id: true, nom: true } },
-          assure: { select: { id: true, nom: true, prenom: true, typeBeneficiaire: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      });
+      filtreDossiersPortail(whereDossiers, search, statut);
+      const [dossiers, kpis] = await Promise.all([
+        db.dossier.findMany({
+          where: whereDossiers,
+          include: {
+            societe: { select: { id: true, nom: true } },
+            assure: { select: { id: true, nom: true, prenom: true, typeBeneficiaire: true } },
+          },
+          // Tri stable : id en second critère (aucun doublon ni omission)
+          orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        kpisDossiersFiltres(whereDossiers),
+      ]);
 
       // Récupérer les barèmes EN VIGUEUR de la société (P1 : une version par
       // prestation — les versions historiques restent consultables côté
@@ -173,14 +248,7 @@ export async function GET(request: NextRequest) {
       });
       const baremes = dedupliquerEnVigueur(toutesVersions, new Date());
 
-      // Stats rapides — sommes EXACTES en Decimal (plan P3)
-      const totalDossiers = dossiers.length;
-      const totalReclame = enNombre(sommer(dossiers.map(d => d.montantReclame))) ?? 0;
-      const totalPaye = enNombre(sommer(
-        dossiers.filter(d => d.statut === 'PAYE').map(d => d.montantPaye)
-      )) ?? 0;
-      const enCours = dossiers.filter(d => !['PAYE', 'REJETE'].includes(d.statut)).length;
-      const rejetes = dossiers.filter(d => d.statut === 'REJETE').length;
+      // KPIs + pagination renvoyés : calculés sur l'ensemble filtré (hors page)
 
       return NextResponse.json({
         type: 'PORTAIL_CLIENT',
@@ -188,7 +256,10 @@ export async function GET(request: NextRequest) {
           id: assure.id,
           nom: assure.nom,
           prenom: assure.prenom,
-          nSS: assure.nSS,
+          // P2-03 : NSS masqué côté backend — même pour l'assuré lui-même
+          // (minimisation des données : le portail n'a pas besoin du NSS
+          // complet ; le personnel habilité le consulte via les écrans internes).
+          nSS: masquerNss(assure.nSS),
           matricule: assure.matricule,
           typeBeneficiaire: assure.typeBeneficiaire,
           dateNaissance: assure.dateNaissance,
@@ -202,7 +273,19 @@ export async function GET(request: NextRequest) {
           codeFamille: assure.codeFamille,
         },
         societe: assure.societe,
-        famille: familleMembers,
+        // P2-03 : la famille était renvoyée BRUTE (objets Prisma complets,
+        // NSS et coordonnées compris) — projection minimale des champs
+        // affichés par le portail, sans NSS ni coordonnées sensibles.
+        famille: familleMembers.map(m => ({
+          id: m.id,
+          nom: m.nom,
+          prenom: m.prenom,
+          typeBeneficiaire: m.typeBeneficiaire,
+          dateNaissance: m.dateNaissance,
+          codeFamille: m.codeFamille,
+          actif: m.actif,
+          _count: { dossiers: m._count.dossiers },
+        })),
         contrats: contrats.map(c => ({
           id: c.id,
           reference: c.reference,
@@ -240,7 +323,8 @@ export async function GET(request: NextRequest) {
             typeBeneficiaire: d.assure.typeBeneficiaire,
           } : null,
         })),
-        kpis: { totalDossiers, totalReclame, totalPaye, enCours, rejetes },
+        kpis,
+        pagination: metaPagination(page, limit, kpis.totalDossiers),
       });
     }
 
@@ -289,28 +373,24 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      // Récupérer les dossiers (uniquement ceux de la société du contact)
+      // ─── P2-02 : dossiers de la société PAGINÉS / triés / filtrés ────────
+      const { page, limit, search, sortBy, sortOrder, statut } = paramsPaginationDossiers(new URL(request.url));
       const whereDossiers: Prisma.DossierWhereInput = { societeId };
       Object.assign(whereDossiers, filtreDateChamp('dateReception', plage));
-      const dossiers = await db.dossier.findMany({
-        where: whereDossiers,
-        include: {
-          assure: { select: { id: true, nom: true, prenom: true, typeBeneficiaire: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      });
-
-      // Stats
-      const totalAssures = assures.filter(a => a.typeBeneficiaire === 'ASSURE').length;
-      const totalAyantsDroit = assures.filter(a => a.typeBeneficiaire !== 'ASSURE').length;
-      const totalDossiers = dossiers.length;
-      const totalReclame = enNombre(sommer(dossiers.map(d => d.montantReclame))) ?? 0;
-      const totalPaye = enNombre(sommer(
-        dossiers.filter(d => d.statut === 'PAYE').map(d => d.montantPaye)
-      )) ?? 0;
-      const enCours = dossiers.filter(d => !['PAYE', 'REJETE'].includes(d.statut)).length;
-      const rejetes = dossiers.filter(d => d.statut === 'REJETE').length;
+      filtreDossiersPortail(whereDossiers, search, statut);
+      const [dossiers, kpis] = await Promise.all([
+        db.dossier.findMany({
+          where: whereDossiers,
+          include: {
+            assure: { select: { id: true, nom: true, prenom: true, typeBeneficiaire: true } },
+          },
+          // Tri stable : id en second critère (aucun doublon ni omission)
+          orderBy: [{ [sortBy]: sortOrder }, { id: 'asc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        kpisDossiersFiltres(whereDossiers),
+      ]);
 
       return NextResponse.json({
         type: 'CONTACT_ENTREPRISE',
@@ -325,7 +405,9 @@ export async function GET(request: NextRequest) {
           id: a.id,
           nom: a.nom,
           prenom: a.prenom,
-          nSS: a.nSS,
+          // P2-03 : NSS masqué côté backend pour les contacts entreprise
+          // (aucun masquage visuel React — la donnée ne quitte pas le serveur).
+          nSS: masquerNss(a.nSS),
           matricule: a.matricule,
           typeBeneficiaire: a.typeBeneficiaire,
           dateEffet: a.dateEffet,
@@ -363,14 +445,11 @@ export async function GET(request: NextRequest) {
           } : null,
         })),
         kpis: {
-          totalAssures,
-          totalAyantsDroit,
-          totalDossiers,
-          totalReclame,
-          totalPaye,
-          enCours,
-          rejetes,
+          ...kpis,
+          totalAssures: assures.filter(a => a.typeBeneficiaire === 'ASSURE').length,
+          totalAyantsDroit: assures.filter(a => a.typeBeneficiaire !== 'ASSURE').length,
         },
+        pagination: metaPagination(page, limit, kpis.totalDossiers),
       });
     }
 

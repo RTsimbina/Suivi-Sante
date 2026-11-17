@@ -47,6 +47,11 @@ export const API_PERMISSIONS: Record<
   '/api/portail-client': {
     roles: ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
   },
+  // P2-02 : export CSV/PDF des dossiers autorisés — mêmes rôles que la
+  // lecture (périmètre société et confidentialité NSS identiques).
+  '/api/portail-client/export': {
+    roles: ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
+  },
   // ─── Portail Prestataire (rôles externes prestataires de soins) ─────────
   // L'identité du prestataire est résolue CÔTÉ SERVEUR (JWT → liaison par
   // e-mail) : aucun prestataireId transmis par le navigateur n'est accepté.

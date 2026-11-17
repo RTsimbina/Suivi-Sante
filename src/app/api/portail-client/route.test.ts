@@ -25,6 +25,9 @@ const dbMocks = vi.hoisted(() => ({
   assureFindMany: vi.fn(),
   contratFindMany: vi.fn(),
   dossierFindMany: vi.fn(),
+  dossierCount: vi.fn(),
+  dossierAggregate: vi.fn(),
+  dossierGroupBy: vi.fn(),
   baremeFindMany: vi.fn(),
   societeFindUnique: vi.fn(),
   societeFindFirst: vi.fn(),
@@ -45,7 +48,13 @@ vi.mock('@/lib/db', () => ({
       findMany: dbMocks.assureFindMany,
     },
     contrat: { findMany: dbMocks.contratFindMany },
-    dossier: { findMany: dbMocks.dossierFindMany },
+    dossier: {
+      findMany: dbMocks.dossierFindMany,
+      // P2-02 : KPIs calculés sur l'ENSEMBLE filtré (hors page)
+      count: dbMocks.dossierCount,
+      aggregate: dbMocks.dossierAggregate,
+      groupBy: dbMocks.dossierGroupBy,
+    },
     bareme: { findMany: dbMocks.baremeFindMany },
     societe: { findUnique: dbMocks.societeFindUnique, findFirst: dbMocks.societeFindFirst },
     entrepriseContact: { findFirst: dbMocks.contactFindFirst },
@@ -85,6 +94,10 @@ beforeEach(() => {
   dbMocks.assureFindMany.mockResolvedValue([]);
   dbMocks.contratFindMany.mockResolvedValue([]);
   dbMocks.dossierFindMany.mockResolvedValue([]);
+  // P2-02 : KPIs sur l'ensemble filtré (agrégations vides = aucun dossier)
+  dbMocks.dossierCount.mockResolvedValue(0);
+  dbMocks.dossierAggregate.mockResolvedValue({ _sum: { montantReclame: null, montantPaye: null } });
+  dbMocks.dossierGroupBy.mockResolvedValue([]);
   dbMocks.baremeFindMany.mockResolvedValue([]);
   // P1 Révocation : compte actif, version de session courante (= celle des jetons)
   dbMocks.utilisateurFindUnique.mockResolvedValue({ actif: true, sessionVersion: 1 });
@@ -183,8 +196,7 @@ describe('GET /api/portail-client — mode PORTAIL_CLIENT', () => {
 });
 
 describe('GET /api/portail-client — mode CONTACT_ENTREPRISE', () => {
-  it('auto-répare un token sans societeId via le contact d\'entreprise', async () => {
-    jwtMocks.getToken.mockResolvedValue({
+  it('auto-répare un token sans societeId via le contact d\'entreprise', async () => {    jwtMocks.getToken.mockResolvedValue({
       sessionVersion: 1,
       id: 'u2', role: 'CONTACT_ENTREPRISE', email: 'contact@entreprise.mg', // pas de societeId
     });
@@ -219,5 +231,98 @@ describe('GET /api/portail-client — mode CONTACT_ENTREPRISE', () => {
     expect(body.erreur).toContain('Aucune société liée à votre compte');
     expect(body.erreur).toContain('orphelin@entreprise.mg');
     errorSpy.mockRestore();
+  });
+});
+
+// ─── P2-03 : confidentialité du NSS (masquage backend, jamais visuel) ────────
+
+const AYANT_DROIT = {
+  id: 'assure-2',
+  nom: 'RABE',
+  prenom: 'Marie',
+  nSS: '987654321098',
+  matricule: 'M002',
+  typeBeneficiaire: 'CONJOINT',
+  dateNaissance: null,
+  sexe: 'F',
+  dateEffet: null,
+  bareme: 0.8,
+  telephone: '03411111111',
+  email: 'rabe@exemple.mg',
+  adresse: 'Antananarivo',
+  actif: true,
+  codeFamille: 'FAM-1',
+  _count: { dossiers: 2 },
+};
+
+describe('GET /api/portail-client — P2-03 confidentialité du NSS', () => {
+  it('PORTAIL_CLIENT : NSS masqué pour l\'assuré, famille projetée SANS NSS ni coordonnées', async () => {
+    jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
+      id: 'u1', role: 'PORTAIL_CLIENT', email: 'client@exemple.com', assureId: 'assure-1',
+    });
+    dbMocks.assureFindUnique.mockResolvedValue(ASSURE_COMPLET);
+    dbMocks.assureFindMany.mockResolvedValue([AYANT_DROIT]);
+
+    const res = await GET(requeteGet());
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // Seuls les 4 derniers caractères restent lisibles
+    expect(body.assure.nSS).toBe('••••••••9012');
+    expect(body.assure.nSS).not.toContain('123456');
+    // La famille ne contient plus NI NSS NI coordonnées sensibles
+    expect(body.famille).toHaveLength(1);
+    for (const champ of ['nSS', 'email', 'telephone', 'adresse', 'matricule']) {
+      expect(body.famille[0]).not.toHaveProperty(champ);
+    }
+    // Les champs affichés restent présents (fonctionnalités préservées)
+    expect(body.famille[0].nom).toBe('RABE');
+    expect(body.famille[0].typeBeneficiaire).toBe('CONJOINT');
+    expect(body.famille[0]._count.dossiers).toBe(2);
+  });
+
+  it('CONTACT_ENTREPRISE : NSS masqué pour tous les assurés de la société', async () => {
+    jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
+      id: 'u2', role: 'CONTACT_ENTREPRISE', email: 'contact@entreprise.mg', societeId: 'soc-1',
+    });
+    dbMocks.societeFindUnique.mockResolvedValue({
+      id: 'soc-1', nom: 'Société A', adresse: null, telephone: null, email: null,
+    });
+    dbMocks.assureFindMany.mockResolvedValue([
+      { ...ASSURE_COMPLET, _count: { dossiers: 1 } },
+      { ...AYANT_DROIT, societeId: 'soc-1', _count: { dossiers: 0 } },
+    ]);
+
+    const res = await GET(requeteGet());
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.assures).toHaveLength(2);
+    for (const a of body.assures) {
+      expect(a.nSS).toMatch(/^•+.{4}$/);
+      expect(a.nSS).not.toContain('123456');
+      expect(a.nSS).not.toContain('987654');
+    }
+    // Les autres champs métier restent présents
+    expect(body.assures[0].nom).toBe('RAKOTO');
+    expect(body.assures[0].matricule).toBe('M001');
+  });
+
+  it('ADMINISTRATEUR : le masquage du portail n\'est pas contournable (mode test sans données)', async () => {
+    jwtMocks.getToken.mockResolvedValue({
+      sessionVersion: 1,
+      id: 'u3', role: 'ADMINISTRATEUR', email: 'admin@exemple.mg',
+    });
+
+    const res = await GET(requeteGet());
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.type).toBe('ADMINISTRATEUR');
+    expect(body).not.toHaveProperty('assure');
+    expect(body).not.toHaveProperty('assures');
+    expect(body).not.toHaveProperty('dossiers');
   });
 });
