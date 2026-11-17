@@ -14,10 +14,19 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   calculePlage,
   libellePeriode,
+  paramsVersSelection,
   selectionVersParams,
   anneeCouranteFuseau,
   type PlagePeriode,
@@ -40,11 +49,38 @@ interface PeriodeContextValue {
 const PeriodeContext = createContext<PeriodeContextValue | null>(null);
 
 export function PeriodeProvider({ children }: { children: ReactNode }) {
-  const [selection, setSelection] = useState<SelectionPeriode>(() => ({
-    mode: 'TOUTES',
-    annee: anneeCouranteFuseau(),
-    index: 1,
-  }));
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Restauration depuis l'URL (/?periodeMode=...&periodeAnnee=...) : après
+  // F5/Ctrl+R ou partage de lien, le filtre de période affiché est celui de
+  // l'URL. Paramètres absents ou invalides ⇒ « TOUTES » (comportement sûr).
+  const [selection, setSelection] = useState<SelectionPeriode>(
+    () => paramsVersSelection(searchParams) ?? {
+      mode: 'TOUTES',
+      annee: anneeCouranteFuseau(),
+      index: 1,
+    },
+  );
+
+  // Miroir URL : toute modification de la sélection est reflétée dans l'URL
+  // (router.replace — pas d'entrée d'historique pour un simple filtre), en
+  // préservant les autres paramètres (vue, onglet, ...). La comparaison évite
+  // toute boucle : après le replace, l'URL correspond déjà à la sélection.
+  useEffect(() => {
+    const actuelle = new URLSearchParams(searchParams.toString());
+    for (const cle of [...actuelle.keys()]) {
+      if (cle.startsWith('periode')) actuelle.delete(cle);
+    }
+    for (const [cle, valeur] of selectionVersParams(selection)) {
+      actuelle.set(cle, valeur);
+    }
+    const qs = actuelle.toString();
+    if (qs !== searchParams.toString()) {
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+  }, [selection, searchParams, router, pathname]);
 
   const value = useMemo<PeriodeContextValue>(() => {
     const plage = calculePlage(selection);

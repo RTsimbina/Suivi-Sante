@@ -10,6 +10,17 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SocietesView from './societes-view';
+// Navigation Next.js (vue / onglet / période vivent désormais dans l'URL) :
+// instances stables — aucun router.push/replace au montage avec une URL propre.
+vi.mock('next/navigation', () => {
+  const params = new URLSearchParams();
+  return {
+    usePathname: () => '/',
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+    useSearchParams: () => params,
+  };
+});
+
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();

@@ -18,11 +18,15 @@ import {
 } from 'lucide-react';
 import AssistantView from '@/components/suivisante/assistant-view';
 import { cn } from '@/lib/utils';
+import { useOngletUrl } from '@/lib/use-url-state';
 import { formatMontant, formatDate, TYPE_BENEF_LABELS } from './utils';
 import { KPICard, OngletDossiers } from './portail-commun';
 import { ContratsOnglet } from './portail-assure';
 import type { PortailData } from './types';
 import type { PropsPortailVue } from './use-portail-data';
+
+/** Onglets du portail entreprise, adressables par URL : /portail?onglet=<key> */
+const ONGLETS_PORTAIL_ENTREPRISE = ['dossiers', 'assures', 'contrats', 'assistant'] as const;
 
 export default function PortailEntreprise({
   data,
@@ -31,6 +35,8 @@ export default function PortailEntreprise({
   data: PortailData;
   hook: PropsPortailVue;
 }) {
+  // Onglet actif dans l'URL : restauré après actualisation (F5), partageable.
+  const [onglet, setOnglet] = useOngletUrl(ONGLETS_PORTAIL_ENTREPRISE, 'dossiers');
   // Recherche locale dans la liste des assurés (client-side, inchangée)
   const [assureSearch, setAssureSearch] = useState('');
   const filteredAssures = (data.assures || []).filter(a => {
@@ -82,7 +88,7 @@ export default function PortailEntreprise({
       </div>
 
       {/* Onglets */}
-      <Tabs defaultValue='dossiers' className='w-full'>
+      <Tabs value={onglet} onValueChange={setOnglet} className='w-full'>
         <TabsList className='bg-card'>
           <TabsTrigger value='dossiers' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
             <FileText className='h-3.5 w-3.5' /> Dossiers

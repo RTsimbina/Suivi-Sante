@@ -8,6 +8,8 @@ import {
   getOptionsPeriode,
   getOptionsAnnee,
   nbPeriodesParAnnee,
+  paramsVersSelection,
+  selectionVersParams,
   zonedVersUtc,
   decalageFuseauMs,
   anneeCouranteFuseau,
@@ -15,7 +17,6 @@ import {
   formatDateFrFuseau,
   partiesLocales,
   parserDateISO,
-  selectionVersParams,
   plageDepuisParams,
   filtreDateChamp,
   type SelectionPeriode,
@@ -304,5 +305,58 @@ describe('invariant bucketing SQL ↔ zéro-remplissage', () => {
     const dedans = new Date(plage.debut.getTime() + 3600_000); // 31/12 22:00Z
     expect(partiesLocales(dedans).mois).toBe(1);
     expect(partiesLocales(dedans).annee).toBe(2026);
+  });
+});
+
+/* ─── paramsVersSelection : restauration du filtre depuis l'URL (F5) ─────── */
+
+describe('paramsVersSelection — inverse de selectionVersParams', () => {
+  it('roundtrip complet : sélection → params → sélection (mensuel)', () => {
+    const selection = { mode: 'MENSUEL' as const, annee: 2026, index: 3 };
+    const params = selectionVersParams(selection);
+    expect(paramsVersSelection(params)).toEqual(selection);
+  });
+
+  it('roundtrip trimestriel, semestriel, annuel', () => {
+    expect(paramsVersSelection(selectionVersParams({ mode: 'TRIMESTRIEL', annee: 2025, index: 2 })))
+      .toEqual({ mode: 'TRIMESTRIEL', annee: 2025, index: 2 });
+    expect(paramsVersSelection(selectionVersParams({ mode: 'SEMESTRIEL', annee: 2024, index: 1 })))
+      .toEqual({ mode: 'SEMESTRIEL', annee: 2024, index: 1 });
+    expect(paramsVersSelection(selectionVersParams({ mode: 'ANNUEL', annee: 2026 })))
+      .toEqual({ mode: 'ANNUEL', annee: 2026 });
+  });
+
+  it('roundtrip personnalisé (dates de début / fin)', () => {
+    const selection = { mode: 'PERSONNALISE' as const, annee: 2026, debut: '2026-01-01', fin: '2026-03-31' };
+    const restauree = paramsVersSelection(selectionVersParams(selection))!;
+    expect(restauree.mode).toBe('PERSONNALISE');
+    expect(restauree.debut).toBe('2026-01-01');
+    expect(restauree.fin).toBe('2026-03-31');
+  });
+
+  it('« TOUTES » et absence de paramètres → null (comportement par défaut)', () => {
+    expect(paramsVersSelection(new URLSearchParams())).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('autre=1'))).toBeNull();
+  });
+
+  it('refuse les valeurs invalides (mode inconnu, année hors bornes, index hors plage)', () => {
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=BOGUE'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=MENSUEL&periodeAnnee=1899'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=MENSUEL&periodeAnnee=2201'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=MENSUEL&periodeAnnee=2026&periodeIndex=13'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=TRIMESTRIEL&periodeAnnee=2026&periodeIndex=5'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=MENSUEL&periodeAnnee=abc'))).toBeNull();
+  });
+
+  it('refuse un mode personnalisé incomplet ou avec des dates invalides', () => {
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=PERSONNALISE'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=PERSONNALISE&periodeDebut=2026-01-01'))).toBeNull();
+    expect(paramsVersSelection(new URLSearchParams('periodeMode=PERSONNALISE&periodeDebut=bogue&periodeFin=2026-03-31'))).toBeNull();
+  });
+
+  it('le résultat restauré produit la même plage que la sélection d\'origine', () => {
+    const origine = { mode: 'MENSUEL' as const, annee: 2026, index: 5 };
+    const restauree = paramsVersSelection(selectionVersParams(origine))!;
+    expect(calculePlage(restauree)).toEqual(calculePlage(origine));
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import type { NextRequest } from 'next/server';
 import { matchPermission } from '@/lib/api-permissions';
+import { ciblePostConnexion } from '@/lib/navigation';
 import { enTeteEgalSecret } from '@/lib/mail/api-auth';
 import type { RoleType } from '@/lib/auth-context';
 
@@ -85,11 +86,13 @@ export default async function proxy(request: NextRequest) {
 
   // 2. Autoriser les pages publiques
   if (PUBLIC_PAGES.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    // Si déjà connecté et sur /login, rediriger vers l'accueil
+    // Si déjà connecté et sur /login, rediriger vers sa destination initiale
+    // (callbackUrl local, jamais /login lui-même — sinon boucle) ou l'accueil
     if (pathname === '/login') {
       const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
       if (token) {
-        return NextResponse.redirect(new URL('/', request.url));
+        const cible = ciblePostConnexion(request.nextUrl.searchParams.get('callbackUrl')) ?? '/';
+        return NextResponse.redirect(new URL(cible, request.url));
       }
     }
     return response;
@@ -149,7 +152,13 @@ export default async function proxy(request: NextRequest) {
       );
     }
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
+    // Destination initiale COMPLÈTE (pathname + query) : /?vue=technique&onglet=calcul
+    // doit être restaurée intégralement après la connexion, pas seulement le
+    // chemin — sinon l'utilisateur repart de la vue par défaut (perte de page).
+    loginUrl.searchParams.set(
+      'callbackUrl',
+      pathname + (request.nextUrl.search || ''),
+    );
     const loginResponse = NextResponse.redirect(loginUrl);
     // Propager les security headers sur la redirect aussi
     for (const [k, v] of securityHeaders.entries()) {

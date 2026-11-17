@@ -13,13 +13,17 @@
  * Comportements, permissions, responsive et règles métier inchangés.
  */
 
+import { Suspense } from 'react';
 import { PeriodeProvider } from '@/lib/periode-context';
 import ContenuPortail from '@/components/portail/contenu-portail';
 
 export default function PortailPage() {
   return (
-    <PeriodeProvider>
-      <ContenuPortail />
-    </PeriodeProvider>
+    // useSearchParams (période + onglet) exige une limite Suspense pour le prerender
+    <Suspense fallback={null}>
+      <PeriodeProvider>
+        <ContenuPortail />
+      </PeriodeProvider>
+    </Suspense>
   );
 }

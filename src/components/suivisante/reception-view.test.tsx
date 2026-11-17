@@ -15,6 +15,17 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { PeriodeProvider } from '@/lib/periode-context';
 import ReceptionView from './reception-view';
+// Navigation Next.js (vue / onglet / période vivent désormais dans l'URL) :
+// instances stables — aucun router.push/replace au montage avec une URL propre.
+vi.mock('next/navigation', () => {
+  const params = new URLSearchParams();
+  return {
+    usePathname: () => '/',
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+    useSearchParams: () => params,
+  };
+});
+
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 

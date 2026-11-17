@@ -335,6 +335,39 @@ export function selectionVersParams(selection: SelectionPeriode | null | undefin
   return params;
 }
 
+/**
+ * Lit les paramètres de période d'une URL client — inverse exact de
+ * `selectionVersParams`. Utilisé par PeriodeProvider pour restaurer le filtre
+ * de période après actualisation (F5) ou partage de lien.
+ *
+ * Validation STRICTE (mode connu, année 1900-2200, index borné selon la
+ * périodicité, dates ISO valides) : tout paramètre invalide → null, le
+ * contexte retombe sur « TOUTES » sans jamais planter.
+ */
+export function paramsVersSelection(params: URLSearchParams): SelectionPeriode | null {
+  const modeBrut = params.get('periodeMode');
+  if (!modeBrut || modeBrut === 'TOUTES') return null;
+  if (!PERIODICITES.some((p) => p.value === modeBrut)) return null;
+  const mode = modeBrut as Periodicite;
+
+  if (mode === 'PERSONNALISE') {
+    const debutBrut = params.get('periodeDebut');
+    const finBrut = params.get('periodeFin');
+    if (!debutBrut || !finBrut) return null;
+    if (!parserDateISO(debutBrut) || !parserDateISO(finBrut)) return null;
+    return { mode, annee: 0, debut: debutBrut, fin: finBrut };
+  }
+
+  const anneeBrut = Number(params.get('periodeAnnee'));
+  if (!Number.isInteger(anneeBrut) || anneeBrut < 1900 || anneeBrut > 2200) return null;
+  if (mode === 'ANNUEL') return { mode, annee: anneeBrut };
+
+  const nb = nbPeriodesParAnnee(mode);
+  const indexBrut = Number(params.get('periodeIndex'));
+  if (!Number.isInteger(indexBrut) || indexBrut < 1 || indexBrut > nb) return null;
+  return { mode, annee: anneeBrut, index: indexBrut };
+}
+
 /* ──────────────────────────────────────────────────────────────
    Côté serveur : lecture des paramètres + builder Prisma
    ────────────────────────────────────────────────────────────── */

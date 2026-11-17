@@ -10,6 +10,29 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TechniqueView from './technique-view';
+// Navigation Next.js (vue / onglet / période vivent désormais dans l'URL) :
+// instances stables — aucun router.push/replace au montage avec une URL propre.
+const navigationState = vi.hoisted(() => {
+  let params = new URLSearchParams();
+  return {
+    // Nouvelle instance à chaque navigation (comme le vrai useSearchParams)
+    // pour déclencher le re-render des Tabs contrôlés par l'URL.
+    getParams: () => params,
+    reset: () => { params = new URLSearchParams(); },
+    applique: (url: string) => { params = new URLSearchParams(url.split('?')[1] || ''); },
+  };
+});
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({
+    push: vi.fn(navigationState.applique),
+    replace: vi.fn(navigationState.applique),
+    back: vi.fn(),
+  }),
+  useSearchParams: () => navigationState.getParams(),
+}));
+
 
 // ─── Stubs jsdom requis par Radix Select et Recharts ─────────────────────────
 beforeAll(() => {
@@ -132,6 +155,7 @@ function stubFetch(opts: { societes?: unknown[]; exclusions?: unknown[]; baremes
 
 describe('TechniqueView — caractérisation', () => {
   beforeEach(() => {
+    navigationState.reset();
     vi.unstubAllGlobals();
     // ResizeObserver : requis par Recharts ResponsiveContainer, absent de jsdom
     // (reposé après chaque unstubAllGlobals).

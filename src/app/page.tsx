@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
@@ -14,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
+import { resoudreVue, PARAM_VUE } from '@/lib/navigation';
 import PeriodFilter from '@/components/suivisante/period-filter';
 import UserMenu from '@/components/suivisante/user-menu';
 import UtilisateursView from '@/components/suivisante/utilisateurs-view';
@@ -90,9 +92,12 @@ const DATE_REFERENCE_PAR_VUE: Partial<Record<View, string>> = {
 
 export default function Home() {
   return (
-    <PeriodeProvider>
-      <ContenuSante />
-    </PeriodeProvider>
+    // useSearchParams (vue + période) exige une limite Suspense pour le prerender
+    <Suspense fallback={null}>
+      <PeriodeProvider>
+        <ContenuSante />
+      </PeriodeProvider>
+    </Suspense>
   );
 }
 
@@ -100,7 +105,7 @@ function ContenuSante() {
   const { role, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { queryString: qsPeriode } = usePeriode();
-  const [view, setView] = useState<View>('direction');
+  const searchParams = useSearchParams();
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [loadingKpis, setLoadingKpis] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -122,23 +127,25 @@ function ContenuSante() {
     return allNavItems.filter(item => item.roles.includes(role));
   }, [role]);
 
-  // Définir la vue par défaut selon le rôle
+  // ─── Vue active résolue depuis l'URL (/?vue=...) ─────────────────────────
+  // L'URL est la source de vérité : après F5/Ctrl+R ou partage de lien, le
+  // module consulté est restauré. Une vue absente, inconnue ou NON autorisée
+  // pour le rôle retombe sur la vue par défaut du rôle et l'URL est corrigée
+  // (router.replace) pour refléter la page réellement affichée — la garde de
+  // rôle existante est ainsi préservée, sans boucle (vue valide ⇒ null).
+  const clesAutorisees = useMemo(() => navItems.map(n => n.key), [navItems]);
+  const { vue: vueResolue, urlCanonique } = useMemo(
+    () => resoudreVue(searchParams.get(PARAM_VUE), role, clesAutorisees),
+    [searchParams, role, clesAutorisees],
+  );
+  // Fallback de typage uniquement : vueResolue est toujours non-null ici
+  // (les rôles portail sont redirigés vers leur page dédiée ci-dessus avant
+  // tout rendu de contenu, et isViewAllowed reste false pour eux).
+  const view = (vueResolue ?? 'direction') as View;
+
   useEffect(() => {
-    // 'profil' est accessible via le menu utilisateur, pas la sidebar — ne pas réinitialiser
-    if (view === 'profil') return;
-    if (role && navItems.length > 0) {
-      const currentAllowed = navItems.find(n => n.key === view);
-      if (!currentAllowed) {
-        // Le rôle ACCUEIL démarre sur l'Accueil (import), les autres sur leur première vue
-        if (role === 'ACCUEIL') {
-          const accueilView = navItems.find(n => n.key === 'import');
-          setView(accueilView ? accueilView.key : navItems[0].key);
-        } else {
-          setView(navItems[0].key);
-        }
-      }
-    }
-  }, [role, navItems, view]);
+    if (urlCanonique) router.replace(urlCanonique, { scroll: false });
+  }, [urlCanonique, router]);
 
   // Vérifier si l'utilisateur peut créer des dossiers
   const canCreateDossier = role === 'ADMINISTRATEUR' || role === 'ACCUEIL' || role === 'TECHNIQUE' || role === 'COMPTABILITE';
@@ -165,11 +172,6 @@ function ContenuSante() {
     }
     if (isAuthenticated) fetchKpis();
   }, [isAuthenticated, qsPeriode]);
-
-  function handleNav(key: View) {
-    setView(key);
-    setSidebarOpen(false);
-  }
 
   function handleDossierCreated() {
     setFormOpen(false);
@@ -238,9 +240,13 @@ function ContenuSante() {
                     const Icon = item.icon;
                     const active = view === item.key;
                     return (
-                      <button
+                      // Navigation par URL réelles : chaque module possède une
+                      // adresse stable (/?vue=<clé>), ouvrable dans un nouvel
+                      // onglet et restaurée à l'identique par F5/Ctrl+R.
+                      <Link
                         key={item.key}
-                        onClick={() => handleNav(item.key)}
+                        href={`/?vue=${item.key}`}
+                        onClick={() => setSidebarOpen(false)}
                         className={cn(
                           'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                           active
@@ -255,7 +261,7 @@ function ContenuSante() {
                             {item.badge}
                           </Badge>
                         )}
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
@@ -297,8 +303,15 @@ function ContenuSante() {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">
-            {(() => { const Icon = navItems.find(n => n.key === view)?.icon || LayoutDashboard; return <Icon className="h-4 w-4 text-muted-foreground" />; })()}
-            <h2 className="font-semibold text-sm">{navItems.find(n => n.key === view)?.label || 'Suivi Santé'}</h2>
+            {(() => {
+              // La vue « profil » (menu utilisateur) n'est pas dans la sidebar :
+              // titre et icône dédiés, cohérents avec /?vue=profil.
+              const Icon = view === 'profil' ? Users : navItems.find(n => n.key === view)?.icon || LayoutDashboard;
+              return <Icon className="h-4 w-4 text-muted-foreground" />;
+            })()}
+            <h2 className="font-semibold text-sm">
+              {view === 'profil' ? 'Mon Profil' : navItems.find(n => n.key === view)?.label || 'Suivi Santé'}
+            </h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
@@ -306,7 +319,7 @@ function ContenuSante() {
               En ligne
             </Badge>
             <ThemeToggle />
-            <UserMenu onProfilClick={() => setView('profil')} />
+            <UserMenu onProfilClick={() => router.push(`/?vue=profil`)} />
           </div>
         </header>
 

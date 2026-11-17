@@ -32,6 +32,7 @@ import { useSocietesBaremes } from './technique/use-societes-baremes';
 import { useCalculTM } from './technique/use-calcul-tm';
 import { useImportISA } from './technique/use-import-isa';
 import { useExclusions } from './technique/use-exclusions';
+import { useOngletUrl } from '@/lib/use-url-state';
 import SocietesBaremesTab from './technique/societes-baremes-tab';
 import CalculTMTab from './technique/calcul-tm-tab';
 import ImportISATab from './technique/import-isa-tab';
@@ -42,8 +43,14 @@ interface TechniqueViewProps {
   loading: boolean;
 }
 
+/** Onglets de la vue Technique, adressables par URL : /?vue=technique&onglet=<key> */
+const ONGLETS_TECHNIQUE = ['societes', 'calcul', 'import', 'exclusions'] as const;
+
 export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
   // ─── État des onglets (hooks conteneur) ───
+  // L'onglet actif vit dans l'URL (/?vue=technique&onglet=calcul) : restauré
+  // après actualisation, partagé par lien.
+  const [onglet, setOnglet] = useOngletUrl(ONGLETS_TECHNIQUE, 'societes');
   const societesBaremes = useSocietesBaremes();
   const calculTM = useCalculTM(societesBaremes.societes);
   const importISA = useImportISA();
@@ -168,7 +175,7 @@ export default function TechniqueView({ kpis, loading }: TechniqueViewProps) {
       </div>
 
       {/* ─── Section 2: Tabs ─── */}
-      <Tabs defaultValue="societes" className="w-full">
+      <Tabs value={onglet} onValueChange={setOnglet} className="w-full">
         <TabsList>
           <TabsTrigger value="societes" className="gap-1.5">
             <Building2 className="h-4 w-4" />

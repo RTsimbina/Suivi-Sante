@@ -16,6 +16,11 @@ vi.mock('next-auth/react', () => ({
   signIn: vi.fn(),
 }));
 
+// La page lit callbackUrl via useSearchParams (sous une limite Suspense)
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock('next-themes', () => ({
   useTheme: vi.fn(() => ({ theme: 'light', setTheme: vi.fn() })),
 }));

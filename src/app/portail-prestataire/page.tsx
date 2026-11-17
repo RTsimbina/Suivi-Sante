@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import AssistantView from '@/components/suivisante/assistant-view';
 import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
+import { useOngletUrl } from '@/lib/use-url-state';
 import PeriodFilter from '@/components/suivisante/period-filter';
 import { DashboardTab } from '@/components/suivisante/portail-prestataire/dashboard-tab';
 import { BaremesTab } from '@/components/suivisante/portail-prestataire/baremes-tab';
@@ -29,9 +30,12 @@ import type { DonneesPortail, SocieteBaremes } from '@/components/suivisante/por
 
 export default function PortailPrestatairePage() {
   return (
-    <PeriodeProvider>
-      <ContenuPortailPrestataire />
-    </PeriodeProvider>
+    // useSearchParams (période + onglet) exige une limite Suspense pour le prerender
+    <Suspense fallback={null}>
+      <PeriodeProvider>
+        <ContenuPortailPrestataire />
+      </PeriodeProvider>
+    </Suspense>
   );
 }
 
@@ -39,6 +43,12 @@ function ContenuPortailPrestataire() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { queryString: qsPeriode, libelle } = usePeriode();
+  // Onglet actif dans l'URL (/portail-prestataire?onglet=actes) : restauré
+  // après actualisation (F5), partageable par lien.
+  const [onglet, setOnglet] = useOngletUrl(
+    ['dashboard', 'baremes', 'actes', 'assures', 'factures', 'assistant'],
+    'dashboard',
+  );
 
   const [data, setData] = useState<DonneesPortail | null>(null);
   const [baremes, setBaremes] = useState<SocieteBaremes[]>([]);
@@ -212,7 +222,7 @@ function ContenuPortailPrestataire() {
             </CardContent>
           </Card>
         ) : (
-          <Tabs defaultValue='dashboard' className='space-y-4'>
+          <Tabs value={onglet} onValueChange={setOnglet} className='space-y-4'>
             <TabsList className='flex flex-wrap h-auto gap-1'>
               <TabsTrigger value='dashboard' className='gap-1.5 text-xs'>
                 <Stethoscope className='h-3.5 w-3.5' />

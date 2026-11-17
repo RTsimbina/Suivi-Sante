@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Sparkles, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ciblePostConnexion } from '@/lib/navigation';
 
 // Jeu de données officiel : workflow « Jeu de données de test (reset + seed) »
 // (seed.yml → scripts/reset_seed.mjs). Deux mots de passe distincts, un par
@@ -44,12 +46,20 @@ const GROUPES_DEMO: { cle: CompteDemo['groupe']; titre: string }[] = [
   { cle: 'externes', titre: 'Comptes externes (entreprises & prestataires)' },
 ];
 
-export default function LoginPage() {
+/** Formulaire de connexion (séparé pour lire l'URL sous une limite Suspense). */
+function FormulaireLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Destination initiale : le proxy redirige les sessions expirées vers
+  // /login?callbackUrl=<page consultée> ; après connexion, l'utilisateur
+  // retrouve cette page (si elle est locale et autorisée pour son rôle —
+  // la garde de rôle de la page de destination fait le reste).
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -102,7 +112,10 @@ export default function LoginPage() {
       } catch {
         // En cas d'erreur, redirection par défaut
       }
-      window.location.href = '/';
+      // Destination initiale (callbackUrl local, jamais /login lui-même) ;
+      // sinon l'accueil. Les rôles sans navigation interne ont déjà été
+      // redirigés vers leur portail dédié.
+      window.location.href = ciblePostConnexion(callbackUrl) ?? '/';
     }
   }
 
@@ -291,5 +304,16 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+/**
+ * Page de connexion : le formulaire lit le callbackUrl via useSearchParams,
+ * qui exige une limite Suspense pour le prerender statique.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <FormulaireLogin />
+    </Suspense>
   );
 }

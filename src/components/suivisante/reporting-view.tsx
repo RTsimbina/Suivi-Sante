@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { CONTRAT_STATUTS, APPEL_FONDS_STATUTS, APPEL_FONDS_STATUT_VALEURS } from '@/lib/statuts';
 import { formatMontant, formatDate } from './format';
 import { usePeriode } from '@/lib/periode-context';
+import { useOngletUrl } from '@/lib/use-url-state';
 
 interface Contrat {
   id: string; reference: string; budgetAnnuel: number; budgetUtilise: number;
@@ -45,9 +46,14 @@ const APPEL_LABEL: Record<string, string> = Object.fromEntries(
 const STATUT_BADGE_LOOKUP: Record<string, string> = { ...CONTRAT_BADGE, ...APPEL_BADGE };
 const STATUT_LABEL_LOOKUP: Record<string, string> = { ...CONTRAT_LABEL, ...APPEL_LABEL };
 
+/** Onglets de la vue Reporting, adressables par URL : /?vue=reporting&onglet=<key> */
+const ONGLETS_REPORTING = ['contrats', 'appels', 'rapport'] as const;
+
 export default function ReportingView() {
   const { queryString: qsPeriode, selection: selectionPeriode } = usePeriode();
-  const [tab, setTab] = useState<'contrats' | 'appels' | 'rapport'>('contrats');
+  // L'onglet actif vit dans l'URL (contrats / appels de fonds / rapport) :
+  // restauré après actualisation, partageable par lien.
+  const [tab, setTab] = useOngletUrl(ONGLETS_REPORTING, 'contrats');
   const [contrats, setContrats] = useState<Contrat[]>([]);
   const [rapportMois, setRapportMois] = useState(new Date().getMonth() + 1);
   const [generatingRapport, setGeneratingRapport] = useState(false);

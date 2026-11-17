@@ -9,6 +9,8 @@
  * - La liste et le détail sont des présentateurs purs dans ./societes/.
  */
 
+import { useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Search, Plus, Users, FileText, DollarSign, Loader2, Stethoscope, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +24,7 @@ import { useSocietesList } from './societes/use-societes-list';
 import { useContacts } from './societes/use-contacts';
 import SocietesList from './societes/societes-list';
 import SocieteDetail from './societes/societe-detail';
-import type { Societe } from './societes/types';
+import type { Societe, DetailTab } from './societes/types';
 
 // ─── Composant principal ────────────────────────────────────────────────────
 
@@ -30,12 +32,67 @@ interface Props {
   userRole?: string;
 }
 
+/** Onglets du détail société, adressables par URL : /?vue=societes&societe=<id>&onglet=<key> */
+const ONGLETS_SOCIETE_DETAIL = ['baremes', 'assures', 'prestataires', 'contacts'] as const;
+
 export default function SocietesView({ userRole }: Props) {
   const canWrite = userRole === 'ADMINISTRATEUR' || userRole === 'TECHNIQUE';
   const canManageContacts = ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'].includes(userRole || '');
 
   const list = useSocietesList();
   const contacts = useContacts(list.selectedId);
+
+  // ─── Synchronisation URL ↔ détail société ────────────────────────────────
+  // L'URL est restaurée après actualisation (F5) ou dans un nouvel onglet :
+  // /?vue=societes&societe=<id>&onglet=contacts sélectionne la société et son
+  // onglet dès que la liste est chargée. Les interactions reflètent l'état
+  // dans l'URL (replace, sans entrée d'historique ni boucle : comparaison).
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const majUrlSociete = (societeId: string | null, onglet: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (societeId) params.set('societe', societeId); else params.delete('societe');
+    if (onglet && societeId) params.set('onglet', onglet); else params.delete('onglet');
+    const qs = params.toString();
+    if (qs !== searchParams.toString()) {
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+  };
+
+  useEffect(() => {
+    const sid = searchParams.get('societe');
+    const ongletBrut = searchParams.get('onglet');
+    // La sélection n'est appliquée que lorsque la liste est chargée
+    if (sid && list.societes.length > 0 && list.societes.some(s => s.id === sid)) {
+      if (list.selectedId !== sid) list.setSelectedId(sid);
+    }
+    const ongletValide = ongletBrut && (ONGLETS_SOCIETE_DETAIL as readonly string[]).includes(ongletBrut);
+    if (ongletValide && list.selectedId && list.activeTab !== ongletBrut) {
+      list.setActiveTab(ongletBrut as DetailTab);
+    }
+    // Nettoyage : société supprimée/inconnue, ou onglet sans société
+    if (sid && list.societes.length > 0 && !list.societes.some(s => s.id === sid)) {
+      majUrlSociete(null, null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, list.societes, list.selectedId, list.activeTab]);
+
+  // Miroir état → URL : l'URL reflète TOUJOURS la page affichée, y compris
+  // l'auto-sélection de la première société. Priorité inversée selon la
+  // complétude de l'URL : si elle désigne déjà une société ET un onglet
+  // valide (lien copié, F5), c'est elle qui prime — le miroir ne complète
+  // que les URL incomplètes (pas de ping-pong, pas de boucle).
+  useEffect(() => {
+    const sidUrl = searchParams.get('societe');
+    const ongletUrl = searchParams.get('onglet');
+    const ongletUrlValide = !!ongletUrl && (ONGLETS_SOCIETE_DETAIL as readonly string[]).includes(ongletUrl);
+    if (list.selectedId && (!sidUrl || !ongletUrlValide)) {
+      majUrlSociete(list.selectedId, list.activeTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, list.selectedId, list.activeTab]);
 
   // ─── Rendu ──────────────────────────────────────────────────────────────
 
@@ -139,7 +196,7 @@ export default function SocietesView({ userRole }: Props) {
             selectedId={list.selectedId}
             detailsMap={list.detailsMap}
             canWrite={canWrite}
-            onSelect={(id) => { list.setSelectedId(id); list.setActiveTab('baremes'); }}
+            onSelect={(id) => { list.setSelectedId(id); list.setActiveTab('baremes'); majUrlSociete(id, 'baremes'); }}
             onEdit={(s: Societe) => list.openEdit(s)}
             onDelete={(id: string) => list.setDeleteConfirm(id)}
           />
@@ -161,7 +218,7 @@ export default function SocietesView({ userRole }: Props) {
                 details={list.details}
                 isLoading={list.isLoading}
                 activeTab={list.activeTab}
-                onTabChange={list.setActiveTab}
+                onTabChange={(t) => { list.setActiveTab(t); majUrlSociete(list.selectedId, t); }}
                 canManageContacts={canManageContacts}
                 canWrite={canWrite}
                 basculerLoading={list.basculerLoadingId === list.selectedSociete.id}
