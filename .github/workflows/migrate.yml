@@ -1,13 +1,29 @@
 # ─── Migration base de données (Neon → Prisma) ───────────────────────────────
 #
-# Chemin AUTORITAIRE pour appliquer les migrations Prisma sur la base de
-# production, indépendamment du build Vercel.
+# Chemin AUTORITAIRE et DEPUIS 2026-11 EXCLUSIF pour appliquer les migrations
+# Prisma sur la base de production : `prisma migrate deploy` a été RETIRÉ du
+# script build de Vercel (package.json) — le build ne fait plus que compiler
+# Next.js, et CE workflow est le seul chemin de migration de production.
 #
 # Contexte (incident du 16/09/2026) : la base production a été créée et
 # maintenue avec `prisma db push` (aucune table _prisma_migrations). Le
 # `prisma migrate deploy` du build Vercel a donc tenté de recréer des tables
 # existantes (« relation already exists ») → build en échec → ancien code
 # servi, migration jamais appliquée, listes « aucune liste trouvée ».
+#
+# SAUVEGARDE AVANT MIGRATION (input sauvegarde, défaut : true) :
+#   un pg_dump VÉRIFIÉ (lisibilité + taille non nulle, scripts/backup-db.sh)
+#   est produit AVANT toute application de migration et publié en artifact
+#   GitHub privé (rétention 7 jours). Restauration : scripts/restore-db.sh
+#   (pg_restore) sur l'URL de connexion directe.
+#
+# DÉPLOIEMENT APPLICATIF (input declencher_deploiement, défaut : false) :
+#   Vercel déploie automatiquement à chaque push git ; pour garantir que le
+#   nouveau code part APRÈS les migrations nécessaires, cocher
+#   declencher_deploiement : un Deploy Hook Vercel (secret optionnel
+#   VERCEL_DEPLOY_HOOK_URL) déclenche le déploiement UNE FOIS les migrations
+#   réussies et vérifiées. Les migrations du projet sont additives et non
+#   destructives : le code reste compatible avant ET après leur application.
 #
 # Deux modes (workflow_dispatch) :
 #   • adopter_existant = true  (PREMIÈRE exécution) : enregistre les
@@ -53,6 +69,16 @@ on:
         required: false
       liberer_verrou:
         description: "Récupération P1002 : terminer les sessions détenant le verrou consultatif migrate"
+        type: boolean
+        default: false
+        required: false
+      sauvegarde:
+        description: "Sauvegarde pg_dump VÉRIFIÉE avant migration (recommandé : true)"
+        type: boolean
+        default: true
+        required: false
+      declencher_deploiement:
+        description: "Déclencher le déploiement Vercel APRÈS migrations réussies (secret VERCEL_DEPLOY_HOOK_URL requis)"
         type: boolean
         default: false
         required: false
@@ -215,11 +241,66 @@ jobs:
         if: ${{ inputs.resoudre_echec != '' }}
         run: npx prisma migrate resolve --rolled-back "${{ inputs.resoudre_echec }}"
 
+      - name: Sauvegarde de la base (pg_dump VÉRIFIÉ, avant toute migration)
+        if: ${{ inputs.sauvegarde != false }}
+        env:
+          BACKUP_DIR: backups
+        run: |
+          set -euo pipefail
+          # DATABASE_URL (connexion directe, masquée) est exporté par
+          # l'étape « Récupérer l'URL » ci-dessus via GITHUB_ENV.
+          # backup-db.sh vérifie la lisibilité et la taille non nulle du dump.
+          bash scripts/backup-db.sh
+          ls -lh backups/
+
+      - name: Publier la sauvegarde pré-migration (artifact privé, 7 jours)
+        if: ${{ inputs.sauvegarde != false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-pre-migration-${{ github.run_id }}
+          path: backups/
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Appliquer les migrations en attente
         run: npx prisma migrate deploy
 
       - name: État final des migrations
         run: npx prisma migrate status
+
+      - name: Vérification stricte — aucune migration en attente ni en échec
+        run: |
+          set -euo pipefail
+          ETAT=$(npx prisma migrate status 2>&1)
+          echo "$ETAT"
+          # Échec EXPLICITE si la base n'est pas à jour : une migration
+          # restée en attente ou en échec ne doit jamais passer inaperçue.
+          if echo "$ETAT" | grep -qi "not yet been applied\|have failed"; then
+            echo "::error::Des migrations restent en attente ou en échec — voir la sortie ci-dessus."
+            exit 1
+          fi
+
+      - name: Déclencher le déploiement applicatif (hook Vercel, migrations vérifiées)
+        if: ${{ inputs.declencher_deploiement == true }}
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_DEPLOY_HOOK_URL:-}" ]; then
+            echo "::error::declencher_deploiement=true mais le secret VERCEL_DEPLOY_HOOK_URL n'est pas défini. Créer un Deploy Hook dans Vercel (Project Settings → Git → Deploy Hooks) puis l'ajouter aux secrets du dépôt."
+            exit 1
+          fi
+          # L'URL du hook n'est jamais affichée (secret GitHub, masqué).
+          for i in 1 2 3; do
+            if curl -sS --max-time 30 -X POST "$VERCEL_DEPLOY_HOOK_URL" > /dev/null; then
+              echo "Déploiement Vercel déclenché après migrations réussies et vérifiées."
+              exit 0
+            fi
+            echo "Tentative $i échouée, nouvel essai dans 5 s…"
+            sleep 5
+          done
+          echo "::error::Impossible de déclencher le déploiement Vercel après 3 tentatives."
+          exit 1
 
       - name: Synthèse
         if: always()
@@ -229,5 +310,11 @@ jobs:
           echo "• Exécutions suivantes → laisser décoché (deploy standard)."
           echo "• Migration en échec (P3018) → renseigner « resoudre_echec » avec le nom de la migration."
           echo "• Verrou migrate indisponible (P1002) → cocher « liberer_verrou »."
+          echo "• Sauvegarde pg_dump avant migration → coché par défaut ; artifact"
+          echo "  « backup-pre-migration-<run> » téléchargeable 7 jours (restore-db.sh)."
+          echo "• Le build Vercel ne migre PLUS : ce workflow est le SEUL chemin de"
+          echo "  migration de production."
+          echo "• Pour déployer le code APRÈS migrations → cocher « declencher_deploiement »"
+          echo "  (secret VERCEL_DEPLOY_HOOK_URL requis — Deploy Hook Vercel)."
           echo "• Une fois ce workflow vert, recharger l'application : les listes"
           echo "  Prestataires / Sociétés / Service Technique / Utilisateurs fonctionnent."

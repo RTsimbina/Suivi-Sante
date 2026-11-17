@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "prisma generate && (prisma migrate deploy || echo \"[BUILD] ATTENTION : migration non appliquée (base injoignable au build ?) — utiliser le workflow 'Migration base de données' ou npm run db:migrate:deploy\") && next build",
+    "build": "next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "test": "vitest run",
@@ -87,6 +87,7 @@
     "eslint-config-next": "^16.1.1",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5",
     "vitest": "^4.1.10"
