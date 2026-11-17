@@ -101,7 +101,7 @@ export default function PortailClientTab() {
       )}
 
       {error && (
-        <Card className="border-red-100 bg-red-50 dark:bg-red-950/40/50">
+        <Card className="border-red-100 bg-red-50 dark:bg-red-950/40">
           <CardContent className="p-4">
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           </CardContent>

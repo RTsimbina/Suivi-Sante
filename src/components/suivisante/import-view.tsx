@@ -109,7 +109,7 @@ function ImportZone({ source, categorie, label, description, columns, icon: Icon
 // ─── Composant résultat import ──────────────────────────────────
 function ResultBanner({ result }: { result: ImportResult }) {
   return (
-    <div className="p-4 rounded-lg border bg-emerald-50 dark:bg-emerald-950/40/50 border-emerald-200 dark:border-emerald-800 flex items-center gap-3">
+    <div className="p-4 rounded-lg border bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 flex items-center gap-3">
       <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
       <div className="flex-1 text-sm">
         <span className="font-semibold">{result.nbSucces}/{result.nbLignes}</span> lignes importées
@@ -189,7 +189,7 @@ export default function ImportView() {
             icon={FileSpreadsheet}
             accentColor="text-blue-600"
           />
-          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40/30">
+          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40">
             <Plus className="size-8 text-blue-400" />
             <div>
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Remboursement</h4>
@@ -220,7 +220,7 @@ export default function ImportView() {
             icon={FileSpreadsheet}
             accentColor="text-amber-600"
           />
-          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40/30">
+          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40">
             <Plus className="size-8 text-amber-400" />
             <div>
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Règlement</h4>

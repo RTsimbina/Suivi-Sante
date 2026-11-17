@@ -127,7 +127,7 @@ export default function FormCalcul({ calculResult, calculLoading }: FormCalculPr
             <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-1">Montant remboursé</p>
             <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatAr(calculResult.calcul.montantRembourse)}</p>
           </div>
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40/70 border border-amber-200 dark:border-amber-800/60 p-3 text-center">
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 p-3 text-center">
             <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Ticket modérateur</p>
             <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{formatAr(calculResult.calcul.ticketModerateur)}</p>
           </div>

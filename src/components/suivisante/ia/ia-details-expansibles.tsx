@@ -93,7 +93,7 @@ export function IaIncoherences({ incoherences }: { incoherences: IncoherenceIa[]
             incoherences.map((inc, idx) => (
               <Card
                 key={`${inc.numeroDossier}-${idx}`}
-                className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40/50 dark:bg-red-950/20 py-4 gap-3"
+                className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20 py-4 gap-3"
               >
                 <CardContent className="px-4 pb-0 pt-0">
                   <div className="flex items-center justify-between gap-2">

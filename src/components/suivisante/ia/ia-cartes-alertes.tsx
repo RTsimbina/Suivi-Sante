@@ -91,7 +91,7 @@ export default function IaCartesAlertes({ data, expandedCards, onToggleCard }: I
 
       {/* Carte 4 : Pièces justificatives manquantes (orange/amber, cliquable) */}
       <Card
-        className="border-amber-300 bg-amber-50 dark:bg-amber-950/40/80 dark:bg-amber-950/30 cursor-pointer hover:shadow-md transition-shadow"
+        className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 cursor-pointer hover:shadow-md transition-shadow"
         onClick={() => onToggleCard('pieces')}
       >
         <CardContent className="pt-6">
@@ -117,7 +117,7 @@ export default function IaCartesAlertes({ data, expandedCards, onToggleCard }: I
 
       {/* Carte 5 : Incohérences de traitement (red, cliquable) */}
       <Card
-        className="border-red-300 bg-red-50 dark:bg-red-950/40/80 dark:bg-red-950/30 cursor-pointer hover:shadow-md transition-shadow"
+        className="border-red-300 bg-red-50 dark:bg-red-950/30 cursor-pointer hover:shadow-md transition-shadow"
         onClick={() => onToggleCard('incoherences')}
       >
         <CardContent className="pt-6">

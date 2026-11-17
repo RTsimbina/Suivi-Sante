@@ -93,7 +93,7 @@ export default function IaRetardsAnomalies({ retards, anomalies }: { retards: Re
               anomalies.map((a, idx) => (
                 <Card
                   key={`${a.numeroDossier}-${idx}`}
-                  className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40/50 dark:bg-amber-950/20 py-4 gap-3"
+                  className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 py-4 gap-3"
                 >
                   <CardContent className="px-4 pb-0 pt-0">
                     <div className="flex items-center justify-between gap-2">
