@@ -134,15 +134,12 @@ export function deriveStatutFacture(d: DossierPourStatut): StatutFacture {
 }
 
 /**
- * Masque un numéro de sécurité sociale pour l'affichage au portail
- * (donnée minimale : les 3 premiers et 2 derniers caractères).
+ * Masque un numéro de sécurité sociale pour l'affichage aux rôles externes.
+ * P2-03 : implémentation CENTRALISÉE dans src/lib/nss.ts (masquage strict :
+ * seuls les 4 derniers caractères restent lisibles) — re-exporté ici pour
+ * compatibilité avec les imports historiques du portail prestataire.
  */
-export function masquerNss(nss: string | null | undefined): string {
-  const brut = (nss || '').trim();
-  if (!brut) return '—';
-  if (brut.length <= 5) return brut;
-  return `${brut.slice(0, 3)}${'•'.repeat(Math.min(6, brut.length - 5))}${brut.slice(-2)}`;
-}
+export { masquerNss } from './nss';
 
 /** Traduit un statut de dossier (workflow plateforme) en libellé français. */
 export const STATUT_DOSSIER_LABELS: Record<string, string> = {

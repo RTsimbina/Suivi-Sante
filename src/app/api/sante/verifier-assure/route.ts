@@ -5,6 +5,7 @@ import { parseJsonBody } from '@/lib/validation/parse';
 import { verifierAssureSchema } from '@/lib/validation';
 import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
 import { enNombre, sommer, Decimal, appliquerTaux, reliquat as calculerReliquat } from '@/lib/money';
+import { journaillerConsultationNss } from '@/lib/nss';
 
 export async function POST(request: NextRequest) {
   // Vérification auth
@@ -161,6 +162,21 @@ export async function POST(request: NextRequest) {
     const reliquatGlobal = calculerReliquat(plafondAnnuelGlobal, totalConsomme) ?? new Decimal(0);
 
     // ── 8. Retourner le résultat complet ──
+    // P2-03C : la route est réservée au personnel habilité (API_PERMISSIONS :
+    // ADMINISTRATEUR / SANTE / ACCUEIL / TECHNIQUE) qui reçoit le NSS complet
+    // selon les permissions métier validées. Toute consultation ciblée est
+    // TRACÉE (QUI / QUAND / société / bénéficiaire / motif) — sans jamais
+    // écrire le NSS dans le journal (référence assuré uniquement).
+    await journaillerConsultationNss({
+      assureId: assure.id,
+      societeId: assure.societeId,
+      beneficiaire: `${assure.prenom || ''} ${assure.nom}`.trim(),
+      modifiePar: request.headers.get('x-user-name') || 'inconnu',
+      roleUtilisateur: userRole ?? undefined,
+      motif: 'Consultation Contrôle Santé (vérification assuré)',
+      request,
+    });
+
     return Response.json({
       assure: {
         id: assure.id,

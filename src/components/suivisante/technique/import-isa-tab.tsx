@@ -58,7 +58,7 @@ export default function ImportISATab({
             ${isDragging
               ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
               : importFile
-                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40/50'
+                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40'
                 : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'
             }
           `}

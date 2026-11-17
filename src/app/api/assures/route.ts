@@ -9,6 +9,7 @@ import {
 import { parseJsonBody } from '@/lib/validation/parse';
 import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { assureCreateSchema, assureUpdateSchema } from '@/lib/validation';
+import { masquerNss } from '@/lib/nss';
 
 // ─── GET : Lister les assurés (avec filtres famille) ──────────────────────────
 
@@ -106,10 +107,30 @@ export async function GET(request: NextRequest) {
       countsByType[st.typeBeneficiaire] = st._count;
     }
 
+    // ─── P2-03 : confidentialité du NSS ─────────────────────────────────────
+    // Les rôles externes (PORTAIL_CLIENT, CONTACT_ENTREPRISE) reçoivent le
+    // NSS MASQUÉ côté backend, y compris pour les ayants droit — le masquage
+    // visuel React n'est jamais la protection. Rôles internes habilités :
+    // NSS complet selon les permissions métier validées (API_PERMISSIONS).
+    const assuresSortie = perimetre.restricted
+      ? assures.map(a => ({ ...a, nSS: masquerNss(a.nSS) }))
+      : assures;
+    const ayantsDroitSortie = perimetre.restricted
+      ? Object.fromEntries(
+          Object.entries(ayantsDroitMap).map(([pid, liste]) => [
+            pid,
+            (liste as { nSS?: string | null }[]).map(ad => ({
+              ...ad,
+              nSS: masquerNss(ad.nSS),
+            })),
+          ]),
+        )
+      : ayantsDroitMap;
+
     return NextResponse.json({
-      assures,
+      assures: assuresSortie,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-      ayantsDroitMap: avecAyantsDroit ? ayantsDroitMap : undefined,
+      ayantsDroitMap: avecAyantsDroit ? ayantsDroitSortie : undefined,
       countsByType,
     });
   } catch (error) {

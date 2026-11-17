@@ -87,6 +87,43 @@ function stubFetch(opts: { societes?: unknown[]; exclusions?: unknown[]; baremes
     if (url.includes('/api/technique/exclusions')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ exclusions: opts.exclusions ?? exclusions }) });
     }
+    // P2-04 : liste des assurés de la société (sélecteur du simulateur)
+    if (url.includes('/api/assures?')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ assures: [{ id: 'assure-1', nom: 'RAKOTO', prenom: 'Jean', matricule: 'M1', typeBeneficiaire: 'ASSURE' }] }) });
+    }
+    // P2-04 : calcul fait par le BACKEND (simuler-acte → moteur centralisé)
+    if (url.includes('/api/sante/simuler-acte')) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          autorise: true,
+          raison: 'OK',
+          message: 'Acte couvert. Montant couvert : 100 000 Ar.',
+          details: {
+            prestation: 'HOSPITALISATION',
+            typeActe: 'HOSPITALISATION',
+            plafondActe: 100000,
+            consommeActe: 0,
+            reliquatActe: 100000,
+            tauxCouverture: 80,
+            montantDemande: 100000,
+            montantCouvert: 100000,
+            priseEnChargeTheorique: 80000,
+            priseEnChargeAutorisee: 80000,
+            partAssureur: 80000,
+            partPatient: 20000,
+            ticketModerateur: 20000,
+            depassementPlafond: 0,
+            partContractuelleAssure: 20000,
+            plafondGlobal: 100000,
+            consommeGlobal: 0,
+            reliquatGlobal: 100000,
+            nbActesIdentiques: 0,
+          },
+          alertes: [],
+        }),
+      });
+    }
     return Promise.reject(new Error('fetch non mocké : ' + url));
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -177,20 +214,25 @@ describe('TechniqueView — caractérisation', () => {
     await user.click(screen.getByLabelText('Type de prestation'));
     await user.click(await screen.findByRole('option', { name: 'Hospitalisation' }));
 
+    // P2-04 : sélection assuré — le calcul backend exige sa consommation annuelle
+    await user.click(screen.getByLabelText('Assuré'));
+    await user.click(await screen.findByRole('option', { name: /Jean RAKOTO/ }));
+
     // Montant réclamé
     await user.type(screen.getByLabelText('Montant réclamé (Ar)'), '100000');
 
     await user.click(screen.getByRole('button', { name: /Calculer/ }));
 
-    // Résultat : couvert = min(100000, 100000) ; remboursé = 80 000 ; TM = 20 000
+    // Résultat (renvoyé par le backend) : couvert = min(100000, 100000)
+    // ; prise en charge autorisée = 80 000 ; TM = 20 000
     // (les montants apparaissent 2× : bloc résultat + phrase d'explication)
     expect(screen.getByText('Résultat du calcul')).toBeInTheDocument();
     expect(screen.getByText(/80\s?%\s?—\s?Plafond\s?:/)).toBeInTheDocument();
     expect(screen.getByText(/Montant remboursé/)).toBeInTheDocument();
     expect(screen.getAllByText(/80\s?000\s?Ar/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/20\s?000\s?Ar/).length).toBeGreaterThanOrEqual(1);
-    // Explication du calcul présente
-    expect(screen.getByText(/dans la limite du plafond/)).toBeInTheDocument();
+    // Explication du calcul présente (message du moteur serveur)
+    expect(screen.getByText(/Acte couvert/)).toBeInTheDocument();
   });
 
   it('onglet Import : affiche la dropzone et le bouton désactivé sans fichier', async () => {

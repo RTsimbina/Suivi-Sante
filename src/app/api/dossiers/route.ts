@@ -10,7 +10,8 @@ import {
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
 import { trouverBaremeValide } from "@/lib/baremes-validite";
-import { sommer, superieurOuEgal, enNombre, appliquerTaux, moins } from "@/lib/money";
+import { sommer, superieurOuEgal, enNombre } from "@/lib/money";
+import { calculerRemboursement } from "@/lib/services/calcul-remboursement";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { dossierCreateSchema } from "@/lib/validation";
 import {
@@ -18,6 +19,7 @@ import {
   avecRetryNumeroDossier,
 } from "@/lib/numero-dossier";
 import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
+import { masquerNss } from "@/lib/nss";
 
 export async function GET(request: NextRequest) {
   try {
@@ -103,8 +105,15 @@ export async function GET(request: NextRequest) {
       db.dossier.count({ where: whereFiltre }),
     ]);
 
+    // ─── P2-03 : confidentialité du NSS ─────────────────────────────────────
+    // Le champ nSS (copié sur le dossier à la saisie) n'est JAMAIS transmis
+    // aux rôles externes : masquage côté backend avant sérialisation.
+    const dossiersSortie = perimetre.restricted
+      ? dossiers.map(d => ({ ...d, nSS: masquerNss(d.nSS) }))
+      : dossiers;
+
     return NextResponse.json({
-      dossiers,
+      dossiers: dossiersSortie,
       pagination: {
         page,
         limit,
@@ -221,14 +230,15 @@ export async function POST(request: NextRequest) {
     let finalMontantValide = montantValide || null;
     let finalTicketModerateur = ticketModerateur || null;
 
-    if (plafondResult && plafondResult.details.montantCouvert != null) {
-      // Utiliser le montant couvert par le plafond (qui tient compte du reliquat)
-      // et le taux de couverture du barème — calcul en Decimal exact (plan P3)
-      const taux = plafondResult.details.tauxCouverture || 0;
-      const montantCouvert = plafondResult.details.montantCouvert;
-      const montantValideDecimal = appliquerTaux(montantCouvert, taux);
-      finalMontantValide = enNombre(montantValideDecimal) ?? 0;
-      finalTicketModerateur = enNombre(moins(montantCouvert, finalMontantValide)) ?? 0;
+    if (plafondResult) {
+      // P2-04 : règle MÉTIER UNIFIÉE (src/lib/services/calcul-remboursement.ts)
+      // — l'assureur valide la prise en charge AUTORISÉE (le plafond annuel
+      // borne la prise en charge après application du taux) et le ticket
+      // modérateur = dépense − autorisée. Plus aucun calcul local parallèle :
+      // les valeurs proviennent du même service que la simulation et la
+      // vérification de plafond.
+      finalMontantValide = plafondResult.details.partAssureur ?? null;
+      finalTicketModerateur = plafondResult.details.ticketModerateur ?? null;
     }
 
     // ─── P1 : référence du barème à FIGER sur le dossier ───────────────────
@@ -289,6 +299,22 @@ export async function POST(request: NextRequest) {
           const consomme = sommer(plafondTx.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame));
           if (baremeTx && superieurOuEgal(consomme, baremeTx.plafond)) {
             throw new Error(`PLAFOND_ATTEINT_TRANSACTION: Plafond ${typeDossier} atteint lors de la création`);
+          }
+          // ─── P2-04 : recalcul dans la transaction (consommation À JOUR) ──
+          // Le montant pré-calculé hors transaction peut reposer sur une
+          // consommation périmée (une création concurrente a committé pendant
+          // l'attente du FOR UPDATE) : on recalcule via le SERVICE CENTRAL
+          // avec la consommation relue à l'intérieur de la transaction —
+          // le montant validé ne dépasse JAMAIS le reliquat réel.
+          if (baremeTx) {
+            const calculTx = calculerRemboursement({
+              montantFrais: montantReclame,
+              tauxCouverture: baremeTx.tauxCouverture,
+              plafondAnnuel: enNombre(baremeTx.plafond) ?? 0,
+              consommationAnterieure: enNombre(consomme) ?? 0,
+            });
+            finalMontantValide = calculTx.priseEnChargeAutorisee;
+            finalTicketModerateur = calculTx.ticketModerateur;
           }
         }
 

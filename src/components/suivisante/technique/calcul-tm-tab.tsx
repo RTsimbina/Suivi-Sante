@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calculator } from 'lucide-react';
+import { Calculator, Loader2 } from 'lucide-react';
 
 import { formatMontant } from '../format';
 import { PRESTATIONS, PRESTATION_LABELS, Societe } from './types';
@@ -36,8 +36,12 @@ export default function CalculTMTab({
     setCalcSocieteId,
     calcPrestation,
     setCalcPrestation,
+    calcAssureId,
+    setCalcAssureId,
+    assures,
     calcMontant,
     setCalcMontant,
+    calcLoading,
     calcResult,
     handleCalculer,
   } = state;
@@ -85,6 +89,39 @@ export default function CalculTMTab({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="calc-assure">Assuré</Label>
+            <Select
+              value={calcAssureId}
+              onValueChange={setCalcAssureId}
+              disabled={!calcSocieteId}
+            >
+              <SelectTrigger id="calc-assure" className="w-full">
+                <SelectValue
+                  placeholder={
+                    calcSocieteId
+                      ? 'Sélectionner un assuré'
+                      : 'Sélectionner d\'abord une société'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {assures.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {[a.prenom, a.nom].filter(Boolean).join(' ') || a.id}
+                    {a.matricule ? ` — ${a.matricule}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* P2-04 : la prise en compte du plafond annuel RESTANT exige la
+                consommation de l'assuré — le calcul est fait par le backend. */}
+            <p className="text-[11px] text-muted-foreground">
+              Le plafond annuel restant de cet assuré est pris en compte
+              (calcul effectué côté serveur).
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="calc-montant">Montant réclamé (Ar)</Label>
             <Input
               id="calc-montant"
@@ -98,11 +135,11 @@ export default function CalculTMTab({
 
           <Button
             onClick={handleCalculer}
-            disabled={!calcSocieteId || !calcPrestation || !calcMontant}
+            disabled={!calcSocieteId || !calcPrestation || !calcAssureId || !calcMontant || calcLoading}
             className="w-full gap-2"
           >
-            <Calculator className="h-4 w-4" />
-            Calculer
+            {calcLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
+            {calcLoading ? 'Calcul en cours…' : 'Calculer'}
           </Button>
         </CardContent>
       </Card>
@@ -123,6 +160,37 @@ export default function CalculTMTab({
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Montant couvert</span>
                 <span className="font-medium">{formatMontant(calcResult.montantCouvert)}</span>
+              </div>
+              {calcResult.priseEnChargeTheorique !== undefined && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Prise en charge théorique (contrat)</span>
+                  <span className="font-medium">{formatMontant(calcResult.priseEnChargeTheorique)}</span>
+                </div>
+              )}
+              {calcResult.plafondRestant !== undefined && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Plafond annuel restant</span>
+                  <span className="font-medium">{formatMontant(calcResult.plafondRestant)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Part contractuelle de l'assuré</span>
+                <span className="font-medium">
+                  {formatMontant(calcResult.partContractuelleAssure ?? calcResult.ticketModerateur - calcResult.montantRembourse)}
+                </span>
+              </div>
+              {calcResult.depassementPlafond !== undefined && calcResult.depassementPlafond > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Dépassement du plafond</span>
+                  <span className="font-medium text-amber-700">{formatMontant(calcResult.depassementPlafond)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-sm font-medium">
+                <span className="text-muted-foreground">Ticket modérateur total</span>
+                <span>{formatMontant(calcResult.ticketModerateur)}</span>
               </div>
             </div>
 

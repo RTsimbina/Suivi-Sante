@@ -14,8 +14,9 @@
  */
 
 import { db } from './db';
-import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, plus, reliquat as calculerReliquat, formaterAr, formaterPourcent, versDecimal } from './money';
+import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, reliquat as calculerReliquat, formaterAr, formaterPourcent, versDecimal } from './money';
 import { dedupliquerEnVigueur, trouverBaremeValide, type BaremeDated } from './baremes-validite';
+import { calculerRemboursement } from './services/calcul-remboursement';
 
 /** Taux de consommation en % : consommé / plafond × 100 (Decimal exact). */
 function tauxConsommation(consomme: Decimal, plafond: Decimal): Decimal | null {
@@ -42,6 +43,9 @@ export interface PlafondCheckResult {
     tauxCouverture?: number;
     montantDemande?: number;
     montantCouvert?: number | null;
+    /** P2-04 — décomposition métier du calcul centralisé (calcul-remboursement.ts). */
+    priseEnChargeTheorique?: number | null;
+    partContractuelleAssure?: number | null;
     partAssureur?: number | null;
     partPatient?: number | null;
     ticketModerateur?: number | null;
@@ -292,16 +296,23 @@ export async function verifierPlafondAnnuel(opts: {
     });
   }
 
-  // ─── 6. Calcul final (Decimal exact, arrondi comptable 2 décimales) ────
+  // ─── 6. Calcul final — SERVICE MÉTIER CENTRALISÉ (P2-04) ────────────────
+  // La règle du remboursement / ticket modérateur vit désormais dans
+  // src/lib/services/calcul-remboursement.ts (source unique partagée par
+  // toute l'application) : le plafond borne la prise en charge AUTORISÉE
+  // (min(théorique, restant)) et le ticket modérateur distingue la part
+  // contractuelle de l'assuré du dépassement du plafond.
+  const calcul = calculerRemboursement({
+    montantFrais: montantDemande,
+    tauxCouverture: bareme.tauxCouverture,
+    plafondAnnuel: enNombre(bareme.plafond) ?? 0,
+    consommationAnterieure: enNombre(consommeActe) ?? 0,
+  });
+
+  // montantCouvert (sémantique inchangée) = montant soumis au taux :
+  // min(montant demandé, reliquat acte). La prise en charge effective de
+  // l'assureur est `partAssureur` = prise en charge autorisée du service.
   const montantCouvert = minDecimal(montantDemande, reliquatActe) ?? new Decimal(0);
-  // Ticket modérateur = part du patient sur le montant couvert (taux non couvert)
-  const partAssureur = appliquerTaux(montantCouvert, bareme.tauxCouverture) ?? new Decimal(0);
-  const ticketModerateur = moins(montantCouvert, partAssureur) ?? new Decimal(0);
-  // Dépassement plafond = ce qui dépasse le plafond (à la charge totale du patient)
-  const depassementPlafond = moins(montantDemande, reliquatActe);
-  const depassement = depassementPlafond && depassementPlafond.isNegative() ? new Decimal(0) : (depassementPlafond ?? new Decimal(0));
-  // Part patient totale = ticket modérateur + dépassement plafond
-  const partPatient = plus(ticketModerateur, depassement) ?? new Decimal(0);
   const autorise = inferieurOuEgal(montantDemande, reliquatActe) && inferieurA(consommeGlobal, plafondGlobal);
 
   return {
@@ -318,10 +329,14 @@ export async function verifierPlafondAnnuel(opts: {
       tauxCouverture: bareme.tauxCouverture,
       montantDemande,
       montantCouvert: enNombre(montantCouvert),
-      partAssureur: Math.round(enNombre(partAssureur) ?? 0),
-      partPatient: Math.round(enNombre(partPatient) ?? 0),
-      ticketModerateur: enNombre(ticketModerateur),
-      depassementPlafond: enNombre(depassement),
+      // P2-04 : règle unifiée — le plafond borne la prise en charge APRÈS
+      // taux ; le ticket modérateur = dépense − prise en charge autorisée.
+      partAssureur: calcul.priseEnChargeAutorisee,
+      partPatient: calcul.ticketModerateur,
+      ticketModerateur: calcul.ticketModerateur,
+      depassementPlafond: calcul.depassementPlafond,
+      priseEnChargeTheorique: calcul.priseEnChargeTheorique,
+      partContractuelleAssure: calcul.partContractuelleAssure,
       plafondGlobal: enNombre(plafondGlobal),
       consommeGlobal: enNombre(consommeGlobal),
       reliquatGlobal: enNombre(reliquatGlobal),

@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
 import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
-import { enNombre, egaux, superieurA } from "@/lib/money";
+import { enNombre, egaux, superieurA, sommer, superieurOuEgal } from "@/lib/money";
+import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { DOSSIER_TRANSITIONS, DOSSIER_ROLE_TRANSITIONS } from '@/lib/statuts';
 import { dossierUpdateSchema } from "@/lib/validation";
@@ -236,21 +237,100 @@ export async function PATCH(
       });
     }
 
+    // ─── P2-04D8 : sérialisation des remboursements simultanés ─────────────
+    // C'est la transition RECU → EN_ANALYSE qui fait ENTRER un dossier dans
+    // la consommation annuelle (statuts EN_ANALYSE..PAYE comptent) : deux
+    // dossiers passant simultanément en analyse sur un même reliquat doivent
+    // être SÉRALISÉS (verrou FOR UPDATE du barème + re-vérification dans la
+    // même transaction), sinon le plafond annuel restant est dépassé.
+    // La transition EN_ANALYSE → VALIDE est aussi vérifiée en transaction
+    // (montants modifiés, pré-réservations concurrentes).
+    const transitionEntreeConsommation =
+      statut === 'EN_ANALYSE' && existing.statut === 'RECU' && !!(assureId || existing.assureId);
+    const transitionValide =
+      statut === 'VALIDE' && existing.statut === 'EN_ANALYSE' && !!(assureId || existing.assureId);
+    const transitionSerrialisee = transitionEntreeConsommation || transitionValide;
+
     // ─── Mise à jour ──────────────────────────────────────────────────────
-    const updated = await db.dossier.update({
-      where: { id },
-      data: {
-        ...(statut ? { statut } : {}),
-        ...updateData,
-        historique: JSON.stringify(newHistorique),
-      },
-      include: {
-        societe: true,
-        gestionnaireAccueil: true,
-        gestionnaireTechnique: true,
-        gestionnaireCompta: true,
-      },
-    });
+    const updated = transitionSerrialisee
+      ? await db.$transaction(async (tx) => {
+          const baremeTx = await trouverBaremeValide(tx, {
+            societeId: existing.societeId,
+            prestation: existing.typeDossier,
+            date: existing.dateSoins ?? existing.dateReception,
+          });
+          if (baremeTx) {
+            // FOR UPDATE : l'opération concurrente attend le commit, puis
+            // relit une consommation à jour (READ COMMITTED).
+            await tx.$queryRaw`SELECT "id" FROM "Bareme" WHERE "id" = ${baremeTx.id} FOR UPDATE`;
+            const annee = (existing.dateReception ?? new Date()).getFullYear();
+            const dossiersAnnee = await tx.dossier.findMany({
+              where: {
+                assureId: assureId || existing.assureId,
+                societeId: existing.societeId,
+                typeDossier: existing.typeDossier,
+                dateReception: {
+                  gte: new Date(annee, 0, 1),
+                  lte: new Date(annee, 11, 31, 23, 59, 59),
+                },
+                statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
+                id: { not: id },
+              },
+              select: { montantPaye: true, montantValide: true, montantReclame: true },
+            });
+            const consomme = sommer(
+              dossiersAnnee.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame),
+            );
+            if (transitionEntreeConsommation) {
+              // Entrée en consommation : le dossier AJOUTE son montant au
+              // reliquat — bloqué si plafond restant insuffisant.
+              // (Decimal.plus et non « + » : valueOf de Decimal renvoie une
+              // chaîne — « + » concaténerait 350000 + 100000 en 350000100000.)
+              if (superieurOuEgal(
+                consomme.plus(enNombre(existing.montantReclame) ?? 0),
+                baremeTx.plafond,
+              )) {
+                throw new Error(
+                  `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors du passage en analyse`,
+                );
+              }
+            } else if (superieurOuEgal(consomme, baremeTx.plafond)) {
+              // EN_ANALYSE → VALIDE : les pré-réservations concurrentes ne
+              // doivent pas laisser valider un dépassement.
+              throw new Error(
+                `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la validation`,
+              );
+            }
+          }
+          return tx.dossier.update({
+            where: { id },
+            data: {
+              ...(statut ? { statut } : {}),
+              ...updateData,
+              historique: JSON.stringify(newHistorique),
+            },
+            include: {
+              societe: true,
+              gestionnaireAccueil: true,
+              gestionnaireTechnique: true,
+              gestionnaireCompta: true,
+            },
+          });
+        })
+      : await db.dossier.update({
+          where: { id },
+          data: {
+            ...(statut ? { statut } : {}),
+            ...updateData,
+            historique: JSON.stringify(newHistorique),
+          },
+          include: {
+            societe: true,
+            gestionnaireAccueil: true,
+            gestionnaireTechnique: true,
+            gestionnaireCompta: true,
+          },
+        });
 
     // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
     // Valeurs converties comme en base pour éviter les faux positifs de diff
@@ -269,6 +349,17 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (error) {
+    // ─── P2-04D8 : échec EXPLICITE de la validation si le plafond est atteint
+    // pendant la transaction sérialisée (deux validations simultanées) ─────
+    if (error instanceof Error && error.message.includes('PLAFOND_ATTEINT_TRANSACTION')) {
+      return NextResponse.json(
+        {
+          erreur: error.message.replace('PLAFOND_ATTEINT_TRANSACTION: ', 'Transition bloquée : '),
+          plafondAtteint: true,
+        },
+        { status: 422 },
+      );
+    }
     console.error("Error updating dossier:", error);
     return NextResponse.json({ erreur: "Erreur lors de la mise à jour du dossier" },
       { status: 500 }

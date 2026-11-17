@@ -452,7 +452,7 @@ describe('GET /api/portail-prestataire/assures — données minimales et interse
     const res = await GET_ASSURES(requete('/api/portail-prestataire/assures?scope=clients'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.assures[0].nSSMasque).toBe('123••••••12');
+    expect(body.assures[0].nSSMasque).toBe('••••••••9012'); // P2-03 : seuls les 4 derniers caractères
     expect(JSON.stringify(body)).not.toContain('123456789012'); // NSS brut jamais exposé
     // Conventions actives uniquement + intersection
     expect(dbMocks.prestataireSocieteFindMany.mock.calls[0][0].where).toEqual(

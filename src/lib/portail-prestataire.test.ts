@@ -111,12 +111,14 @@ describe('soldeFacture', () => {
 });
 
 describe('masquerNss — donnée minimale exposée au portail', () => {
-  it('masque le corps du NSS (3 premiers + 2 derniers caractères)', () => {
-    expect(masquerNss('123456789012')).toBe('123••••••12');
+  // P2-03 : format durci (implémentation centralisée dans src/lib/nss.ts) —
+  // seuls les 4 DERNIERS caractères restent lisibles.
+  it('masque le corps du NSS (4 derniers caractères visibles)', () => {
+    expect(masquerNss('123456789012')).toBe('••••••••9012');
   });
 
-  it('NSS court ou vide → affiché tel quel ou tiret', () => {
-    expect(masquerNss('12345')).toBe('12345');
+  it('NSS court → 4 derniers visibles ; vide ou null → tiret', () => {
+    expect(masquerNss('12345')).toBe('•2345');
     expect(masquerNss('')).toBe('—');
     expect(masquerNss(null)).toBe('—');
   });

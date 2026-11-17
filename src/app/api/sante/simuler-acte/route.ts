@@ -3,8 +3,8 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { simulerActeSchema } from '@/lib/validation';
-import { trouverBaremeValide, dedupliquerEnVigueur } from '@/lib/baremes-validite';
-import { Decimal, enNombre, sommer, superieurA, superieurOuEgal, inferieurOuEgal, inferieurA, minDecimal, appliquerTaux, moins, reliquat as calculerReliquat, formaterAr, formaterNombre, formaterPourcent, versDecimal } from '@/lib/money';
+import { verifierPlafondAnnuel } from '@/lib/plafond-check';
+import { enNombre } from '@/lib/money';
 
 export async function POST(request: NextRequest) {
   const authError = await checkAuth(request);
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         raison: "ASSURE_INACTIF",
         message: "L'assuré est inactif. Aucune prise en charge possible.",
         details: { assureActif: false },
+        alertes: [],
       });
     }
 
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     if (prestataireId) {
       const lienPS = await db.prestataireSociete.findUnique({
         where: { prestataireId_societeId: { prestataireId, societeId: assure.societeId } },
+        select: { actif: true },
       });
       // Si un lien existe et est inactif → refus
       if (lienPS && !lienPS.actif) {
@@ -52,167 +54,58 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Récupérer le barème VALIDE À LA DATE DU JOUR (P1 — simulation courante)
-    const bareme = await trouverBaremeValide(db, {
+    // ─── P2-04 : UNIFICATION DU CALCUL DU TICKET MODÉRATEUR ─────────────────
+    // Toute la logique métier (barème valide à la date courante, consommation
+    // annuelle et ses règles d'exclusion, plafond acte + plafond global,
+    // prise en charge théorique / autorisée, dépassement, ticket modérateur,
+    // alertes) vit dans verifierPlafondAnnuel → src/lib/services/
+    // calcul-remboursement.ts (source unique partagée par toute l'application).
+    // AVANT : cette route répliquait le moteur avec une règle DIVERGENTE (les
+    // dossiers RECU comptaient dans la consommation, contrairement au circuit
+    // de traitement) — plus aucun calcul parallèle.
+    const verification = await verifierPlafondAnnuel({
+      assureId: assure.id,
       societeId: assure.societeId,
-      prestation: typeActe,
-      date: new Date(),
+      typeActe,
+      montantDemande,
+      prestataireId: prestataireId || undefined,
     });
 
-    if (!bareme) {
-      return Response.json({
-        autorise: false,
-        raison: "ACTE_NON_COVERT",
-        message: `L'acte "${typeActe}" n'est pas couvert par le contrat de la société ${assure.societe.nom}.`,
-        details: { prestation: typeActe, societe: assure.societe.nom },
-      });
-    }
-
-    // Calculer la consommation existante pour ce type d'acte
+    // Actes identiques de l'année (affichage Contrôle Santé — enrichissement
+    // propre à la simulation, hors moteur de calcul)
     const debutAnnee = new Date(new Date().getFullYear(), 0, 1);
     const finAnnee = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
-
-    const dossiersActe = await db.dossier.findMany({
+    const actes = await db.dossier.findMany({
       where: {
         assureId: assure.id,
         typeDossier: typeActe,
         dateReception: { gte: debutAnnee, lte: finAnnee },
-        statut: { not: 'REJETE' },
       },
-    });
-
-    // Consommations EXACTES en Decimal (plan P3) — réplique plafond-check.ts
-    const consommeActe = sommer(
-      dossiersActe.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
-    );
-    const reliquatActe = calculerReliquat(bareme.plafond, consommeActe) ?? new Decimal(0);
-
-    // Calculer la consommation globale
-    // P1 : plafond global = barèmes EN VIGUEUR (une version par prestation,
-    // dédupliquée) — les versions historiques ne doivent pas le multiplier.
-    const toutesVersions = await db.bareme.findMany({ where: { societeId: assure.societeId, supprime: false } });
-    const baremes = dedupliquerEnVigueur(toutesVersions, new Date());
-    const plafondGlobal = sommer(baremes.map(b => b.plafond));
-
-    const dossiersGlobal = await db.dossier.findMany({
-      where: {
-        assureId: assure.id,
-        dateReception: { gte: debutAnnee, lte: finAnnee },
-        statut: { not: 'REJETE' },
+      select: {
+        numeroDossier: true,
+        dateReception: true,
+        montantReclame: true,
+        montantPaye: true,
+        statut: true,
       },
+      orderBy: { dateReception: 'desc' },
     });
-
-    const consommeGlobal = sommer(
-      dossiersGlobal.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
-    );
-    const reliquatGlobal = calculerReliquat(plafondGlobal, consommeGlobal) ?? new Decimal(0);
-
-    // Vérifications
-    const alertes: { type: 'info' | 'warning' | 'danger'; message: string }[] = [];
-
-    // 1. Plafond spécifique atteint (comparaison exacte)
-    if (superieurOuEgal(consommeActe, bareme.plafond)) {
-      return Response.json({
-        autorise: false,
-        raison: "PLAFOND_ACTE_ATTEINT",
-        message: `Plafond ${typeActe} déjà atteint (${formaterAr(consommeActe)} / ${formaterAr(bareme.plafond)}). Aucun reliquat disponible.`,
-        details: {
-          plafondActe: enNombre(bareme.plafond),
-          consommeActe: enNombre(consommeActe),
-          reliquatActe: 0,
-          nbActesIdentiques: dossiersActe.length,
-          tauxCouverture: bareme.tauxCouverture,
-        },
-        alertes: [{
-          type: 'danger',
-          message: `SUSPENSION — L'assuré a épuisé son plafond ${typeActe} pour l'année ${new Date().getFullYear()}.`,
-        }],
-      });
-    }
-
-    // 2. Montant demandé dépasse le reliquat de l'acte
-    if (superieurA(montantDemande, reliquatActe)) {
-      alertes.push({
-        type: 'danger',
-        message: `Le montant demandé (${formaterAr(montantDemande)}) dépasse le reliquat disponible pour ${typeActe} (${formaterAr(reliquatActe)}).`,
-      });
-    }
-
-    // 3. Plafond global atteint (comparaison exacte)
-    if (superieurOuEgal(consommeGlobal, plafondGlobal)) {
-      return Response.json({
-        autorise: false,
-        raison: "PLAFOND_GLOBAL_ATTEINT",
-        message: `Plafond annuel global atteint. Aucun nouvel acte ne peut être pris en charge.`,
-        details: {
-          plafondGlobal: enNombre(plafondGlobal),
-          consommeGlobal: enNombre(consommeGlobal),
-          reliquatGlobal: 0,
-        },
-        alertes: [{
-          type: 'danger',
-          message: `SUSPENSION GLOBALE — Tous les plafonds de l'assuré sont épuisés pour l'année ${new Date().getFullYear()}.`,
-        }],
-      });
-    }
-
-    // 4. Plafond global > 70% (comparaison exacte)
-    if (!plafondGlobal.isZero() && superieurOuEgal(consommeGlobal.mul(100), plafondGlobal.mul(70))) {
-      alertes.push({
-        type: 'warning',
-        message: `Plafond global à ${formaterPourcent(consommeGlobal, plafondGlobal)}. Approbation spéciale recommandée.`,
-      });
-    }
-
-    // 5. Plafond acte > 70%
-    // P1 : conversion Decimal du plafond de la version (Decimal | number).
-    const plafondActeDec = versDecimal(bareme.plafond) ?? new Decimal(0);
-    if (!plafondActeDec.isZero() && superieurOuEgal(consommeActe.mul(100), plafondActeDec.mul(70))) {
-      alertes.push({
-        type: 'warning',
-        message: `Plafond ${typeActe} à ${formaterPourcent(consommeActe, bareme.plafond)}.`,
-      });
-    }
-
-    // Calcul du montant couvert (Decimal exact, arrondi comptable)
-    const montantCouvert = minDecimal(montantDemande, reliquatActe) ?? new Decimal(0);
-    const partAssureur = appliquerTaux(montantCouvert, bareme.tauxCouverture) ?? new Decimal(0);
-    const partPatient = moins(montantCouvert, partAssureur) ?? new Decimal(0);
-
-    // Actes identiques récents (montants convertis pour l'affichage)
-    const actesIdentiques = dossiersActe.map(d => ({
-      numeroDossier: d.numeroDossier,
-      dateReception: d.dateReception,
-      montantReclame: enNombre(d.montantReclame),
-      montantPaye: enNombre(d.montantPaye),
-      statut: d.statut,
-    }));
-
-    const autorise = inferieurOuEgal(montantDemande, reliquatActe) && inferieurA(consommeGlobal, plafondGlobal);
 
     return Response.json({
-      autorise,
-      raison: autorise ? 'OK' : 'MONTANT_DEPASSE_RELIQUAT',
-      message: autorise
-        ? `Acte autorisé. Montant couvert : ${formaterAr(montantCouvert)}.`
-        : `Le montant demandé dépasse le reliquat disponible.`,
-      details: {
-        typeActe,
-        plafondActe: enNombre(bareme.plafond),
-        consommeActe: enNombre(consommeActe),
-        reliquatActe: enNombre(reliquatActe),
-        tauxCouverture: bareme.tauxCouverture,
-        montantDemande,
-        montantCouvert: enNombre(montantCouvert),
-        partAssureur: Math.round(enNombre(partAssureur) ?? 0),
-        partPatient: Math.round(enNombre(partPatient) ?? 0),
-        plafondGlobal: enNombre(plafondGlobal),
-        consommeGlobal: enNombre(consommeGlobal),
-        reliquatGlobal: enNombre(reliquatGlobal),
-        nbActesIdentiques: dossiersActe.length,
-      },
-      actesIdentiques,
-      alertes,
+      autorise: verification.autorise,
+      raison: verification.raison,
+      message: verification.message,
+      // Compatibilité Contrôle Santé : la clé `typeActe` complète le champ
+      // `prestation` du moteur (ancien format de cette route).
+      details: { ...verification.details, typeActe },
+      actesIdentiques: actes.map(a => ({
+        numeroDossier: a.numeroDossier,
+        dateReception: a.dateReception,
+        montantReclame: enNombre(a.montantReclame),
+        montantPaye: enNombre(a.montantPaye),
+        statut: a.statut,
+      })),
+      alertes: verification.alertes,
     });
   } catch (error) {
     console.error('[SANTÉ] Erreur simulation acte:', error);

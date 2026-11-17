@@ -238,3 +238,44 @@ describe('Isolation — GET /api/contrats', () => {
     );
   });
 });
+
+// ─── P2-03 : confidentialité du NSS (masquage CÔTÉ BACKEND) ─────────────────
+
+describe('P2-03 — NSS masqué pour les rôles externes', () => {
+  it('dossiers : CONTACT_ENTREPRISE → nSS masqué ; habilité interne → complet', async () => {
+    dbMocks.dossierFindMany.mockResolvedValue([
+      { id: 'dos-A-1', societeId: SOC_A, nSS: '123456789012', numeroDossier: 'DOS-1' },
+    ]);
+    dbMocks.dossierCount.mockResolvedValue(1);
+
+    const externe = await getDossiers(requete('/api/dossiers', EXTERNE_SOC_A));
+    expect(externe.status).toBe(200);
+    const bExterne = await externe.json();
+    expect(bExterne.dossiers[0].nSS).toBe('••••••••9012');
+    expect(JSON.stringify(bExterne)).not.toContain('123456789012');
+
+    const interne = await getDossiers(requete('/api/dossiers', INTERNE));
+    expect(interne.status).toBe(200);
+    const bInterne = await interne.json();
+    expect(bInterne.dossiers[0].nSS).toBe('123456789012');
+  });
+
+  it('assurés : CONTACT_ENTREPRISE → nSS masqué dans la liste', async () => {
+    dbMocks.assureFindMany.mockResolvedValue([
+      { id: 'a1', nom: 'RAKOTO', nSS: '123456789012', _count: { dossiers: 1 } },
+    ]);
+    dbMocks.assureCount.mockResolvedValue(1);
+    dbMocks.assureGroupBy.mockResolvedValue([]);
+
+    const externe = await getAssures(requete('/api/assures', EXTERNE_SOC_A));
+    expect(externe.status).toBe(200);
+    const bExterne = await externe.json();
+    expect(bExterne.assures[0].nSS).toBe('••••••••9012');
+    expect(JSON.stringify(bExterne)).not.toContain('123456789012');
+
+    const interne = await getAssures(requete('/api/assures', INTERNE));
+    expect(interne.status).toBe(200);
+    const bInterne = await interne.json();
+    expect(bInterne.assures[0].nSS).toBe('123456789012');
+  });
+});

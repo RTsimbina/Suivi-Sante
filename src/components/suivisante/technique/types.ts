@@ -75,12 +75,38 @@ export const emptyBaremes = (): BaremeRow[] =>
 
 // ─── Calcul ticket modérateur ───────────────────────────────────────────────
 
+/** Assuré sélectionnable du simulateur (P2-04 : le calcul exige sa consommation). */
+export interface AssureOption {
+  id: string;
+  nom: string;
+  prenom: string | null;
+  matricule: string | null;
+  typeBeneficiaire: string;
+}
+
+/**
+ * P2-04 : le résultat provient du BACKEND (POST /api/sante/simuler-acte →
+ * src/lib/services/calcul-remboursement.ts, source unique de vérité). Le
+ * simulateur n'additionne plus rien localement — il affiche la décomposition
+ * métier : prise en charge théorique / autorisée, plafond restant,
+ * part contractuelle de l'assuré, dépassement du plafond.
+ */
 export interface CalculResult {
   bareme: { tauxCouverture: number; plafond: number };
+  /** Montant soumis au taux : min(dépense, plafond restant). */
   montantCouvert: number;
+  /** Prise en charge AUTORISÉE de l'assureur (plafonnée après taux). */
   montantRembourse: number;
+  /** Charge totale de l'assuré (part contractuelle + dépassement). */
   ticketModerateur: number;
   explication: string;
+  // Décomposition métier (backend source de vérité)
+  priseEnChargeTheorique?: number;
+  consommationAnterieure?: number;
+  plafondRestant?: number;
+  partContractuelleAssure?: number;
+  depassementPlafond?: number;
+  autorise?: boolean;
 }
 
 // ─── Import ISA ─────────────────────────────────────────────────────────────
