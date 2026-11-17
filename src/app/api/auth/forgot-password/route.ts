@@ -5,12 +5,28 @@ import { smtpEstConfigureAsync } from '@/lib/email';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { forgotPasswordSchema } from '@/lib/validation';
 import { envoyerReinitialisationMdp } from '@/lib/mail';
+import { limiterRouteSensible } from '@/lib/route-rate-limit';
 
 // Durée de validité du token de réinitialisation : 30 minutes
 const RESET_TOKEN_EXPIRY = '30m';
 
 export async function POST(request: NextRequest) {
   try {
+    // ─── P1 : limitation par adresse IP AVANT toute lecture du corps ──────
+    // Les requêtes en rafale sont refusées 429 sans effet de bord (ni
+    // service de messagerie, ni requête en base). Fenêtre FIXE partagée
+    // entre toutes les instances (Redis → Postgres → mémoire).
+    const limiteIp = await limiterRouteSensible(request.headers, {
+      prefixe: 'forgot',
+      ip: {
+        envLimite: 'FORGOT_PASSWORD_IP_LIMIT',
+        limiteDefaut: 10,
+        envFenetre: 'FORGOT_PASSWORD_IP_WINDOW',
+        fenetreDefaut: 900, // 15 minutes
+      },
+    });
+    if (!limiteIp.ok) return limiteIp.reponse;
+
     // ─── Validation Zod centralisée (format email) ─────────────────────────
     const parsed = await parseJsonBody(request, forgotPasswordSchema);
     if (!parsed.success) {
@@ -20,6 +36,24 @@ export async function POST(request: NextRequest) {
       );
     }
     const emailTrimmed = parsed.data.email.toLowerCase();
+
+    // ─── P1 : limitation par adresse e-mail DÉCLARÉE ────────────────────────
+    // La clé est construite sur l'e-mail FOURNI (jamais sur son existence) :
+    // compte réel ou inconnu → même réponse 429, aucune énumération.
+    // 3 demandes / 10 min est très au-dessus de l'usage légitime et coupe
+    // le spam de liens AVANT le service de messagerie — dont la chaîne
+    // anti-abus existante est préservée à l'identique.
+    const limiteEmail = await limiterRouteSensible(request.headers, {
+      prefixe: 'forgot',
+      identite: {
+        envLimite: 'FORGOT_PASSWORD_EMAIL_LIMIT',
+        limiteDefaut: 3,
+        envFenetre: 'FORGOT_PASSWORD_EMAIL_WINDOW',
+        fenetreDefaut: 600, // 10 minutes
+        valeur: emailTrimmed,
+      },
+    });
+    if (!limiteEmail.ok) return limiteEmail.reponse;
 
     // Vérifier que l'utilisateur existe et est actif
     const user = await db.utilisateur.findUnique({

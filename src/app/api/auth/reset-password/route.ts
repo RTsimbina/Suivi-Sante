@@ -4,9 +4,26 @@ import { hash } from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { resetPasswordSchema } from '@/lib/validation';
+import { limiterRouteSensible } from '@/lib/route-rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // ─── P1 : limitation par adresse IP avant même la lecture du corps ────
+    // Protège la route contre le spam et limite le coût de la vérification
+    // HMAC des jetons. La fenêtre FIXE se réinitialise d'elle-même : aucun
+    // déblocage manuel n'est nécessaire (aucun blocage abusif des légitimes
+    // — 10 requêtes / 15 min dépasse largement l'usage réel).
+    const limiteIp = await limiterRouteSensible(request.headers, {
+      prefixe: 'reset',
+      ip: {
+        envLimite: 'RESET_PASSWORD_IP_LIMIT',
+        limiteDefaut: 10,
+        envFenetre: 'RESET_PASSWORD_IP_WINDOW',
+        fenetreDefaut: 900, // 15 minutes
+      },
+    });
+    if (!limiteIp.ok) return limiteIp.reponse;
+
     // ─── Validation Zod centralisée (token requis, politique mot de passe) ──
     const parsed = await parseJsonBody(request, resetPasswordSchema);
     if (!parsed.success) {
