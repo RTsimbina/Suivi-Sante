@@ -44,11 +44,6 @@ function getConfig() {
 
 // ─── Fonction principale ─────────────────────────────────────────────────────
 
-export interface LLMMessage {
-  role: 'system' | 'assistant' | 'user';
-  content: string;
-}
-
 /**
  * Appelle le LLM et retourne le texte de la réponse.
  */

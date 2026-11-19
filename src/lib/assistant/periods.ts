@@ -97,11 +97,6 @@ export function resolvePeriode(params: PeriodeParams | undefined): PeriodeResolu
   }
 }
 
-/** Where Prisma standard sur un champ date pour une période donnée */
-export function periodeWhere(field: string, periode: PeriodeResolue) {
-  return { [field]: { gte: periode.du, lte: periode.au } };
-}
-
 /** Liste blanche des champs de date utilisables en SQL brut */
 const CHAMPS_DATE: Record<string, true> = {
   dateReception: true,
@@ -123,12 +118,4 @@ const TABLES: Record<string, true> = { Dossier: true };
 export function periodeSqlFrag(field: string, periode: PeriodeResolue): Prisma.Sql {
   if (!CHAMPS_DATE[field]) throw new AssistantError('Champ de date non autorisé.');
   return Prisma.sql`AND "${Prisma.raw(field)}" >= ${periode.du} AND "${Prisma.raw(field)}" <= ${periode.au}`;
-}
-
-/** Fragment SQL sûr pour filtrer par colonne d'identifiant (valeur liée) */
-export function egalSqlFrag(colonne: string, valeur: string | null): Prisma.Sql {
-  if (!valeur) return Prisma.empty;
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(colonne)) throw new AssistantError('Colonne non autorisée.');
-  if (!/^[a-zA-Z0-9_-]+$/.test(valeur)) throw new AssistantError('Identifiant invalide.');
-  return Prisma.sql`AND "${Prisma.raw(colonne)}" = ${valeur}`;
 }

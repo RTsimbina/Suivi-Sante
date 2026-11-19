@@ -43,13 +43,11 @@ export interface EtatCompte {
 }
 
 /** Accès minimal à Utilisateur sur un client Prisma (ou un mock de tests). */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface SessionRevocationDb {
   utilisateur: {
     findUnique(args: any): Promise<any>;
   };
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /** Portion du JWT utilisée pour la vérification (token NextAuth). */
 export interface JetonSession {

@@ -154,5 +154,3 @@ export function useContacts(selectedId: string | null) {
     setCFormEmail,
   };
 }
-
-export type ContactsState = ReturnType<typeof useContacts>;

@@ -30,8 +30,6 @@ export const ROLES = [
   'PRESTATAIRE',
 ] as const;
 
-export type RoleValeur = (typeof ROLES)[number];
-
 /** Libellés lisibles des rôles (avec accents — référence unique). */
 export const ROLE_LABELS: Record<string, string> = {
   ADMINISTRATEUR: 'Administrateur',
@@ -55,10 +53,6 @@ export const INTERNAL_ROLES: string[] = [
 
 /** Rôles externes : périmètre forcé sur la société rattachée au compte. */
 export const EXTERNAL_ROLES = ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'] as const;
-
-export function isRoleInterne(role: string | undefined | null): boolean {
-  return !!role && INTERNAL_ROLES.includes(role);
-}
 
 /** Couleurs de badges par rôle (affichage uniforme des listes d'utilisateurs). */
 export const ROLE_COLORS: Record<string, string> = {
@@ -153,13 +147,6 @@ export const CATEGORIES_DOSSIER: ReferentielItem[] = [
   { valeur: 'REGLEMENT_PRESTATAIRE', label: 'Règlement Prestataire' },
 ];
 
-export const CATEGORIE_DOSSIER_VALEURS: string[] = CATEGORIES_DOSSIER.map((c) => c.valeur);
-
-export function categorieDossierLabel(valeur: string | null | undefined): string {
-  if (!valeur) return '—';
-  return CATEGORIES_DOSSIER.find((c) => c.valeur === valeur)?.label ?? valeur;
-}
-
 // ─── Types de justificatif ──────────────────────────────────────────────────
 
 export const TYPES_JUSTIFICATIF: ReferentielItem[] = [
@@ -173,10 +160,6 @@ export const TYPES_JUSTIFICATIF: ReferentielItem[] = [
 
 export const TYPE_JUSTIFICATIF_VALEURS: string[] = TYPES_JUSTIFICATIF.map((t) => t.valeur);
 
-export function typeJustificatifLabel(valeur: string): string {
-  return TYPES_JUSTIFICATIF.find((t) => t.valeur === valeur)?.label ?? valeur;
-}
-
 // ─── Types de prestataire ───────────────────────────────────────────────────
 
 export const TYPES_PRESTATAIRE: ReferentielItem[] = [
@@ -189,12 +172,6 @@ export const TYPES_PRESTATAIRE: ReferentielItem[] = [
   { valeur: 'OPTICIEN', label: 'Opticien' },
   { valeur: 'AUTRE', label: 'Autre' },
 ];
-
-export const TYPE_PRESTATAIRE_VALEURS: string[] = TYPES_PRESTATAIRE.map((t) => t.valeur);
-
-export function typePrestataireLabel(valeur: string): string {
-  return TYPES_PRESTATAIRE.find((t) => t.valeur === valeur)?.label ?? valeur;
-}
 
 /** Statuts juridiques — référentiel centralisé des prestataires.
  *  La saisie est canonisée (casse/accents/séparateurs) puis validée contre
@@ -247,12 +224,6 @@ export const TYPES_COURRIEL: ReferentielItem[] = [
   { valeur: 'DOSSIER_REMBOURSEMENT', label: 'Dossier de remboursement' },
 ];
 
-export const TYPE_COURRIEL_VALEURS: string[] = TYPES_COURRIEL.map((t) => t.valeur);
-
-export function typeCourrielLabel(valeur: string): string {
-  return TYPES_COURRIEL.find((t) => t.valeur === valeur)?.label ?? valeur;
-}
-
 // ─── Types de bénéficiaire (Assure.typeBeneficiaire) ────────────────────────
 
 export const TYPES_BENEFICIAIRE: ReferentielItem[] = [
@@ -262,10 +233,6 @@ export const TYPES_BENEFICIAIRE: ReferentielItem[] = [
 ];
 
 export const TYPE_BENEFICIAIRE_VALEURS: string[] = TYPES_BENEFICIAIRE.map((t) => t.valeur);
-
-export function typeBeneficiaireLabel(valeur: string): string {
-  return TYPES_BENEFICIAIRE.find((t) => t.valeur === valeur)?.label ?? valeur;
-}
 
 /** Alias de normalisation pour les imports Excel (majuscules/minuscules libres). */
 export const TYPE_BENEFICIAIRE_ALIASES: Record<string, string> = {
@@ -290,8 +257,6 @@ export const CANAUX_BOT: ReferentielItem[] = [
   { valeur: 'MESSENGER', label: 'Messenger' },
 ];
 
-export const CANAL_BOT_VALEURS: string[] = CANAUX_BOT.map((c) => c.valeur);
-
 // ─── Sources de création d'un dossier ───────────────────────────────────────
 
 export const SOURCES_DOSSIER: ReferentielItem[] = [
@@ -301,22 +266,6 @@ export const SOURCES_DOSSIER: ReferentielItem[] = [
   { valeur: 'SAGE', label: 'Import SAGE' },
 ];
 
-export function sourceDossierLabel(valeur: string): string {
-  return SOURCES_DOSSIER.find((s) => s.valeur === valeur)?.label ?? valeur;
-}
-
-// ─── Sexe ───────────────────────────────────────────────────────────────────
-
-export const SEXES: ReferentielItem[] = [
-  { valeur: 'M', label: 'Masculin' },
-  { valeur: 'F', label: 'Féminin' },
-];
-
-export function sexeLabel(valeur: string | null | undefined): string {
-  if (!valeur) return '—';
-  return SEXES.find((s) => s.valeur === valeur)?.label ?? valeur;
-}
-
 // ─── Statuts d'une ligne d'import (ImportDossier.statutImport) ──────────────
 
 export const STATUTS_IMPORT: ReferentielItem[] = [
@@ -324,8 +273,6 @@ export const STATUTS_IMPORT: ReferentielItem[] = [
   { valeur: 'ERREUR', label: 'Erreur' },
   { valeur: 'IGNOREE', label: 'Ignorée' },
 ];
-
-export const STATUT_IMPORT_VALEURS: string[] = STATUTS_IMPORT.map((s) => s.valeur);
 
 // ─── Journal d'audit : actions et niveaux ───────────────────────────────────
 

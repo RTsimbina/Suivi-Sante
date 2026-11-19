@@ -254,23 +254,3 @@ export function avecPerimetrePrestataire<T>(
   if (!perimetre.restricted || !perimetre.prestataireId) return where;
   return { ...(where as Record<string, unknown>), prestataireId: perimetre.prestataireId } as T;
 }
-
-/**
- * Rejet explicite (403) si le client transmet un prestataireId qui ne
- * correspond pas à l'identité serveur. Utilisé par les routes du portail :
- * un prestataire A qui tente ?prestataireId=B est REFUSÉ (et non silencieusement
- * ignoré) — le serveur ne révèle rien sur B.
- */
-export function refuserPrestataireIdEtranger(
-  prestataireIdClient: string | null | undefined,
-  prestataireIdServeur: string
-): Response | null {
-  const fourni = (prestataireIdClient || '').trim();
-  if (fourni && fourni !== prestataireIdServeur) {
-    return Response.json(
-      { erreur: 'Accès refusé : vous ne pouvez consulter que les données de votre propre prestataire.' },
-      { status: 403 }
-    );
-  }
-  return null;
-}

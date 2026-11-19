@@ -51,19 +51,6 @@ export type PeriodePreset =
   | 'ANNEE_DERNIERE'
   | 'PERSONNALISEE';
 
-export const PERIODE_PRESETS: { id: PeriodePreset; label: string }[] = [
-  { id: 'AUJOURDHUI', label: "Aujourd'hui" },
-  { id: '7_DERNIERS_JOURS', label: '7 derniers jours' },
-  { id: '30_DERNIERS_JOURS', label: '30 derniers jours' },
-  { id: 'CE_MOIS', label: 'Ce mois' },
-  { id: 'MOIS_DERNIER', label: 'Mois dernier' },
-  { id: 'TRIMESTRE_COURANT', label: 'Trimestre courant' },
-  { id: '90_DERNIERS_JOURS', label: '90 derniers jours' },
-  { id: 'ANNEE_COURANTE', label: 'Année courante' },
-  { id: 'ANNEE_DERNIERE', label: 'Année dernière' },
-  { id: 'PERSONNALISEE', label: 'Personnalisée' },
-];
-
 export interface PeriodeParams {
   preset?: PeriodePreset;
   du?: string; // YYYY-MM-DD (si PERSONNALISEE)

@@ -743,5 +743,3 @@ export function usePrestatairesData() {
     handleSaveEdit,
   };
 }
-
-export type PrestatairesDataState = ReturnType<typeof usePrestatairesData>;

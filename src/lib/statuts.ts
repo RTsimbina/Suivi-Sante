@@ -194,11 +194,6 @@ export function getStatutConfig(
   return configs.find((s) => s.valeur === valeur);
 }
 
-/** Liste des options { value, label } pour les selects / filtres. */
-export function statutOptions(configs: StatutConfig[]): { value: string; label: string }[] {
-  return configs.map((s) => ({ value: s.valeur, label: s.label }));
-}
-
 // ─── Helpers Dossier (compatibilité avec l'ancien format.ts) ────────────────
 
 /** Libellé français d'un statut dossier (fallback : valeur brute). */
@@ -212,11 +207,6 @@ export function dossierStatutBadge(statut: string): string {
     getStatutConfig(DOSSIER_STATUTS, statut)?.badge ??
     'bg-muted text-muted-foreground border-border'
   );
-}
-
-/** Couleur hex d'un statut dossier (fallback : gris). */
-export function dossierStatutHex(statut: string): string {
-  return getStatutConfig(DOSSIER_STATUTS, statut)?.hex ?? '#94a3b8';
 }
 
 /**

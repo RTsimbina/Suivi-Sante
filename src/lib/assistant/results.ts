@@ -155,14 +155,6 @@ export const COLONNES_DOSSIER: ResultColonne[] = [
   { key: 'montant', label: 'Montant réclamé', type: 'montant' },
 ];
 
-/** Colonnes standards des tableaux par société */
-export const COLONNES_SOCIETE: ResultColonne[] = [
-  { key: 'societe', label: 'Société', type: 'texte' },
-  { key: 'nb', label: 'Nb dossiers', type: 'nombre' },
-  { key: 'montant', label: 'Montant réclamé', type: 'montant' },
-  { key: 'paye', label: 'Montant payé', type: 'montant' },
-];
-
 // ─── Requêtes partagées ──────────────────────────────────────────────────────
 
 export const LIMITE_LISTE = 15;

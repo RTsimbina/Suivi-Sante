@@ -9,7 +9,7 @@ import { verifierSessionUtilisateur } from './session-revocation';
 // Edge (src/proxy.ts) les importe directement : un module évalué en Edge ne
 // peut pas tirer Prisma (src/lib/db). Ce fichier garde le re-export pour la
 // compatibilité des imports existants (routes API + tests).
-export { API_PERMISSIONS, matchPermission, type PermissionCheckResult } from './api-permissions';
+export { API_PERMISSIONS, matchPermission } from './api-permissions';
 import { matchPermission } from './api-permissions';
 import type { RoleType } from './auth-context';
 

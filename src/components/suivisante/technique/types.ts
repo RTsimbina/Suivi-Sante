@@ -39,7 +39,6 @@ export interface TechniqueKpis {
 // ─── Prestations ────────────────────────────────────────────────────────────
 
 export const PRESTATIONS = [...PARENT_TYPES] as const;
-export type PrestationType = (typeof PRESTATIONS)[number];
 
 export const PRESTATION_LABELS: Record<string, string> = { ...PARENT_LABELS };
 

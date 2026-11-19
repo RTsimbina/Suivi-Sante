@@ -28,12 +28,6 @@ import { fournisseurActif, envoyerViaResend } from './resend';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface PieceJointe {
-  nom: string;
-  contenuBase64: string;
-  contentType?: string;
-}
-
 export interface MessageLivraison {
   id: string;                       // id CourrielSortant (pour les logs)
   destinataires: { to: string[]; cc?: string[]; bcc?: string[] };

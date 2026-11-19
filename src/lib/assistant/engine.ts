@@ -95,18 +95,9 @@ export async function executerQuestion(
   };
 }
 
-/** Liste publique des questions (métadonnées uniquement, sans implémentation) */
-export type QuestionPublique = ReturnType<typeof listerQuestions>['questions'][number];
-
 export function questionEstAutorisee(role: RoleType, questionId: string): boolean {
   const q = questionParId(questionId);
   return !!q && q.role === role;
-}
-
-/** Expose la période par défaut d'une question (utilitaire UI) */
-export function periodeParDefaut(question: QuestionDef): string {
-  if (!question.params.some((p) => p.key === 'PERIODE')) return '';
-  return 'ANNEE_COURANTE';
 }
 
 export { resolvePeriode, extrairePeriode };

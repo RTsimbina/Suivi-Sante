@@ -45,21 +45,6 @@ export function buildContext(token: {
 }
 
 /**
- * Vérifie qu'un rôle externe possède bien son rattachement de données.
- * Un PRESTATAIRE sans prestataireId ne doit rien pouvoir interroger.
- */
-export function exigerRattachement(ctx: AssistantContext, requis: 'assureId' | 'societeId' | 'prestataireId'): string {
-  const valeur = ctx[requis];
-  if (!valeur) {
-    throw new AssistantError(
-      'Aucun rattachement de données lié à votre compte. Contactez votre administrateur.',
-      403
-    );
-  }
-  return valeur;
-}
-
-/**
  * Valide les paramètres d'une question :
  *  - seuls les paramètres déclarés sont acceptés (les autres sont ignorés) ;
  *  - les valeurs sont contrôlées par type (injection impossible : les valeurs

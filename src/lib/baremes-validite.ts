@@ -54,14 +54,12 @@ export interface BaremeDated {
  * serait pas assigné à une signature stricte — le typage STRICT est assumé
  * par les signatures des fonctions ci-dessous (BaremeDated).
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface BaremeClientLike {
   bareme: {
     findFirst(args: any): Promise<any>;
     findMany(args: any): Promise<any[]>;
   };
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ─── Prédicats purs (testés unitairement) ────────────────────────────────────
 

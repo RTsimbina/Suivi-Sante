@@ -371,5 +371,3 @@ export function useSocietesList() {
     handleDownloadRapport,
   };
 }
-
-export type SocietesListState = ReturnType<typeof useSocietesList>;
