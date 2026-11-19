@@ -13,10 +13,9 @@ import { ComptesDemo } from '@/components/login/comptes-demo';
 import { loginContent } from '@/components/login/content';
 import { ciblePostConnexion } from '@/lib/navigation';
 
-// Comptes de démonstration : affichés uniquement hors production (workflow
-// « Jeu de données de test (reset + seed) »). En production, ni affichage ni
-// embarquement dans le bundle — voir components/login/comptes-demo.tsx.
-const AFFICHER_COMPTES_DEMO = process.env.NODE_ENV !== 'production';
+// Comptes de démonstration : affichés dans tous les environnements — la base
+// est (re)seedée par le workflow « Jeu de données de test (reset + seed) »,
+// les identifiants affichés correspondent aux comptes réellement présents.
 
 /** Formulaire de connexion (séparé pour lire l'URL sous une limite Suspense). */
 function FormulaireLogin() {
@@ -289,16 +288,14 @@ function FormulaireLogin() {
               </CardContent>
             </Card>
 
-            {/* Comptes de démonstration — uniquement hors production */}
-            {AFFICHER_COMPTES_DEMO && (
-              <ComptesDemo
-                onPrefill={(courriel, motDePasse) => {
-                  setEmail(courriel);
-                  setPassword(motDePasse);
-                  setError('');
-                }}
-              />
-            )}
+            {/* Comptes de démonstration — tous environnements */}
+            <ComptesDemo
+              onPrefill={(courriel, motDePasse) => {
+                setEmail(courriel);
+                setPassword(motDePasse);
+                setError('');
+              }}
+            />
           </div>
 
           {/* Besoin d'aide ? — sous la carte sur mobile */}

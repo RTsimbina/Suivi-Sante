@@ -5,10 +5,9 @@
  * (seed.yml → scripts/reset_seed.mjs). Deux mots de passe distincts, un par
  * groupe — PWD_INTERNE / PWD_EXTERNE de scripts/reset_seed.mjs.
  *
- * Affiché UNIQUEMENT hors production : au build de production,
- * process.env.NODE_ENV étant remplacé à la compilation, la constante est pliée
- * à [] et le composant ne rend rien — aucun identifiant n'est affiché ni
- * embarqué dans le bundle livré.
+ * Affichés dans TOUS les environnements (demande produit) : la base est
+ * systématiquement (re)seedée par le workflow ci-dessus, les identifiants
+ * affichés correspondent donc toujours aux comptes réellement présents.
  */
 import { ChevronDown } from 'lucide-react';
 
@@ -19,27 +18,24 @@ type CompteDemo = {
   groupe: 'internes' | 'externes';
 };
 
-const DEMO_CREDENTIALS: CompteDemo[] =
-  process.env.NODE_ENV === 'production'
-    ? []
-    : [
-        // ── Comptes internes (personnel de la caisse) — SuiviSante@2026 ──
-        { email: 'admin@suivisante.mg', role: 'Administrateur', password: 'SuiviSante@2026', groupe: 'internes' },
-        { email: 'accueil@suivisante.mg', role: 'Accueil', password: 'SuiviSante@2026', groupe: 'internes' },
-        { email: 'technique@suivisante.mg', role: 'Service Technique', password: 'SuiviSante@2026', groupe: 'internes' },
-        { email: 'compta@suivisante.mg', role: 'Comptabilité', password: 'SuiviSante@2026', groupe: 'internes' },
-        { email: 'sante@suivisante.mg', role: 'Contrôle Santé', password: 'SuiviSante@2026', groupe: 'internes' },
-        // ── Comptes externes (portails) — Contact@2026 ──
-        { email: 'portail.sanlam@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'portail.telma@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'contact.sanlam@sanlam.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'contact.telma@telma.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'contact.airtel@airtel.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'contact.bni@bni.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'j.rakotoarison@jirama.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'facturation@hopital-principal.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes' },
-        { email: 'contact@clinique-saintemarie.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes' },
-      ];
+const DEMO_CREDENTIALS: CompteDemo[] = [
+  // ── Comptes internes (personnel de la caisse) — SuiviSante@2026 ──
+  { email: 'admin@suivisante.mg', role: 'Administrateur', password: 'SuiviSante@2026', groupe: 'internes' },
+  { email: 'accueil@suivisante.mg', role: 'Accueil', password: 'SuiviSante@2026', groupe: 'internes' },
+  { email: 'technique@suivisante.mg', role: 'Service Technique', password: 'SuiviSante@2026', groupe: 'internes' },
+  { email: 'compta@suivisante.mg', role: 'Comptabilité', password: 'SuiviSante@2026', groupe: 'internes' },
+  { email: 'sante@suivisante.mg', role: 'Contrôle Santé', password: 'SuiviSante@2026', groupe: 'internes' },
+  // ── Comptes externes (portails) — Contact@2026 ──
+  { email: 'portail.sanlam@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'portail.telma@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'contact.sanlam@sanlam.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'contact.telma@telma.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'contact.airtel@airtel.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'contact.bni@bni.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'contact.jirama@jirama.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'facturation@hopital-principal.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes' },
+  { email: 'contact@clinique-saintemarie.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes' },
+];
 
 const GROUPES_DEMO: { cle: CompteDemo['groupe']; titre: string }[] = [
   { cle: 'internes', titre: 'Comptes internes' },
@@ -54,9 +50,9 @@ export function ComptesDemo({
   if (DEMO_CREDENTIALS.length === 0) return null;
 
   return (
-    // <details> fermé par défaut : la page reste « un seul écran » en
-    // développement (le contenu reste dans le DOM, donc les tests passent).
-    <details className="group mt-4 rounded-2xl border border-dashed border-border bg-card">
+    // <details> ouvert par défaut : les comptes sont directement visibles
+    // (le contenu reste repliable, donc les tests et le clavier passent).
+    <details open className="group mt-4 rounded-2xl border border-dashed border-border bg-card">
       <summary className="flex min-h-11 cursor-pointer select-none list-none items-center justify-center gap-2 rounded-2xl px-4 text-xs font-medium text-suivi-ink-soft transition-colors hover:text-suivi-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-suivi-brand dark:focus-visible:outline-suivi-brand-clair [&::-webkit-details-marker]:hidden">
         Comptes de démonstration
         <ChevronDown
