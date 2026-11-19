@@ -3,48 +3,20 @@
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
-import { Sparkles, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
+import { HeartPulse, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { LoginThemeToggle } from '@/components/login/theme-toggle';
+import { ComptesDemo } from '@/components/login/comptes-demo';
+import { loginContent } from '@/components/login/content';
 import { ciblePostConnexion } from '@/lib/navigation';
 
-// Jeu de données officiel : workflow « Jeu de données de test (reset + seed) »
-// (seed.yml → scripts/reset_seed.mjs). Deux mots de passe distincts, un par
-// groupe — PWD_INTERNE / PWD_EXTERNE de scripts/reset_seed.mjs.
-type CompteDemo = {
-  email: string;
-  role: string;
-  password: string;
-  groupe: 'internes' | 'externes';
-  color: string;
-};
-
-const DEMO_CREDENTIALS: CompteDemo[] = [
-  // ── Comptes internes (personnel de la caisse) — SuiviSante@2026 ──
-  { email: 'admin@suivisante.mg', role: 'Administrateur', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800' },
-  { email: 'accueil@suivisante.mg', role: 'Accueil', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
-  { email: 'technique@suivisante.mg', role: 'Service Technique', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800' },
-  { email: 'compta@suivisante.mg', role: 'Comptabilité', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800' },
-  { email: 'sante@suivisante.mg', role: 'Contrôle Santé', password: 'SuiviSante@2026', groupe: 'internes', color: 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800' },
-  // ── Comptes externes (portails) — Contact@2026 ──
-  { email: 'portail.sanlam@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes', color: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800' },
-  { email: 'portail.telma@suivisante.mg', role: 'Client / Assuré', password: 'Contact@2026', groupe: 'externes', color: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/40 dark:text-sky-300 dark:border-sky-800' },
-  { email: 'contact.sanlam@sanlam.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
-  { email: 'contact.telma@telma.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
-  { email: 'contact.airtel@airtel.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
-  { email: 'contact.bni@bni.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
-  { email: 'j.rakotoarison@jirama.mg', role: 'Entreprise Cliente', password: 'Contact@2026', groupe: 'externes', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-300 dark:border-violet-800' },
-  { email: 'facturation@hopital-principal.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes', color: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800' },
-  { email: 'contact@clinique-saintemarie.mg', role: 'Prestataire', password: 'Contact@2026', groupe: 'externes', color: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800' },
-];
-
-const GROUPES_DEMO: { cle: CompteDemo['groupe']; titre: string }[] = [
-  { cle: 'internes', titre: 'Comptes internes' },
-  { cle: 'externes', titre: 'Comptes externes (entreprises & prestataires)' },
-];
+// Comptes de démonstration : affichés uniquement hors production (workflow
+// « Jeu de données de test (reset + seed) »). En production, ni affichage ni
+// embarquement dans le bundle — voir components/login/comptes-demo.tsx.
+const AFFICHER_COMPTES_DEMO = process.env.NODE_ENV !== 'production';
 
 /** Formulaire de connexion (séparé pour lire l'URL sous une limite Suspense). */
 function FormulaireLogin() {
@@ -52,7 +24,10 @@ function FormulaireLogin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [infoMotDePasse, setInfoMotDePasse] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
   // Destination initiale : le proxy redirige les sessions expirées vers
   // /login?callbackUrl=<page consultée> ; après connexion, l'utilisateur
@@ -119,193 +94,239 @@ function FormulaireLogin() {
     }
   }
 
+  // Flux « mot de passe oublié » intégré à la page : message affiché dans la
+  // page (role="status") — mêmes messages que l'ancien window.alert().
+  function gererMotDePasseOublie() {
+    if (email.trim()) {
+      fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+        .then((r) => r.json())
+        .then((data) =>
+          setInfoMotDePasse(data.message || 'Si un compte existe, un lien de réinitialisation a été envoyé.')
+        )
+        .catch(() => setInfoMotDePasse('Erreur réseau. Veuillez réessayer.'));
+    } else {
+      window.location.href = '/reset-password';
+    }
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12 relative">
-      {/* Theme toggle in top-right */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
-            <Sparkles className="h-6 w-6 text-white" />
+    <div className="relative flex min-h-dvh flex-col bg-suivi-surface text-suivi-ink">
+      {/* Lien d'évitement vers le formulaire */}
+      <a
+        href="#connexion-formulaire"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-suivi-brand focus:px-5 focus:py-2.5 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Aller au formulaire de connexion
+      </a>
+
+      <main className="flex flex-1 flex-col lg:flex-row">
+        {/* Colonne gauche — fond pâle (≥1024px) */}
+        <div className="flex flex-col px-6 pb-6 pt-6 sm:px-10 lg:w-[56%] lg:px-14 lg:pb-8 lg:pt-8">
+          <header className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-suivi-brand">
+                <HeartPulse className="h-5 w-5 text-white" aria-hidden="true" />
+              </span>
+              <span className="text-lg font-semibold tracking-tight">Suivi Santé</span>
+            </div>
+            <LoginThemeToggle />
+          </header>
+
+          <div className="my-auto max-w-xl py-10 lg:py-12">
+            {loginContent.surtitre && (
+              <p className="text-xl font-semibold tracking-tight text-suivi-rose lg:text-2xl">
+                {loginContent.surtitre}
+              </p>
+            )}
+            <h1 className="mt-3 text-4xl font-light leading-tight tracking-tight lg:text-5xl">
+              {loginContent.titre}
+            </h1>
+            {loginContent.phrase && (
+              <p className="mt-4 max-w-md text-base leading-relaxed text-suivi-ink-soft">
+                {loginContent.phrase}
+              </p>
+            )}
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Suivi des Dossiers Santé
-          </p>
+
+          {/* Besoin d'aide ? — bas de colonne sur ordinateur */}
+          {supportEmail && (
+            <p className="hidden text-sm text-suivi-ink-soft lg:block">
+              Besoin d&rsquo;aide ?{' '}
+              <a
+                href={`mailto:${supportEmail}`}
+                className="rounded font-medium text-suivi-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-suivi-brand dark:text-suivi-brand-clair dark:focus-visible:outline-suivi-brand-clair"
+              >
+                Contactez le support
+              </a>
+            </p>
+          )}
         </div>
 
-        {/* Login Card */}
-        <Card className="rounded-xl border shadow-sm">
-          <CardHeader className="pb-4 pt-6 px-6">
-            <h2 className="text-lg font-semibold text-center">Connexion</h2>
-            <p className="text-sm text-muted-foreground text-center">
-              Entrez vos identifiants pour accéder à la plateforme
-            </p>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Error */}
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300"
-                >
-                  {error}
-                </div>
-              )}
+        {/* Colonne droite — aplat bleu ≥1024px, carte de connexion */}
+        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8 sm:px-6 lg:w-[44%] lg:bg-suivi-brand lg:px-8 lg:py-12">
+          <div className="w-full max-w-[420px] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-700">
+            <Card className="rounded-2xl border-none shadow-lg shadow-suivi-brand/15">
+              <CardHeader className="px-6 pb-2 pt-6 text-center lg:px-8">
+                <h2 className="text-xl font-semibold tracking-tight">Connexion</h2>
+                <p className="mt-1 text-sm leading-relaxed text-suivi-ink-soft">
+                  Entrez vos identifiants pour accéder à la plateforme
+                </p>
+              </CardHeader>
+              <CardContent className="px-6 pb-6 lg:px-8">
+                <form id="connexion-formulaire" onSubmit={handleSubmit} className="space-y-4" tabIndex={-1}>
+                  {/* Erreur de connexion */}
+                  {error && (
+                    <div
+                      id="erreur-connexion"
+                      role="alert"
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+                    >
+                      {error}
+                    </div>
+                  )}
 
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Adresse e-mail</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="nom@suivisante.mg"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                    autoComplete="email"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
+                  {/* Réponse du flux mot de passe oublié */}
+                  {infoMotDePasse && (
+                    <div
+                      id="info-mot-de-passe"
+                      role="status"
+                      className="rounded-xl border border-suivi-brand/20 bg-suivi-brand/5 px-4 py-3 text-sm leading-relaxed text-suivi-ink"
+                    >
+                      {infoMotDePasse}
+                    </div>
+                  )}
 
-              {/* Password */}
-              <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    required
-                    autoComplete="current-password"
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
-                    aria-pressed={showPassword}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Forgot password link */}
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const emailInput = (document.getElementById('email') as HTMLInputElement);
-                    const emailVal = emailInput?.value?.trim();
-                    if (emailVal) {
-                      fetch('/api/auth/forgot-password', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: emailVal }),
-                      }).then(r => r.json()).then(data => {
-                        alert(data.message || 'Si un compte existe, un lien de réinitialisation a été envoyé.');
-                      }).catch(() => alert('Erreur réseau. Veuillez réessayer.'));
-                    } else {
-                      window.location.href = '/reset-password';
-                    }
-                  }}
-                  className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline"
-                >
-                  Mot de passe oublié ?
-                </button>
-              </div>
-
-              {/* Submit */}
-              <Button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                size="lg"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Connexion en cours…
-                  </>
-                ) : (
-                  'Se connecter'
-                )}
-              </Button>
-
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Demo credentials */}
-        <Card className="mt-6 rounded-xl border border-dashed shadow-none bg-muted/30">
-          <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-3 text-center">
-              Comptes de démonstration
-            </p>
-            <div className="space-y-4">
-              {GROUPES_DEMO.map((groupe) => {
-                const comptes = DEMO_CREDENTIALS.filter((c) => c.groupe === groupe.cle);
-                return (
-                  <div key={groupe.cle} className="space-y-2">
-                    <p className="text-[11px] font-semibold text-muted-foreground">
-                      {groupe.titre} — mot de passe :{' '}
-                      <code className="font-mono bg-muted px-1.5 py-0.5 rounded">{comptes[0]?.password}</code>
-                    </p>
-                    {comptes.map((cred) => (
-                      <button
-                        key={cred.email}
-                        type="button"
-                        onClick={() => {
-                          setEmail(cred.email);
-                          setPassword(cred.password);
-                          setError('');
-                        }}
-                        className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition-all cursor-pointer hover:shadow-sm hover:scale-[1.01] active:scale-[0.99] ${cred.color}`}
-                      >
-                        <span className="font-mono text-xs font-medium">
-                          {cred.email}
-                        </span>
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-background/60 whitespace-nowrap">
-                          {cred.role}
-                        </span>
-                      </button>
-                    ))}
+                  {/* E-mail */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Adresse e-mail</Label>
+                    <div className="relative">
+                      <Mail
+                        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-suivi-ink-soft"
+                        aria-hidden="true"
+                      />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="nom@suivisante.mg"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="h-11 rounded-xl pl-10 placeholder:text-suivi-ink-soft"
+                        aria-describedby={error ? 'erreur-connexion' : undefined}
+                        required
+                        autoComplete="email"
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-muted-foreground text-center mt-3">
-              Cliquez sur un compte pour pré-remplir le formulaire de connexion.
-            </p>
-          </CardContent>
-        </Card>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2026 Suivi Santé — Tous droits réservés
+                  {/* Mot de passe */}
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Mot de passe</Label>
+                    <div className="relative">
+                      <Lock
+                        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-suivi-ink-soft"
+                        aria-hidden="true"
+                      />
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="h-11 rounded-xl pl-10 pr-12 placeholder:text-suivi-ink-soft"
+                        aria-describedby={error ? 'erreur-connexion' : undefined}
+                        required
+                        autoComplete="current-password"
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-suivi-ink-soft transition-colors hover:text-suivi-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-suivi-brand dark:focus-visible:outline-suivi-brand-clair"
+                        aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Eye className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mot de passe oublié */}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={gererMotDePasseOublie}
+                      className="rounded-full px-3 py-2.5 text-sm font-medium text-suivi-brand underline-offset-4 hover:text-suivi-brand-forte hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-suivi-brand dark:text-suivi-brand-clair dark:hover:text-suivi-brand-clair dark:focus-visible:outline-suivi-brand-clair"
+                    >
+                      Mot de passe oublié ?
+                    </button>
+                  </div>
+
+                  {/* Connexion */}
+                  <Button
+                    type="submit"
+                    className="h-12 w-full rounded-full bg-suivi-brand text-base font-medium text-white hover:bg-suivi-brand-forte focus-visible:ring-suivi-brand focus-visible:ring-offset-2 focus-visible:ring-offset-card dark:focus-visible:ring-suivi-brand-clair"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        Connexion en cours…
+                      </>
+                    ) : (
+                      'Se connecter'
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Comptes de démonstration — uniquement hors production */}
+            {AFFICHER_COMPTES_DEMO && (
+              <ComptesDemo
+                onPrefill={(courriel, motDePasse) => {
+                  setEmail(courriel);
+                  setPassword(motDePasse);
+                  setError('');
+                }}
+              />
+            )}
+          </div>
+
+          {/* Besoin d'aide ? — sous la carte sur mobile */}
+          {supportEmail && (
+            <p className="mt-6 text-center text-sm text-suivi-ink-soft lg:hidden">
+              Besoin d&rsquo;aide ?{' '}
+              <a
+                href={`mailto:${supportEmail}`}
+                className="rounded font-medium text-suivi-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-suivi-brand dark:text-suivi-brand-clair dark:focus-visible:outline-suivi-brand-clair"
+              >
+                Contactez le support
+              </a>
+            </p>
+          )}
+        </div>
+      </main>
+
+      {/* Pied discret */}
+      <footer className="px-6 pb-6 text-center text-xs leading-relaxed text-suivi-ink-soft lg:absolute lg:bottom-0 lg:left-auto lg:right-0 lg:w-[44%] lg:pb-5 lg:text-white/75">
+        <p>
+          © {new Date().getFullYear()} Suivi Santé — Tous droits réservés
+          {loginContent.legal && <span className="block">{loginContent.legal}</span>}
         </p>
-      </div>
+      </footer>
     </div>
   );
 }
+
 /**
  * Page de connexion : le formulaire lit le callbackUrl via useSearchParams,
  * qui exige une limite Suspense pour le prerender statique.

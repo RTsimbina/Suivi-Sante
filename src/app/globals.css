@@ -37,6 +37,14 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Jetons de la page de connexion (src/app/login) — déclinés clair/sombre ci-dessous */
+  --color-suivi-brand: var(--suivi-brand);
+  --color-suivi-brand-forte: var(--suivi-brand-forte);
+  --color-suivi-brand-clair: var(--suivi-brand-clair);
+  --color-suivi-surface: var(--suivi-surface);
+  --color-suivi-ink: var(--suivi-ink);
+  --color-suivi-ink-soft: var(--suivi-ink-soft);
+  --color-suivi-rose: var(--suivi-rose);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -45,6 +53,14 @@
 
 :root {
   --radius: 0.625rem;
+  /* Page de connexion — clair */
+  --suivi-brand: #0C42A0;        /* bleu institutionnel : bouton principal, aplat */
+  --suivi-brand-forte: #0A3685;  /* survol du bouton principal */
+  --suivi-brand-clair: #0C42A0;  /* (utilisé en sombre uniquement) */
+  --suivi-surface: #F7F8FD;      /* fond pâle de la colonne gauche */
+  --suivi-ink: #2D3142;          /* texte principal */
+  --suivi-ink-soft: #5B6475;     /* texte secondaire */
+  --suivi-rose: #E0206B;         /* rose : sur-titre grande taille et filets uniquement */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -79,6 +95,14 @@
 }
 
 .dark {
+  /* Page de connexion — sombre */
+  --suivi-brand: #0E4DB8;        /* bleu légèrement lumineux pour l'aplat nocturne */
+  --suivi-brand-forte: #0C42A0;
+  --suivi-brand-clair: #8FB7F0;  /* liens et focus sur surfaces sombres */
+  --suivi-surface: #12151C;
+  --suivi-ink: #E8EAF2;
+  --suivi-ink-soft: #A5ADC0;
+  --suivi-rose: #E0206B;
   --background: oklch(0.13 0.005 160);
   --foreground: oklch(0.97 0 0);
   --card: oklch(0.17 0.005 160);
