@@ -69,6 +69,30 @@ export interface PlafondCheckResult {
   alertes: { type: 'info' | 'warning' | 'danger'; message: string }[];
 }
 
+// ─── Fenêtre annuelle canonique (BIZ-2) ─────────────────────────────────────
+
+/**
+ * Fenêtre de consommation annuelle — SOURCE UNIQUE (BIZ-2).
+ *
+ * Ancien comportement : le moteur central bornait la consommation sur
+ * l'année COURANTE tandis que les re-vérifications transactionnelles
+ * (PATCH dossier, création) utilisaient l'année de dateReception — un
+ * dossier traité l'année suivant sa réception était jugé selon deux
+ * fenêtres différentes selon le chemin de code.
+ *
+ * Règle retenue (à valider fonctionnellement — décision n°1) : l'année de
+ * la réception du dossier, déjà appliquée par les re-vérifications
+ * transactionnelles existantes.
+ */
+export function fenetreAnnuelle(dateReference: Date): { debut: Date; fin: Date; annee: number } {
+  const annee = dateReference.getFullYear();
+  return {
+    debut: new Date(annee, 0, 1),
+    fin: new Date(annee, 11, 31, 23, 59, 59),
+    annee,
+  };
+}
+
 // ─── Fonction principale ───────────────────────────────────────────────────
 
 /**
@@ -84,6 +108,9 @@ export interface PlafondCheckResult {
  *     (utile lors de la mise à jour d'un dossier existant)
  *   - datePrestation : optionnel (P1) — date à laquelle le tarif doit être
  *     valide (dossier.dateSoins, à défaut dateReception). Défaut : maintenant.
+ *   - dateReception : optionnel (BIZ-2) — ancre la fenêtre annuelle de
+ *     consommation sur l'année de réception du dossier. Défaut : année de
+ *     datePrestation.
  */
 export async function verifierPlafondAnnuel(opts: {
   assureId?: string;
@@ -93,9 +120,13 @@ export async function verifierPlafondAnnuel(opts: {
   prestataireId?: string;
   excludeDossierId?: string;
   datePrestation?: Date;
+  dateReception?: Date;
 }): Promise<PlafondCheckResult> {
   const { assureId, societeId, typeActe, montantDemande, prestataireId, excludeDossierId } = opts;
   const datePrestation = opts.datePrestation ?? new Date();
+  // BIZ-2 : fenêtre de consommation ancrée sur l'année de réception du
+  // dossier (à défaut, de la prestation) — identique sur tous les chemins.
+  const fenetre = fenetreAnnuelle(opts.dateReception ?? datePrestation);
 
   // ─── 1. Récupérer l'assuré (si fourni) ───────────────────────────────────
   let assureActif = true;
@@ -172,11 +203,10 @@ export async function verifierPlafondAnnuel(opts: {
   };
 
   // ─── 4. Calculer la consommation annuelle ────────────────────────────────
-  const debutAnnee = new Date(new Date().getFullYear(), 0, 1);
-  const finAnnee = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
-
+  // BIZ-2 : la fenêtre provient de fenetreAnnuelle() — même année de
+  // dateReception sur le moteur central et les re-vérifications transaction.
   const whereBase: Record<string, unknown> = {
-    dateReception: { gte: debutAnnee, lte: finAnnee },
+    dateReception: { gte: fenetre.debut, lte: fenetre.fin },
     // Seuls les dossiers traités (au moins EN_ANALYSE) consomment le plafond.
     // RECU = simplement reçu, pas encore validé → ne compte pas.
     statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
@@ -245,7 +275,7 @@ export async function verifierPlafondAnnuel(opts: {
       },
       alertes: [{
         type: 'danger',
-        message: `PLAFOND ATTEINT — L'assuré a épuisé son plafond ${typeActe} pour l'année ${new Date().getFullYear()}.`,
+        message: `PLAFOND ATTEINT — L'assuré a épuisé son plafond ${typeActe} pour l'année ${fenetre.annee}.`,
       }],
     };
   }
@@ -263,7 +293,7 @@ export async function verifierPlafondAnnuel(opts: {
       },
       alertes: [{
         type: 'danger',
-        message: `PLAFOND GLOBAL ATTEINT — Tous les plafonds sont épuisés pour l'année ${new Date().getFullYear()}.`,
+        message: `PLAFOND GLOBAL ATTEINT — Tous les plafonds sont épuisés pour l'année ${fenetre.annee}.`,
       }],
     };
   }

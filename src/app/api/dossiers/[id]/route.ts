@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { verifierPlafondAnnuel, fenetreAnnuelle } from "@/lib/plafond-check";
 import { logAuditOperation, getUserInfoFromRequest } from '@/lib/audit-log';
 import { enNombre, egaux, superieurA, sommer, superieurOuEgal } from "@/lib/money";
 import { trouverBaremeValide } from "@/lib/baremes-validite";
@@ -57,6 +57,9 @@ export async function PATCH(
     const updateData: Record<string, unknown> = {};
     const assignComments: string[] = [];
 
+    // BIZ-1 : montant validé applicatif après ce PATCH (null si absent/vidé)
+    const nouveauMontantValide = montantValide !== undefined ? (montantValide || null) : null;
+
     if (statut) {
       // Le schéma Zod garantit déjà que statut ∈ VALID_STATUTS.
       if (existing.statut === statut) {
@@ -94,6 +97,7 @@ export async function PATCH(
             excludeDossierId: id,
             // P1 : tarification à la date de la prestation du dossier.
             datePrestation: existing.dateSoins ?? existing.dateReception,
+            dateReception: existing.dateReception, // BIZ-2 : fenêtre = année de réception
           });
 
           // Bloquer si plafond épuisé
@@ -151,21 +155,30 @@ export async function PATCH(
     // Champs financiers et administratifs
     if (montantValide !== undefined) {
       const newMontantValide = montantValide || null;
-      // Re-vérifier le plafond si le montant validé change et que le dossier est validé
+      // ─── BIZ-1 : re-vérification du plafond dès qu'un assureId existe ──────
+      // Ancien comportement : le contrôle ne portait que sur quatre statuts
+      // (VALIDE, EN_COMPTABILITE, EN_PAIEMENT, PAYE) — un montant validé
+      // envoyé avec la transition EN_ANALYSE → VALIDE (ou posé sur un dossier
+      // RECU) contournait totalement le plafond. Le dépassement de reliquat
+      // (MONTANT_DEPASSE_RELIQUAT) est désormais bloquant : la consommation
+      // annuelle cumule montantPaye ?? montantValide ?? montantReclame, un
+      // montant validé supérieur au reliquat pulvérisait le plafond.
+      // (Règle « dépassement autorisé sur approbation spéciale » à valider
+      // fonctionnellement — décision n°1 du rapport.)
       if (newMontantValide !== null && !egaux(newMontantValide, existing.montantValide)
-          && ['VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'].includes(existing.statut)
-          && existing.assureId) {
+          && !!(assureId || existing.assureId)) {
         const plafondRecheck = await verifierPlafondAnnuel({
-          assureId: existing.assureId,
+          assureId: assureId || existing.assureId || undefined,
           societeId: existing.societeId,
           typeActe: existing.typeDossier,
           montantDemande: newMontantValide,
           excludeDossierId: id,
           // P1 : tarification à la date de la prestation du dossier.
           datePrestation: existing.dateSoins ?? existing.dateReception,
+          dateReception: existing.dateReception, // BIZ-2 : fenêtre = année de réception
         });
         if (!plafondRecheck.autorise &&
-            ['PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT'].includes(plafondRecheck.raison)) {
+            ['PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'MONTANT_DEPASSE_RELIQUAT'].includes(plafondRecheck.raison)) {
           return NextResponse.json(
             { erreur: `Modification bloquée : ${plafondRecheck.message}`, plafondAtteint: true, plafondDetails: plafondRecheck.details },
             { status: 422 }
@@ -249,7 +262,17 @@ export async function PATCH(
       statut === 'EN_ANALYSE' && existing.statut === 'RECU' && !!(assureId || existing.assureId);
     const transitionValide =
       statut === 'VALIDE' && existing.statut === 'EN_ANALYSE' && !!(assureId || existing.assureId);
-    const transitionSerrialisee = transitionEntreeConsommation || transitionValide;
+    // BIZ-1 : un changement de montantValide sur un dossier DÉJÀ en
+    // consommation modifie le plafond consommé — il est sérialisé comme les
+    // transitions (verrou FOR UPDATE + re-vérification dans la transaction).
+    const montantValideChange =
+      montantValide !== undefined &&
+      (montantValide || null) !== null &&
+      !egaux(montantValide, existing.montantValide) &&
+      !!(assureId || existing.assureId);
+    const statutConsommant = ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'].includes(existing.statut);
+    const transitionSerrialisee =
+      transitionEntreeConsommation || transitionValide || (montantValideChange && statutConsommant);
 
     // ─── Mise à jour ──────────────────────────────────────────────────────
     const updated = transitionSerrialisee
@@ -263,15 +286,17 @@ export async function PATCH(
             // FOR UPDATE : l'opération concurrente attend le commit, puis
             // relit une consommation à jour (READ COMMITTED).
             await tx.$queryRaw`SELECT "id" FROM "Bareme" WHERE "id" = ${baremeTx.id} FOR UPDATE`;
-            const annee = (existing.dateReception ?? new Date()).getFullYear();
+            // BIZ-2 : même fenêtre annuelle que verifierPlafondAnnuel
+            // (année de la réception du dossier — plus d'année courante).
+            const fenetreTx = fenetreAnnuelle(existing.dateReception ?? new Date());
             const dossiersAnnee = await tx.dossier.findMany({
               where: {
                 assureId: assureId || existing.assureId,
                 societeId: existing.societeId,
                 typeDossier: existing.typeDossier,
                 dateReception: {
-                  gte: new Date(annee, 0, 1),
-                  lte: new Date(annee, 11, 31, 23, 59, 59),
+                  gte: fenetreTx.debut,
+                  lte: fenetreTx.fin,
                 },
                 statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
                 id: { not: id },
@@ -281,25 +306,43 @@ export async function PATCH(
             const consomme = sommer(
               dossiersAnnee.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame),
             );
-            if (transitionEntreeConsommation) {
-              // Entrée en consommation : le dossier AJOUTE son montant au
-              // reliquat — bloqué si plafond restant insuffisant.
+            if (transitionEntreeConsommation || transitionValide) {
+              // ─── BIZ-1 : contrôle sur le montant EFFECTIVEMENT consommé ──
+              // Après la transition, le dossier consomme
+              // max(montantReclame, montantValide) — le contrôle porte sur ce
+              // montant, symétriquement à la branche d'entrée en
+              // consommation. Ancien comportement : la transition
+              // EN_ANALYSE → VALIDE ne comparait que la consommation
+              // existante au plafond ; le montant validé n'était jamais borné.
               // (Decimal.plus et non « + » : valueOf de Decimal renvoie une
               // chaîne — « + » concaténerait 350000 + 100000 en 350000100000.)
+              const maxConsommable = Math.max(
+                enNombre(existing.montantReclame) ?? 0,
+                enNombre(montantValide ?? existing.montantValide) ?? 0,
+              );
               if (superieurOuEgal(
-                consomme.plus(enNombre(existing.montantReclame) ?? 0),
+                consomme.plus(maxConsommable),
                 baremeTx.plafond,
               )) {
                 throw new Error(
-                  `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors du passage en analyse`,
+                  `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la ${transitionValide ? 'validation' : 'passage en analyse'}`,
                 );
               }
-            } else if (superieurOuEgal(consomme, baremeTx.plafond)) {
-              // EN_ANALYSE → VALIDE : les pré-réservations concurrentes ne
-              // doivent pas laisser valider un dépassement.
-              throw new Error(
-                `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la validation`,
-              );
+            } else if (montantValideChange) {
+              // ─── BIZ-1 : montantValide modifié hors transition ──────────
+              // La contribution future du dossier au plafond devient
+              // montantPaye ?? nouveau montantValide ?? montantReclame.
+              const contributionFuture = existing.montantPaye
+                ?? nouveauMontantValide
+                ?? existing.montantReclame;
+              if (superieurOuEgal(
+                consomme.plus(enNombre(contributionFuture) ?? 0),
+                baremeTx.plafond,
+              )) {
+                throw new Error(
+                  `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la modification du montant validé`,
+                );
+              }
             }
           }
           return tx.dossier.update({

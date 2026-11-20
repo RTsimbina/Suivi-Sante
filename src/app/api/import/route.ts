@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkAuth } from "@/lib/authorize";
-import { DOSSIER_STATUT_VALEURS } from "@/lib/statuts";
+import { DOSSIER_STATUT_VALEURS, DOSSIER_TRANSITIONS } from "@/lib/statuts";
 import { readExcelRows } from "@/lib/excel";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
@@ -166,6 +166,53 @@ export async function POST(request: NextRequest) {
         }
 
         if (existing) {
+          // ─── BIZ-7 : statuts posés via la matrice de transitions ─────────
+          // Ancien comportement : le statut du fichier était appliqué tel
+          // quel — un fichier erroné pouvait faire sauter un dossier RECU
+          // directement à PAYE en contournant le circuit de traitement.
+          const statutFichier = (updateData as Record<string, unknown>).statut as string | undefined;
+          if (statutFichier && existing.statut && statutFichier !== existing.statut) {
+            const transitionsAutorisees = DOSSIER_TRANSITIONS[existing.statut] || [];
+            if (!transitionsAutorisees.includes(statutFichier)) {
+              anomalies.push({
+                ligne: ligneNum, type: "avertissement", champ: "Statut",
+                message: `[STATUT] Transition "${existing.statut}" → "${statutFichier}" non autorisée par la matrice. Le statut existant est conservé.`,
+                donnees: row,
+              });
+              delete (updateData as Record<string, unknown>).statut;
+            }
+          }
+
+          // ─── BIZ-7 : contrôle de plafond sur la MISE À JOUR ───────────────
+          // Ancien comportement : ISA/SAGE écrivaient montantValide et
+          // montantPaye SANS AUCUN contrôle — un fichier erroné pulvérisait
+          // les plafonds en marquant les lignes en succès.
+          const montantValideImport = (updateData as Record<string, unknown>).montantValide as number | undefined;
+          const montantPayeImport = (updateData as Record<string, unknown>).montantPaye as number | undefined;
+          const montantEffectif = montantPayeImport ?? montantValideImport;
+          if (montantEffectif && existing.assureId && existing.societeId) {
+            const plafondUpdate = await verifierPlafondAnnuel({
+              assureId: existing.assureId,
+              societeId: existing.societeId,
+              typeActe: existing.typeDossier,
+              montantDemande: montantEffectif,
+              excludeDossierId: existing.id,
+              datePrestation: existing.dateSoins ?? existing.dateReception,
+              dateReception: existing.dateReception, // BIZ-2
+            });
+            if (!plafondUpdate.autorise &&
+                ['ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'MONTANT_DEPASSE_RELIQUAT'].includes(plafondUpdate.raison)) {
+              nbErreurs++;
+              anomalies.push({
+                ligne: ligneNum, type: "erreur", champ: "PLAFOND",
+                message: `[PLAFOND] Mise à jour bloquée : ${plafondUpdate.message} (raison: ${plafondUpdate.raison})`,
+                donnees: row,
+              });
+              importDossiers.push({ numeroLigne: ligneNum, statutImport: "ERREUR", erreur: "Plafond dépassé", donnees });
+              continue;
+            }
+          }
+
           // Mise à jour du dossier existant
           await db.dossier.update({
             where: { numeroDossier },
@@ -207,7 +254,12 @@ export async function POST(request: NextRequest) {
             createData.assureId = assureIdImport;
           }
 
-          // ─── Vérification non bloquante du plafond annuel (EXCEL) ──────────
+          // ─── Vérification du plafond annuel (BIZ-7 : BLOQUANTE) ───────────
+          // Ancien comportement : simple avertissement non bloquant — un
+          // fichier erroné écrivait des dossiers hors plafond en les
+          // marquant en succès. Désormais, un dépassement rejette la ligne
+          // (statutImport ERREUR). Politique d'import à valider avec la
+          // direction (décision n°5 du rapport).
           let historiqueEntries: unknown[] = [];
           if (assureIdImport && societe && (source === "EXCEL" || source === "ISA") && montantReclame > 0) {
             try {
@@ -218,32 +270,21 @@ export async function POST(request: NextRequest) {
                 montantDemande: montantReclame,
                 // P1 : tarification à la date de réception de la ligne importée.
                 datePrestation: dateReception ?? new Date(),
+                dateReception, // BIZ-2 : fenêtre = année de réception
               });
 
-              if (!plafondResult.autorise) {
-                // Bloquer si le prestataire est inactif
-                if (plafondResult.raison === 'PRESTATAIRE_INACTIF') {
-                  nbErreurs++;
-                  anomalies.push({
-                    ligne: ligneNum, type: "erreur", champ: "PLAFOND",
-                    message: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
-                    donnees: row,
-                  });
-                  importDossiers.push({ numeroLigne: ligneNum, statutImport: "ERREUR", erreur: "Prestataire inactif", donnees });
-                  continue;
-                }
-                nbAvertissementsPlafond++;
+              if (!plafondResult.autorise &&
+                  ['PRESTATAIRE_INACTIF', 'ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'MONTANT_DEPASSE_RELIQUAT'].includes(plafondResult.raison)) {
+                nbErreurs++;
                 anomalies.push({
-                  ligne: ligneNum, type: "avertissement", champ: "PLAFOND",
+                  ligne: ligneNum, type: "erreur", champ: "PLAFOND",
                   message: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
                   donnees: row,
                 });
-                historiqueEntries.push({
-                  date: new Date().toISOString(),
-                  action: 'IMPORT_PLAFOND',
-                  commentaire: `[PLAFOND] ${plafondResult.message} (raison: ${plafondResult.raison})`,
-                });
-              } else if (plafondResult.alertes.length > 0) {
+                importDossiers.push({ numeroLigne: ligneNum, statutImport: "ERREUR", erreur: plafondResult.raison, donnees });
+                continue;
+              }
+              if (!plafondResult.autorise || plafondResult.alertes.length > 0) {
                 for (const alerte of plafondResult.alertes) {
                   if (alerte.type === 'warning' || alerte.type === 'danger') {
                     nbAvertissementsPlafond++;

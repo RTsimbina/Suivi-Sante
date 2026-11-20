@@ -8,7 +8,7 @@ import {
   avecPerimetreSociete,
 } from "@/lib/data-isolation";
 import { Prisma } from "@prisma/client";
-import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
+import { verifierPlafondAnnuel, fenetreAnnuelle, type PlafondCheckResult } from "@/lib/plafond-check";
 import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { sommer, superieurOuEgal, enNombre } from "@/lib/money";
 import { calculerRemboursement } from "@/lib/services/calcul-remboursement";
@@ -19,7 +19,7 @@ import {
   avecRetryNumeroDossier,
 } from "@/lib/numero-dossier";
 import { plageDepuisParams, filtreDateChamp } from "@/lib/periodes";
-import { masquerNss } from "@/lib/nss";
+import { masquerDossierPourRole } from "@/lib/services/serialisation-dossier";
 
 export async function GET(request: NextRequest) {
   try {
@@ -105,12 +105,13 @@ export async function GET(request: NextRequest) {
       db.dossier.count({ where: whereFiltre }),
     ]);
 
-    // ─── P2-03 : confidentialité du NSS ─────────────────────────────────────
-    // Le champ nSS (copié sur le dossier à la saisie) n'est JAMAIS transmis
-    // aux rôles externes : masquage côté backend avant sérialisation.
-    const dossiersSortie = perimetre.restricted
-      ? dossiers.map(d => ({ ...d, nSS: masquerNss(d.nSS) }))
-      : dossiers;
+    // ─── P2-03 / SEC-1 : confidentialité du NSS et des commentaires privés ──
+    // Le NSS (copié sur le dossier à la saisie) n'est JAMAIS transmis aux
+    // rôles externes : masquage côté backend avant sérialisation. La
+    // sérialisation est centralisée avec la route de détail
+    // (src/lib/services/serialisation-dossier.ts) pour éviter toute
+    // divergence entre liste et détail.
+    const dossiersSortie = dossiers.map(d => masquerDossierPourRole(d, perimetre.restricted));
 
     return NextResponse.json({
       dossiers: dossiersSortie,
@@ -173,6 +174,7 @@ export async function POST(request: NextRequest) {
         montantDemande: montantReclame,
         prestataireId: prestataireId || undefined,
         datePrestation: dateSoins ?? dateReception,
+        dateReception, // BIZ-2 : fenêtre de consommation = année de réception
       });
 
       // Bloquer si le plafond est atteint (assuré inactif, plafond acte/global épuisé)
@@ -260,6 +262,13 @@ export async function POST(request: NextRequest) {
         ? dateReception.getFullYear()
         : new Date().getFullYear();
 
+    // BIZ-2 : fenêtre de consommation canonique (année de réception) — le
+    // chemin transactionnel utilise la MÊME fenêtre que verifierPlafondAnnuel
+    // (ancien comportement : année courante ici, divergente du PATCH).
+    const fenetreConsommation = fenetreAnnuelle(
+      dateReception instanceof Date ? dateReception : new Date(),
+    );
+
     const dossier = await avecRetryNumeroDossier((decalage) =>
       db.$transaction(async (tx) => {
         // Re-vérifier le plafond dans la transaction
@@ -291,7 +300,7 @@ export async function POST(request: NextRequest) {
               assureId,
               societeId,
               typeDossier,
-              dateReception: { gte: new Date(new Date().getFullYear(), 0, 1), lte: new Date(new Date().getFullYear(), 11, 31, 23, 59, 59) },
+              dateReception: { gte: fenetreConsommation.debut, lte: fenetreConsommation.fin },
               statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
             },
             select: { montantValide: true, montantPaye: true, montantReclame: true },

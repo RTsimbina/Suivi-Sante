@@ -5,6 +5,7 @@ import {
   perimetreDepuisHeaders,
   refuserHorsPerimetre,
 } from "@/lib/data-isolation";
+import { masquerDossierPourRole } from "@/lib/services/serialisation-dossier";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -52,7 +53,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       historiqueParsed = [];
     }
 
-    return NextResponse.json({ ...dossier, historiqueParsed });
+    // ─── SEC-1 : confidentialité alignée sur la route de liste (P2-03) ──────
+    // Les rôles externes reçoivent le NSS du dossier et de l'assuré masqués
+    // et SANS les commentaires privés ; sérialisation centralisée dans
+    // src/lib/services/serialisation-dossier.ts (source unique avec la liste).
+    const dossierSortie = masquerDossierPourRole(
+      { ...dossier, historiqueParsed },
+      perimetre.restricted,
+    );
+
+    return NextResponse.json(dossierSortie);
   } catch (error) {
     console.error('[DOSSIER_DETAIL] Erreur:', error);
     return NextResponse.json({ erreur: "Erreur lors du chargement du dossier." }, { status: 500 });

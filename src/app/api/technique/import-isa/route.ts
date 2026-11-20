@@ -154,31 +154,33 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // ─── Vérification non bloquante du plafond annuel ────────────────
-        // Si le dossier a un assureId, vérifier le plafond.
-        // Non bloquant pour les imports : on enregistre un avertissement
-        // dans l'historique du dossier et dans le rapport d'import.
+        // ─── Vérification du plafond annuel (BIZ-7 : BLOQUANTE sur dépassement)
+        // Si le dossier a un assureId, vérifier le plafond sur le montant
+        // VALIDE que le fichier va écrire (et non sur le montant réclamé).
+        // Ancien comportement : simple avertissement non bloquant — ISA
+        // pulvérisait les plafonds en marquant les lignes en succès.
         if (existingDossier.assureId && updateData.montantValide) {
           try {
             const plafondResult = await verifierPlafondAnnuel({
               assureId: existingDossier.assureId,
               societeId: existingDossier.societeId,
               typeActe: existingDossier.typeDossier,
-              montantDemande: enNombre(existingDossier.montantReclame) ?? 0,
+              montantDemande: Number(updateData.montantValide),
               excludeDossierId: existingDossier.id,
               // P1 : tarification à la date de prestation du dossier importé.
               datePrestation: existingDossier.dateSoins ?? existingDossier.dateReception,
+              dateReception: existingDossier.dateReception, // BIZ-2
             });
 
+            if (!plafondResult.autorise &&
+                ['PRESTATAIRE_INACTIF', 'ASSURE_INACTIF', 'PLAFOND_ACTE_ATTEINT', 'PLAFOND_GLOBAL_ATTEINT', 'MONTANT_DEPASSE_RELIQUAT'].includes(plafondResult.raison)) {
+              nbErreurs++;
+              const message = `[PLAFOND] ${plafondResult.message}`;
+              erreursDetail.push({ ligne: ligneNum, numeroDossier, message });
+              importDossiers.push({ numeroLigne: ligneNum, statutImport: 'ERREUR', erreur: message, donnees });
+              continue;
+            }
             if (!plafondResult.autorise) {
-              // Bloquer l'import si le prestataire est inactif
-              if (plafondResult.raison === 'PRESTATAIRE_INACTIF') {
-                nbErreurs++;
-                const message = `[PLAFOND] ${plafondResult.message}`;
-                erreursDetail.push({ ligne: ligneNum, numeroDossier, message });
-                importDossiers.push({ numeroLigne: ligneNum, statutImport: 'ERREUR', erreur: message, donnees });
-                continue;
-              }
               nbAvertissementsPlafond++;
               erreursDetail.push({
                 ligne: ligneNum,

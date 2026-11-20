@@ -1,9 +1,12 @@
 /**
- * Tests de la route POST /api/appels-fonds — atomicité budget.
- * Correctif audit P2 : la création de l'appel et l'incrément du
- * budgetUtilise du contrat doivent s'exécuter dans la MÊME transaction
- * (avant : deux écritures séparées, un échec intermédiaire laissait un
- * budget désynchronisé).
+ * Tests de la route POST /api/appels-fonds — atomicité budget + garde-fous.
+ *
+ * Correctifs :
+ *   - audit P2 : la création de l'appel et l'incrément du budgetUtilise du
+ *     contrat doivent s'exécuter dans la MÊME transaction ;
+ *   - BIZ-6 : verrou FOR UPDATE sur le contrat, statut ACTIF exigé, date
+ *     d'appel dans la période contractuelle, refus du dépassement du budget
+ *     annuel (avant : incrément aveugle, solde > 100 % sans erreur).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,6 +15,7 @@ import type { NextRequest } from 'next/server';
 // ─── Mocks de modules (hoistés) ──────────────────────────────────────────────
 
 const txMocks = vi.hoisted(() => ({
+  queryRaw: vi.fn().mockResolvedValue([]),
   contratFindUnique: vi.fn(),
   contratUpdate: vi.fn(),
   appelCreate: vi.fn(),
@@ -46,11 +50,25 @@ const PAYLOAD_VALIDE = {
   observations: 'T3 2026',
 };
 
+/** Contrat actif, période 2026, budget 1 000 000 Ar, 1000 Ar déjà utilisés. */
+function contratValide() {
+  return {
+    id: 'clx-contrat-1',
+    statut: 'ACTIF',
+    dateDebut: new Date('2026-01-01'),
+    dateFin: new Date('2026-12-31'),
+    budgetAnnuel: 1000000,
+    budgetUtilise: 1000,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  txMocks.queryRaw.mockResolvedValue([]);
   // $transaction(fn) → exécute fn avec un faux client tx
   dbMocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({
+      $queryRaw: txMocks.queryRaw,
       contrat: {
         findUnique: txMocks.contratFindUnique,
         update: txMocks.contratUpdate,
@@ -62,7 +80,7 @@ beforeEach(() => {
 
 describe('POST /api/appels-fonds', () => {
   it('crée l’appel et incrémente le budgetUtilise dans la même transaction', async () => {
-    txMocks.contratFindUnique.mockResolvedValue({ id: 'clx-contrat-1', budgetUtilise: 1000 });
+    txMocks.contratFindUnique.mockResolvedValue(contratValide());
     const appelCree = { id: 'appel-1', montant: 150000, statut: 'EN_ATTENTE' };
     txMocks.appelCreate.mockResolvedValue(appelCree);
     txMocks.contratUpdate.mockResolvedValue({});
@@ -92,6 +110,67 @@ describe('POST /api/appels-fonds', () => {
     expect(dbMocks.transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('BIZ-6 : verrouille la ligne du contrat (FOR UPDATE) AVANT la lecture du budget', async () => {
+    txMocks.contratFindUnique.mockResolvedValue(contratValide());
+    txMocks.appelCreate.mockResolvedValue({ id: 'appel-1' });
+    txMocks.contratUpdate.mockResolvedValue({});
+
+    await POST(requetePost(PAYLOAD_VALIDE));
+
+    expect(txMocks.queryRaw).toHaveBeenCalled();
+    expect(String(txMocks.queryRaw.mock.calls[0][0])).toContain('FOR UPDATE');
+    // le verrou précède la lecture du contrat
+    expect(txMocks.contratFindUnique).toHaveBeenCalledAfter(txMocks.queryRaw);
+  });
+
+  it('BIZ-6 : contrat non ACTIF → 422, aucune écriture', async () => {
+    txMocks.contratFindUnique.mockResolvedValue({ ...contratValide(), statut: 'RESILIE' });
+
+    const res = await POST(requetePost(PAYLOAD_VALIDE));
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.erreur).toContain('non actif');
+    expect(body.erreur).toContain('RESILIE');
+    expect(txMocks.appelCreate).not.toHaveBeenCalled();
+    expect(txMocks.contratUpdate).not.toHaveBeenCalled();
+  });
+
+  it('BIZ-6 : date d’appel hors période contractuelle → 422, aucune écriture', async () => {
+    txMocks.contratFindUnique.mockResolvedValue(contratValide());
+
+    const res = await POST(requetePost({ ...PAYLOAD_VALIDE, dateAppel: '2027-03-15' }));
+
+    expect(res.status).toBe(422);
+    expect((await res.json()).erreur).toContain('période contractuelle');
+    expect(txMocks.appelCreate).not.toHaveBeenCalled();
+  });
+
+  it('BIZ-6 : dépassement du budget annuel → 422 détaillé, aucune écriture', async () => {
+    txMocks.contratFindUnique.mockResolvedValue({ ...contratValide(), budgetUtilise: 900000 });
+
+    const res = await POST(requetePost(PAYLOAD_VALIDE)); // 900 000 + 150 000 > 1 000 000
+
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.erreur).toContain('Budget annuel insuffisant');
+    expect(body.soldeDisponible).toBeDefined();
+    expect(body.montantDemande).toBeDefined();
+    expect(txMocks.appelCreate).not.toHaveBeenCalled();
+    expect(txMocks.contratUpdate).not.toHaveBeenCalled();
+  });
+
+  it('BIZ-6 : montant exactement égal au solde disponible → accepté (borne incluse)', async () => {
+    txMocks.contratFindUnique.mockResolvedValue({ ...contratValide(), budgetUtilise: 850000 });
+    txMocks.appelCreate.mockResolvedValue({ id: 'appel-2' });
+    txMocks.contratUpdate.mockResolvedValue({});
+
+    const res = await POST(requetePost(PAYLOAD_VALIDE)); // 850 000 + 150 000 = 1 000 000
+
+    expect(res.status).toBe(201);
+    expect(txMocks.contratUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it('renvoie 404 si le contrat est introuvable (et ne crée rien)', async () => {
     txMocks.contratFindUnique.mockResolvedValue(null);
 
@@ -113,7 +192,7 @@ describe('POST /api/appels-fonds', () => {
   });
 
   it('renvoie 500 si l’incrément budget échoue (la transaction avorte la création)', async () => {
-    txMocks.contratFindUnique.mockResolvedValue({ id: 'clx-contrat-1' });
+    txMocks.contratFindUnique.mockResolvedValue(contratValide());
     txMocks.appelCreate.mockResolvedValue({ id: 'appel-1' });
     txMocks.contratUpdate.mockRejectedValue(new Error('write conflict'));
 

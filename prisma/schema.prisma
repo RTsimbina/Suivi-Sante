@@ -92,6 +92,9 @@ model Contrat {
   appelsDeFonds   AppelDeFonds[]
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // ARC-02 : index cœur — contrats par société (appels de fonds, budgets)
+  @@index([societeId, statut])
 }
 
 model AppelDeFonds {
@@ -167,6 +170,17 @@ model Dossier {
   justificatifs             Justificatif[]
   importations              ImportDossier[]
   courriel                  Courriel?
+
+  // ─── ARC-02 : index cœur — listes/KPI/exports et contrôle de plafond ─────
+  // (societeId, statut, dateReception) : listes isolées par société + filtre
+  // statut/période ; (assureId, typeDossier, dateReception) : consommation
+  // annuelle par type d'acte (verifierPlafondAnnuel) ; (assureId,
+  // dateReception) : consommation globale tous actes ; prestataireId :
+  // jointures et filtres prestataire.
+  @@index([societeId, statut, dateReception])
+  @@index([assureId, typeDossier, dateReception])
+  @@index([assureId, dateReception])
+  @@index([prestataireId])
 }
 
 model Commentaire {
@@ -272,6 +286,11 @@ model Assure {
   dossiers          Dossier[]  @relation("AssureDossier")
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
+
+  // ARC-02 : index cœur — listes par société, regroupements familiaux
+  @@index([societeId, actif])
+  @@index([codeFamille])
+  @@index([assurePrincipalId])
 }
 
 model Prestataire {
@@ -380,6 +399,10 @@ model Courriel {
   dossier         Dossier?   @relation(fields: [dossierId], references: [id])
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+
+  // ARC-02 : index cœur — tri de la réception et filtrage par société
+  @@index([statut, dateCourriel])
+  @@index([societeId])
 }
 
 model MessageBot {
