@@ -3,11 +3,12 @@
  *
  * Cette fonction est appelée depuis :
  *   - /api/sante/simuler-acte (simulation)
- *   - POST /api/dossiers (création manuelle)
- *   - PATCH /api/dossiers/[id] (transition EN_ANALYSE → VALIDE)
+ *   - POST /api/dossiers (création manuelle) — BLOQUANT (422) + re-vérification
+ *     transactionnelle FOR UPDATE (PLAFOND_ATTEINT_TRANSACTION → 422)
+ *   - PATCH /api/dossiers/[id] (transition EN_ANALYSE → VALIDE) — idem, BLOQUANT
  *   - POST /api/technique/baremes (prévisualisation formulaire + plafond annuel)
- *   - POST /api/technique/import-isa (alertes non bloquantes)
- *   - POST /api/import (alertes non bloquantes pour EXCEL avec assureId)
+ *   - POST /api/technique/import-isa (BLOQUANT PAR LIGNE, rejet partiel)
+ *   - POST /api/import (BLOQUANT PAR LIGNE, rejet partiel)
  *
  * La logique est extraite de simuler-acte pour garantir un calcul identique
  * partout dans le circuit de traitement.
