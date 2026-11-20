@@ -161,8 +161,8 @@ function ContenuPortailPrestataire() {
 
   return (
     <div className='min-h-screen flex flex-col bg-muted/30'>
-      {/* Header */}
-      <header className='h-14 border-b bg-card flex items-center px-4 gap-3 shadow-sm'>
+      {/* Header — figé (sticky top-0), identique à la coque des portails client/entreprise */}
+      <header className='h-14 border-b bg-card flex items-center px-4 gap-3 shadow-sm sticky top-0 z-50'>
         <div className='flex items-center gap-2'>
           <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600'>
             <Stethoscope className='h-4 w-4 text-white' />
