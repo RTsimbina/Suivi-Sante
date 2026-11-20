@@ -75,7 +75,7 @@ export default function SanteView() {
       {/* En-tête */}
       <div>
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <HeartPulse className="h-5 w-5 text-emerald-600" />
+          <HeartPulse className="h-5 w-5 text-brand-600" />
           Contrôle Santé — Vérification Assuré
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
@@ -115,7 +115,7 @@ export default function SanteView() {
                     'rounded-lg border p-3 flex items-start gap-3 text-sm',
                     a.type === 'danger' && 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300',
                     a.type === 'warning' && 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300',
-                    a.type === 'info' && 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300',
+                    a.type === 'info' && 'border-info-200 dark:border-info-800 bg-info-50 dark:bg-info-950/40 text-info-700 dark:text-info-300',
                   )}
                 >
                   {a.type === 'danger' ? <ShieldX className="h-5 w-5 mt-0.5 shrink-0" /> :

@@ -194,7 +194,7 @@ export default function AnnuairePrestataires({
                     >
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2">
-                          <Stethoscope className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <Stethoscope className="h-4 w-4 text-brand-600 shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium truncate max-w-[220px]">{p.nom}</p>
                             {p.email && (
@@ -235,8 +235,8 @@ export default function AnnuairePrestataires({
                       <td className="py-2.5 px-3 text-xs hidden lg:table-cell">{p.nbDossiers ?? 0}</td>
                       <td className="py-2.5 px-3">
                         <div className="flex flex-col gap-1 items-start">
-                          <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${p.actif ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${p.actif ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${p.actif ? 'text-brand-700 dark:text-brand-400' : 'text-red-700 dark:text-red-400'}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${p.actif ? 'bg-brand-500' : 'bg-red-500'}`} />
                             {p.actif ? 'Actif' : 'Inactif'}
                           </span>
                           {p.statut && STATUT_CONVENTIONNEL_LABELS[p.statut] && (

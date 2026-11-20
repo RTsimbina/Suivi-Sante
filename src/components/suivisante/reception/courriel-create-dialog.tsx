@@ -63,7 +63,7 @@ export default function CourrielCreateDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-sky-600" />
+            <Mail className="h-5 w-5 text-info-600" />
             Enregistrer un courriel
           </DialogTitle>
           <DialogDescription>
@@ -186,7 +186,7 @@ export default function CourrielCreateDialog({
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-brand-600 hover:bg-brand-700"
             onClick={onCreer}
             disabled={submitting || !formExpediteur.trim() || !formObjet.trim()}
           >

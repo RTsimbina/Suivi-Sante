@@ -51,11 +51,11 @@ export default function ActesHistory({
   page, onPageChange, onAppliquer, onReset,
 }: ActesHistoryProps) {
   return (
-    <Card className="border-emerald-200 dark:border-emerald-800">
+    <Card className="border-brand-200 dark:border-brand-800">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-emerald-600" />
+            <ClipboardList className="h-5 w-5 text-brand-600" />
             Historique des actes réalisés
             {pagination.total > 0 && (
               <Badge variant="secondary" className="ml-1 text-xs">
@@ -72,7 +72,7 @@ export default function ActesHistory({
             <Filter className="h-3.5 w-3.5 mr-1" />
             Filtres
             {nbFiltresActifs > 0 && (
-              <Badge className="ml-1.5 h-4 min-w-4 px-1 text-[10px] bg-emerald-600 text-white">
+              <Badge className="ml-1.5 h-4 min-w-4 px-1 text-[10px] bg-brand-600 text-white">
                 {nbFiltresActifs}
               </Badge>
             )}
@@ -155,7 +155,7 @@ export default function ActesHistory({
               <Button
                 onClick={onAppliquer}
                 disabled={loading || !assureId}
-                className="bg-emerald-600 hover:bg-emerald-700 h-8 text-xs px-4"
+                className="bg-brand-600 hover:bg-brand-700 h-8 text-xs px-4"
               >
                 {loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1.5" />}
                 Rechercher
@@ -167,7 +167,7 @@ export default function ActesHistory({
         {/* ── Tableau des actes ── */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
             <span className="ml-2 text-sm text-muted-foreground">Chargement des actes...</span>
           </div>
         ) : actes.length > 0 ? (
@@ -282,7 +282,7 @@ export default function ActesHistory({
             {nbFiltresActifs > 0 && (
               <button
                 onClick={onReset}
-                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-1"
+                className="text-xs text-brand-600 dark:text-brand-400 hover:underline mt-1"
               >
                 Réinitialiser les filtres
               </button>

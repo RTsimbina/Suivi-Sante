@@ -160,7 +160,7 @@ export default function PeriodFilter({ dateRefLabel, className }: PeriodFilterPr
           selectionInvalide
             ? 'border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40'
             : periodeActive
-              ? 'border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50'
+              ? 'border-brand-300 dark:border-brand-800 text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/50'
               : 'border-border text-muted-foreground bg-muted/40',
         )}
       >

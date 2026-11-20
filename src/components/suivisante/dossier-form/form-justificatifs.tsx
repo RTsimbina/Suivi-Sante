@@ -31,10 +31,10 @@ export default function FormJustificatifs({
   return (
     <div className="space-y-3">
       <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <FileText className="size-4 text-emerald-600" />
+        <FileText className="size-4 text-brand-600" />
         Justificatifs
       </h4>
-      <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center hover:border-emerald-400 transition-colors cursor-pointer" onClick={() => fileRef.current?.click()}>
+      <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center hover:border-brand-400 transition-colors cursor-pointer" onClick={() => fileRef.current?.click()}>
         <Upload className="size-5 mx-auto text-muted-foreground mb-1" />
         <p className="text-xs text-muted-foreground">Cliquez pour ajouter des fichiers (PDF, JPG, PNG — max 10 Mo)</p>
         <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" className="hidden" onChange={onAddFiles} />
@@ -48,7 +48,7 @@ export default function FormJustificatifs({
               <select value={f.type} onChange={e => onFileTypeChange(f.id, e.target.value)} className="h-7 text-xs rounded border bg-transparent px-1">
                 {JUSTIF_TYPES.map(t => <option key={t} value={t}>{JUSTIF_LABELS[t]}</option>)}
               </select>
-              {uploadingFiles.includes(f.id) && <Loader2 className="size-3.5 animate-spin text-emerald-600" />}
+              {uploadingFiles.includes(f.id) && <Loader2 className="size-3.5 animate-spin text-brand-600" />}
               <button type="button" onClick={() => onRemoveFile(f.id)} className="text-red-500 hover:text-red-700 dark:text-red-300">
                 <X className="size-3.5" />
               </button>

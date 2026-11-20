@@ -125,7 +125,7 @@ export default function DossiersView() {
               <div className="overflow-x-auto">
                 <div className="min-w-[900px]">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-background">
+                    <thead className="bg-background">
                       <tr className="border-b text-left text-muted-foreground">
                         <th className="pb-2 font-medium">N° Dossier</th>
                         <th className="pb-2 font-medium">Date</th>

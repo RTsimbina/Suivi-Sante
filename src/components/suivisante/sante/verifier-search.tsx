@@ -42,7 +42,7 @@ export default function VerifierSearch({
           <Button
             onClick={() => onVerifier(query)}
             disabled={loading || query.length < 2}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-emerald-600 hover:bg-emerald-700 h-7 text-xs px-3"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 bg-brand-600 hover:bg-brand-700 h-7 text-xs px-3"
           >
             {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3 mr-1" />}
             Vérifier

@@ -96,14 +96,14 @@ export default function SocieteDetail({
         {/* En-tête société */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            <div className="h-12 w-12 rounded-xl bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-brand-600 dark:text-brand-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold">{societe.nom}</h3>
                 {societe.actif ? (
-                  <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100">
+                  <Badge className="bg-brand-100 text-brand-700 dark:text-brand-300 text-[10px] border-brand-200 dark:border-brand-800 hover:bg-brand-100">
                     <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Active
                   </Badge>
                 ) : (
@@ -137,7 +137,7 @@ export default function SocieteDetail({
                 size="sm"
                 className={cn(
                   'h-7 text-xs gap-1',
-                  !societe.actif && 'border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400'
+                  !societe.actif && 'border-brand-300 text-brand-700 hover:bg-brand-50 dark:text-brand-400'
                 )}
                 onClick={onToggleActif}
                 disabled={basculerLoading}
@@ -214,7 +214,7 @@ export default function SocieteDetail({
                       <td className="py-2 px-3 font-mono">{c.reference}</td>
                       <td className="py-2 px-3 text-right">{c.budgetAnnuel.toLocaleString('fr-FR')} Ar</td>
                       <td className="py-2 px-3 text-right text-amber-600">{c.budgetUtilise.toLocaleString('fr-FR')} Ar</td>
-                      <td className={cn('py-2 px-3 text-right font-medium', c.solde < 0 ? 'text-red-600' : 'text-emerald-600')}>{c.solde.toLocaleString('fr-FR')} Ar</td>
+                      <td className={cn('py-2 px-3 text-right font-medium', c.solde < 0 ? 'text-red-600' : 'text-brand-600')}>{c.solde.toLocaleString('fr-FR')} Ar</td>
                       <td className="py-2 px-3 text-center">
                         <Badge variant="outline" className={cn('text-[9px]',
                             getStatutConfig(CONTRAT_STATUTS, c.statut)?.badge ?? 'bg-muted text-muted-foreground'
@@ -231,7 +231,7 @@ export default function SocieteDetail({
         {/* ─── Onglets Barèmes / Assurés / Prestataires ─── */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+            <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
             <span className="ml-2 text-xs text-muted-foreground">Chargement des données...</span>
           </div>
         ) : details ? (
@@ -248,7 +248,7 @@ export default function SocieteDetail({
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px',
                       isActive
-                        ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                        ? 'border-brand-500 text-brand-600 dark:text-brand-400'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
                     )}
                   >
@@ -256,7 +256,7 @@ export default function SocieteDetail({
                     {tab.label}
                     <Badge variant="outline" className={cn(
                       'text-[9px] ml-0.5',
-                      isActive && 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400'
+                      isActive && 'border-brand-200 dark:border-brand-800 text-brand-600 dark:text-brand-400'
                     )}>{tab.count}</Badge>
                   </button>
                 );

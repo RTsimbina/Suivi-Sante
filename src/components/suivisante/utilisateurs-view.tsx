@@ -67,7 +67,7 @@ export default function UtilisateursView() {
               options={[{ value: 'true', label: 'Actif' }, { value: 'false', label: 'Inactif' }]}
               className="w-full md:w-32"
             />
-            <Button onClick={d.openCreateDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm shrink-0">
+            <Button onClick={d.openCreateDialog} className="bg-brand-600 hover:bg-brand-700 text-white h-9 text-sm shrink-0">
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Nouvel utilisateur
             </Button>

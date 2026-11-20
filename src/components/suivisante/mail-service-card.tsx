@@ -69,8 +69,8 @@ interface EnvoiRecent {
 
 const BADGES_STATUT: Record<string, string> = {
   EN_ATTENTE: 'bg-gray-100 text-gray-700 border-gray-200',
-  EN_COURS: 'bg-blue-100 text-blue-700 border-blue-200',
-  ENVOYE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  EN_COURS: 'bg-info-100 text-info-700 border-info-200',
+  ENVOYE: 'bg-brand-100 text-brand-700 border-brand-200',
   ECHEC: 'bg-red-100 text-red-700 border-red-200',
 };
 
@@ -186,9 +186,9 @@ export default function MailServiceCard() {
 
   const kpis = stats
     ? [
-        { label: 'Envoyés (24 h)', value: stats.envoyes24h, tone: 'text-emerald-600' },
+        { label: 'Envoyés (24 h)', value: stats.envoyes24h, tone: 'text-brand-600' },
         { label: 'Échecs (24 h)', value: stats.echecs24h, tone: 'text-red-600' },
-        { label: 'En attente', value: stats.enAttente, tone: 'text-blue-600' },
+        { label: 'En attente', value: stats.enAttente, tone: 'text-info-600' },
         { label: 'En cours', value: stats.enCours, tone: 'text-foreground' },
         { label: 'Taux de succès', value: taux === null ? '—' : `${taux}%`, tone: 'text-foreground' },
       ]
@@ -199,7 +199,7 @@ export default function MailServiceCard() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Mail className="h-4 w-4 text-emerald-600" />
+            <Mail className="h-4 w-4 text-brand-600" />
             Service de messagerie centralisé
           </CardTitle>
           <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={chargerStats}>
@@ -223,7 +223,7 @@ export default function MailServiceCard() {
         <div className="border rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h4 className="text-sm font-semibold flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              <ShieldCheck className="h-3.5 w-3.5 text-brand-600" />
               Authentification du domaine d&apos;expédition
             </h4>
             <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={chargerDns}>
@@ -258,7 +258,7 @@ export default function MailServiceCard() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold">{nom}</span>
                       {detail.statut === 'PASS' ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] hover:bg-emerald-100">PASS</Badge>
+                        <Badge className="bg-brand-100 text-brand-700 border-brand-200 text-[10px] hover:bg-brand-100">PASS</Badge>
                       ) : detail.statut === 'ABSENT' ? (
                         <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200">ABSENT</Badge>
                       ) : (
@@ -293,7 +293,7 @@ export default function MailServiceCard() {
         {/* ── E-mail de test (plan §19) ── */}
         <div className="border rounded-lg p-4 space-y-3">
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <Send className="h-3.5 w-3.5 text-emerald-600" />
+            <Send className="h-3.5 w-3.5 text-brand-600" />
             E-mail de test
           </h4>
           <div className="flex flex-col md:flex-row gap-2">
@@ -309,7 +309,7 @@ export default function MailServiceCard() {
               />
             </div>
             <Button
-              className="h-9 md:mt-6 bg-emerald-600 hover:bg-emerald-700"
+              className="h-9 md:mt-6 bg-brand-600 hover:bg-brand-700"
               disabled={envoiTest || !testEmail.trim()}
               onClick={handleTestEmail}
             >
@@ -319,7 +319,7 @@ export default function MailServiceCard() {
           </div>
           {resultatTest && (
             <div className={`text-xs rounded-lg p-2.5 border ${resultatTest.ok
-              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+              ? 'bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800'
               : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'}`}>
               {resultatTest.message}
             </div>
@@ -330,7 +330,7 @@ export default function MailServiceCard() {
         <div className="border rounded-lg p-4 space-y-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h4 className="text-sm font-semibold flex items-center gap-2">
-              <ListChecks className="h-3.5 w-3.5 text-emerald-600" />
+              <ListChecks className="h-3.5 w-3.5 text-brand-600" />
               File d&apos;attente — {stats ? `${stats.enAttente} en attente, ${stats.enCours} en cours` : '…'}
             </h4>
             <Button variant="outline" size="sm" className="h-7 text-[11px]" disabled={traitement} onClick={handleTraiterFile}>

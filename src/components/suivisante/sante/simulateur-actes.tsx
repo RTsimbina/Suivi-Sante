@@ -101,7 +101,7 @@ export default function SimulateurActes({
           <Button
             onClick={onSimuler}
             disabled={simLoading || simLignes.every(l => !l.typeActe || !l.montant)}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-brand-600 hover:bg-brand-700"
           >
             {simLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
             Simuler {simLignes.filter(l => l.typeActe && parseFloat(l.montant) > 0).length > 1
@@ -130,7 +130,7 @@ export default function SimulateurActes({
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground">Total couvert</p>
-                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatAr(simResults.reduce((s, r) => s + (r.result.details?.montantCouvert || 0), 0))}</p>
+                <p className="text-sm font-bold text-brand-600 dark:text-brand-400">{formatAr(simResults.reduce((s, r) => s + (r.result.details?.montantCouvert || 0), 0))}</p>
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground">Total patient</p>
@@ -147,16 +147,16 @@ export default function SimulateurActes({
             className={cn(
               'rounded-lg border p-4 space-y-3',
               sim.result.autorise
-                ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20'
+                ? 'border-brand-200 dark:border-brand-800 bg-brand-50/50 dark:bg-brand-950/20'
                 : 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20',
             )}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {sim.result.autorise
-                  ? <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  ? <CheckCircle2 className="h-5 w-5 text-brand-600 dark:text-brand-400" />
                   : <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />}
-                <span className={cn('text-sm font-semibold', sim.result.autorise ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300')}>
+                <span className={cn('text-sm font-semibold', sim.result.autorise ? 'text-brand-700 dark:text-brand-300' : 'text-red-700 dark:text-red-300')}>
                   {sim.result.autorise ? 'ACTE AUTORISÉ' : 'ACTE NON AUTORISÉ'}
                 </span>
                 {simResults.length > 1 && (
@@ -185,7 +185,7 @@ export default function SimulateurActes({
                 </div>
                 <div className="bg-background/60 rounded-lg p-2.5">
                   <p className="text-[10px] text-muted-foreground">Montant couvert</p>
-                  <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatAr(sim.result.details.montantCouvert)}</p>
+                  <p className="text-sm font-bold text-brand-600 dark:text-brand-400">{formatAr(sim.result.details.montantCouvert)}</p>
                 </div>
                 <div className="bg-background/60 rounded-lg p-2.5">
                   <p className="text-[10px] text-muted-foreground">Part assureur ({sim.result.details.tauxCouverture}%)</p>

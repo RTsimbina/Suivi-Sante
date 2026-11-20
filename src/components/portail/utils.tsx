@@ -36,7 +36,7 @@ export function StatutIcon({ statut }: { statut: string }) {
   if (statut === 'REJETE') return <XCircle className='h-3.5 w-3.5 text-red-500' />;
   if (statut === 'EN_PAIEMENT' || statut === 'EN_COMPTABILITE') return <Clock className='h-3.5 w-3.5 text-violet-500' />;
   if (statut === 'EN_ANALYSE') return <Clock className='h-3.5 w-3.5 text-amber-500' />;
-  return <Info className='h-3.5 w-3.5 text-sky-500' />;
+  return <Info className='h-3.5 w-3.5 text-info-500' />;
 }
 
 /** Boutons de filtre par statut — P2-02 : filtre SERVEUR (conservé entre pages). */
@@ -63,7 +63,7 @@ export function BoutonsStatut({
           className={cn(
             'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
             valeur === f.valeur
-              ? 'bg-emerald-600 text-white border-emerald-600'
+              ? 'bg-brand-600 text-white border-brand-600'
               : 'border-border hover:bg-muted'
           )}
         >

@@ -37,7 +37,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
     <Card className="p-6">
       <form onSubmit={form.handleSubmit} className="space-y-6">
         <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Plus className="size-5 text-emerald-600" />
+          <Plus className="size-5 text-brand-600" />
           {form.categorieDossier === 'REGLEMENT_PRESTATAIRE'
             ? 'Nouveau dossier — Règlement Prestataire'
             : form.categorieDossier === 'REMBOURSEMENT_ASSURE'
@@ -102,7 +102,7 @@ export default function DossierForm({ onSuccess, defaultCategorie }: DossierForm
         />
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={form.loading} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button type="submit" disabled={form.loading} className="bg-brand-600 hover:bg-brand-700">
             {form.loading ? <><Loader2 className="size-4 animate-spin mr-2" /> Enregistrement...</> : <><Plus className="size-4 mr-2" /> Enregistrer le dossier</>}
           </Button>
         </div>

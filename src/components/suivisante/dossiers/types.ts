@@ -76,10 +76,10 @@ export const JUSTIFICATIF_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 export const JUSTIFICATIF_COLORS: Record<string, string> = {
-  FACTURE: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  ORDONNANCE: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+  FACTURE: 'bg-brand-50 dark:bg-brand-950/40 text-brand-700 dark:text-brand-300 border-brand-200 dark:border-brand-800',
+  ORDONNANCE: 'bg-info-50 dark:bg-info-950/40 text-info-700 dark:text-info-300 border-info-200 dark:border-info-800',
   RIB: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  CARNET_SOINS: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+  CARNET_SOINS: 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
   DECOMPTE: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 border-orange-200',
   AUTRE: 'bg-muted text-muted-foreground border-border',
 };
@@ -88,9 +88,9 @@ export const JUSTIFICATIF_COLORS: Record<string, string> = {
 export const HISTORIQUE_STATUT_COLORS: Record<string, string> = {
   RECU: 'bg-slate-400',
   EN_ANALYSE: 'bg-amber-500',
-  VALIDE: 'bg-emerald-500',
+  VALIDE: 'bg-brand-500',
   EN_COMPTABILITE: 'bg-orange-500',
-  EN_PAIEMENT: 'bg-sky-500',
+  EN_PAIEMENT: 'bg-info-500',
   PAYE: 'bg-teal-500',
   REJETE: 'bg-red-500',
 };

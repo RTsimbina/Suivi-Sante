@@ -70,14 +70,14 @@ export default function CreateDialog({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-emerald-600" /> Nouveau prestataire
+            <Plus className="h-5 w-5 text-brand-600" /> Nouveau prestataire
           </DialogTitle>
         </DialogHeader>
 
         {createSuccess ? (
-          <div className="flex items-center gap-2.5 p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-            <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">{createSuccess}</p>
+          <div className="flex items-center gap-2.5 p-4 rounded-lg bg-brand-50 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-800/40">
+            <CheckCircle2 className="h-5 w-5 text-brand-600 shrink-0" />
+            <p className="text-sm text-brand-700 dark:text-brand-300 font-medium">{createSuccess}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -289,20 +289,20 @@ export default function CreateDialog({
                             className={cn(
                               'w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors cursor-pointer',
                               selected
-                                ? 'bg-emerald-50 dark:bg-emerald-950/30'
+                                ? 'bg-brand-50 dark:bg-brand-950/30'
                                 : 'hover:bg-muted/60'
                             )}
                           >
                             <div className={cn(
                               'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
                               selected
-                                ? 'bg-emerald-600 border-emerald-600'
+                                ? 'bg-brand-600 border-brand-600'
                                 : 'border-muted-foreground/30'
                             )}>
                               {selected && <CheckCircle2 className="h-3 w-3 text-white" />}
                             </div>
-                            <Building2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                            <span className={cn('truncate', selected && 'font-medium text-emerald-700 dark:text-emerald-300')}>
+                            <Building2 className="h-3.5 w-3.5 text-info-500 shrink-0" />
+                            <span className={cn('truncate', selected && 'font-medium text-brand-700 dark:text-brand-300')}>
                               {s.nom}
                             </span>
                           </button>
@@ -311,7 +311,7 @@ export default function CreateDialog({
                     )}
                   </div>
                   {createSelectedSocietes.length > 0 && (
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 font-medium">
+                    <p className="text-[11px] text-brand-600 dark:text-brand-400 mt-1.5 font-medium">
                       {createSelectedSocietes.length} société(s) sélectionnée(s)
                     </p>
                   )}
@@ -330,7 +330,7 @@ export default function CreateDialog({
                 Annuler
               </Button>
               <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="flex-1 bg-brand-600 hover:bg-brand-700 text-white"
                 onClick={onCreate}
                 disabled={creating}
               >

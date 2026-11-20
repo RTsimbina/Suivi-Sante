@@ -22,7 +22,7 @@ export default function StatusPipeline({ statut }: { statut: string }) {
               <div className={cn(
                 'h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium border-2',
                 i === 0
-                  ? 'bg-emerald-100 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                  ? 'bg-brand-100 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300'
                   : i === 1
                     ? 'bg-red-100 border-red-300 text-red-700 dark:text-red-300'
                     : 'bg-muted border-border text-muted-foreground'
@@ -36,7 +36,7 @@ export default function StatusPipeline({ statut }: { statut: string }) {
             {i < PIPELINE_STEPS.length - 1 && (
               <div className={cn(
                 'h-0.5 w-6 mb-4',
-                i === 0 ? 'bg-emerald-400' : 'bg-muted-foreground/30'
+                i === 0 ? 'bg-brand-400' : 'bg-muted-foreground/30'
               )} />
             )}
           </div>
@@ -53,16 +53,16 @@ export default function StatusPipeline({ statut }: { statut: string }) {
             <div className={cn(
               'h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-all',
               i < currentIdx
-                ? 'bg-emerald-50 dark:bg-emerald-950/400 border-emerald-500 text-white'
+                ? 'bg-brand-50 dark:bg-brand-950/400 border-brand-500 text-white'
                 : i === currentIdx
-                  ? 'bg-emerald-100 border-emerald-400 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-200'
+                  ? 'bg-brand-100 border-brand-400 text-brand-700 dark:text-brand-300 ring-2 ring-brand-200'
                   : 'bg-muted border-border text-muted-foreground'
             )}>
               {i < currentIdx ? <CheckCheck className="h-3.5 w-3.5" /> : i + 1}
             </div>
             <span className={cn(
               'text-[10px] w-16 text-center leading-tight',
-              i <= currentIdx ? 'text-emerald-700 dark:text-emerald-300 font-medium' : 'text-muted-foreground'
+              i <= currentIdx ? 'text-brand-700 dark:text-brand-300 font-medium' : 'text-muted-foreground'
             )}>
               {step.label}
             </span>
@@ -70,7 +70,7 @@ export default function StatusPipeline({ statut }: { statut: string }) {
           {i < PIPELINE_STEPS.length - 1 && (
             <div className={cn(
               'h-0.5 w-6 mb-4 transition-all',
-              i < currentIdx ? 'bg-emerald-50 dark:bg-emerald-950/400' : 'bg-muted-foreground/30'
+              i < currentIdx ? 'bg-brand-50 dark:bg-brand-950/400' : 'bg-muted-foreground/30'
             )} />
           )}
         </div>

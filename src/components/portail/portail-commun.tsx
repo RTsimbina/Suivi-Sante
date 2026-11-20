@@ -143,7 +143,7 @@ export function BarrePagination({
             className={cn(
               'h-7 min-w-7 px-1.5 rounded-md text-xs border transition-colors',
               p === pagination.page
-                ? 'bg-emerald-600 text-white border-emerald-600'
+                ? 'bg-brand-600 text-white border-brand-600'
                 : 'border-border hover:bg-muted',
             )}
           >
@@ -246,7 +246,7 @@ export function OngletDossiers({
       <CardHeader className='pb-3'>
         <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <FolderOpen className='h-4 w-4 text-emerald-600' />
+            <FolderOpen className='h-4 w-4 text-brand-600' />
             {titreSansPage} ({pagination.total.toLocaleString('fr-FR')})
           </CardTitle>
           <div className='flex flex-col sm:flex-row sm:items-center gap-1.5'>

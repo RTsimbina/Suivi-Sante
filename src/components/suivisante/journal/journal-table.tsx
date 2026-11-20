@@ -86,7 +86,7 @@ export default function JournalTable({ entries, selectedEntry, onSelectEntry }: 
                     {entry.action === 'SUPPRESSION' ? (
                       <span className="text-red-600 dark:text-red-400">Supprimé</span>
                     ) : entry.action === 'CREATION' ? (
-                      <span className="text-emerald-600 dark:text-emerald-400">{truncate(entry.nouvelleValeur, 35)}</span>
+                      <span className="text-brand-600 dark:text-brand-400">{truncate(entry.nouvelleValeur, 35)}</span>
                     ) : (
                       truncate(entry.nouvelleValeur, 35)
                     )}

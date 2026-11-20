@@ -51,7 +51,7 @@ export default function PortailEntreprise({
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Building2 className='h-4 w-4 text-emerald-600' />
+            <Building2 className='h-4 w-4 text-brand-600' />
             {data.societe.nom}
           </CardTitle>
         </CardHeader>
@@ -78,10 +78,10 @@ export default function PortailEntreprise({
 
       {/* KPIs */}
       <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3'>
-        <KPICard icon={<Users className='h-4 w-4 text-emerald-600' />} label='Assurés' value={String(data.kpis.totalAssures || 0)} color='emerald' />
-        <KPICard icon={<Baby className='h-4 w-4 text-sky-600' />} label='Ayants droit' value={String(data.kpis.totalAyantsDroit || 0)} color='sky' />
+        <KPICard icon={<Users className='h-4 w-4 text-brand-600' />} label='Assurés' value={String(data.kpis.totalAssures || 0)} color='emerald' />
+        <KPICard icon={<Baby className='h-4 w-4 text-info-600' />} label='Ayants droit' value={String(data.kpis.totalAyantsDroit || 0)} color='sky' />
         <KPICard icon={<FolderOpen className='h-4 w-4 text-violet-600' />} label='Total dossiers' value={String(data.kpis.totalDossiers)} color='violet' />
-        <KPICard icon={<BarChart3 className='h-4 w-4 text-sky-600' />} label='Montant réclamé' value={formatMontant(data.kpis.totalReclame || 0)} color='sky' />
+        <KPICard icon={<BarChart3 className='h-4 w-4 text-info-600' />} label='Montant réclamé' value={formatMontant(data.kpis.totalReclame || 0)} color='sky' />
         <KPICard icon={<TrendingUp className='h-4 w-4 text-teal-600' />} label='Montant payé' value={formatMontant(data.kpis.totalPaye || 0)} color='teal' />
         <KPICard icon={<Clock className='h-4 w-4 text-amber-600' />} label='En cours' value={String(data.kpis.enCours || 0)} color='amber' />
         <KPICard icon={<XCircle className='h-4 w-4 text-red-500' />} label='Rejetés' value={String(data.kpis.rejetes || 0)} color='red' />
@@ -90,16 +90,16 @@ export default function PortailEntreprise({
       {/* Onglets */}
       <Tabs value={onglet} onValueChange={setOnglet} className='w-full'>
         <TabsList className='bg-card'>
-          <TabsTrigger value='dossiers' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='dossiers' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <FileText className='h-3.5 w-3.5' /> Dossiers
           </TabsTrigger>
-          <TabsTrigger value='assures' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='assures' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <Users className='h-3.5 w-3.5' /> Assurés
           </TabsTrigger>
-          <TabsTrigger value='contrats' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='contrats' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <CreditCard className='h-3.5 w-3.5' /> Contrats
           </TabsTrigger>
-          <TabsTrigger value='assistant' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='assistant' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <Bot className='h-3.5 w-3.5' /> Assistant IA
           </TabsTrigger>
         </TabsList>
@@ -125,7 +125,7 @@ export default function PortailEntreprise({
             <CardHeader className='pb-3'>
               <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
                 <CardTitle className='text-sm font-medium flex items-center gap-2'>
-                  <Users className='h-4 w-4 text-emerald-600' />
+                  <Users className='h-4 w-4 text-brand-600' />
                   Assurés ({filteredAssures.length})
                 </CardTitle>
                 <input
@@ -163,7 +163,7 @@ export default function PortailEntreprise({
                           </td>
                           <td className='py-2 text-xs'>{formatDate(a.dateEffet ?? '')}</td>
                           <td className='py-2 text-xs text-center'>
-                            <Badge className={cn('text-[10px]', a.actif ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-red-100 text-red-700')}>
+                            <Badge className={cn('text-[10px]', a.actif ? 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300' : 'bg-red-100 text-red-700')}>
                               {a.actif ? 'Actif' : 'Inactif'}
                             </Badge>
                           </td>

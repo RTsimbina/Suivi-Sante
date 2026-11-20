@@ -41,7 +41,7 @@ export default function ImportISATab({
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+          <FileSpreadsheet className="h-5 w-5 text-brand-600" />
           Import fichier ISA
         </CardTitle>
       </CardHeader>
@@ -56,10 +56,10 @@ export default function ImportISATab({
             relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8
             cursor-pointer transition-colors
             ${isDragging
-              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
+              ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40'
               : importFile
-                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40'
-                : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'
+                ? 'border-brand-300 dark:border-brand-700 bg-brand-50 dark:bg-brand-950/40'
+                : 'border-muted-foreground/25 hover:border-brand-400 hover:bg-muted/50'
             }
           `}
         >
@@ -72,7 +72,7 @@ export default function ImportISATab({
           />
           {importFile ? (
             <>
-              <FileSpreadsheet className="h-10 w-10 text-emerald-600 mb-2" />
+              <FileSpreadsheet className="h-10 w-10 text-brand-600 mb-2" />
               <p className="text-sm font-medium">{importFile.name}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {(importFile.size / 1024).toFixed(1)} Ko — Cliquez ou déposez pour changer
@@ -82,7 +82,7 @@ export default function ImportISATab({
             <>
               <Upload className="h-10 w-10 text-muted-foreground/40 mb-2" />
               <p className="text-sm font-medium">
-                Glissez-déposez votre fichier <span className="text-emerald-600 font-semibold">.xlsx</span> ici
+                Glissez-déposez votre fichier <span className="text-brand-600 font-semibold">.xlsx</span> ici
               </p>
               <p className="text-xs text-muted-foreground mt-1">ou cliquez pour sélectionner</p>
             </>
@@ -111,8 +111,8 @@ export default function ImportISATab({
                 <p className="text-2xl font-bold">{importResult.nbLignes}</p>
               </Card>
               <Card className="p-4">
-                <p className="text-xs text-emerald-600">Succès</p>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{importResult.nbSucces}</p>
+                <p className="text-xs text-brand-600">Succès</p>
+                <p className="text-2xl font-bold text-brand-700 dark:text-brand-300">{importResult.nbSucces}</p>
               </Card>
               <Card className="p-4">
                 <p className="text-xs text-red-500">Erreurs</p>
@@ -148,9 +148,9 @@ export default function ImportISATab({
             )}
 
             {importResult.nbErreurs === 0 && (
-              <div className="flex items-center gap-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+              <div className="flex items-center gap-2 rounded-md border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-3">
+                <CheckCircle className="h-5 w-5 text-brand-600" />
+                <p className="text-sm text-brand-700 dark:text-brand-300 font-medium">
                   Toutes les lignes ont été importées avec succès !
                 </p>
               </div>

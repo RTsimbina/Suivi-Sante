@@ -98,12 +98,12 @@ export default function PortailSecuriseTab() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-emerald-100 dark:border-emerald-800">
+      <Card className="border-brand-100 dark:border-brand-800">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
             <div className="flex-1 w-full">
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1.5">
-                <Shield className="h-3.5 w-3.5 text-emerald-600" />
+                <Shield className="h-3.5 w-3.5 text-brand-600" />
                 Sélectionnez votre entreprise
               </label>
               <select
@@ -129,7 +129,7 @@ export default function PortailSecuriseTab() {
       {!selectedSociete && (
         <Card className="border-dashed border-border">
           <CardContent className="p-8 text-center">
-            <Building2 className="h-10 w-10 mx-auto text-emerald-400 mb-3" />
+            <Building2 className="h-10 w-10 mx-auto text-brand-400 mb-3" />
             <p className="text-sm font-medium text-foreground">Sélectionnez votre entreprise</p>
             <p className="text-xs text-muted-foreground mt-1">
               Choisissez votre entreprise ci-dessus pour accéder à vos KPIs, contrats et dossiers.
@@ -148,19 +148,19 @@ export default function PortailSecuriseTab() {
             </div>
           ) : kpis && (
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-              <Card className="border-emerald-100 dark:border-emerald-800">
+              <Card className="border-brand-100 dark:border-brand-800">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40"><FolderOpen className="h-4 w-4 text-emerald-600" /></div>
+                    <div className="p-2 rounded-lg bg-brand-50 dark:bg-brand-950/40"><FolderOpen className="h-4 w-4 text-brand-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Total dossiers</span>
                   </div>
                   <p className="text-2xl font-bold">{kpis.totalDossiers}</p>
                 </CardContent>
               </Card>
-              <Card className="border-sky-100">
+              <Card className="border-info-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-sky-50 dark:bg-sky-950/40"><BarChart3 className="h-4 w-4 text-sky-600" /></div>
+                    <div className="p-2 rounded-lg bg-info-50 dark:bg-info-950/40"><BarChart3 className="h-4 w-4 text-info-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Montant réclamé</span>
                   </div>
                   <p className="text-2xl font-bold">{formatMontant(kpis.totalReclame)}</p>
@@ -211,7 +211,7 @@ export default function PortailSecuriseTab() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-emerald-600" />
+                  <Building2 className="h-4 w-4 text-brand-600" />
                   Contrats & Solde
                 </CardTitle>
               </CardHeader>
@@ -246,7 +246,7 @@ export default function PortailSecuriseTab() {
                               <div className="flex items-center justify-end gap-2">
                                 <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                                   <div
-                                    className={cn('h-full rounded-full', tauxUtil > 80 ? 'bg-red-50 dark:bg-red-950/400' : tauxUtil > 50 ? 'bg-amber-50 dark:bg-amber-950/400' : 'bg-emerald-50 dark:bg-emerald-950/400')}
+                                    className={cn('h-full rounded-full', tauxUtil > 80 ? 'bg-red-50 dark:bg-red-950/400' : tauxUtil > 50 ? 'bg-amber-50 dark:bg-amber-950/400' : 'bg-brand-50 dark:bg-brand-950/400')}
                                     style={{width: `${Math.min(tauxUtil, 100)}%`}}
                                   />
                                 </div>
@@ -266,7 +266,7 @@ export default function PortailSecuriseTab() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4 text-emerald-600" />
+                <FileText className="h-4 w-4 text-brand-600" />
                 Dossiers de l&apos;entreprise ({dossiers.length})
               </CardTitle>
             </CardHeader>

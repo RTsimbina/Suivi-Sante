@@ -86,7 +86,7 @@ export function FacturesTab({
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Receipt className='h-4 w-4 text-emerald-600' />
+            <Receipt className='h-4 w-4 text-brand-600' />
             Factures / Règlements
             <span className='text-xs font-normal text-muted-foreground'>({total})</span>
           </CardTitle>
@@ -94,7 +94,7 @@ export function FacturesTab({
         <CardContent className='space-y-4'>
           {/* Bandeau explicatif des statuts (mapping workflow plateforme) */}
           <div className='rounded-md border bg-muted/40 p-3 text-[11px] text-muted-foreground flex items-start gap-2'>
-            <Info className='h-3.5 w-3.5 mt-0.5 shrink-0 text-emerald-600' />
+            <Info className='h-3.5 w-3.5 mt-0.5 shrink-0 text-brand-600' />
             <span>
               Les factures correspondent aux dossiers de <strong>règlement
               prestataire</strong> (paiement direct à l&apos;établissement). Le statut

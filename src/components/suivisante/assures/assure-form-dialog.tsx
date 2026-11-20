@@ -163,7 +163,7 @@ export default function AssureFormDialog({
           </div>
           <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1 h-8 text-sm" onClick={() => onOpenChange(false)}>Annuler</Button>
-            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-sm" onClick={onEnregistrer} disabled={saving || !formNom || !formSocieteId}>
+            <Button className="flex-1 bg-brand-600 hover:bg-brand-700 text-white h-8 text-sm" onClick={onEnregistrer} disabled={saving || !formNom || !formSocieteId}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editing ? 'Enregistrer' : 'Créer'}
             </Button>

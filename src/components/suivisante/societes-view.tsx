@@ -102,8 +102,8 @@ export default function SocietesView({ userRole }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-emerald-600" />
+            <div className="h-9 w-9 rounded-lg bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-brand-600" />
             </div>
             <div>
               <p className="text-lg font-bold">{list.societes.length}</p>
@@ -113,8 +113,8 @@ export default function SocietesView({ userRole }: Props) {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
-              <Users className="h-4 w-4 text-blue-600" />
+            <div className="h-9 w-9 rounded-lg bg-info-50 dark:bg-info-950/40 flex items-center justify-center">
+              <Users className="h-4 w-4 text-info-600" />
             </div>
             <div>
               <p className="text-lg font-bold">{list.totalAssures}</p>
@@ -124,8 +124,8 @@ export default function SocietesView({ userRole }: Props) {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center">
-              <Stethoscope className="h-4 w-4 text-purple-600" />
+            <div className="h-9 w-9 rounded-lg bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center">
+              <Stethoscope className="h-4 w-4 text-violet-600" />
             </div>
             <div>
               <p className="text-lg font-bold">{list.totalBaremes}</p>
@@ -169,7 +169,7 @@ export default function SocietesView({ userRole }: Props) {
           />
         </div>
         {canWrite && (
-          <Button onClick={list.openCreate} className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm">
+          <Button onClick={list.openCreate} className="bg-brand-600 hover:bg-brand-700 text-white h-9 text-sm">
             <Plus className="h-4 w-4 mr-1.5" />
             Nouvelle société
           </Button>
@@ -179,7 +179,7 @@ export default function SocietesView({ userRole }: Props) {
       {/* ─── Layout maître-détail ─── */}
       {list.loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+          <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
         </div>
       ) : list.societes.length === 0 ? (
         <Card>
@@ -292,7 +292,7 @@ export default function SocietesView({ userRole }: Props) {
             </p>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => list.setFormOpen(false)} className="h-8 text-sm">Annuler</Button>
-              <Button onClick={list.handleSave} disabled={list.saving || !list.formNom.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-sm">
+              <Button onClick={list.handleSave} disabled={list.saving || !list.formNom.trim()} className="bg-brand-600 hover:bg-brand-700 text-white h-8 text-sm">
                 {list.saving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
                 {list.editing ? 'Enregistrer' : 'Créer'}
               </Button>
@@ -359,7 +359,7 @@ export default function SocietesView({ userRole }: Props) {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => contacts.setContactFormOpen(false)} className="h-8 text-sm">Annuler</Button>
-              <Button onClick={contacts.handleSaveContact} disabled={contacts.contactSaving || !contacts.cFormNom.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-sm">
+              <Button onClick={contacts.handleSaveContact} disabled={contacts.contactSaving || !contacts.cFormNom.trim()} className="bg-brand-600 hover:bg-brand-700 text-white h-8 text-sm">
                 {contacts.contactSaving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
                 {contacts.editingContact ? 'Enregistrer' : 'Ajouter'}
               </Button>

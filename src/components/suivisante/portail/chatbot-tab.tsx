@@ -122,7 +122,7 @@ export default function ChatbotTab() {
           </div>
 
           {/* En-tête chat */}
-          <div className="bg-emerald-600 px-4 py-3 flex items-center gap-3">
+          <div className="bg-brand-600 px-4 py-3 flex items-center gap-3">
             <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
@@ -130,11 +130,11 @@ export default function ChatbotTab() {
               <p className="text-sm font-semibold text-white">Suivi Santé - Assistant</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="h-2 w-2 rounded-full bg-green-300 animate-pulse" />
-                <p className="text-[10px] text-emerald-100">En ligne</p>
+                <p className="text-[10px] text-brand-100">En ligne</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Globe className="h-4 w-4 text-emerald-200" />
+              <Globe className="h-4 w-4 text-brand-200" />
             </div>
           </div>
 
@@ -159,7 +159,7 @@ export default function ChatbotTab() {
                   'max-w-[85%] rounded-xl px-3 py-2 shadow-sm',
                   msg.role === 'bot'
                     ? 'bg-white rounded-tl-none'
-                    : 'bg-emerald-100 rounded-tr-none'
+                    : 'bg-brand-100 rounded-tr-none'
                 )}>
                   <p className={cn(
                     'text-[13px] leading-relaxed whitespace-pre-line',
@@ -175,7 +175,7 @@ export default function ChatbotTab() {
                       {msg.timestamp.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {msg.role === 'user' && (
-                      <CheckCheck className="h-3 w-3 text-blue-500" />
+                      <CheckCheck className="h-3 w-3 text-info-500" />
                     )}
                   </div>
                 </div>
@@ -207,7 +207,7 @@ export default function ChatbotTab() {
                     onClick={() => handleQuickAction(action.query)}
                     className="flex-1 flex flex-col items-center gap-1 bg-white rounded-lg px-2 py-2.5 shadow-sm hover:shadow transition-shadow active:scale-95"
                   >
-                    <Icon className="h-4 w-4 text-emerald-600" />
+                    <Icon className="h-4 w-4 text-brand-600" />
                     <span className="text-[10px] font-medium text-foreground text-center leading-tight">{action.label}</span>
                   </button>
                 );
@@ -222,7 +222,7 @@ export default function ChatbotTab() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
               placeholder="Saisissez votre message..."
-              className="flex-1 h-9 bg-white border-border rounded-full text-[13px] px-4 focus-visible:ring-emerald-400"
+              className="flex-1 h-9 bg-white border-border rounded-full text-[13px] px-4 focus-visible:ring-brand-400"
               disabled={isLoading}
             />
             <Button
@@ -230,7 +230,7 @@ export default function ChatbotTab() {
               disabled={isLoading || !input.trim()}
               size="icon"
               aria-label="Envoyer le message"
-              className="h-9 w-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+              className="h-9 w-9 rounded-full bg-brand-600 hover:bg-brand-700 text-white shrink-0"
             >
               <Send className="h-4 w-4" />
             </Button>

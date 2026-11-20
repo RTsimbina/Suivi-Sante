@@ -51,7 +51,7 @@ export default function Toolbar({
       {canEdit && (
         <div className="flex gap-2">
           <ImportDialog importerFichier={importerFichier} />
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm" onClick={onNouveau}>
+          <Button className="bg-brand-600 hover:bg-brand-700 text-white h-9 text-sm" onClick={onNouveau}>
             <Plus className="h-4 w-4 mr-2" />Nouveau bénéficiaire
           </Button>
         </div>

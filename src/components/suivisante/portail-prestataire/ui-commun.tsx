@@ -16,7 +16,7 @@ export function KPICard({
   icon: Icon,
   label,
   value,
-  color = 'text-emerald-600 dark:text-emerald-400',
+  color = 'text-brand-600 dark:text-brand-400',
 }: {
   icon: LucideIcon;
   label: string;

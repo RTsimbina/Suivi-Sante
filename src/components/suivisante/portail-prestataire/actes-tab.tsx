@@ -113,7 +113,7 @@ export function ActesTab({
     <Card>
       <CardHeader className='pb-3'>
         <CardTitle className='text-sm font-medium flex items-center gap-2'>
-          <Stethoscope className='h-4 w-4 text-emerald-600' />
+          <Stethoscope className='h-4 w-4 text-brand-600' />
           Actes médicaux réalisés
           <span className='text-xs font-normal text-muted-foreground'>
             ({total} au total)

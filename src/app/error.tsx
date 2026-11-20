@@ -35,7 +35,7 @@ export default function Error({
         <div className="flex gap-3 justify-center">
           <Button
             onClick={reset}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-brand-600 hover:bg-brand-700 text-white"
           >
             <RotateCw className="h-4 w-4 mr-2" />
             Recharger

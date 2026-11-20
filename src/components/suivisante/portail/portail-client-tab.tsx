@@ -51,7 +51,7 @@ export default function PortailClientTab() {
   return (
     <div className="space-y-4">
       {/* Formulaire de recherche */}
-      <Card className="border-emerald-100 dark:border-emerald-800">
+      <Card className="border-brand-100 dark:border-brand-800">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -70,7 +70,7 @@ export default function PortailClientTab() {
               <Button
                 onClick={handleSearch}
                 disabled={loading || !query.trim()}
-                className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-10 bg-brand-600 hover:bg-brand-700 text-white"
               >
                 <Search className="h-4 w-4 mr-2" />
                 {loading ? 'Recherche...' : 'Rechercher'}
@@ -84,7 +84,7 @@ export default function PortailClientTab() {
       {loading && (
         <div className="space-y-3">
           {[1, 2].map((i) => (
-            <Card key={i} className="border-emerald-100 dark:border-emerald-800">
+            <Card key={i} className="border-brand-100 dark:border-brand-800">
               <CardContent className="p-4 space-y-3">
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-3 w-32" />
@@ -133,7 +133,7 @@ export default function PortailClientTab() {
       {!searched && !loading && (
         <Card className="border-dashed border-border">
           <CardContent className="p-8 text-center">
-            <FileText className="h-10 w-10 mx-auto text-emerald-400 mb-3" />
+            <FileText className="h-10 w-10 mx-auto text-brand-400 mb-3" />
             <p className="text-sm font-medium text-foreground">Recherchez votre dossier</p>
             <p className="text-xs text-muted-foreground mt-1">
               Entrez votre numéro de dossier ou votre nom pour suivre l&apos;état de votre remboursement.

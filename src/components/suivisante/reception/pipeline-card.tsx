@@ -10,10 +10,10 @@ import { FileInput, Database, ArrowRight, Timer, ChevronRight, ChevronDown } fro
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const steps = [
-  { title: 'Réception', desc: 'Saisie dans Excel, création ID unique', icon: FileInput, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40', border: 'border-sky-200 dark:border-sky-800' },
+  { title: 'Réception', desc: 'Saisie dans Excel, création ID unique', icon: FileInput, color: 'text-info-600', bg: 'bg-info-50 dark:bg-info-950/40', border: 'border-info-200 dark:border-info-800' },
   { title: 'Service Technique', desc: 'Traitement via ISA', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800' },
-  { title: 'Comptabilité', desc: 'Décompte Excel + Paiement SAGE', icon: ArrowRight, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-800' },
-  { title: 'Paiement', desc: 'Virement effectué', icon: Timer, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-800' },
+  { title: 'Comptabilité', desc: 'Décompte Excel + Paiement SAGE', icon: ArrowRight, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-200 dark:border-violet-800' },
+  { title: 'Paiement', desc: 'Virement effectué', icon: Timer, color: 'text-brand-600', bg: 'bg-brand-50 dark:bg-brand-950/40', border: 'border-brand-200 dark:border-brand-800' },
 ];
 
 export default function PipelineCard() {

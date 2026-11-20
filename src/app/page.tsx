@@ -194,7 +194,7 @@ function ContenuSante() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
           <p className="text-sm text-muted-foreground">Chargement...</p>
         </div>
       </div>
@@ -216,7 +216,7 @@ function ContenuSante() {
         {/* Logo */}
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>
@@ -250,14 +250,14 @@ function ContenuSante() {
                         className={cn(
                           'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                           active
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400'
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         )}
                       >
-                        <Icon className={cn('h-4 w-4', active && 'text-emerald-600 dark:text-emerald-400')} />
+                        <Icon className={cn('h-4 w-4', active && 'text-brand-600 dark:text-brand-400')} />
                         <span className="flex-1 text-left">{item.label}</span>
                         {item.badge && (
-                          <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50">
+                          <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-brand-300 dark:border-brand-800 text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/50">
                             {item.badge}
                           </Badge>
                         )}
@@ -275,7 +275,7 @@ function ContenuSante() {
           {canCreateDossier && (
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-xs h-8">
+                <Button className="w-full bg-brand-600 hover:bg-brand-700 text-xs h-8">
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   Nouveau dossier
                 </Button>
@@ -314,8 +314,8 @@ function ContenuSante() {
             </h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
-              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+            <Badge variant="outline" className="text-[10px] border-brand-300 dark:border-brand-800 text-brand-600 dark:text-brand-400">
+              <span className="mr-1 h-1.5 w-1.5 rounded-full bg-brand-500 inline-block" />
               En ligne
             </Badge>
             <ThemeToggle />

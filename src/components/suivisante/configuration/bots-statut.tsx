@@ -31,7 +31,7 @@ export default function BotsStatut({ bots, botStatus }: BotsStatutProps) {
                   <p className="font-medium text-sm">{bot.nom}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {bot.actif ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100">
+                      <Badge className="bg-brand-100 text-brand-700 dark:text-brand-300 text-[10px] border-brand-200 dark:border-brand-800 hover:bg-brand-100">
                         <CheckCircle2 className="h-3 w-3 mr-1" /> Actif
                       </Badge>
                     ) : (

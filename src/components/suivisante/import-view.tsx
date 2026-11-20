@@ -85,7 +85,7 @@ function ImportZone({ source, categorie, label, description, columns, icon: Icon
       {result && (
         <div className="mt-3 space-y-2 p-3 rounded-lg border bg-muted/20">
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div><p className="font-bold text-emerald-600">{result.nbSucces}</p><p className="text-muted-foreground">Succès</p></div>
+            <div><p className="font-bold text-brand-600">{result.nbSucces}</p><p className="text-muted-foreground">Succès</p></div>
             <div><p className="font-bold text-red-600">{result.nbErreurs}</p><p className="text-muted-foreground">Erreurs</p></div>
             <div><p className="font-bold">{result.tauxSucces}%</p><p className="text-muted-foreground">Taux</p></div>
           </div>
@@ -109,8 +109,8 @@ function ImportZone({ source, categorie, label, description, columns, icon: Icon
 // ─── Composant résultat import ──────────────────────────────────
 function ResultBanner({ result }: { result: ImportResult }) {
   return (
-    <div className="p-4 rounded-lg border bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 flex items-center gap-3">
-      <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
+    <div className="p-4 rounded-lg border bg-brand-50 dark:bg-brand-950/40 border-brand-200 dark:border-brand-800 flex items-center gap-3">
+      <CheckCircle2 className="size-5 text-brand-600 shrink-0" />
       <div className="flex-1 text-sm">
         <span className="font-semibold">{result.nbSucces}/{result.nbLignes}</span> lignes importées
         {result.nbErreurs > 0 && <span className="text-red-600 ml-2">({result.nbErreurs} erreurs)</span>}
@@ -163,7 +163,7 @@ export default function ImportView() {
       {/* ── EN-TÊTE : Deux flux métier ── */}
       <div>
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-1">
-          <ClipboardList className="size-5 text-emerald-600" />
+          <ClipboardList className="size-5 text-brand-600" />
           Accueil — Enregistrement des dossiers
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -175,9 +175,9 @@ export default function ImportView() {
       {/* ── FLUX 1 : Remboursement Assuré ── */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <Users className="size-4 text-blue-600" />
-          <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Flux 1 — Remboursement Assuré</h3>
-          <Badge className="bg-blue-100 text-blue-700 dark:text-blue-300 text-[10px] border-0">Dossiers venant des assurés des entreprises clientes</Badge>
+          <Users className="size-4 text-info-600" />
+          <h3 className="text-sm font-semibold text-info-700 dark:text-info-300 uppercase tracking-wide">Flux 1 — Remboursement Assuré</h3>
+          <Badge className="bg-info-100 text-info-700 dark:text-info-300 text-[10px] border-0">Dossiers venant des assurés des entreprises clientes</Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ImportZone
@@ -187,15 +187,15 @@ export default function ImportView() {
             description="Crée les dossiers de remboursement déposés par les assurés. Catégorie automatique : REMBOURSEMENT_ASSURE."
             columns={colonnesCommunes}
             icon={FileSpreadsheet}
-            accentColor="text-blue-600"
+            accentColor="text-info-600"
           />
-          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40">
-            <Plus className="size-8 text-blue-400" />
+          <Card className="p-5 flex flex-col items-center justify-center text-center space-y-3 border-dashed border-2 border-info-200 dark:border-info-800 bg-info-50 dark:bg-info-950/40">
+            <Plus className="size-8 text-info-400" />
             <div>
               <h4 className="text-sm font-semibold text-foreground">Saisie manuelle — Remboursement</h4>
               <p className="text-xs text-muted-foreground mt-1">Enregistrer un dossier de remboursement assuré directement via le formulaire.</p>
             </div>
-            <Button variant="outline" className="border-blue-300 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:bg-blue-950/40" onClick={() => setShowManualRemboursement(true)}>
+            <Button variant="outline" className="border-info-300 text-info-700 dark:text-info-300 hover:bg-info-50 dark:bg-info-950/40" onClick={() => setShowManualRemboursement(true)}>
               <FilePlus className="size-4 mr-1.5" />
               Nouveau dossier remboursement
             </Button>
@@ -239,7 +239,7 @@ export default function ImportView() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Users className="size-5 text-blue-600" />
+              <Users className="size-5 text-info-600" />
               Nouveau dossier — Remboursement Assuré
             </DialogTitle>
           </DialogHeader>
@@ -264,7 +264,7 @@ export default function ImportView() {
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <History className="size-5 text-emerald-600" />
+            <History className="size-5 text-brand-600" />
             Historique des imports
           </h3>
           <Button variant="outline" size="sm" onClick={loadHistorique}>Actualiser</Button>
@@ -291,7 +291,7 @@ export default function ImportView() {
                     <td className="py-2 pr-4 font-medium">{h.nomFichier}</td>
                     <td className="py-2 pr-4"><Badge variant="outline" className="text-xs">{h.source}</Badge></td>
                     <td className="py-2 pr-4 text-right">{h.nbLignes}</td>
-                    <td className="py-2 pr-4 text-right text-emerald-600 font-medium">{h.nbSucces}</td>
+                    <td className="py-2 pr-4 text-right text-brand-600 font-medium">{h.nbSucces}</td>
                     <td className="py-2 text-right text-red-600 font-medium">{h.nbErreurs}</td>
                   </tr>
                 ))}

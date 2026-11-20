@@ -131,11 +131,11 @@ export function getStatutBadge(statut: string) {
 export function getBarColor(taux: number) {
   if (taux >= 100) return 'bg-red-500';
   if (taux >= 70) return 'bg-amber-500';
-  return 'bg-emerald-500';
+  return 'bg-brand-500';
 }
 
 export function getBarDarkColor(taux: number) {
   if (taux >= 100) return 'dark:bg-red-400';
   if (taux >= 70) return 'dark:bg-amber-400';
-  return 'dark:bg-emerald-400';
+  return 'dark:bg-brand-400';
 }

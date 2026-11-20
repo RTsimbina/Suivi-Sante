@@ -43,7 +43,7 @@ export default function PortailAssure({
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Building2 className='h-4 w-4 text-emerald-600' />
+            <Building2 className='h-4 w-4 text-brand-600' />
             Mes informations
           </CardTitle>
         </CardHeader>
@@ -71,8 +71,8 @@ export default function PortailAssure({
 
       {/* KPIs */}
       <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3'>
-        <KPICard icon={<FolderOpen className='h-4 w-4 text-emerald-600' />} label='Total dossiers' value={String(data.kpis.totalDossiers)} color='emerald' />
-        <KPICard icon={<BarChart3 className='h-4 w-4 text-sky-600' />} label='Montant réclamé' value={formatMontant(data.kpis.totalReclame || 0)} color='sky' />
+        <KPICard icon={<FolderOpen className='h-4 w-4 text-brand-600' />} label='Total dossiers' value={String(data.kpis.totalDossiers)} color='emerald' />
+        <KPICard icon={<BarChart3 className='h-4 w-4 text-info-600' />} label='Montant réclamé' value={formatMontant(data.kpis.totalReclame || 0)} color='sky' />
         <KPICard icon={<TrendingUp className='h-4 w-4 text-teal-600' />} label='Montant payé' value={formatMontant(data.kpis.totalPaye || 0)} color='teal' />
         <KPICard icon={<Clock className='h-4 w-4 text-amber-600' />} label='En cours' value={String(data.kpis.enCours || 0)} color='amber' />
         <KPICard icon={<XCircle className='h-4 w-4 text-red-500' />} label='Rejetés' value={String(data.kpis.rejetes || 0)} color='red' />
@@ -81,19 +81,19 @@ export default function PortailAssure({
       {/* Onglets principaux */}
       <Tabs value={onglet} onValueChange={setOnglet} className='w-full'>
         <TabsList className='bg-card'>
-          <TabsTrigger value='dossiers' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='dossiers' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <FileText className='h-3.5 w-3.5' /> Mes dossiers
           </TabsTrigger>
-          <TabsTrigger value='famille' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='famille' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <Heart className='h-3.5 w-3.5' /> Ma famille
           </TabsTrigger>
-          <TabsTrigger value='garanties' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='garanties' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <Shield className='h-3.5 w-3.5' /> Mes garanties
           </TabsTrigger>
-          <TabsTrigger value='contrats' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='contrats' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <CreditCard className='h-3.5 w-3.5' /> Contrats
           </TabsTrigger>
-          <TabsTrigger value='assistant' className='gap-1.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white'>
+          <TabsTrigger value='assistant' className='gap-1.5 data-[state=active]:bg-brand-600 data-[state=active]:text-white'>
             <Bot className='h-3.5 w-3.5' /> Assistant IA
           </TabsTrigger>
         </TabsList>
@@ -117,33 +117,33 @@ export default function PortailAssure({
           <Card>
             <CardHeader className='pb-3'>
               <CardTitle className='text-sm font-medium flex items-center gap-2'>
-                <Heart className='h-4 w-4 text-emerald-600' />
+                <Heart className='h-4 w-4 text-brand-600' />
                 Mon foyer ({(data.famille || []).length + 1} personne(s))
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className='space-y-2'>
                 {/* Assuré principal */}
-                <div className='flex items-center gap-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800'>
-                  <div className='h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center'>
-                    <UserCheck className='h-5 w-5 text-emerald-600' />
+                <div className='flex items-center gap-3 p-3 rounded-lg bg-brand-50 dark:bg-brand-950/30 border border-brand-200 dark:border-brand-800'>
+                  <div className='h-10 w-10 rounded-full bg-brand-100 dark:bg-brand-900/50 flex items-center justify-center'>
+                    <UserCheck className='h-5 w-5 text-brand-600' />
                   </div>
                   <div className='flex-1 min-w-0'>
                     <p className='text-sm font-medium'>{assure.prenom || ''} {assure.nom}</p>
                     <p className='text-xs text-muted-foreground'>Assuré principal</p>
                   </div>
-                  <Badge className='bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px]'>Principal</Badge>
+                  <Badge className='bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300 text-[10px]'>Principal</Badge>
                 </div>
                 {/* Ayants droit */}
                 {(data.famille || []).map(m => (
                   <div key={m.id} className='flex items-center gap-3 p-3 rounded-lg border bg-card'>
                     <div className={cn(
                       'h-10 w-10 rounded-full flex items-center justify-center',
-                      m.typeBeneficiaire === 'CONJOINT' ? 'bg-violet-100 dark:bg-violet-900/50' : 'bg-sky-100 dark:bg-sky-900/50'
+                      m.typeBeneficiaire === 'CONJOINT' ? 'bg-violet-100 dark:bg-violet-900/50' : 'bg-info-100 dark:bg-info-900/50'
                     )}>
                       {m.typeBeneficiaire === 'CONJOINT'
                         ? <Heart className='h-5 w-5 text-violet-600' />
-                        : <Baby className='h-5 w-5 text-sky-600' />
+                        : <Baby className='h-5 w-5 text-info-600' />
                       }
                     </div>
                     <div className='flex-1 min-w-0'>
@@ -171,7 +171,7 @@ export default function PortailAssure({
           <Card>
             <CardHeader className='pb-3'>
               <CardTitle className='text-sm font-medium flex items-center gap-2'>
-                <Shield className='h-4 w-4 text-emerald-600' />
+                <Shield className='h-4 w-4 text-brand-600' />
                 Mes garanties — {data.societe.nom}
               </CardTitle>
             </CardHeader>
@@ -228,7 +228,7 @@ export function ContratsOnglet({ data, titre }: { data: PortailData; titre: stri
     <Card>
       <CardHeader className='pb-3'>
         <CardTitle className='text-sm font-medium flex items-center gap-2'>
-          <CreditCard className='h-4 w-4 text-emerald-600' />
+          <CreditCard className='h-4 w-4 text-brand-600' />
           {titre}
         </CardTitle>
       </CardHeader>
@@ -245,7 +245,7 @@ export function ContratsOnglet({ data, titre }: { data: PortailData; titre: stri
                     <p className='text-sm font-medium'>{c.reference}</p>
                     <Badge className={cn(
                       'text-[10px]',
-                      c.statut === 'ACTIF' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : getStatutConfig(CONTRAT_STATUTS, c.statut)?.badge ?? 'bg-muted text-muted-foreground'
+                      c.statut === 'ACTIF' ? 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300' : getStatutConfig(CONTRAT_STATUTS, c.statut)?.badge ?? 'bg-muted text-muted-foreground'
                     )}>{getStatutConfig(CONTRAT_STATUTS, c.statut)?.label ?? c.statut}</Badge>
                   </div>
                   <div className='grid grid-cols-3 gap-4 text-xs'>
@@ -264,12 +264,12 @@ export function ContratsOnglet({ data, titre }: { data: PortailData; titre: stri
                   <div className='mt-3'>
                     <div className='flex items-center justify-between text-[10px] text-muted-foreground mb-1'>
                       <span>Taux d&apos;utilisation</span>
-                      <span className={taux > 80 ? 'text-red-600 font-semibold' : 'text-emerald-600 font-semibold'}>{taux.toFixed(1)}%</span>
+                      <span className={taux > 80 ? 'text-red-600 font-semibold' : 'text-brand-600 font-semibold'}>{taux.toFixed(1)}%</span>
                     </div>
                     <div className='w-full h-1.5 rounded-full bg-muted overflow-hidden'>
                       <div className={cn(
                         'h-full rounded-full transition-all',
-                        taux > 80 ? 'bg-red-500' : taux > 50 ? 'bg-amber-500' : 'bg-emerald-500'
+                        taux > 80 ? 'bg-red-500' : taux > 50 ? 'bg-amber-500' : 'bg-brand-500'
                       )} style={{ width: `${Math.min(taux, 100)}%` }} />
                     </div>
                   </div>

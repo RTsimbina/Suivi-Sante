@@ -42,7 +42,7 @@ export default function LinkDialog({
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             Lier un prestataire à <span className="font-medium text-foreground">{societeNom}</span>.{' '}
-            Il sera <span className="font-medium text-emerald-600">Actif</span> par défaut.
+            Il sera <span className="font-medium text-brand-600">Actif</span> par défaut.
           </p>
           {availablePrestataires.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground rounded-lg border border-dashed">
@@ -68,7 +68,7 @@ export default function LinkDialog({
                   Annuler
                 </Button>
                 <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="flex-1 bg-brand-600 hover:bg-brand-700 text-white"
                   onClick={onLink}
                   disabled={!linkPrestataireId || saving}
                 >

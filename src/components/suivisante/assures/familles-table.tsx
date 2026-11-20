@@ -51,7 +51,7 @@ export default function FamillesTable({
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
-          <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+          <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-brand-600" /></div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -156,7 +156,7 @@ function AssureFamilyRow({
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+            <div className="h-8 w-8 rounded-full bg-brand-100 text-brand-700 dark:text-brand-300 flex items-center justify-center text-xs font-semibold flex-shrink-0">
               {principal.nom[0]}{principal.prenom ? principal.prenom[0] : ''}
             </div>
             <div className="min-w-0">
@@ -164,7 +164,7 @@ function AssureFamilyRow({
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 {principal.matricule && <span className="font-mono">{principal.matricule}</span>}
                 {age && <span>{age}</span>}
-                {principal.dateEffet && <span className="text-emerald-600">Effet: {formatDate(principal.dateEffet)}</span>}
+                {principal.dateEffet && <span className="text-brand-600">Effet: {formatDate(principal.dateEffet)}</span>}
               </div>
             </div>
           </div>
@@ -175,7 +175,7 @@ function AssureFamilyRow({
           </Badge>
         </td>
         <td className="px-4 py-3 hidden lg:table-cell">
-          <Badge variant="outline" className="text-[11px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+          <Badge variant="outline" className="text-[11px] bg-info-50 dark:bg-info-950/40 text-info-700 dark:text-info-300 border-info-200 dark:border-info-800">
             {principal.societe.nom}
           </Badge>
         </td>
@@ -188,7 +188,7 @@ function AssureFamilyRow({
           </span>
         </td>
         <td className="px-4 py-3">
-          <Badge variant={principal.actif ? 'default' : 'destructive'} className={cn('text-[11px]', principal.actif ? 'bg-emerald-600 text-white' : '')}>
+          <Badge variant={principal.actif ? 'default' : 'destructive'} className={cn('text-[11px]', principal.actif ? 'bg-brand-600 text-white' : '')}>
             {principal.actif ? 'Actif' : 'Inactif'}
           </Badge>
         </td>
@@ -242,7 +242,7 @@ function AssureFamilyRow({
             </span>
           </td>
           <td className="px-4 py-2.5">
-            <Badge variant={ad.actif ? 'default' : 'destructive'} className={cn('text-[11px]', ad.actif ? 'bg-emerald-600 text-white' : '')}>
+            <Badge variant={ad.actif ? 'default' : 'destructive'} className={cn('text-[11px]', ad.actif ? 'bg-brand-600 text-white' : '')}>
               {ad.actif ? 'Actif' : 'Inactif'}
             </Badge>
           </td>

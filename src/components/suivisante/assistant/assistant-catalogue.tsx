@@ -35,7 +35,7 @@ export function CatalogueListe({
                 className={cn(
                   'w-full text-left text-xs px-3 py-2 rounded-lg transition-colors',
                   questionActiveId === q.id
-                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium'
+                    ? 'bg-brand-500/10 text-brand-700 dark:text-brand-300 font-medium'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
@@ -81,14 +81,14 @@ export function AssistantCatalogueCompact({
       <Dialog open={catalogueOuvert} onOpenChange={setCatalogueOuvert}>
         <DialogTrigger asChild>
           <Button variant="outline" className="w-full justify-start text-xs gap-2">
-            <MessageCircleQuestion className="h-4 w-4 text-emerald-600" />
+            <MessageCircleQuestion className="h-4 w-4 text-brand-600" />
             {questionActive ? questionActive.question : 'Choisir une question...'}
           </Button>
         </DialogTrigger>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-sm flex items-center gap-2">
-              <MessageCircleQuestion className="h-4 w-4 text-emerald-600" />
+              <MessageCircleQuestion className="h-4 w-4 text-brand-600" />
               Catalogue de questions ({totalQuestions})
             </DialogTitle>
           </DialogHeader>

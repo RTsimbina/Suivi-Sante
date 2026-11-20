@@ -26,11 +26,11 @@ export default function AssistantConversation({ messages, enCours, finRef }: Ass
           m.role === 'user' ? (
             <div key={m.id} className="flex justify-end">
               <div className="max-w-[80%] flex items-start gap-2">
-                <div className="bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-br-sm">
+                <div className="bg-brand-600 text-white text-sm px-4 py-2.5 rounded-2xl rounded-br-sm">
                   {m.texte}
                 </div>
-                <div className="h-7 w-7 rounded-full bg-emerald-600/10 flex items-center justify-center shrink-0 mt-0.5">
-                  <User className="h-3.5 w-3.5 text-emerald-600" />
+                <div className="h-7 w-7 rounded-full bg-brand-600/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <User className="h-3.5 w-3.5 text-brand-600" />
                 </div>
               </div>
             </div>

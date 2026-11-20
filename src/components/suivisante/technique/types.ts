@@ -142,12 +142,12 @@ export interface ExclusionRow {
 // ─── Définitions d'affichage ────────────────────────────────────────────────
 
 export const kpiDefs = [
-  { key: 'totalAnalyses', label: 'Dossiers analysés', icon: ClipboardCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+  { key: 'totalAnalyses', label: 'Dossiers analysés', icon: ClipboardCheck, color: 'text-brand-600', bg: 'bg-brand-50 dark:bg-brand-950/40' },
   { key: 'totalValides', label: 'Validés', icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50 dark:bg-teal-950/40' },
   { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950/40' },
   { key: 'enCours', label: 'En cours', icon: Loader2, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-  { key: 'delaiMoyenAnalyse', label: 'Délai moyen (j)', icon: Clock, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40' },
-  { key: 'montantTotalValide', label: 'Montant validé', icon: Currency, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40', format: true },
+  { key: 'delaiMoyenAnalyse', label: 'Délai moyen (j)', icon: Clock, color: 'text-info-600', bg: 'bg-info-50 dark:bg-info-950/40' },
+  { key: 'montantTotalValide', label: 'Montant validé', icon: Currency, color: 'text-brand-600', bg: 'bg-brand-50 dark:bg-brand-950/40', format: true },
 ];
 
 export const PIE_COLORS = ['#f59e0b', '#10b981', '#ef4444'];

@@ -45,9 +45,9 @@ export default function UtilisateurFormDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {editing ? (
-              <><Pencil className="h-4 w-4 text-emerald-600" /> Modifier l'utilisateur</>
+              <><Pencil className="h-4 w-4 text-brand-600" /> Modifier l'utilisateur</>
             ) : (
-              <><UserCog className="h-4 w-4 text-emerald-600" /> Nouvel utilisateur</>
+              <><UserCog className="h-4 w-4 text-brand-600" /> Nouvel utilisateur</>
             )}
           </DialogTitle>
         </DialogHeader>
@@ -91,7 +91,7 @@ export default function UtilisateurFormDialog({
                 {ROLES.map(r => (
                   <SelectItem key={r.value} value={r.value}>
                     <span className="flex items-center gap-2">
-                      <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-blue-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-violet-500' : 'bg-indigo-500')} />
+                      <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-info-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-violet-500' : 'bg-violet-500')} />
                       {r.label}
                     </span>
                   </SelectItem>
@@ -107,8 +107,8 @@ export default function UtilisateurFormDialog({
             {formData.role === 'CONTACT_ENTREPRISE' && liaison && liaison.detail && (
               <p className={cn(
                 'text-[11px] mt-1 flex items-start gap-1',
-                liaison.etat === 'TROUVE' && 'text-emerald-600 dark:text-emerald-400',
-                liaison.etat === 'CREABLE' && 'text-blue-600 dark:text-blue-400',
+                liaison.etat === 'TROUVE' && 'text-brand-600 dark:text-brand-400',
+                liaison.etat === 'CREABLE' && 'text-info-600 dark:text-info-400',
                 liaison.etat === 'BLOQUE' && 'text-amber-600 dark:text-amber-400',
                 liaison.etat === 'VERIFIE' && 'text-muted-foreground',
               )}>
@@ -215,7 +215,7 @@ export default function UtilisateurFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Annuler
             </Button>
-            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={submitting}>
+            <Button type="submit" className="bg-brand-600 hover:bg-brand-700 text-white" disabled={submitting}>
               {submitting && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
               {editing ? 'Enregistrer' : "Creer l'utilisateur"}
             </Button>

@@ -53,7 +53,7 @@ export default function DossierHeader({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <DialogTitle className="text-lg">
-              <span className="font-mono text-emerald-600">{dossier.numeroDossier}</span>
+              <span className="font-mono text-brand-600">{dossier.numeroDossier}</span>
               <span className="mx-2 text-muted-foreground">—</span>
               {dossier.beneficiaire}
             </DialogTitle>
@@ -98,7 +98,7 @@ export default function DossierHeader({
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors',
                 ongletActif === onglet.key
-                  ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300'
+                  ? 'border-brand-600 text-brand-700 dark:text-brand-300'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >

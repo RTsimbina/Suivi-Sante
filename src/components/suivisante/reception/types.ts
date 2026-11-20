@@ -39,7 +39,7 @@ export const TYPE_LABELS: Record<string, string> = {
 
 export const TYPE_COLORS: Record<string, string> = {
   FACTURE_PRESTATAIRE: 'bg-orange-50 dark:bg-orange-950/40 text-orange-700 border-orange-200',
-  DOSSIER_REMBOURSEMENT: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+  DOSSIER_REMBOURSEMENT: 'bg-info-50 dark:bg-info-950/40 text-info-700 dark:text-info-300 border-info-200 dark:border-info-800',
 };
 
 /* ── Statuts courriel — délégués à la source de vérité (statuts.ts) ── */

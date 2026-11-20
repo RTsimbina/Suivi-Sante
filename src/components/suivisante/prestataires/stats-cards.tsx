@@ -24,8 +24,8 @@ export default function StatsCards({
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       <Card><CardContent className="p-3 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
-          <Building2 className="h-4 w-4 text-blue-600" />
+        <div className="h-9 w-9 rounded-lg bg-info-50 dark:bg-info-950/40 flex items-center justify-center">
+          <Building2 className="h-4 w-4 text-info-600" />
         </div>
         <div>
           <p className="text-lg font-bold">{totalSocietesAvecPresta}</p>
@@ -33,8 +33,8 @@ export default function StatsCards({
         </div>
       </CardContent></Card>
       <Card><CardContent className="p-3 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-          <Stethoscope className="h-4 w-4 text-emerald-600" />
+        <div className="h-9 w-9 rounded-lg bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center">
+          <Stethoscope className="h-4 w-4 text-brand-600" />
         </div>
         <div>
           <p className="text-lg font-bold">{totalPrestatairesUniques}</p>
@@ -42,8 +42,8 @@ export default function StatsCards({
         </div>
       </CardContent></Card>
       <Card><CardContent className="p-3 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
-          <Link2 className="h-4 w-4 text-blue-600" />
+        <div className="h-9 w-9 rounded-lg bg-info-50 dark:bg-info-950/40 flex items-center justify-center">
+          <Link2 className="h-4 w-4 text-info-600" />
         </div>
         <div>
           <p className="text-lg font-bold">{totalLiens}</p>
@@ -51,11 +51,11 @@ export default function StatsCards({
         </div>
       </CardContent></Card>
       <Card><CardContent className="p-3 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <div className="h-9 w-9 rounded-lg bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center">
+          <CheckCircle2 className="h-4 w-4 text-brand-600" />
         </div>
         <div>
-          <p className="text-lg font-bold text-emerald-600">{totalActifs}</p>
+          <p className="text-lg font-bold text-brand-600">{totalActifs}</p>
           <p className="text-[11px] text-muted-foreground">Actifs</p>
         </div>
       </CardContent></Card>

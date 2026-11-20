@@ -76,15 +76,15 @@ export const NIVEAU_OPTIONS = [
 ];
 
 export const NIVEAU_CONFIG: Record<string, { icon: typeof Info; bg: string; text: string; border: string; dot: string }> = {
-  INFO:     { icon: Info,          bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-900', dot: 'bg-emerald-500' },
+  INFO:     { icon: Info,          bg: 'bg-brand-50 dark:bg-brand-950/40', text: 'text-brand-700 dark:text-brand-400', border: 'border-brand-200 dark:border-brand-900', dot: 'bg-brand-500' },
   STANDARD: { icon: AlertTriangle,  bg: 'bg-amber-50 dark:bg-amber-950/40',    text: 'text-amber-700 dark:text-amber-400',    border: 'border-amber-200 dark:border-amber-900',    dot: 'bg-amber-500' },
   SENSIBLE: { icon: AlertCircle,    bg: 'bg-orange-50 dark:bg-orange-950/40',   text: 'text-orange-700 dark:text-orange-400',   border: 'border-orange-200 dark:border-orange-900',   dot: 'bg-orange-500' },
   CRITIQUE: { icon: AlertOctagon,   bg: 'bg-red-50 dark:bg-red-950/40',       text: 'text-red-700 dark:text-red-400',       border: 'border-red-200 dark:border-red-900',       dot: 'bg-red-500' },
 };
 
 export const ACTION_CONFIG: Record<string, { icon: string; bg: string; text: string }> = {
-  CREATION:     { icon: '➕', bg: 'bg-emerald-50 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400' },
-  MODIFICATION: { icon: '✏️', bg: 'bg-blue-50 dark:bg-blue-950/40',    text: 'text-blue-700 dark:text-blue-400' },
+  CREATION:     { icon: '➕', bg: 'bg-brand-50 dark:bg-brand-950/40', text: 'text-brand-700 dark:text-brand-400' },
+  MODIFICATION: { icon: '✏️', bg: 'bg-info-50 dark:bg-info-950/40',    text: 'text-info-700 dark:text-info-400' },
   SUPPRESSION:  { icon: '🗑', bg: 'bg-red-50 dark:bg-red-950/40',       text: 'text-red-700 dark:text-red-400' },
   CONSULTATION: { icon: '🔍', bg: 'bg-slate-100 dark:bg-slate-950/40',  text: 'text-slate-600 dark:text-slate-400' },
 };

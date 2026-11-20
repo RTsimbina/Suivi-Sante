@@ -38,7 +38,7 @@ export default function AssistantView({ compact = false }: { compact?: boolean }
     return (
       <div className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
           <p className="text-sm text-muted-foreground">Chargement de l&apos;assistant...</p>
         </div>
       </div>
@@ -63,7 +63,7 @@ export default function AssistantView({ compact = false }: { compact?: boolean }
         <aside className="w-72 shrink-0 border-r flex flex-col min-h-0">
           <div className="p-3 border-b space-y-2">
             <div className="flex items-center gap-2">
-              <MessageCircleQuestion className="h-4 w-4 text-emerald-600" />
+              <MessageCircleQuestion className="h-4 w-4 text-brand-600" />
               <h3 className="text-sm font-semibold">Catalogue de questions</h3>
             </div>
             <div className="relative">
@@ -76,7 +76,7 @@ export default function AssistantView({ compact = false }: { compact?: boolean }
               />
             </div>
             {assistant.catalogue?.role && (
-              <Badge variant="outline" className="text-[10px] w-fit border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400">
+              <Badge variant="outline" className="text-[10px] w-fit border-brand-300 dark:border-brand-800 text-brand-600 dark:text-brand-400">
                 {assistant.catalogue.total} questions pour votre rôle
               </Badge>
             )}
@@ -108,7 +108,7 @@ export default function AssistantView({ compact = false }: { compact?: boolean }
       <div className="flex-1 flex flex-col min-h-0">
         {/* Bandeau sécurité */}
         <div className="px-4 py-2 border-b bg-muted/30 flex items-center gap-2 shrink-0">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+          <ShieldCheck className="h-3.5 w-3.5 text-brand-600" />
           <p className="text-[11px] text-muted-foreground">
             Réponses calculées directement depuis la base de la plateforme — sans service d&apos;IA externe. Vos données restent dans Suivi Santé.
           </p>

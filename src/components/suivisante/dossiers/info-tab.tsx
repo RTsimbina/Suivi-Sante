@@ -98,7 +98,7 @@ function InfoRow({
       {Icon && <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={cn('text-sm', highlight ? 'font-semibold text-emerald-700 dark:text-emerald-300' : 'font-medium')}>
+        <p className={cn('text-sm', highlight ? 'font-semibold text-brand-700 dark:text-brand-300' : 'font-medium')}>
           {value || <span className="text-muted-foreground font-normal">—</span>}
         </p>
       </div>

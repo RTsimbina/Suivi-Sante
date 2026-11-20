@@ -45,7 +45,7 @@ export default function SmtpForm({
     <div className="border rounded-lg p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold flex items-center gap-2">
-          <Plug className="h-3.5 w-3.5 text-emerald-600" />
+          <Plug className="h-3.5 w-3.5 text-brand-600" />
           Configuration du serveur SMTP
         </h4>
         {dbConfig && (
@@ -130,17 +130,17 @@ export default function SmtpForm({
 
       {/* Aide contextuelle Microsoft 365 / Gmail */}
       {smtpForm.smtpHost && (
-        <div className="text-[10px] text-blue-600 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded p-2 space-y-0.5">
+        <div className="text-[10px] text-info-600 bg-info-50 dark:bg-info-950/30 border border-info-200 dark:border-info-800 rounded p-2 space-y-0.5">
           {smtpForm.smtpHost.toLowerCase().includes('office365') || smtpForm.smtpHost.toLowerCase().includes('outlook') ? (
             <>
               <p className="font-semibold">Microsoft 365 / Outlook détecté</p>
-              <p>Hôte : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">smtp.office365.com</code> — Port : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">587</code></p>
+              <p>Hôte : <code className="bg-info-100 dark:bg-info-900 px-1 rounded">smtp.office365.com</code> — Port : <code className="bg-info-100 dark:bg-info-900 px-1 rounded">587</code></p>
               <p>Si MFA est activé, utilisez un <strong>Mot de passe d&apos;application</strong> (<a href="https://myaccount.microsoft.com/security-info" target="_blank" rel="noopener" className="underline">myaccount.microsoft.com/security-info</a>), pas le mot de passe du compte.</p>
             </>
           ) : smtpForm.smtpHost.toLowerCase().includes('gmail') || smtpForm.smtpHost.toLowerCase().includes('google') ? (
             <>
               <p className="font-semibold">Gmail détecté</p>
-              <p>Hôte : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">smtp.gmail.com</code> — Port : <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">587</code></p>
+              <p>Hôte : <code className="bg-info-100 dark:bg-info-900 px-1 rounded">smtp.gmail.com</code> — Port : <code className="bg-info-100 dark:bg-info-900 px-1 rounded">587</code></p>
               <p>Utilisez un <strong>Mot de passe d&apos;application</strong> (<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" className="underline">myaccount.google.com/apppasswords</a>), pas le mot de passe du compte.</p>
             </>
           ) : null}
@@ -149,7 +149,7 @@ export default function SmtpForm({
 
       {/* Résultat du test de connexion */}
       {testConnResult && (
-        <div className={`p-3 rounded ${testConnResult.ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`p-3 rounded ${testConnResult.ok ? 'bg-brand-50 text-brand-700 border border-brand-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           <div className="flex items-start gap-2">
             {testConnResult.ok ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />}
             <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{testConnResult.message}</pre>
@@ -173,7 +173,7 @@ export default function SmtpForm({
           size="sm"
           onClick={onSave}
           disabled={savingConfig || !smtpForm.smtpHost || !smtpForm.smtpUser || (!smtpForm.smtpPass && !dbConfig) || !smtpForm.smtpFrom}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
+          className="bg-brand-600 hover:bg-brand-700 text-white text-xs h-8"
         >
           {savingConfig ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
           Sauvegarder
@@ -181,7 +181,7 @@ export default function SmtpForm({
       </div>
 
       {configSource === 'env' && !dbConfig && (
-        <p className="text-[10px] text-blue-600 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded p-2">
+        <p className="text-[10px] text-info-600 bg-info-50 dark:bg-info-950/40 border border-info-200 dark:border-info-800 rounded p-2">
           La configuration actuelle provient des variables d&apos;environnement (.env). Vous pouvez la remplacer en remplissant le formulaire ci-dessus.
         </p>
       )}

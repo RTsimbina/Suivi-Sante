@@ -23,7 +23,7 @@ export default function IaPrevisions({ previsions }: { previsions: PrevisionIa }
     <Card>
       <CardHeader className="pb-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="size-4 text-emerald-600" />
+          <TrendingUp className="size-4 text-brand-600" />
           Prévision de charge
         </CardTitle>
       </CardHeader>

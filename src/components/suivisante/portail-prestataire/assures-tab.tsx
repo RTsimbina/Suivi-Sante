@@ -76,7 +76,7 @@ export function AssuresTab({
     <Card>
       <CardHeader className='pb-3'>
         <CardTitle className='text-sm font-medium flex items-center gap-2'>
-          <Users className='h-4 w-4 text-emerald-600' />
+          <Users className='h-4 w-4 text-brand-600' />
           Assurés des sociétés clientes
           <span className='text-xs font-normal text-muted-foreground'>
             ({assures.length} affiché{assures.length > 1 ? 's' : ''})

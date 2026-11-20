@@ -18,7 +18,7 @@ export default function KpiCards({ kpis }: { kpis: ReceptionKpis | undefined }) 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Card>
         <CardContent className="p-4 flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-950/40"><FileInput className="h-6 w-6 text-sky-600" /></div>
+          <div className="p-3 rounded-xl bg-info-50 dark:bg-info-950/40"><FileInput className="h-6 w-6 text-info-600" /></div>
           <div>
             <p className="text-xs text-muted-foreground font-medium">Total enregistrés</p>
             <p className="text-2xl font-bold">{kpis?.totalEnregistres ?? '—'}</p>

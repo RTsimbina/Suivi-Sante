@@ -42,13 +42,13 @@ export function CarteResultat({ resultat }: { resultat: AssistantResult }) {
 
 function IconeResultat({ type }: { type: string }) {
   switch (type) {
-    case 'MONTANT': return <Coins className="h-3.5 w-3.5 text-emerald-600" />;
-    case 'NOMBRE': return <Hash className="h-3.5 w-3.5 text-emerald-600" />;
-    case 'TABLEAU': return <Table2 className="h-3.5 w-3.5 text-emerald-600" />;
-    case 'LISTE': return <ListChecks className="h-3.5 w-3.5 text-emerald-600" />;
-    case 'GRAPHIQUE': return <BarChart3 className="h-3.5 w-3.5 text-emerald-600" />;
-    case 'KPI': return <Gauge className="h-3.5 w-3.5 text-emerald-600" />;
-    default: return <Info className="h-3.5 w-3.5 text-emerald-600" />;
+    case 'MONTANT': return <Coins className="h-3.5 w-3.5 text-brand-600" />;
+    case 'NOMBRE': return <Hash className="h-3.5 w-3.5 text-brand-600" />;
+    case 'TABLEAU': return <Table2 className="h-3.5 w-3.5 text-brand-600" />;
+    case 'LISTE': return <ListChecks className="h-3.5 w-3.5 text-brand-600" />;
+    case 'GRAPHIQUE': return <BarChart3 className="h-3.5 w-3.5 text-brand-600" />;
+    case 'KPI': return <Gauge className="h-3.5 w-3.5 text-brand-600" />;
+    default: return <Info className="h-3.5 w-3.5 text-brand-600" />;
   }
 }
 
@@ -58,7 +58,7 @@ function CorpsResultat({ resultat }: { resultat: AssistantResult }) {
     case 'MONTANT':
       return (
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
+          <span className="text-3xl font-bold text-brand-700 dark:text-brand-300">
             {resultat.type === 'MONTANT' ? formatMontant(resultat.valeur ?? 0) : new Intl.NumberFormat('fr-FR').format(resultat.valeur ?? 0)}
           </span>
           {resultat.type === 'NOMBRE' && resultat.unite && (
@@ -96,7 +96,7 @@ function TableauResultat({ colonnes, lignes, total }: { colonnes: ResultColonne[
   return (
     <div className="max-h-80 overflow-y-auto rounded-lg border">
       <table className="w-full text-xs">
-        <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+        <thead className="bg-muted/80 backdrop-blur">
           <tr>
             {colonnes.map((c) => (
               <th key={c.key} className={cn('px-2.5 py-2 font-medium text-left whitespace-nowrap', c.type === 'montant' || c.type === 'nombre' ? 'text-right' : '')}>
@@ -152,7 +152,7 @@ function GraphiqueResultat({ serie, nom }: { serie: { label: string; valeur: num
               {new Intl.NumberFormat('fr-FR').format(s.valeur)}
             </span>
             <div
-              className="w-full max-w-[40px] rounded-t bg-emerald-500/70 hover:bg-emerald-600 transition-colors"
+              className="w-full max-w-[40px] rounded-t bg-brand-500/70 hover:bg-brand-600 transition-colors"
               style={{ height: `${Math.max((s.valeur / max) * 100, 2)}%` }}
             />
             <span className="text-[8px] text-muted-foreground truncate w-full text-center">{s.label.slice(2)}</span>

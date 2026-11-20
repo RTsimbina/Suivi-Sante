@@ -66,13 +66,13 @@ export const incoherenceLabel: Record<string, string> = {
 export function getRisqueColor(risque: number): string {
   if (risque > 30) return 'bg-red-50 dark:bg-red-950/400';
   if (risque > 15) return 'bg-amber-50 dark:bg-amber-950/400';
-  return 'bg-emerald-50 dark:bg-emerald-950/400';
+  return 'bg-brand-50 dark:bg-brand-950/400';
 }
 
 export function getRisqueTextColor(risque: number): string {
   if (risque > 30) return 'text-red-600';
   if (risque > 15) return 'text-amber-600';
-  return 'text-emerald-600';
+  return 'text-brand-600';
 }
 
 export function getRisqueLabel(risque: number): string {

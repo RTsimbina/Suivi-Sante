@@ -51,7 +51,7 @@ export default function CalculTMTab({
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-emerald-600" />
+            <Calculator className="h-5 w-5 text-brand-600" />
             Calcul du Ticket Modérateur
           </CardTitle>
         </CardHeader>
@@ -194,9 +194,9 @@ export default function CalculTMTab({
               </div>
             </div>
 
-            <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-4">
-              <p className="text-xs text-emerald-700 dark:text-emerald-300 mb-1 font-medium">Montant remboursé</p>
-              <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
+            <div className="rounded-lg border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-4">
+              <p className="text-xs text-brand-700 dark:text-brand-300 mb-1 font-medium">Montant remboursé</p>
+              <p className="text-3xl font-bold text-brand-700 dark:text-brand-300">
                 {formatMontant(calcResult.montantRembourse)}
               </p>
             </div>

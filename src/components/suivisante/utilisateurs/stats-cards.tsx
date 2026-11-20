@@ -17,24 +17,24 @@ interface StatsCardsProps {
 export default function StatsCards({ totalUsers, actifs, inactifs, lockedUsers }: StatsCardsProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20">
+      <Card className="border-0 shadow-sm bg-gradient-to-br from-brand-50 to-brand-100/50 dark:from-brand-950/40 dark:to-brand-900/20">
         <CardContent className="p-3">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-emerald-600" />
+            <Users className="h-4 w-4 text-brand-600" />
             <div>
-              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{totalUsers}</p>
-              <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Total comptes</p>
+              <p className="text-lg font-bold text-brand-700 dark:text-brand-300">{totalUsers}</p>
+              <p className="text-[10px] text-brand-600 dark:text-brand-400">Total comptes</p>
             </div>
           </div>
         </CardContent>
       </Card>
-      <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20">
+      <Card className="border-0 shadow-sm bg-gradient-to-br from-info-50 to-info-100/50 dark:from-info-950/40 dark:to-info-900/20">
         <CardContent className="p-3">
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-blue-600" />
+            <CheckCircle className="h-4 w-4 text-info-600" />
             <div>
-              <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{actifs}</p>
-              <p className="text-[10px] text-blue-600 dark:text-blue-400">Actifs</p>
+              <p className="text-lg font-bold text-info-700 dark:text-info-300">{actifs}</p>
+              <p className="text-[10px] text-info-600 dark:text-info-400">Actifs</p>
             </div>
           </div>
         </CardContent>

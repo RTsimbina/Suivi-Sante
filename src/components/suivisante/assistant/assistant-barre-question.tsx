@@ -38,7 +38,7 @@ export default function AssistantBarreQuestion({
         <div className="max-w-4xl mx-auto space-y-2">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-2 min-w-0">
-              <MessageCircleQuestion className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+              <MessageCircleQuestion className="h-4 w-4 text-brand-600 shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="text-xs font-medium truncate">{questionActive.question}</p>
                 {questionActive.note && (
@@ -67,7 +67,7 @@ export default function AssistantBarreQuestion({
               <Button
                 onClick={onPoser}
                 disabled={!requisComplets || enCours}
-                className="h-9 bg-emerald-600 hover:bg-emerald-700 text-xs ml-auto"
+                className="h-9 bg-brand-600 hover:bg-brand-700 text-xs ml-auto"
               >
                 {enCours ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Obtenir la réponse'}
               </Button>
@@ -77,7 +77,7 @@ export default function AssistantBarreQuestion({
             <Button
               onClick={onPoser}
               disabled={enCours}
-              className="h-9 bg-emerald-600 hover:bg-emerald-700 text-xs"
+              className="h-9 bg-brand-600 hover:bg-brand-700 text-xs"
             >
               {enCours ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Obtenir la réponse'}
             </Button>

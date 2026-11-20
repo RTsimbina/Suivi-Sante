@@ -24,7 +24,7 @@ export default function IaTab({ dossier, alertes, loadingAlertes }: IaTabProps) 
   return (
     <div className="space-y-4">
       {/* Encart d'analyse IA */}
-      <Card className="border-violet-200 bg-gradient-to-br from-violet-50/80 to-indigo-50/60 overflow-hidden">
+      <Card className="border-violet-200 bg-gradient-to-br from-violet-50/80 to-violet-50/60 overflow-hidden">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
             <Brain className="size-4" />
@@ -98,10 +98,10 @@ export default function IaTab({ dossier, alertes, loadingAlertes }: IaTabProps) 
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <div className="h-12 w-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-3">
-            <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+          <div className="h-12 w-12 rounded-full bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center mb-3">
+            <CheckCircle2 className="h-6 w-6 text-brand-500" />
           </div>
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Aucune alerte détectée</p>
+          <p className="text-sm font-medium text-brand-700 dark:text-brand-300">Aucune alerte détectée</p>
           <p className="text-xs text-muted-foreground mt-1">Ce dossier ne présente aucune anomalie identifiée par l&apos;IA.</p>
         </div>
       )}
@@ -148,7 +148,7 @@ export default function IaTab({ dossier, alertes, loadingAlertes }: IaTabProps) 
           {dossier.montantReclame >= 0 &&
             (dossier.montantValide === null || dossier.montantValide >= dossier.montantReclame * 0.5) &&
             dossier.statut !== 'REJETE' && (
-            <div className="flex items-center gap-2 text-sm text-emerald-600">
+            <div className="flex items-center gap-2 text-sm text-brand-600">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Aucun indicateur de risque identifié
             </div>

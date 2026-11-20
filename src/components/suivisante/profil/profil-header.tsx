@@ -30,7 +30,7 @@ export default function ProfilHeader({ profil, roleLabel }: ProfilHeaderProps) {
           <div className={cn(
             'h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold shrink-0 ring-2 ring-offset-2 ring-offset-background',
             currentAvatarInfo ? `${currentAvatarInfo.bg} text-white ${currentAvatarInfo.ring}`
-              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 ring-emerald-300 dark:ring-emerald-700',
+              : 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 ring-brand-300 dark:ring-brand-700',
           )}>
             {initials}
           </div>
@@ -44,7 +44,7 @@ export default function ProfilHeader({ profil, roleLabel }: ProfilHeaderProps) {
               <span className={cn(
                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
                 profil.actif
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  ? 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300'
                   : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
               )}>
                 <CheckCircle className="h-2.5 w-2.5" />

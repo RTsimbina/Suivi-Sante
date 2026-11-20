@@ -40,7 +40,7 @@ export function ResumeFinancier({ parSociete }: { parSociete: ParSociete }) {
       <CardContent className="max-h-96 overflow-y-auto">
         <div className="min-w-[500px]">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-background">
+            <thead className="bg-background">
               <tr className="border-b text-left text-muted-foreground">
                 <th className="pb-2 font-medium">Société</th>
                 <th className="pb-2 font-medium text-right">Dossiers</th>

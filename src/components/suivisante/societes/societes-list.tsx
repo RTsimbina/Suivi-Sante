@@ -38,22 +38,22 @@ export default function SocietesList({
             className={cn(
               'w-full text-left rounded-lg border p-3 transition-all duration-150',
               isSelected
-                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/30 shadow-sm'
+                ? 'border-brand-300 dark:border-brand-700 bg-brand-50/60 dark:bg-brand-950/30 shadow-sm'
                 : 'border-transparent hover:bg-muted/60 hover:border-muted'
             )}
           >
             <div className="flex items-start gap-2.5">
               <div className={cn(
                 'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5',
-                soc.actif ? 'bg-emerald-100 dark:bg-emerald-950/50' : 'bg-muted'
+                soc.actif ? 'bg-brand-100 dark:bg-brand-950/50' : 'bg-muted'
               )}>
-                <Building2 className={cn('h-4 w-4', soc.actif ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')} />
+                <Building2 className={cn('h-4 w-4', soc.actif ? 'text-brand-600 dark:text-brand-400' : 'text-muted-foreground')} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className={cn('text-sm font-medium truncate', !soc.actif && 'text-muted-foreground')}>{soc.nom}</p>
                   {soc.actif ? (
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-500 shrink-0" />
                   ) : (
                     <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
                   )}
@@ -90,7 +90,7 @@ export default function SocietesList({
                 )}
                 <ChevronRight className={cn(
                   'h-4 w-4 text-muted-foreground transition-transform duration-150',
-                  isSelected && 'text-emerald-600 dark:text-emerald-400 translate-x-0.5'
+                  isSelected && 'text-brand-600 dark:text-brand-400 translate-x-0.5'
                 )} />
               </div>
             </div>

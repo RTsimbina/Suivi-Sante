@@ -29,7 +29,7 @@ export function DashboardTab({ data }: { data: DonneesPortail }) {
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Stethoscope className='h-4 w-4 text-emerald-600' />
+            <Stethoscope className='h-4 w-4 text-brand-600' />
             Mon établissement
           </CardTitle>
         </CardHeader>
@@ -76,7 +76,7 @@ export function DashboardTab({ data }: { data: DonneesPortail }) {
       {/* Indicateurs (période sélectionnée) */}
       <div>
         <h3 className='text-sm font-medium mb-2 flex items-center gap-2'>
-          <Receipt className='h-4 w-4 text-emerald-600' />
+          <Receipt className='h-4 w-4 text-brand-600' />
           Indicateurs de la période
         </h3>
         <div className='grid grid-cols-2 md:grid-cols-4 gap-3'>
@@ -100,7 +100,7 @@ export function DashboardTab({ data }: { data: DonneesPortail }) {
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Building2 className='h-4 w-4 text-emerald-600' />
+            <Building2 className='h-4 w-4 text-brand-600' />
             Mes sociétés clientes
           </CardTitle>
         </CardHeader>
@@ -134,7 +134,7 @@ export function DashboardTab({ data }: { data: DonneesPortail }) {
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Stethoscope className='h-4 w-4 text-emerald-600' />
+            <Stethoscope className='h-4 w-4 text-brand-600' />
             Derniers actes
           </CardTitle>
         </CardHeader>

@@ -133,7 +133,7 @@ export default function SocietesBaremesTab({
                           title="Modifier"
                           aria-label="Modifier la société"
                         >
-                          <Pencil className="h-4 w-4 text-emerald-600" />
+                          <Pencil className="h-4 w-4 text-brand-600" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -164,7 +164,7 @@ export default function SocietesBaremesTab({
       <Card className="mt-4">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Filter className="h-4 w-4 text-emerald-600" />
+            <Filter className="h-4 w-4 text-brand-600" />
             Barèmes par société
           </CardTitle>
         </CardHeader>
@@ -267,7 +267,7 @@ export default function SocietesBaremesTab({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={hasValues ? 'font-semibold text-emerald-600' : 'text-muted-foreground'}>
+                          <span className={hasValues ? 'font-semibold text-brand-600' : 'text-muted-foreground'}>
                             {b.tauxCouverture > 0 ? `${b.tauxCouverture}%` : '—'}
                           </span>
                         </TableCell>

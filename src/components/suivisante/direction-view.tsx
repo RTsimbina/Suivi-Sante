@@ -23,20 +23,20 @@ interface DirectionViewProps {
 }
 
 const kpiDefs = [
-  { key: 'totalRecus', label: 'Dossiers reçus', icon: FileText, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-950/40' },
-  { key: 'totalTraites', label: 'Traités', icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+  { key: 'totalRecus', label: 'Dossiers reçus', icon: FileText, color: 'text-info-600 dark:text-info-400', bg: 'bg-info-50 dark:bg-info-950/40' },
+  { key: 'totalTraites', label: 'Traités', icon: CheckCircle2, color: 'text-brand-600 dark:text-brand-400', bg: 'bg-brand-50 dark:bg-brand-950/40' },
   { key: 'totalPayes', label: 'Payés', icon: CreditCard, color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-950/40' },
   { key: 'totalRejetes', label: 'Rejetés', icon: XCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/40' },
   { key: 'delaiMoyenGlobal', label: 'Délai moyen (j)', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
   { key: 'montantTotalReclame', label: 'Montant réclamé', icon: DollarSign, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40', format: true },
-  { key: 'montantTotalPaye', label: 'Montant payé', icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40', format: true },
+  { key: 'montantTotalPaye', label: 'Montant payé', icon: TrendingUp, color: 'text-brand-600 dark:text-brand-400', bg: 'bg-brand-50 dark:bg-brand-950/40', format: true },
   { key: 'tauxRejet', label: 'Taux de rejet', icon: Percent, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-950/40', isPercent: true },
 ];
 
 const serviceColors: Record<string, string> = {
-  ACCUEIL: 'bg-sky-100 text-sky-700 dark:text-sky-300 dark:bg-sky-900/50 dark:text-sky-300',
+  ACCUEIL: 'bg-info-100 text-info-700 dark:text-info-300 dark:bg-info-900/50 dark:text-info-300',
   TECHNIQUE: 'bg-amber-100 text-amber-700 dark:text-amber-300 dark:bg-amber-900/50 dark:text-amber-300',
-  COMPTABILITE: 'bg-emerald-100 text-emerald-700 dark:text-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300',
+  COMPTABILITE: 'bg-brand-100 text-brand-700 dark:text-brand-300 dark:bg-brand-900/50 dark:text-brand-300',
 };
 
 export default function DirectionView({ kpis, loading }: DirectionViewProps) {
@@ -124,7 +124,7 @@ export default function DirectionView({ kpis, loading }: DirectionViewProps) {
         <CardContent className="max-h-96 overflow-y-auto">
           <div className="min-w-[600px]">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-background">
+              <thead className="bg-background">
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="pb-2 font-medium">Gestionnaire</th>
                   <th className="pb-2 font-medium">Service</th>

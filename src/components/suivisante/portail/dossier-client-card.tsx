@@ -31,7 +31,7 @@ export default function DossierClientCard({ dossier }: { dossier: PortailDossier
   })();
 
   return (
-    <Card className="border-emerald-100 dark:border-emerald-800 overflow-hidden">
+    <Card className="border-brand-100 dark:border-brand-800 overflow-hidden">
       <CardContent className="p-4 space-y-3">
         {/* En-tête */}
         <div className="flex items-start justify-between gap-2">
@@ -61,9 +61,9 @@ export default function DossierClientCard({ dossier }: { dossier: PortailDossier
             <p className="text-base font-bold text-foreground mt-0.5">{formatMontant(dossier.montantReclame)}</p>
           </div>
           {isPaye && dossier.montantPaye !== undefined && (
-            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 p-3">
-              <p className="text-[10px] text-emerald-600 uppercase tracking-wide font-medium">Montant payé</p>
-              <p className="text-base font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">{formatMontant(dossier.montantPaye)}</p>
+            <div className="rounded-lg bg-brand-50 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-800 p-3">
+              <p className="text-[10px] text-brand-600 uppercase tracking-wide font-medium">Montant payé</p>
+              <p className="text-base font-bold text-brand-700 dark:text-brand-300 mt-0.5">{formatMontant(dossier.montantPaye)}</p>
             </div>
           )}
         </div>
@@ -71,7 +71,7 @@ export default function DossierClientCard({ dossier }: { dossier: PortailDossier
         {/* Message contextuel */}
         <div className={cn(
           'rounded-lg p-3 text-sm',
-          isPaye && 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300',
+          isPaye && 'bg-brand-50 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-800 text-brand-800 dark:text-brand-300',
           isRejete && 'bg-red-50 dark:bg-red-950/40 border border-red-100 text-red-800',
           isEnCours && 'bg-amber-50 dark:bg-amber-950/40 border border-amber-100 text-amber-800',
           !isPaye && !isRejete && !isEnCours && 'bg-muted border border-border text-foreground'

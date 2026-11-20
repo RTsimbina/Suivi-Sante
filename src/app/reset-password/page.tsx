@@ -71,19 +71,19 @@ function ResetForm({ token, router }: { token: string; router: ReturnType<typeof
       <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
         <div className="w-full max-w-md text-center">
           <div className="flex flex-col items-center mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 mb-3">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
           </div>
           <Card className="rounded-xl border shadow-sm">
             <CardContent className="p-8">
-              <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
+              <CheckCircle2 className="h-12 w-12 text-brand-600 mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-2">Mot de passe modifié</h2>
               <p className="text-sm text-muted-foreground mb-6">
                 Votre mot de passe a été mis à jour avec succès. Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.
               </p>
-              <Button onClick={() => router.push('/login')} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">
+              <Button onClick={() => router.push('/login')} className="w-full bg-brand-600 hover:bg-brand-700 text-white" size="lg">
                 Aller à la page de connexion
               </Button>
             </CardContent>
@@ -97,7 +97,7 @@ function ResetForm({ token, router }: { token: string; router: ReturnType<typeof
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 mb-3">
             <Sparkles className="h-6 w-6 text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
@@ -131,24 +131,24 @@ function ResetForm({ token, router }: { token: string; router: ReturnType<typeof
 
               <div className="space-y-1.5 text-xs">
                 <p className="font-medium text-muted-foreground mb-2">Critères de sécurité :</p>
-                <div className={`flex items-center gap-2 ${hasMinLength ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasMinLength ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
+                <div className={`flex items-center gap-2 ${hasMinLength ? 'text-brand-600' : 'text-muted-foreground'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasMinLength ? 'bg-brand-600' : 'bg-muted-foreground/30'}`} />
                   Au moins 8 caractères
                 </div>
-                <div className={`flex items-center gap-2 ${hasLetter ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasLetter ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
+                <div className={`flex items-center gap-2 ${hasLetter ? 'text-brand-600' : 'text-muted-foreground'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasLetter ? 'bg-brand-600' : 'bg-muted-foreground/30'}`} />
                   Au moins une lettre
                 </div>
-                <div className={`flex items-center gap-2 ${hasNumber ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasNumber ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
+                <div className={`flex items-center gap-2 ${hasNumber ? 'text-brand-600' : 'text-muted-foreground'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasNumber ? 'bg-brand-600' : 'bg-muted-foreground/30'}`} />
                   Au moins un chiffre
                 </div>
-                <div className={`flex items-center gap-2 ${hasSpecial ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${hasSpecial ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
+                <div className={`flex items-center gap-2 ${hasSpecial ? 'text-brand-600' : 'text-muted-foreground'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${hasSpecial ? 'bg-brand-600' : 'bg-muted-foreground/30'}`} />
                   Un caractère spécial (recommandé)
                 </div>
-                <div className={`flex items-center gap-2 ${passwordsMatch ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${passwordsMatch ? 'bg-emerald-600' : 'bg-muted-foreground/30'}`} />
+                <div className={`flex items-center gap-2 ${passwordsMatch ? 'text-brand-600' : 'text-muted-foreground'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${passwordsMatch ? 'bg-brand-600' : 'bg-muted-foreground/30'}`} />
                   Les mots de passe correspondent
                 </div>
               </div>
@@ -161,7 +161,7 @@ function ResetForm({ token, router }: { token: string; router: ReturnType<typeof
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" size="lg" disabled={loading || !isStrong}>
+              <Button type="submit" className="w-full bg-brand-600 hover:bg-brand-700 text-white" size="lg" disabled={loading || !isStrong}>
                 {loading ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Mise à jour en cours…</>) : 'Réinitialiser le mot de passe'}
               </Button>
             </form>
@@ -169,7 +169,7 @@ function ResetForm({ token, router }: { token: string; router: ReturnType<typeof
         </Card>
 
         <div className="text-center mt-4">
-          <button onClick={() => router.push('/login')} className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline">
+          <button onClick={() => router.push('/login')} className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:underline">
             Retour à la page de connexion
           </button>
         </div>
@@ -219,14 +219,14 @@ function RequestForm({ router }: { router: ReturnType<typeof useRouter> }) {
       <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
         <div className="w-full max-w-md text-center">
           <div className="flex flex-col items-center mb-8">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 mb-3">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
           </div>
           <Card className="rounded-xl border shadow-sm">
             <CardContent className="p-8">
-              <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
+              <CheckCircle2 className="h-12 w-12 text-brand-600 mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-2">Lien envoyé</h2>
               <p className="text-sm text-muted-foreground mb-1">
                 Si un compte existe avec <strong>{email}</strong>, un lien de réinitialisation a été envoyé par e-mail.
@@ -234,7 +234,7 @@ function RequestForm({ router }: { router: ReturnType<typeof useRouter> }) {
               <p className="text-xs text-muted-foreground mt-3">
                 Le lien est valable 30 minutes. Vérifiez aussi vos courriers indésirables.
               </p>
-              <Button onClick={() => router.push('/login')} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-6" size="lg">
+              <Button onClick={() => router.push('/login')} className="w-full bg-brand-600 hover:bg-brand-700 text-white mt-6" size="lg">
                 Retour à la page de connexion
               </Button>
             </CardContent>
@@ -248,7 +248,7 @@ function RequestForm({ router }: { router: ReturnType<typeof useRouter> }) {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 mb-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 mb-3">
             <Sparkles className="h-6 w-6 text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Suivi Santé</h1>
@@ -289,7 +289,7 @@ function RequestForm({ router }: { router: ReturnType<typeof useRouter> }) {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" size="lg" disabled={loading}>
+              <Button type="submit" className="w-full bg-brand-600 hover:bg-brand-700 text-white" size="lg" disabled={loading}>
                 {loading ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Envoi en cours…</>) : 'Envoyer le lien'}
               </Button>
             </form>
@@ -297,7 +297,7 @@ function RequestForm({ router }: { router: ReturnType<typeof useRouter> }) {
         </Card>
 
         <div className="text-center mt-4">
-          <button onClick={() => router.push('/login')} className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline">
+          <button onClick={() => router.push('/login')} className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:underline">
             Retour à la page de connexion
           </button>
         </div>
@@ -313,7 +313,7 @@ export default function ResetPasswordPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-muted/30">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
         </div>
       }
     >

@@ -34,7 +34,7 @@ export default function UtilisateursTable({
       <CardContent className="p-0">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
           </div>
         ) : utilisateurs.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
@@ -69,7 +69,7 @@ export default function UtilisateursTable({
                         <div className="flex items-center gap-2.5">
                           <div className={cn(
                             'h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                            user.actif ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            user.actif ? 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300'
                                      : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
                           )}>
                             {user.nom.charAt(0).toUpperCase()}
@@ -108,7 +108,7 @@ export default function UtilisateursTable({
                           className={cn(
                             'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer',
                             user.actif
-                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60'
+                              ? 'bg-brand-100 text-brand-700 hover:bg-brand-200 dark:bg-brand-950/40 dark:text-brand-300 dark:hover:bg-brand-950/60'
                               : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60'
                           )}
                           title={user.actif ? 'Cliquer pour desactiver' : 'Cliquer pour activer'}
@@ -134,7 +134,7 @@ export default function UtilisateursTable({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            className="h-7 w-7 text-info-500 hover:text-info-700 hover:bg-info-50 dark:hover:bg-info-950/40"
                             onClick={() => onEdit(user)}
                             title="Modifier"
                             aria-label="Modifier l'utilisateur"

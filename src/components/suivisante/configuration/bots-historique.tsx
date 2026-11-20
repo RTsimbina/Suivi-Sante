@@ -37,7 +37,7 @@ export default function BotsHistorique({
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold flex items-center gap-2">
-          <Settings className="h-4 w-4 text-emerald-600" />
+          <Settings className="h-4 w-4 text-brand-600" />
           Historique des conversations bots
         </h3>
         <div className="flex gap-2">
@@ -46,7 +46,7 @@ export default function BotsHistorique({
               key={c}
               variant={filterCanal === c ? 'default' : 'outline'}
               size="sm"
-              className={`text-[11px] h-7 ${filterCanal === c ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+              className={`text-[11px] h-7 ${filterCanal === c ? 'bg-brand-600 hover:bg-brand-700' : ''}`}
               onClick={() => onFilterCanalChange(c)}
             >
               {c || 'Tous'}
@@ -62,7 +62,7 @@ export default function BotsHistorique({
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
             </div>
           ) : messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -83,12 +83,12 @@ export default function BotsHistorique({
                         </Badge>
                         <span className="text-[11px] text-muted-foreground">{formatDate(msg.createdAt)}</span>
                       </div>
-                      <div className="bg-emerald-50 dark:bg-emerald-950/40 rounded-lg p-2.5 mb-2 border border-emerald-100 dark:border-emerald-800">
-                        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 mb-0.5">Question</p>
+                      <div className="bg-brand-50 dark:bg-brand-950/40 rounded-lg p-2.5 mb-2 border border-brand-100 dark:border-brand-800">
+                        <p className="text-xs font-medium text-brand-700 dark:text-brand-300 mb-0.5">Question</p>
                         <p className="text-sm text-foreground whitespace-pre-wrap">{msg.message}</p>
                       </div>
-                      <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-2.5 border border-blue-100">
-                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">Réponse Suivi Santé</p>
+                      <div className="bg-info-50 dark:bg-info-950/40 rounded-lg p-2.5 border border-info-100">
+                        <p className="text-xs font-medium text-info-700 dark:text-info-300 mb-0.5">Réponse Suivi Santé</p>
                         <p className="text-sm text-foreground whitespace-pre-wrap">{msg.reponse}</p>
                       </div>
                     </div>

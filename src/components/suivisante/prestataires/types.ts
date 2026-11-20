@@ -120,11 +120,11 @@ export const TYPE_LABELS: Record<string, string> = {
 
 export const TYPE_COLORS: Record<string, string> = {
   HOPITAL: 'bg-red-100 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
-  CLINIQUE: 'bg-blue-100 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+  CLINIQUE: 'bg-info-100 text-info-700 dark:text-info-300 border-info-200 dark:border-info-800',
   PHARMACIE: 'bg-green-100 text-green-700 border-green-200',
-  CABINET_MEDICAL: 'bg-purple-100 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+  CABINET_MEDICAL: 'bg-violet-100 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
   LABORATOIRE: 'bg-amber-100 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  DENTAIRE: 'bg-pink-100 text-pink-700 border-pink-200',
+  DENTAIRE: 'bg-rose-100 text-rose-700 border-rose-200',
   OPTICIEN: 'bg-cyan-100 text-cyan-700 border-cyan-200',
   AUTRE: 'bg-muted text-muted-foreground border-border',
 };

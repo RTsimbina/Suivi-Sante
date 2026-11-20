@@ -139,7 +139,7 @@ export default function ExclusionsTab({
                 label: 'Montant non couvert',
                 value: formatMontantCourt(montantPerdu),
                 icon: TrendingDown,
-                gradient: 'from-violet-400 to-purple-600',
+                gradient: 'from-violet-400 to-violet-600',
                 bgLight: 'bg-violet-50 dark:bg-violet-950/30',
                 textColor: 'text-violet-700 dark:text-violet-300',
                 borderColor: 'border-violet-200/60 dark:border-violet-800/40',
@@ -184,9 +184,9 @@ export default function ExclusionsTab({
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-xs font-medium text-muted-foreground">Taux de couverture global</span>
-                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{(100 - tauxPerte).toFixed(1)}%</span>
+                          <span className="text-xs font-bold text-brand-600 dark:text-brand-400">{(100 - tauxPerte).toFixed(1)}%</span>
                         </div>
-                        <Progress value={100 - tauxPerte} className="h-2.5 [&>div]:bg-gradient-to-r [&>div]:from-emerald-400 [&>div]:to-teal-500" />
+                        <Progress value={100 - tauxPerte} className="h-2.5 [&>div]:bg-gradient-to-r [&>div]:from-brand-400 [&>div]:to-teal-500" />
                       </div>
                       <div className="text-right min-w-[100px]">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Perte totale</p>
@@ -198,8 +198,8 @@ export default function ExclusionsTab({
                   {/* ── Tableau ── */}
                   {filtered.length === 0 ? (
                     <div className="text-center py-16">
-                      <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-950/50 mb-4">
-                        <CheckCircle className="h-8 w-8 text-emerald-500" />
+                      <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-brand-100 dark:bg-brand-950/50 mb-4">
+                        <CheckCircle className="h-8 w-8 text-brand-500" />
                       </div>
                       <p className="text-sm font-medium text-foreground">Aucune exclusion ou dépassement détecté</p>
                       <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
@@ -295,7 +295,7 @@ export default function ExclusionsTab({
                                           <div
                                             className={`h-full rounded-full transition-all ${
                                               d.pourcentageCouvert > 70
-                                                ? 'bg-emerald-500'
+                                                ? 'bg-brand-500'
                                                 : d.pourcentageCouvert > 40
                                                   ? 'bg-amber-500'
                                                   : 'bg-red-500'

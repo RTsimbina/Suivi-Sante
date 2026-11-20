@@ -150,7 +150,7 @@ export default function ReportingView() {
       {/* Tabs */}
       <div className="flex gap-1 border-b">
         {([['contrats', 'Suivi des Contrats', Building2], ['appels', 'Appels de Fonds', DollarSign], ['rapport', 'Rapport Mensuel', FileBarChart]] as const).map(([key, label, Icon]) => (
-          <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === key ? 'border-emerald-600 text-emerald-700 dark:text-emerald-300' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+          <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === key ? 'border-brand-600 text-brand-700 dark:text-brand-300' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             <Icon className="size-4" />{label}
           </button>
         ))}
@@ -162,7 +162,7 @@ export default function ReportingView() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Card className="p-3"><p className="text-xs text-muted-foreground">Budget total</p><p className="text-lg font-bold">{formatMontant(totalBudget)}</p></Card>
             <Card className="p-3"><p className="text-xs text-muted-foreground">Utilisé</p><p className="text-lg font-bold text-amber-600">{formatMontant(totalUtilise)}</p></Card>
-            <Card className="p-3"><p className="text-xs text-muted-foreground">Solde disponible</p><p className="text-lg font-bold text-emerald-600">{formatMontant(totalBudget - totalUtilise)}</p></Card>
+            <Card className="p-3"><p className="text-xs text-muted-foreground">Solde disponible</p><p className="text-lg font-bold text-brand-600">{formatMontant(totalBudget - totalUtilise)}</p></Card>
             <Card className="p-3"><p className="text-xs text-muted-foreground">Taux d'utilisation</p><p className="text-lg font-bold">{totalBudget > 0 ? Math.round((totalUtilise / totalBudget) * 100) : 0}%</p></Card>
           </div>
           <Card className="overflow-hidden">
@@ -196,7 +196,7 @@ export default function ReportingView() {
                           <span className="text-xs text-muted-foreground w-10 text-right">{taux}%</span>
                         </div>
                       </td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${solde < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{formatMontant(solde)}</td>
+                      <td className={`px-4 py-2.5 text-right font-medium ${solde < 0 ? 'text-red-600' : 'text-brand-600'}`}>{formatMontant(solde)}</td>
                       <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE_LOOKUP[c.statut] || ''}>{STATUT_LABEL_LOOKUP[c.statut] || c.statut}</Badge></td>
                       <td className="px-4 py-2.5 text-muted-foreground">{formatDate(c.dateFin)}</td>
                     </tr>
@@ -215,13 +215,13 @@ export default function ReportingView() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-1.5">
               {['TOUS', ...APPEL_FONDS_STATUT_VALEURS].map(s => (
-                <Button key={s} variant={filterStatut === s ? 'default' : 'outline'} size="sm" className={filterStatut === s ? 'bg-emerald-600' : ''} onClick={() => setFilterStatut(s)}>
+                <Button key={s} variant={filterStatut === s ? 'default' : 'outline'} size="sm" className={filterStatut === s ? 'bg-brand-600' : ''} onClick={() => setFilterStatut(s)}>
                   {s === 'TOUS' ? 'Tous' : STATUT_LABEL_LOOKUP[s]}
                 </Button>
               ))}
             </div>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild><Button className="bg-emerald-600 hover:bg-emerald-700"><Plus className="size-4 mr-1" />Nouvel appel</Button></DialogTrigger>
+              <DialogTrigger asChild><Button className="bg-brand-600 hover:bg-brand-700"><Plus className="size-4 mr-1" />Nouvel appel</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Nouvel appel de fonds</DialogTitle></DialogHeader>
                 <div className="space-y-4 pt-2">
@@ -236,7 +236,7 @@ export default function ReportingView() {
                     <div className="space-y-1.5"><Label>Date d'appel *</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
                   </div>
                   <div className="space-y-1.5"><Label>Observations</Label><Input value={formObs} onChange={e => setFormObs(e.target.value)} placeholder="Optionnel" /></div>
-                  <Button onClick={handleSubmitAppel} disabled={submitting} className="w-full bg-emerald-600">
+                  <Button onClick={handleSubmitAppel} disabled={submitting} className="w-full bg-brand-600">
                     {submitting ? 'Enregistrement...' : 'Enregistrer l\'appel de fonds'}
                   </Button>
                 </div>
@@ -246,7 +246,7 @@ export default function ReportingView() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Card className="p-3"><p className="text-xs text-muted-foreground">Total appels</p><p className="text-lg font-bold">{appels.length}</p></Card>
             <Card className="p-3"><p className="text-xs text-muted-foreground">Montant total</p><p className="text-lg font-bold">{formatMontant(totalAppels)}</p></Card>
-            <Card className="p-3"><p className="text-xs text-muted-foreground">Réglés</p><p className="text-lg font-bold text-emerald-600">{appels.filter(a => a.statut === 'REGLE').length}</p></Card>
+            <Card className="p-3"><p className="text-xs text-muted-foreground">Réglés</p><p className="text-lg font-bold text-brand-600">{appels.filter(a => a.statut === 'REGLE').length}</p></Card>
             <Card className="p-3"><p className="text-xs text-muted-foreground">En attente</p><p className="text-lg font-bold text-amber-600">{appelsEnAttente.length}</p></Card>
           </div>
           <Card className="overflow-hidden">
@@ -274,7 +274,7 @@ export default function ReportingView() {
                       <td className="px-4 py-2.5 text-center"><Badge variant="outline" className={STATUT_BADGE_LOOKUP[a.statut] || ''}>{STATUT_LABEL_LOOKUP[a.statut] || a.statut}</Badge></td>
                       <td className="px-4 py-2.5 text-right">
                         {a.statut === 'EN_ATTENTE' && (
-                          <Button size="sm" variant="outline" onClick={() => marquerRegle(a.id)} className="text-xs h-7 text-emerald-600 border-emerald-200 dark:border-emerald-800">
+                          <Button size="sm" variant="outline" onClick={() => marquerRegle(a.id)} className="text-xs h-7 text-brand-600 border-brand-200 dark:border-brand-800">
                             <CheckCircle2 className="size-3 mr-1" />Marquer réglé
                           </Button>
                         )}
@@ -293,7 +293,7 @@ export default function ReportingView() {
         <div className="space-y-4">
           <Card className="p-6">
             <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-              <FileBarChart className="size-5 text-emerald-600" />
+              <FileBarChart className="size-5 text-brand-600" />
               Rapport mensuel automatique
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
@@ -328,7 +328,7 @@ export default function ReportingView() {
               </ul>
             </div>
             <div className="flex gap-2">
-              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleGenererRapport} disabled={generatingRapport}>
+              <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleGenererRapport} disabled={generatingRapport}>
                 {generatingRapport ? <Loader2 className="size-4 mr-1 animate-spin" /> : <TrendingUp className="size-4 mr-1" />}
                 Télécharger le rapport PDF
               </Button>

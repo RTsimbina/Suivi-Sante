@@ -12,15 +12,15 @@ import type { Stats } from './types';
 export default function JournalStats({ stats }: { stats: Stats }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-      <Card className="border-emerald-200 dark:border-emerald-900">
+      <Card className="border-brand-200 dark:border-brand-900">
         <CardContent className="p-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total événements</p>
               <p className="text-xl font-bold mt-0.5">{stats.total}</p>
             </div>
-            <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-              <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <div className="h-8 w-8 rounded-lg bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center">
+              <Shield className="h-4 w-4 text-brand-600 dark:text-brand-400" />
             </div>
           </div>
         </CardContent>
@@ -29,8 +29,8 @@ export default function JournalStats({ stats }: { stats: Stats }) {
         <CardContent className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider font-medium">Créations</p>
-              <p className="text-xl font-bold mt-0.5 text-emerald-600 dark:text-emerald-400">{stats.creations}</p>
+              <p className="text-[10px] text-brand-600 dark:text-brand-400 uppercase tracking-wider font-medium">Créations</p>
+              <p className="text-xl font-bold mt-0.5 text-brand-600 dark:text-brand-400">{stats.creations}</p>
             </div>
             <span className="text-lg">🟢</span>
           </div>

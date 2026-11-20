@@ -70,7 +70,7 @@ export default function ImportDialog({ importerFichier }: ImportDialogProps) {
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+            <FileSpreadsheet className="h-5 w-5 text-brand-600" />
             Importer des bénéficiaires
           </DialogTitle>
         </DialogHeader>
@@ -87,15 +87,15 @@ export default function ImportDialog({ importerFichier }: ImportDialogProps) {
             onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
             className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 cursor-pointer transition-colors
-              ${isDragging ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
-                : importFile ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50'
-                : 'border-muted-foreground/25 hover:border-emerald-400 hover:bg-muted/50'}`}
+              ${isDragging ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/40'
+                : importFile ? 'border-brand-300 dark:border-brand-700 bg-brand-50/50'
+                : 'border-muted-foreground/25 hover:border-brand-400 hover:bg-muted/50'}`}
           >
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileSelect} className="hidden" />
             {importFile ? (
-              <><FileSpreadsheet className="h-10 w-10 text-emerald-600 mb-2" /><p className="text-sm font-medium">{importFile.name}</p><p className="text-xs text-muted-foreground mt-1">{(importFile.size / 1024).toFixed(1)} Ko</p></>
+              <><FileSpreadsheet className="h-10 w-10 text-brand-600 mb-2" /><p className="text-sm font-medium">{importFile.name}</p><p className="text-xs text-muted-foreground mt-1">{(importFile.size / 1024).toFixed(1)} Ko</p></>
             ) : (
-              <><Upload className="h-10 w-10 text-muted-foreground/40 mb-2" /><p className="text-sm font-medium">Glissez-déposez votre fichier <span className="text-emerald-600 font-semibold">.xlsx</span> ici</p><p className="text-xs text-muted-foreground mt-1">ou cliquez pour sélectionner</p></>
+              <><Upload className="h-10 w-10 text-muted-foreground/40 mb-2" /><p className="text-sm font-medium">Glissez-déposez votre fichier <span className="text-brand-600 font-semibold">.xlsx</span> ici</p><p className="text-xs text-muted-foreground mt-1">ou cliquez pour sélectionner</p></>
             )}
           </div>
           <Button onClick={handleImport} disabled={importing || !importFile} className="w-full gap-2">
@@ -106,7 +106,7 @@ export default function ImportDialog({ importerFichier }: ImportDialogProps) {
             <div className="space-y-4 mt-2">
               <div className="grid grid-cols-3 gap-3">
                 <Card className="p-3 text-center"><p className="text-xs text-muted-foreground">Lignes</p><p className="text-xl font-bold">{importResult.nbLignes}</p></Card>
-                <Card className="p-3 text-center"><p className="text-xs text-emerald-600">Succès</p><p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{importResult.nbSucces}</p></Card>
+                <Card className="p-3 text-center"><p className="text-xs text-brand-600">Succès</p><p className="text-xl font-bold text-brand-700 dark:text-brand-300">{importResult.nbSucces}</p></Card>
                 <Card className="p-3 text-center"><p className="text-xs text-red-500">Erreurs</p><p className="text-xl font-bold text-red-600">{importResult.nbErreurs}</p></Card>
               </div>
               {importResult.erreurs && importResult.erreurs.length > 0 && (
@@ -120,8 +120,8 @@ export default function ImportDialog({ importerFichier }: ImportDialogProps) {
                 </div>
               )}
               {importResult.nbErreurs === 0 && (
-                <div className="flex items-center gap-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
-                  <CheckCircle className="h-5 w-5 text-emerald-600" /><p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Tous les bénéficiaires ont été importés avec succès !</p>
+                <div className="flex items-center gap-2 rounded-md border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-950/40 p-3">
+                  <CheckCircle className="h-5 w-5 text-brand-600" /><p className="text-sm text-brand-700 dark:text-brand-300 font-medium">Tous les bénéficiaires ont été importés avec succès !</p>
                 </div>
               )}
             </div>

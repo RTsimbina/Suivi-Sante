@@ -21,7 +21,7 @@ export default function ProfilHistorique({ historique, loading }: ProfilHistoriq
     <Card className="border shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <History className="h-4 w-4 text-blue-500" />
+          <History className="h-4 w-4 text-info-500" />
           Historique des modifications
         </CardTitle>
       </CardHeader>
@@ -41,8 +41,8 @@ export default function ProfilHistorique({ historique, loading }: ProfilHistoriq
                 className="flex items-start gap-3 py-2 px-3 rounded-lg bg-muted/40 border border-border/50 text-sm"
               >
                 <div className="shrink-0 mt-0.5">
-                  <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center">
-                    <History className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                  <div className="h-7 w-7 rounded-full bg-info-100 dark:bg-info-950/40 flex items-center justify-center">
+                    <History className="h-3 w-3 text-info-600 dark:text-info-400" />
                   </div>
                 </div>
                 <div className="min-w-0 flex-1">
@@ -59,7 +59,7 @@ export default function ProfilHistorique({ historique, loading }: ProfilHistoriq
                 <div className="shrink-0 text-right">
                   <span className={cn(
                     'text-[10px] px-1.5 py-0.5 rounded font-medium',
-                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+                    'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300',
                   )}>
                     {entry.nouvelleValeur}
                   </span>

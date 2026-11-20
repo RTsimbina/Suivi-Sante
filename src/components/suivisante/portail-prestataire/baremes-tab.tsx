@@ -94,7 +94,7 @@ export function BaremesTab({
       <Card>
         <CardContent className='p-4 flex flex-col md:flex-row md:items-center gap-3'>
           <div className='flex items-center gap-2 min-w-0'>
-            <Building2 className='h-4 w-4 text-emerald-600 shrink-0' />
+            <Building2 className='h-4 w-4 text-brand-600 shrink-0' />
             <span className='text-sm font-medium shrink-0'>Société cliente :</span>
           </div>
           <Select
@@ -118,7 +118,7 @@ export function BaremesTab({
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <Scale className='h-4 w-4 text-emerald-600' />
+            <Scale className='h-4 w-4 text-brand-600' />
             Barèmes applicables — {societeCourante?.nom}
           </CardTitle>
         </CardHeader>
@@ -183,7 +183,7 @@ export function BaremesTab({
       <Card>
         <CardHeader className='pb-3'>
           <CardTitle className='text-sm font-medium flex items-center gap-2'>
-            <UserSearch className='h-4 w-4 text-emerald-600' />
+            <UserSearch className='h-4 w-4 text-brand-600' />
             Assuré qui se présente — barème applicable
           </CardTitle>
         </CardHeader>
@@ -247,7 +247,7 @@ export function BaremesTab({
             )
           ) : (
             <p className='text-xs text-muted-foreground flex items-center gap-1.5'>
-              <CheckCircle2 className='h-3 w-3 text-emerald-600' />
+              <CheckCircle2 className='h-3 w-3 text-brand-600' />
               Recherchez un assuré pour identifier sa société et consulter le barème
               applicable ci-dessus (données limitées à l&apos;identification).
               <XCircle className='hidden' />

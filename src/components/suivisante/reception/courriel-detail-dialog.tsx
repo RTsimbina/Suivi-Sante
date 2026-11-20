@@ -54,7 +54,7 @@ export default function CourrielDetailDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-sky-600" />
+                <FileText className="h-5 w-5 text-info-600" />
                 Détails du courriel
               </DialogTitle>
               <DialogDescription>
@@ -119,7 +119,7 @@ export default function CourrielDetailDialog({
                 {courriel.montant !== null && courriel.montant > 0 && (
                   <div className="p-3 rounded-lg bg-muted/50">
                     <p className="text-[11px] text-muted-foreground">Montant</p>
-                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatMontantCourt(courriel.montant)}</p>
+                    <p className="text-sm font-bold text-brand-700 dark:text-brand-300">{formatMontantCourt(courriel.montant)}</p>
                   </div>
                 )}
                 {courriel.dateSoins && (
@@ -218,7 +218,7 @@ export default function CourrielDetailDialog({
                 <>
                   <Button variant="outline" onClick={() => onEditModeChange(false)}>Annuler</Button>
                   <Button
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-brand-600 hover:bg-brand-700"
                     onClick={onMettreAJour}
                     disabled={editSubmitting}
                   >

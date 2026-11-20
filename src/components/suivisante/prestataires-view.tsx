@@ -83,7 +83,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
               <Users className="h-4 w-4 mr-1.5" /> Nouveau groupe
             </Button>
             <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-xs"
+              className="bg-brand-600 hover:bg-brand-700 text-white h-9 text-xs"
               onClick={d.openCreateDialog}
             >
               <Plus className="h-4 w-4 mr-1.5" /> Nouveau prestataire
@@ -132,7 +132,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
           {/* ─── Layout maître-détail ─── */}
           {d.loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
             </div>
           ) : d.societes.length === 0 ? (
             <Card><CardContent className="text-center py-16 text-muted-foreground">
@@ -179,7 +179,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
           {d.fetchError && <FetchErrorBanner message={d.fetchError} />}
           {d.loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
             </div>
           ) : (
             <AnnuairePrestataires
@@ -273,7 +273,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              <Users className="h-5 w-5 text-emerald-600" /> Nouveau groupe de prestataires
+              <Users className="h-5 w-5 text-brand-600" /> Nouveau groupe de prestataires
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -309,7 +309,7 @@ export default function PrestatairesView({ userRole }: { userRole: string }) {
               <Button variant="outline" className="flex-1" onClick={() => setGroupeDialogOpen(false)} disabled={groupeSaving}>
                 Annuler
               </Button>
-              <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={creerGroupe} disabled={groupeSaving}>
+              <Button className="flex-1 bg-brand-600 hover:bg-brand-700 text-white" onClick={creerGroupe} disabled={groupeSaving}>
                 {groupeSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Créer le groupe
               </Button>

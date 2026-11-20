@@ -131,7 +131,7 @@ function ContenuPortailPrestataire() {
         </header>
         <div className='flex-1 flex items-center justify-center p-6'>
           <div className='flex flex-col items-center gap-3'>
-            <div className='h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent' />
+            <div className='h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent' />
             <p className='text-sm text-muted-foreground'>Chargement de votre espace...</p>
           </div>
         </div>
@@ -161,9 +161,9 @@ function ContenuPortailPrestataire() {
   return (
     <div className='min-h-screen flex flex-col bg-muted/30'>
       {/* Header */}
-      <header className='h-14 border-b bg-card flex items-center px-4 gap-3 sticky top-0 z-50 shadow-sm'>
+      <header className='h-14 border-b bg-card flex items-center px-4 gap-3 shadow-sm'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600'>
+          <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600'>
             <Stethoscope className='h-4 w-4 text-white' />
           </div>
           <div className='hidden sm:block'>
@@ -179,8 +179,8 @@ function ContenuPortailPrestataire() {
               Mode administrateur
             </Badge>
           )}
-          <Badge variant='outline' className='text-[10px] border-emerald-300 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hidden sm:flex'>
-            <span className='mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block' />
+          <Badge variant='outline' className='text-[10px] border-brand-300 dark:border-brand-800 text-brand-600 dark:text-brand-400 hidden sm:flex'>
+            <span className='mr-1 h-1.5 w-1.5 rounded-full bg-brand-500 inline-block' />
             Connecté
           </Badge>
           <Button variant='ghost' size='sm' className='text-xs gap-1.5' onClick={handleLogout}>
@@ -213,7 +213,7 @@ function ContenuPortailPrestataire() {
         {estAdmin ? (
           <Card className='max-w-lg mx-auto'>
             <CardContent className='p-6 text-center'>
-              <Stethoscope className='h-10 w-10 mx-auto text-emerald-600 mb-3' />
+              <Stethoscope className='h-10 w-10 mx-auto text-brand-600 mb-3' />
               <p className='text-sm font-medium'>{data.message}</p>
               <p className='text-xs text-muted-foreground mt-2'>
                 Créez un compte de rôle « Prestataire » dont l&apos;e-mail correspond à la

@@ -133,7 +133,7 @@ export default function AssignDialog({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-emerald-600" />
+            <Users className="h-5 w-5 text-brand-600" />
             Assigner les dossiers non assignés
           </DialogTitle>
           <DialogDescription>
@@ -158,7 +158,7 @@ export default function AssignDialog({
                   <label
                     key={d.id}
                     className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors hover:bg-muted/60 ${
-                      selectedIds.has(d.id) ? 'bg-emerald-50 dark:bg-emerald-950/20' : ''
+                      selectedIds.has(d.id) ? 'bg-brand-50 dark:bg-brand-950/20' : ''
                     }`}
                   >
                     <Checkbox
@@ -233,7 +233,7 @@ export default function AssignDialog({
               size="sm"
               disabled={!selectedGestionnaire || selectedIds.size === 0 || assigning}
               onClick={handleAssign}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-brand-600 hover:bg-brand-700 text-white"
             >
               {assigning ? (
                 <>

@@ -52,13 +52,13 @@ export default function SocieteList({
               className={cn(
                 'w-full text-left rounded-lg border p-3 transition-all duration-150',
                 isSelected
-                  ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/30 shadow-sm'
+                  ? 'border-brand-300 dark:border-brand-700 bg-brand-50/60 dark:bg-brand-950/30 shadow-sm'
                   : 'border-transparent hover:bg-muted/60 hover:border-muted'
               )}
             >
               <div className="flex items-start gap-2.5">
-                <div className="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0 mt-0.5">
-                  <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <div className="h-9 w-9 rounded-lg bg-info-100 dark:bg-info-950/50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Building2 className="h-4 w-4 text-info-600 dark:text-info-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{s.nom}</p>
@@ -67,19 +67,19 @@ export default function SocieteList({
                       <Stethoscope className="h-2.5 w-2.5" />{stats.total}
                     </span>
                     {stats.actifs > 0 && (
-                      <span className="text-emerald-600 font-medium">{stats.actifs} act.</span>
+                      <span className="text-brand-600 font-medium">{stats.actifs} act.</span>
                     )}
                     {stats.inactifs > 0 && (
                       <span className="text-red-500 font-medium">{stats.inactifs} inact.</span>
                     )}
                     {stats.nbDossiers > 0 && (
-                      <span className="text-blue-500 font-medium">{stats.nbDossiers} dossier(s)</span>
+                      <span className="text-info-500 font-medium">{stats.nbDossiers} dossier(s)</span>
                     )}
                   </div>
                 </div>
                 <ChevronRight className={cn(
                   'h-4 w-4 text-muted-foreground transition-transform shrink-0 mt-1',
-                  isSelected && 'text-emerald-600 dark:text-emerald-400 translate-x-0.5'
+                  isSelected && 'text-brand-600 dark:text-brand-400 translate-x-0.5'
                 )} />
               </div>
             </button>

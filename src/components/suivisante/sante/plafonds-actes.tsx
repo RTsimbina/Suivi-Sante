@@ -55,11 +55,11 @@ export default function PlafondsActes({ result }: { result: VerificationResult }
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'p-1.5 rounded-lg',
-                    isDanger ? 'bg-red-100 dark:bg-red-900/40' : isWarning ? 'bg-amber-100 dark:bg-amber-900/40' : 'bg-emerald-100 dark:bg-emerald-900/40',
+                    isDanger ? 'bg-red-100 dark:bg-red-900/40' : isWarning ? 'bg-amber-100 dark:bg-amber-900/40' : 'bg-brand-100 dark:bg-brand-900/40',
                   )}>
                     {isDanger ? <ShieldX className="h-3.5 w-3.5 text-red-600 dark:text-red-400" /> :
                      isWarning ? <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" /> :
-                     <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+                     <ShieldCheck className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" />}
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-medium">{prestation}</p>
@@ -71,7 +71,7 @@ export default function PlafondsActes({ result }: { result: VerificationResult }
                     <p className="text-xs font-mono font-semibold">{formatAr(data.consomme)} / {formatAr(data.plafond)}</p>
                     <p className={cn(
                       'text-[10px] font-medium',
-                      isDanger ? 'text-red-600 dark:text-red-400' : isWarning ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400',
+                      isDanger ? 'text-red-600 dark:text-red-400' : isWarning ? 'text-amber-600 dark:text-amber-400' : 'text-brand-600 dark:text-brand-400',
                     )}>
                       Reliquat : {formatAr(Math.max(0, data.plafond - data.consomme))}
                     </p>

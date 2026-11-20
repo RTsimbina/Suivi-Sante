@@ -62,13 +62,13 @@ export default function FichePrestataireDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
           </div>
         ) : !prestataire ? null : (
           <>
             <DialogHeader>
               <DialogTitle className="flex flex-wrap items-center gap-2">
-                <Stethoscope className="h-5 w-5 text-emerald-600" />
+                <Stethoscope className="h-5 w-5 text-brand-600" />
                 <span>{prestataire.nom}</span>
                 <Badge variant="outline" className={`text-[10px] ${TYPE_COLORS[prestataire.type] ?? TYPE_COLORS.AUTRE}`}>
                   {TYPE_LABELS[prestataire.type] ?? prestataire.type}
@@ -76,7 +76,7 @@ export default function FichePrestataireDialog({
                 <Badge
                   className={
                     prestataire.actif
-                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                      ? 'bg-brand-100 text-brand-700 border-brand-200'
                       : 'bg-red-100 text-red-700 border-red-200'
                   }
                   variant="outline"
@@ -130,10 +130,10 @@ export default function FichePrestataireDialog({
                   <ul className="space-y-1.5">
                     {rattachements.map(r => (
                       <li key={r.societe.id} className="flex items-center gap-2 text-sm">
-                        <Building2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <Building2 className="h-3.5 w-3.5 text-info-500 shrink-0" />
                         <span className="truncate">{r.societe.nom}</span>
                         {r.actif ? (
-                          <Badge variant="outline" className="text-[10px] border-emerald-200 text-emerald-700 gap-1">
+                          <Badge variant="outline" className="text-[10px] border-brand-200 text-brand-700 gap-1">
                             <CheckCircle2 className="h-2.5 w-2.5" /> Convention active
                           </Badge>
                         ) : (
@@ -161,7 +161,7 @@ export default function FichePrestataireDialog({
               </Button>
               {canEdit && (
                 <Button
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="flex-1 bg-brand-600 hover:bg-brand-700 text-white"
                   onClick={onModifier}
                 >
                   <Pencil className="h-4 w-4 mr-1.5" /> Modifier le prestataire

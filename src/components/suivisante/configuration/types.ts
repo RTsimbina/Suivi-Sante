@@ -53,6 +53,6 @@ export function formatDate(d: string) {
 
 export const CANAL_COLORS: Record<string, string> = {
   WHATSAPP: 'bg-green-100 text-green-700 border-green-200',
-  TELEGRAM: 'bg-blue-100 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-  MESSENGER: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  TELEGRAM: 'bg-info-100 text-info-700 dark:text-info-300 border-info-200 dark:border-info-800',
+  MESSENGER: 'bg-violet-100 text-violet-700 border-violet-200',
 };

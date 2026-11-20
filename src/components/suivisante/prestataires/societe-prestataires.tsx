@@ -61,18 +61,18 @@ export default function SocietePrestataires({
             {/* En-tête société */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <div className="h-11 w-11 rounded-xl bg-info-50 dark:bg-info-950/40 flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-info-600 dark:text-info-400" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold">{selectedSociete.nom}</h3>
-                    <Badge className="bg-blue-100 text-blue-700 dark:text-blue-300 text-[10px] border-blue-200 dark:border-blue-800 hover:bg-blue-100">
+                    <Badge className="bg-info-100 text-info-700 dark:text-info-300 text-[10px] border-info-200 dark:border-info-800 hover:bg-info-100">
                       <Users className="h-2.5 w-2.5 mr-0.5" />{selectedLiens.length} prestataire{selectedLiens.length !== 1 ? 's' : ''}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                    <span className="text-emerald-600 font-medium">{selectedLiens.filter(l => l.actif).length} actif(s)</span>
+                    <span className="text-brand-600 font-medium">{selectedLiens.filter(l => l.actif).length} actif(s)</span>
                     <span>·</span>
                     <span className="text-red-500 font-medium">{selectedLiens.filter(l => !l.actif).length} inactif(s)</span>
                     {selectedLiens.length > 0 && (
@@ -89,7 +89,7 @@ export default function SocietePrestataires({
               {canEdit && (
                 <Button
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs"
+                  className="bg-brand-600 hover:bg-brand-700 text-white h-8 text-xs"
                   onClick={onOpenLinkDialog}
                 >
                   <UserPlus className="h-3.5 w-3.5 mr-1" /> Ajouter un prestataire
@@ -180,11 +180,11 @@ export default function SocietePrestataires({
                           <div className="flex items-center gap-2.5">
                             <div className={cn(
                               'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
-                              l.actif ? 'bg-emerald-100 dark:bg-emerald-950/50' : 'bg-muted'
+                              l.actif ? 'bg-brand-100 dark:bg-brand-950/50' : 'bg-muted'
                             )}>
                               <Stethoscope className={cn(
                                 'h-3.5 w-3.5',
-                                l.actif ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                                l.actif ? 'text-brand-600 dark:text-brand-400' : 'text-muted-foreground'
                               )} />
                             </div>
                             <div className="min-w-0">
@@ -230,7 +230,7 @@ export default function SocietePrestataires({
                               className={cn(
                                 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors cursor-pointer',
                                 l.actif
-                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-950/60'
+                                  ? 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 hover:bg-brand-200 dark:hover:bg-brand-950/60'
                                   : 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-950/60'
                               )}
                             >
@@ -242,7 +242,7 @@ export default function SocietePrestataires({
                             </button>
                           ) : (
                             l.actif ? (
-                              <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] hover:bg-emerald-100">
+                              <Badge className="bg-brand-100 text-brand-700 dark:text-brand-300 text-[10px] hover:bg-brand-100">
                                 <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Actif
                               </Badge>
                             ) : (
@@ -260,7 +260,7 @@ export default function SocietePrestataires({
                               <AlertTriangle className="h-3 w-3" /> Actes refusés
                             </span>
                           ) : (
-                            <span className="text-[10px] text-emerald-600 flex items-center justify-center gap-1">
+                            <span className="text-[10px] text-brand-600 flex items-center justify-center gap-1">
                               <CheckCircle2 className="h-3 w-3" /> Autorisé
                             </span>
                           )}
@@ -305,7 +305,7 @@ export default function SocietePrestataires({
             {selectedLiens.length > 0 && (
               <div className="mt-3 flex items-center gap-4 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> Actif = autorisé
+                  <span className="h-2 w-2 rounded-full bg-brand-500" /> Actif = autorisé
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full bg-red-500" /> Inactif = actes refusés automatiquement

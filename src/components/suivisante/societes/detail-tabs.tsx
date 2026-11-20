@@ -71,11 +71,11 @@ export function BaremesTab({ baremes, search, onSearchChange, totalCount }: {
                       {getPrestationLabel(b.prestation)}
                     </Badge>
                   </td>
-                  <td className="py-2.5 px-3 text-center font-mono font-semibold text-emerald-600 dark:text-emerald-400">{b.tauxCouverture}%</td>
+                  <td className="py-2.5 px-3 text-center font-mono font-semibold text-brand-600 dark:text-brand-400">{b.tauxCouverture}%</td>
                   <td className="py-2.5 px-3 text-right font-mono">{b.plafond.toLocaleString('fr-FR')} Ar</td>
                   <td className="py-2.5 px-3 text-center">
                     {b.active ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                      <CheckCircle2 className="h-4 w-4 text-brand-500 mx-auto" />
                     ) : (
                       <X className="h-4 w-4 text-muted-foreground mx-auto" />
                     )}
@@ -119,7 +119,7 @@ export function AssuresTab({ assures, search, onSearchChange, totalCount }: {
       ) : (
         <div className="max-h-[50vh] overflow-y-auto rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 sticky top-0">
+            <thead className="border-b bg-muted/50">
               <tr className="text-left">
                 <th className="py-2.5 px-3 font-medium text-muted-foreground">Bénéficiaire</th>
                 <th className="py-2.5 px-3 font-medium text-muted-foreground">Type</th>
@@ -134,8 +134,8 @@ export function AssuresTab({ assures, search, onSearchChange, totalCount }: {
                 <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="py-2.5 px-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                      <div className="h-8 w-8 rounded-full bg-info-100 dark:bg-info-950/40 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-info-700 dark:text-info-300">
                           {a.prenom?.[0]}{a.nom[0]}
                         </span>
                       </div>
@@ -157,7 +157,7 @@ export function AssuresTab({ assures, search, onSearchChange, totalCount }: {
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {a.actif ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mx-auto" />
+                      <CheckCircle2 className="h-4 w-4 text-brand-500 mx-auto" />
                     ) : (
                       <X className="h-4 w-4 text-muted-foreground mx-auto" />
                     )}
@@ -189,8 +189,8 @@ export function PrestatairesTab({ prestataires, search, onSearchChange, totalCou
       {prestataires.length > 0 && (
         <div className="flex items-center gap-4 mb-3 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-            <span className="font-medium text-emerald-600">{nbActifs} actif(s)</span>
+            <CheckCircle2 className="h-3 w-3 text-brand-500" />
+            <span className="font-medium text-brand-600">{nbActifs} actif(s)</span>
           </span>
           <span className="flex items-center gap-1">
             <X className="h-3 w-3 text-red-500" />
@@ -218,7 +218,7 @@ export function PrestatairesTab({ prestataires, search, onSearchChange, totalCou
       ) : (
         <div className="max-h-[50vh] overflow-y-auto rounded-lg border">
           <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50 sticky top-0">
+            <thead className="border-b bg-muted/50">
               <tr className="text-left">
                 <th className="py-2.5 px-3 font-medium text-muted-foreground">Prestataire</th>
                 <th className="py-2.5 px-3 font-medium text-muted-foreground">Type</th>
@@ -238,11 +238,11 @@ export function PrestatairesTab({ prestataires, search, onSearchChange, totalCou
                     <div className="flex items-center gap-2.5">
                       <div className={cn(
                         'h-8 w-8 rounded-full flex items-center justify-center shrink-0',
-                        p.actifSociete ? 'bg-purple-100 dark:bg-purple-950/40' : 'bg-muted'
+                        p.actifSociete ? 'bg-violet-100 dark:bg-violet-950/40' : 'bg-muted'
                       )}>
                         <Stethoscope className={cn(
                           'h-4 w-4',
-                          p.actifSociete ? 'text-purple-700 dark:text-purple-300' : 'text-muted-foreground'
+                          p.actifSociete ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground'
                         )} />
                       </div>
                       <div>
@@ -267,7 +267,7 @@ export function PrestatairesTab({ prestataires, search, onSearchChange, totalCou
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {p.actifSociete ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 dark:text-emerald-300 text-[10px] hover:bg-emerald-100">
+                      <Badge className="bg-brand-100 text-brand-700 dark:text-brand-300 text-[10px] hover:bg-brand-100">
                         <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Actif
                       </Badge>
                     ) : (
@@ -301,7 +301,7 @@ export function ContactsTab({ contacts, search, onSearchChange, totalCount, load
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
+        <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
         <span className="ml-2 text-xs text-muted-foreground">Chargement des contacts...</span>
       </div>
     );
@@ -321,7 +321,7 @@ export function ContactsTab({ contacts, search, onSearchChange, totalCount, load
             />
           </div>
         )}
-        <Button size="sm" onClick={onAdd} className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs gap-1">
+        <Button size="sm" onClick={onAdd} className="bg-brand-600 hover:bg-brand-700 text-white h-8 text-xs gap-1">
           <Plus className="h-3.5 w-3.5" /> Ajouter
         </Button>
       </div>

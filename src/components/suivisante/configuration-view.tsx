@@ -33,7 +33,7 @@ export default function ConfigurationView() {
       {/* Statut des bots */}
       <div>
         <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-          <Zap className="h-4 w-4 text-emerald-600" />
+          <Zap className="h-4 w-4 text-brand-600" />
           Bots de communication
         </h3>
         <BotsStatut bots={cfg.bots} botStatus={cfg.botStatus} />
@@ -44,16 +44,16 @@ export default function ConfigurationView() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Mail className="h-4 w-4 text-emerald-600" />
+              <Mail className="h-4 w-4 text-brand-600" />
               Email mensuel aux sociétés client
             </CardTitle>
             {cfg.configSource === 'db' && (
-              <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200">
+              <Badge variant="outline" className="text-[10px] text-brand-600 border-brand-200">
                 Configuré en base de données
               </Badge>
             )}
             {cfg.configSource === 'env' && !cfg.dbConfig && (
-              <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200">
+              <Badge variant="outline" className="text-[10px] text-info-600 border-info-200">
                 Variables d&apos;environnement
               </Badge>
             )}
@@ -65,7 +65,7 @@ export default function ConfigurationView() {
             {cfg.smtpStatus === null ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : cfg.smtpStatus.ok ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <CheckCircle2 className="h-4 w-4 text-brand-600" />
             ) : (
               <XCircle className="h-4 w-4 text-amber-600" />
             )}

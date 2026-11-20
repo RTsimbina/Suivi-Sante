@@ -46,7 +46,7 @@ export default function JustificatifsTab({
             id="upload-justificatif"
             accept=".pdf,.jpg,.jpeg,.png,.webp"
             onChange={(e) => onSelectFichier(e.target.files?.[0] || null)}
-            className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-emerald-50 dark:file:bg-emerald-950/40 file:text-emerald-700 dark:file:text-emerald-300 hover:file:bg-emerald-100 dark:hover:file:bg-emerald-900/50"
+            className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-brand-50 dark:file:bg-brand-950/40 file:text-brand-700 dark:file:text-brand-300 hover:file:bg-brand-100 dark:hover:file:bg-brand-900/50"
           />
         </div>
         <Select value={uploadType} onValueChange={onTypeChange}>
@@ -64,7 +64,7 @@ export default function JustificatifsTab({
         </Select>
         <Button
           size="sm"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 gap-1 shrink-0"
+          className="bg-brand-600 hover:bg-brand-700 text-white h-9 gap-1 shrink-0"
           onClick={onEnvoyer}
           disabled={uploading || !uploadFile}
         >
@@ -79,8 +79,8 @@ export default function JustificatifsTab({
             key={j.id}
             className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
           >
-            <div className="h-10 w-10 rounded-md bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center shrink-0">
-              <FileText className="h-5 w-5 text-emerald-600" />
+            <div className="h-10 w-10 rounded-md bg-brand-50 dark:bg-brand-950/40 flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-brand-600" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{j.nomFichier}</p>

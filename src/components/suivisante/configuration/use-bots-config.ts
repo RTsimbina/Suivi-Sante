@@ -209,8 +209,8 @@ export function useBotsConfig() {
 
   const bots: BotStatus[] = [
     { nom: 'WhatsApp Bot', canal: 'WHATSAPP', actif: botStatus?.whatsapp?.actif || false, messagesTotal: messages.filter(m => m.canal === 'WHATSAPP').length, icon: MessageSquare, couleur: 'text-green-600 bg-green-50' },
-    { nom: 'Telegram Bot', canal: 'TELEGRAM', actif: botStatus?.telegram?.actif || false, messagesTotal: messages.filter(m => m.canal === 'TELEGRAM').length, icon: Send, couleur: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' },
-    { nom: 'Messenger Bot', canal: 'MESSENGER', actif: botStatus?.messenger?.actif || false, messagesTotal: messages.filter(m => m.canal === 'MESSENGER').length, icon: Bot, couleur: 'text-indigo-600 bg-indigo-50' },
+    { nom: 'Telegram Bot', canal: 'TELEGRAM', actif: botStatus?.telegram?.actif || false, messagesTotal: messages.filter(m => m.canal === 'TELEGRAM').length, icon: Send, couleur: 'text-info-600 bg-info-50 dark:bg-info-950/40' },
+    { nom: 'Messenger Bot', canal: 'MESSENGER', actif: botStatus?.messenger?.actif || false, messagesTotal: messages.filter(m => m.canal === 'MESSENGER').length, icon: Bot, couleur: 'text-violet-600 bg-violet-50' },
   ];
 
   return {

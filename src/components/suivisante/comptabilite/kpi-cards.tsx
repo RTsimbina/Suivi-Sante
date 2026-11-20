@@ -26,10 +26,10 @@ interface KpiDef {
 }
 
 const kpiDefs: KpiDef[] = [
-  { key: 'decomptesRecus', label: 'Décomptes reçus', icon: FileSpreadsheet, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-950/40' },
-  { key: 'paiementsEffectues', label: 'Paiements effectués', icon: BadgeCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+  { key: 'decomptesRecus', label: 'Décomptes reçus', icon: FileSpreadsheet, color: 'text-info-600', bg: 'bg-info-50 dark:bg-info-950/40' },
+  { key: 'paiementsEffectues', label: 'Paiements effectués', icon: BadgeCheck, color: 'text-brand-600', bg: 'bg-brand-50 dark:bg-brand-950/40' },
   { key: 'enCoursPaiement', label: 'En cours de paiement', icon: HourglassIcon, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40' },
-  { key: 'montantTotalPaye', label: 'Montant total payé', icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/40', format: true },
+  { key: 'montantTotalPaye', label: 'Montant total payé', icon: Wallet, color: 'text-brand-600', bg: 'bg-brand-50 dark:bg-brand-950/40', format: true },
 ];
 
 export default function KpiCards({ comptabilite }: { comptabilite: ComptaKpi }) {

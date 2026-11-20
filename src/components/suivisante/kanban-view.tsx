@@ -73,7 +73,7 @@ export default function KanbanView() {
             size="sm"
             variant="outline"
             onClick={() => setAssignDialogOpen(true)}
-            className="text-xs gap-1.5 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+            className="text-xs gap-1.5 border-brand-300 dark:border-brand-700 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-950/30"
           >
             <UserPlus className="h-3.5 w-3.5" />
             Assigner en masse

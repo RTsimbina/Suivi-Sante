@@ -51,17 +51,17 @@ export default function CourrielsCard({
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-sky-600" />
+            <Mail className="h-5 w-5 text-info-600" />
             <CardTitle className="text-sm font-medium">Courriels</CardTitle>
             {pagination.total > 0 && (
-              <Badge variant="outline" className="text-[10px] border-sky-200 dark:border-sky-800 text-sky-600 bg-sky-50 dark:bg-sky-950/40">
+              <Badge variant="outline" className="text-[10px] border-info-200 dark:border-info-800 text-info-600 bg-info-50 dark:bg-info-950/40">
                 {pagination.total}
               </Badge>
             )}
           </div>
           <Button
             size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 text-xs h-8"
+            className="bg-brand-600 hover:bg-brand-700 text-xs h-8"
             onClick={onNouveau}
           >
             <Plus className="h-3.5 w-3.5 mr-1.5" />

@@ -58,7 +58,7 @@ export function SortableCard({ dossier, showUnassigned }: { dossier: Dossier; sh
         <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal">
           {typeDossierLabel(dossier.typeDossier)}
         </Badge>
-        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+        <span className="text-xs font-semibold text-brand-700 dark:text-brand-300">
           {formatMontant(dossier.montantReclame)}
         </span>
       </div>

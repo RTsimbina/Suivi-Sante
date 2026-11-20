@@ -155,21 +155,21 @@ export default function ComptaImportZone({
         {result && (
           <div className="space-y-3 p-4 rounded-lg border bg-muted/20">
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="size-4 text-emerald-600" />
+              <CheckCircle2 className="size-4 text-brand-600" />
               <span className="text-sm font-semibold text-foreground">Résultat de l&apos;import</span>
               <Badge variant="outline" className="text-xs ml-auto">{result.source}</Badge>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30">
-                <p className="text-lg font-bold text-emerald-600">{result.nbSucces}</p>
+              <div className="p-2 rounded-md bg-brand-50 dark:bg-brand-950/30">
+                <p className="text-lg font-bold text-brand-600">{result.nbSucces}</p>
                 <p className="text-[10px] text-muted-foreground">Succès</p>
               </div>
               <div className="p-2 rounded-md bg-red-50 dark:bg-red-950/30">
                 <p className="text-lg font-bold text-red-600">{result.nbErreurs}</p>
                 <p className="text-[10px] text-muted-foreground">Erreurs</p>
               </div>
-              <div className="p-2 rounded-md bg-sky-50 dark:bg-sky-950/30">
-                <p className="text-lg font-bold text-sky-600">{result.tauxSucces}%</p>
+              <div className="p-2 rounded-md bg-info-50 dark:bg-info-950/30">
+                <p className="text-lg font-bold text-info-600">{result.tauxSucces}%</p>
                 <p className="text-[10px] text-muted-foreground">Taux</p>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function ComptaImportZone({
               </p>
             )}
             {result.totalMontantImporte !== undefined && result.totalMontantImporte > 0 && (
-              <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+              <p className="text-xs font-medium text-brand-700 dark:text-brand-300 flex items-center gap-1">
                 <Wallet className="size-3" />
                 Total montant importé : {formatMontantCourt(result.totalMontantImporte)}
               </p>

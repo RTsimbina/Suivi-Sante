@@ -91,7 +91,7 @@ export default function EditPrestataireDialog({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Pencil className="h-5 w-5 text-emerald-600" /> Modifier le prestataire
+            <Pencil className="h-5 w-5 text-brand-600" /> Modifier le prestataire
           </DialogTitle>
         </DialogHeader>
 
@@ -319,7 +319,7 @@ export default function EditPrestataireDialog({
               Annuler
             </Button>
             <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="flex-1 bg-brand-600 hover:bg-brand-700 text-white"
               onClick={handleEnregistrer}
               disabled={saving}
             >

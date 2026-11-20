@@ -61,7 +61,7 @@ export default function JournalView() {
       {/* ═══ Chargement ═══ */}
       {journal.loading && (
         <div className="flex items-center justify-center py-16">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
           <span className="ml-2 text-sm text-muted-foreground">Chargement du journal...</span>
         </div>
       )}
@@ -109,7 +109,7 @@ export default function JournalView() {
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
           <Card className="p-6">
             <div className="flex items-center gap-3">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
               <span className="text-sm">Génération de l&apos;export en cours...</span>
             </div>
           </Card>

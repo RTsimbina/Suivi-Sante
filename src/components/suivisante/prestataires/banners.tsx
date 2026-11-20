@@ -40,23 +40,23 @@ export function SyncNeededBanner({
 }) {
   if (!show) return null;
   return (
-    <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40">
+    <div className="p-4 rounded-lg bg-info-50 dark:bg-info-950/20 border border-info-200 dark:border-info-800/40">
       <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
-          <Link2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        <div className="h-10 w-10 rounded-lg bg-info-100 dark:bg-info-950/50 flex items-center justify-center shrink-0">
+          <Link2 className="h-5 w-5 text-info-600 dark:text-info-400" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Aucun lien prestataire-société</p>
-          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+          <p className="text-sm font-medium text-info-800 dark:text-info-200">Aucun lien prestataire-société</p>
+          <p className="text-xs text-info-700 dark:text-info-300 mt-1">
             {message || 'Les prestataires doivent être liés aux sociétés pour gérer leur statut (actif/inactif). '}
             Cliquez ci-dessous pour créer automatiquement les liens à partir des dossiers existants.
           </p>
           {result && (
-            <p className="text-xs mt-2 font-medium text-emerald-700 dark:text-emerald-300">{result}</p>
+            <p className="text-xs mt-2 font-medium text-brand-700 dark:text-brand-300">{result}</p>
           )}
           <div className="mt-3">
             <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+              className="bg-info-600 hover:bg-info-700 text-white h-8 text-xs"
               onClick={onSync}
               disabled={syncing}
             >
@@ -77,7 +77,7 @@ export function InfoBanner() {
       <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
       <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
         <span className="font-semibold">Statut par société :</span>{' '}
-        <span className="font-medium text-emerald-700 dark:text-emerald-300">Actif</span> = le prestataire est autorisé pour cette société.{' '}
+        <span className="font-medium text-brand-700 dark:text-brand-300">Actif</span> = le prestataire est autorisé pour cette société.{' '}
         <span className="font-medium text-red-700 dark:text-red-300">Inactif</span> = les actes de ce prestataire seront{' '}
         <span className="font-semibold">refusés automatiquement</span> pour cette société.
       </p>

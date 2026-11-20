@@ -44,9 +44,9 @@ export const TYPE_BENEF_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 export const TYPE_BENEF_COLORS: Record<string, string> = {
-  ASSURE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-  CONJOINT: 'bg-pink-100 text-pink-700 dark:bg-pink-950/40 dark:text-pink-300',
-  ENFANT: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+  ASSURE: 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300',
+  CONJOINT: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+  ENFANT: 'bg-info-100 text-info-700 dark:bg-info-950/40 dark:text-info-300',
 };
 
 /** Format « 01 janv. 2025 » propre à ce module (mois abrégé). */

@@ -110,7 +110,7 @@ export default function ProfilMotDePasse({
           <div className="flex items-center gap-2 pt-2">
             <Button
               type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-brand-600 hover:bg-brand-700 text-white"
               disabled={submittingMdp || !ancienMdp || !nouveauMdp || nouveauMdp !== confirmMdp}
             >
               {submittingMdp && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}

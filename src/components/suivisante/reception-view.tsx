@@ -91,7 +91,7 @@ export default function ReceptionView({ kpis, loading }: ReceptionViewProps) {
                 <div>
                   <p className="text-xs text-muted-foreground">{item.label}</p>
                   <p className="text-sm font-medium">{item.value}</p>
-                  {item.auto && <Badge variant="outline" className="mt-1 text-emerald-600 border-emerald-200 dark:border-emerald-800 text-[10px]">Auto-généré par IA</Badge>}
+                  {item.auto && <Badge variant="outline" className="mt-1 text-brand-600 border-brand-200 dark:border-brand-800 text-[10px]">Auto-généré par IA</Badge>}
                 </div>
               </div>
             ))}

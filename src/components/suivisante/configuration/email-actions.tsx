@@ -66,7 +66,7 @@ export default function EmailActions({
           <Button
             onClick={onSendRapport}
             disabled={sendingRapport || !smtpConfigured}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0"
+            className="bg-brand-600 hover:bg-brand-700 text-white shrink-0"
             title={!smtpConfigured ? 'Configurez SMTP d\'abord' : undefined}
           >
             {sendingRapport && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
