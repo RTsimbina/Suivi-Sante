@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Sparkles, LogOut, Stethoscope, Scale, Receipt, FileText, AlertTriangle, RefreshCw, Bot, Users,
@@ -183,6 +184,7 @@ function ContenuPortailPrestataire() {
             <span className='mr-1 h-1.5 w-1.5 rounded-full bg-brand-500 inline-block' />
             Connecté
           </Badge>
+          <ThemeToggle />
           <Button variant='ghost' size='sm' className='text-xs gap-1.5' onClick={handleLogout}>
             <LogOut className='h-3.5 w-3.5' />
             <span className='hidden sm:inline'>Déconnexion</span>
@@ -190,8 +192,9 @@ function ContenuPortailPrestataire() {
         </div>
       </header>
 
-      {/* Barre de filtre par période — système commun de la plateforme */}
-      <div className='border-b bg-card/60 px-4 py-2 flex flex-col items-center gap-1'>
+      {/* Barre de filtre par période — système commun de la plateforme.
+          Sticky sous l'en-tête (top-14 = h-14 du header) : la zone d'en-tête reste figée au défilement. */}
+      <div className='sticky top-14 z-40 border-b bg-card px-4 py-2 flex flex-col items-center gap-1'>
         <PeriodFilter dateRefLabel='Date de réception des dossiers' />
         <div className='flex items-center gap-2'>
           <p className='text-[10px] text-muted-foreground'>

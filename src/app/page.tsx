@@ -202,7 +202,7 @@ function ContenuSante() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="h-dvh flex overflow-hidden bg-background">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -230,7 +230,7 @@ function ContenuSante() {
         </div>
 
         {/* Navigation grouped by section */}
-        <ScrollArea className="flex-1 py-2">
+        <ScrollArea className="min-h-0 flex-1 py-2">
           <nav className="space-y-3 px-3">
             {Object.entries(sections).map(([section, items]) => (
               <div key={section}>
@@ -297,7 +297,8 @@ function ContenuSante() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
+        {/* Top bar — figée : le shell est en hauteur bornée (h-screen +
+            overflow-hidden) et le défilement se fait DANS <main> ci-dessous */}
         <header className="h-14 border-b bg-card flex items-center px-4 gap-3 shrink-0">
           <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setSidebarOpen(true)}>
             <Menu className="h-5 w-5" />
@@ -325,13 +326,13 @@ function ContenuSante() {
 
         {/* Barre de filtre par période — réutilisable, visible sur les vues concernées */}
         {isViewAllowed && VUES_AVEC_PERIODE.includes(view) && (
-          <div className="border-b bg-muted/30 px-4 py-2 flex justify-start lg:justify-end">
+          <div className="border-b bg-muted/30 px-4 py-2 flex justify-start lg:justify-end shrink-0">
             <PeriodFilter dateRefLabel={DATE_REFERENCE_PAR_VUE[view]} />
           </div>
         )}
 
         {/* Page content — garde : ne rien rendre si la vue n'est pas autorisée */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
           {isViewAllowed && view === 'direction' && <DirectionView kpis={kpis} loading={loadingKpis} />}
           {isViewAllowed && view === 'dossiers' && <DossiersView />}
           {isViewAllowed && view === 'kanban' && <div className="h-[calc(100vh-8rem)]"><KanbanView /></div>}
