@@ -80,7 +80,7 @@ export default function PortailEntreprise({
       <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3'>
         <KPICard icon={<Users className='h-4 w-4 text-brand-600' />} label='Assurés' value={String(data.kpis.totalAssures || 0)} color='emerald' />
         <KPICard icon={<Baby className='h-4 w-4 text-info-600' />} label='Ayants droit' value={String(data.kpis.totalAyantsDroit || 0)} color='sky' />
-        <KPICard icon={<FolderOpen className='h-4 w-4 text-violet-600' />} label='Total dossiers' value={String(data.kpis.totalDossiers)} color='violet' />
+        <KPICard icon={<FolderOpen className='h-4 w-4 text-accent-600' />} label='Total dossiers' value={String(data.kpis.totalDossiers)} color='accent' />
         <KPICard icon={<BarChart3 className='h-4 w-4 text-info-600' />} label='Montant réclamé' value={formatMontant(data.kpis.totalReclame || 0)} color='sky' />
         <KPICard icon={<TrendingUp className='h-4 w-4 text-teal-600' />} label='Montant payé' value={formatMontant(data.kpis.totalPaye || 0)} color='teal' />
         <KPICard icon={<Clock className='h-4 w-4 text-amber-600' />} label='En cours' value={String(data.kpis.enCours || 0)} color='amber' />

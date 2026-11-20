@@ -194,7 +194,7 @@ export default function SocieteDetail({
         {contrats.length > 0 && (
           <div className="mb-4">
             <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-              <DollarSign className="h-3.5 w-3.5 text-rose-500" />
+              <DollarSign className="h-3.5 w-3.5 text-famille-500" />
               Contrats et soldes
             </p>
             <div className="overflow-x-auto rounded-lg border">

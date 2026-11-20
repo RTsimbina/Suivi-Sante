@@ -14,11 +14,11 @@
  *
  * Un état optimiste rend le clic instantané : la navigation (router.push)
  * est asynchrone, l'onglet affiché bascule immédiatement puis l'URL se met
- * à jour. Dès que searchParams change, l'optimiste est remis à null : l'URL
+ * à jour. Dès que searchParams change (invalidation dérivée — voir plus bas), l.URL
  * redevient la seule source de vérité.
  * ────────────────────────────────────────────────────────────────────────── */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { PARAM_ONGLET } from '@/lib/navigation';
 
@@ -35,17 +35,22 @@ export function useOngletUrl(valeurs: readonly string[], defaut: string) {
   const brut = searchParams.get(PARAM_ONGLET);
   const depuisUrl = brut && valeurs.includes(brut) ? brut : defaut;
 
-  const [optimiste, setOptimiste] = useState<string | null>(null);
-  // L'URL a changé (navigation aboutie) : l'état optimiste n'a plus de raison
-  // d'être — l'URL redevient la source de vérité unique.
-  useEffect(() => {
-    setOptimiste(null);
-  }, [searchParams]);
+  const paramsCourants = searchParams.toString();
+  // État optimiste : { valeur cliquée, query string AU MOMENT du clic }.
+  // Invalidé de façon DÉRIVÉE (pas d'effet) : dès que searchParams évolue
+  // (navigation aboutie, retour arrière, changement de vue), la query
+  // courante diffère de celle du clic → l'optimiste est ignoré et l'URL
+  // redevient la source de vérité unique. Éviter un setState synchrone dans
+  // un useEffect (rendu en cascade — règle react-hooks/set-state-in-effect,
+  // cf. react.dev/learn/you-might-not-need-an-effect).
+  const [optimiste, setOptimiste] = useState<{ valeur: string; pourUrl: string } | null>(null);
+  const valeurOptimiste =
+    optimiste && optimiste.pourUrl === paramsCourants ? optimiste.valeur : null;
 
-  const onglet = optimiste ?? depuisUrl;
+  const onglet = valeurOptimiste ?? depuisUrl;
 
   const setOnglet = (v: string) => {
-    setOptimiste(v);
+    setOptimiste({ valeur: v, pourUrl: paramsCourants });
     const params = new URLSearchParams(searchParams.toString());
     // URL propre : l'onglet par défaut n'apparaît pas dans l'URL
     if (v === defaut) params.delete(PARAM_ONGLET);

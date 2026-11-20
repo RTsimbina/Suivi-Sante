@@ -76,7 +76,7 @@ export default function SocietesView({ userRole }: Props) {
     if (sid && list.societes.length > 0 && !list.societes.some(s => s.id === sid)) {
       majUrlSociete(null, null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams, list.societes, list.selectedId, list.activeTab]);
 
   // Miroir état → URL : l'URL reflète TOUJOURS la page affichée, y compris
@@ -91,7 +91,7 @@ export default function SocietesView({ userRole }: Props) {
     if (list.selectedId && (!sidUrl || !ongletUrlValide)) {
       majUrlSociete(list.selectedId, list.activeTab);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams, list.selectedId, list.activeTab]);
 
   // ─── Rendu ──────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ export default function SocietesView({ userRole }: Props) {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center">
-              <Stethoscope className="h-4 w-4 text-violet-600" />
+            <div className="h-9 w-9 rounded-lg bg-accent-50 dark:bg-accent-950/40 flex items-center justify-center">
+              <Stethoscope className="h-4 w-4 text-accent-600" />
             </div>
             <div>
               <p className="text-lg font-bold">{list.totalBaremes}</p>
@@ -146,8 +146,8 @@ export default function SocietesView({ userRole }: Props) {
         </Card>
         <Card>
           <CardContent className="p-3 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center">
-              <DollarSign className="h-4 w-4 text-rose-600" />
+            <div className="h-9 w-9 rounded-lg bg-famille-50 dark:bg-famille-950/40 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-famille-600" />
             </div>
             <div>
               <p className="text-lg font-bold">{list.totalContrats}</p>

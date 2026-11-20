@@ -34,7 +34,7 @@ export function formatDate(d: string): string {
 export function StatutIcon({ statut }: { statut: string }) {
   if (statut === 'PAYE') return <CheckCircle className='h-3.5 w-3.5 text-teal-600' />;
   if (statut === 'REJETE') return <XCircle className='h-3.5 w-3.5 text-red-500' />;
-  if (statut === 'EN_PAIEMENT' || statut === 'EN_COMPTABILITE') return <Clock className='h-3.5 w-3.5 text-violet-500' />;
+  if (statut === 'EN_PAIEMENT' || statut === 'EN_COMPTABILITE') return <Clock className='h-3.5 w-3.5 text-accent-500' />;
   if (statut === 'EN_ANALYSE') return <Clock className='h-3.5 w-3.5 text-amber-500' />;
   return <Info className='h-3.5 w-3.5 text-info-500' />;
 }

@@ -21,7 +21,7 @@ export default function ProfilAvatar({ currentAvatar, avatarLoading, onChanger }
     <Card className="border shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <Palette className="h-4 w-4 text-violet-500" />
+          <Palette className="h-4 w-4 text-accent-500" />
           Avatar
         </CardTitle>
       </CardHeader>

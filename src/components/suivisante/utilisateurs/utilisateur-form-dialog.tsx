@@ -91,7 +91,7 @@ export default function UtilisateurFormDialog({
                 {ROLES.map(r => (
                   <SelectItem key={r.value} value={r.value}>
                     <span className="flex items-center gap-2">
-                      <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-info-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-violet-500' : 'bg-violet-500')} />
+                      <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-info-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-accent-500' : 'bg-accent-500')} />
                       {r.label}
                     </span>
                   </SelectItem>

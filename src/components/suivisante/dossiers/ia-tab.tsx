@@ -24,32 +24,32 @@ export default function IaTab({ dossier, alertes, loadingAlertes }: IaTabProps) 
   return (
     <div className="space-y-4">
       {/* Encart d'analyse IA */}
-      <Card className="border-violet-200 bg-gradient-to-br from-violet-50/80 to-violet-50/60 overflow-hidden">
+      <Card className="border-accent-200 bg-gradient-to-br from-accent-50/80 to-accent-50/60 overflow-hidden">
         <CardContent className="p-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
+          <div className="flex items-center gap-2 text-sm font-medium text-accent-800">
             <Brain className="size-4" />
             <span>Analyse IA du dossier</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
+            <div className="rounded-lg bg-card/70 border border-accent-200 dark:border-accent-800 p-3 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Montant réclamé</p>
               <p className="text-base font-bold text-foreground mt-0.5">{formatMontant(dossier.montantReclame)}</p>
             </div>
-            <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
+            <div className="rounded-lg bg-card/70 border border-accent-200 dark:border-accent-800 p-3 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Montant validé</p>
               <p className="text-base font-bold mt-0.5" style={{color: dossier.montantValide && dossier.montantValide < dossier.montantReclame ? '#dc2626' : '#059669'}}>
                 {dossier.montantValide ? formatMontant(dossier.montantValide) : '—'}
               </p>
             </div>
-            <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
+            <div className="rounded-lg bg-card/70 border border-accent-200 dark:border-accent-800 p-3 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Taux couverture</p>
-              <p className="text-base font-bold text-violet-700 dark:text-violet-300 mt-0.5">
+              <p className="text-base font-bold text-accent-700 dark:text-accent-300 mt-0.5">
                 {dossier.montantValide && dossier.montantReclame > 0
                   ? ((dossier.montantValide / dossier.montantReclame) * 100).toFixed(1) + '%'
                   : '—'}
               </p>
             </div>
-            <div className="rounded-lg bg-card/70 border border-violet-200 dark:border-violet-800 p-3 text-center">
+            <div className="rounded-lg bg-card/70 border border-accent-200 dark:border-accent-800 p-3 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Ticket mod.</p>
               <p className="text-base font-bold text-amber-600 mt-0.5">
                 {dossier.ticketModerateur ? formatMontant(dossier.ticketModerateur) : '—'}
@@ -62,7 +62,7 @@ export default function IaTab({ dossier, alertes, loadingAlertes }: IaTabProps) 
       {/* Alertes détectées */}
       {loadingAlertes ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-violet-500" />
+          <Loader2 className="h-5 w-5 animate-spin text-accent-500" />
           <span className="ml-2 text-sm text-muted-foreground">Analyse IA en cours...</span>
         </div>
       ) : alertes.length > 0 ? (
@@ -110,7 +110,7 @@ export default function IaTab({ dossier, alertes, loadingAlertes }: IaTabProps) 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-violet-500" />
+            <TrendingDown className="h-4 w-4 text-accent-500" />
             Indicateurs de risque
           </CardTitle>
         </CardHeader>

@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 const steps = [
   { title: 'Réception', desc: 'Saisie dans Excel, création ID unique', icon: FileInput, color: 'text-info-600', bg: 'bg-info-50 dark:bg-info-950/40', border: 'border-info-200 dark:border-info-800' },
   { title: 'Service Technique', desc: 'Traitement via ISA', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-800' },
-  { title: 'Comptabilité', desc: 'Décompte Excel + Paiement SAGE', icon: ArrowRight, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-200 dark:border-violet-800' },
+  { title: 'Comptabilité', desc: 'Décompte Excel + Paiement SAGE', icon: ArrowRight, color: 'text-accent-600', bg: 'bg-accent-50 dark:bg-accent-950/40', border: 'border-accent-200 dark:border-accent-800' },
   { title: 'Paiement', desc: 'Virement effectué', icon: Timer, color: 'text-brand-600', bg: 'bg-brand-50 dark:bg-brand-950/40', border: 'border-brand-200 dark:border-brand-800' },
 ];
 

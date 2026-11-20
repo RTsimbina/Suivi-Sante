@@ -23,12 +23,28 @@ import type { PaginationInfo, PortailData, PortailDossier } from './types';
 
 // ─── Cartes KPI ──────────────────────────────────────────────────────────────
 
+// Mapping STATIQUE des couleurs KPI : Tailwind v4 ne génère que les classes
+// présentes textuellement dans les sources — l'ancienne construction
+// dynamique ('border-' + color + '-100') produisait des classes
+// ingénérables (bordures et fonds silencieusement absents du CSS).
+// emerald → jetons brand, sky → jetons info, accent → jetons violet ;
+// amber/red/teal = couleurs standard de statut (charte des alertes).
+const COULEURS_KPI: Record<string, { bordure: string; fond: string }> = {
+  emerald: { bordure: 'border-brand-100 dark:border-brand-800', fond: 'bg-brand-50 dark:bg-brand-950/40' },
+  sky: { bordure: 'border-info-100 dark:border-info-800', fond: 'bg-info-50 dark:bg-info-950/40' },
+  accent: { bordure: 'border-accent-100 dark:border-accent-800', fond: 'bg-accent-50 dark:bg-accent-950/40' },
+  amber: { bordure: 'border-amber-100 dark:border-amber-800', fond: 'bg-amber-50 dark:bg-amber-950/40' },
+  red: { bordure: 'border-red-100 dark:border-red-800', fond: 'bg-red-50 dark:bg-red-950/40' },
+  teal: { bordure: 'border-teal-100 dark:border-teal-800', fond: 'bg-teal-50 dark:bg-teal-950/40' },
+};
+
 export function KPICard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
+  const couleurs = COULEURS_KPI[color] ?? COULEURS_KPI.emerald;
   return (
-    <Card className={cn('border-' + color + '-100 dark:border-' + color + '-800')}>
+    <Card className={couleurs.bordure}>
       <CardContent className='p-3 flex flex-col gap-1.5'>
         <div className='flex items-center gap-2'>
-          <div className={cn('p-1.5 rounded-md bg-' + color + '-50 dark:bg-' + color + '-950/40')}>
+          <div className={cn('p-1.5 rounded-md', couleurs.fond)}>
             {icon}
           </div>
           <span className='text-[10px] text-muted-foreground font-medium leading-tight'>{label}</span>

@@ -238,11 +238,11 @@ export function PrestatairesTab({ prestataires, search, onSearchChange, totalCou
                     <div className="flex items-center gap-2.5">
                       <div className={cn(
                         'h-8 w-8 rounded-full flex items-center justify-center shrink-0',
-                        p.actifSociete ? 'bg-violet-100 dark:bg-violet-950/40' : 'bg-muted'
+                        p.actifSociete ? 'bg-accent-100 dark:bg-accent-950/40' : 'bg-muted'
                       )}>
                         <Stethoscope className={cn(
                           'h-4 w-4',
-                          p.actifSociete ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground'
+                          p.actifSociete ? 'text-accent-700 dark:text-accent-300' : 'text-muted-foreground'
                         )} />
                       </div>
                       <div>

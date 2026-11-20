@@ -71,6 +71,35 @@
   --color-info-800: var(--info-800);
   --color-info-900: var(--info-900);
   --color-info-950: var(--info-950);
+  /* accent = violet — accentuation de domaine : Intelligence IA, badges de
+     rôles (COMPTABILITE, PORTAIL_CLIENT), étapes de pipeline, statuts de
+     traitement. famille = rose — données humaines et familiales (conjoints,
+     membres de famille) et repères financiers associés. Deux échelles
+     DISTINCTES : ne pas fusionner — accent (violet) et famille (rose) ont
+     chacun leur signification, à l'image de --suivi-rose (charte connexion,
+     sur-titres et filets) qui reste un jeton séparé. */
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+  --color-accent-950: var(--accent-950);
+  --color-famille-50: var(--famille-50);
+  --color-famille-100: var(--famille-100);
+  --color-famille-200: var(--famille-200);
+  --color-famille-300: var(--famille-300);
+  --color-famille-400: var(--famille-400);
+  --color-famille-500: var(--famille-500);
+  --color-famille-600: var(--famille-600);
+  --color-famille-700: var(--famille-700);
+  --color-famille-800: var(--famille-800);
+  --color-famille-900: var(--famille-900);
+  --color-famille-950: var(--famille-950);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -102,6 +131,31 @@
   --info-800: #075985;
   --info-900: #0c4a6e;
   --info-950: #082f49;
+  /* accent (violet) et famille (rose) — clair (échelles Tailwind v4
+     violet/rose à l'identique : la centralisation est sans changement
+     visuel, elle ne fait qu'ajouter la source de vérité unique) */
+  --accent-50: #f5f3ff;
+  --accent-100: #ede9fe;
+  --accent-200: #ddd6fe;
+  --accent-300: #c4b5fd;
+  --accent-400: #a78bfa;
+  --accent-500: #8b5cf6;
+  --accent-600: #7c3aed;
+  --accent-700: #6d28d9;
+  --accent-800: #5b21b6;
+  --accent-900: #4c1d95;
+  --accent-950: #2e1065;
+  --famille-50: #fff1f2;
+  --famille-100: #ffe4e6;
+  --famille-200: #fecdd3;
+  --famille-300: #fda4af;
+  --famille-400: #fb7185;
+  --famille-500: #f43f5e;
+  --famille-600: #e11d48;
+  --famille-700: #be123c;
+  --famille-800: #9f1239;
+  --famille-900: #881337;
+  --famille-950: #4c0519;
   /* Page de connexion — clair */
   --suivi-brand: #0C42A0;        /* bleu institutionnel : bouton principal, aplat */
   --suivi-brand-forte: #0A3685;  /* survol du bouton principal */
@@ -168,6 +222,30 @@
   --info-800: #075985;
   --info-900: #0c4a6e;
   --info-950: #082f49;
+  /* accent (violet) et famille (rose) — sombre : mêmes valeurs que clair,
+     comme brand/info — les composants permutent les paliers via dark: */
+  --accent-50: #f5f3ff;
+  --accent-100: #ede9fe;
+  --accent-200: #ddd6fe;
+  --accent-300: #c4b5fd;
+  --accent-400: #a78bfa;
+  --accent-500: #8b5cf6;
+  --accent-600: #7c3aed;
+  --accent-700: #6d28d9;
+  --accent-800: #5b21b6;
+  --accent-900: #4c1d95;
+  --accent-950: #2e1065;
+  --famille-50: #fff1f2;
+  --famille-100: #ffe4e6;
+  --famille-200: #fecdd3;
+  --famille-300: #fda4af;
+  --famille-400: #fb7185;
+  --famille-500: #f43f5e;
+  --famille-600: #e11d48;
+  --famille-700: #be123c;
+  --famille-800: #9f1239;
+  --famille-900: #881337;
+  --famille-950: #4c0519;
   /* Page de connexion — sombre */
   --suivi-brand: #0E4DB8;        /* bleu légèrement lumineux pour l'aplat nocturne */
   --suivi-brand-forte: #0C42A0;

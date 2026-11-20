@@ -193,13 +193,13 @@ export default function PortailSecuriseTab() {
                   <p className="text-2xl font-bold text-red-600">{kpis.totalRejete}</p>
                 </CardContent>
               </Card>
-              <Card className="border-violet-100">
+              <Card className="border-accent-100">
                 <CardContent className="p-4 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-950/40"><Users className="h-4 w-4 text-violet-600" /></div>
+                    <div className="p-2 rounded-lg bg-accent-50 dark:bg-accent-950/40"><Users className="h-4 w-4 text-accent-600" /></div>
                     <span className="text-xs text-muted-foreground font-medium">Taux paiement</span>
                   </div>
-                  <p className="text-2xl font-bold text-violet-700 dark:text-violet-300">
+                  <p className="text-2xl font-bold text-accent-700 dark:text-accent-300">
                     {kpis.totalDossiers > 0 ? ((kpis.totalPaye / kpis.totalReclame) * 100).toFixed(1) + '%' : '\u2014'}
                   </p>
                 </CardContent>

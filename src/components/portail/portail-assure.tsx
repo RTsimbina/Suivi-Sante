@@ -139,10 +139,10 @@ export default function PortailAssure({
                   <div key={m.id} className='flex items-center gap-3 p-3 rounded-lg border bg-card'>
                     <div className={cn(
                       'h-10 w-10 rounded-full flex items-center justify-center',
-                      m.typeBeneficiaire === 'CONJOINT' ? 'bg-violet-100 dark:bg-violet-900/50' : 'bg-info-100 dark:bg-info-900/50'
+                      m.typeBeneficiaire === 'CONJOINT' ? 'bg-accent-100 dark:bg-accent-900/50' : 'bg-info-100 dark:bg-info-900/50'
                     )}>
                       {m.typeBeneficiaire === 'CONJOINT'
-                        ? <Heart className='h-5 w-5 text-violet-600' />
+                        ? <Heart className='h-5 w-5 text-accent-600' />
                         : <Baby className='h-5 w-5 text-info-600' />
                       }
                     </div>
