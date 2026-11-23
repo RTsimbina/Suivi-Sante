@@ -18,9 +18,11 @@ export interface ReferentielItem {
 
 // ─── Rôles utilisateurs ─────────────────────────────────────────────────────
 
-/** Les 7 rôles de la plateforme (identiques à RoleType de auth-context). */
+/** Les 10 rôles de la plateforme (identiques à RoleType de auth-context). */
 export const ROLES = [
   'ADMINISTRATEUR',
+  'DIRECTION_GENERALE',
+  'RESPONSABLE_SERVICE',
   'ACCUEIL',
   'TECHNIQUE',
   'COMPTABILITE',
@@ -33,6 +35,8 @@ export const ROLES = [
 /** Libellés lisibles des rôles (avec accents — référence unique). */
 export const ROLE_LABELS: Record<string, string> = {
   ADMINISTRATEUR: 'Administrateur',
+  DIRECTION_GENERALE: 'Direction Générale',
+  RESPONSABLE_SERVICE: 'Responsable de service',
   ACCUEIL: 'Accueil',
   TECHNIQUE: 'Service Technique',
   COMPTABILITE: 'Comptabilité',
@@ -45,6 +49,8 @@ export const ROLE_LABELS: Record<string, string> = {
 /** Rôles internes (personnel de la caisse) — peuvent voir les commentaires privés. */
 export const INTERNAL_ROLES: string[] = [
   'ADMINISTRATEUR',
+  'DIRECTION_GENERALE',
+  'RESPONSABLE_SERVICE',
   'ACCUEIL',
   'TECHNIQUE',
   'COMPTABILITE',
@@ -57,6 +63,8 @@ export const EXTERNAL_ROLES = ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'] as const;
 /** Couleurs de badges par rôle (affichage uniforme des listes d'utilisateurs). */
 export const ROLE_COLORS: Record<string, string> = {
   ADMINISTRATEUR: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300',
+  DIRECTION_GENERALE: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300',
+  RESPONSABLE_SERVICE: 'bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300',
   ACCUEIL: 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300',
   TECHNIQUE: 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300',
   COMPTABILITE: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300',
@@ -73,6 +81,11 @@ export const SERVICES_GESTIONNAIRE: ReferentielItem[] = [
   { valeur: 'ACCUEIL', label: 'Accueil' },
   { valeur: 'TECHNIQUE', label: 'Service Technique' },
   { valeur: 'COMPTABILITE', label: 'Comptabilité' },
+  // Assignation native du contrôle médical (colonne Dossier.
+  // gestionnaireControleMedicalId) — même mécanique que les 3 services du
+  // circuit : un « gestionnaire » de référentiel peut être rattaché au service
+  // Contrôle médical et assigné aux dossiers (traçabilité KPI intégrée).
+  { valeur: 'CONTROLE_MEDICAL', label: 'Contrôle médical' },
 ];
 
 export function serviceGestionnaireLabel(service: string): string {

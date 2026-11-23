@@ -239,3 +239,43 @@ describe('resoudrePerimetreKpi (anti-usurpation d\u2019identité)', () => {
     expect(r.userIdEffective).toBeNull();
   });
 });
+
+// ─── R1 / R2 : Direction Générale et Responsable de service ─────────────────
+
+describe('resoudrePerimetreKpi (rôles R1 / R2)', () => {
+  it('R1 — la Direction Générale consulte en GLOBAL (comme l\u2019admin, sans paramétrage)', () => {
+    const r = resoudrePerimetreKpi('DIRECTION_GENERALE', 'dg1', 'col2');
+    expect(r.niveau).toBe('GLOBAL');
+    expect(r.userIdEffective).toBe('col2');
+    expect(r.serviceEffective).toBeNull();
+  });
+  it('R1 — la Direction Générale sans paramètre voit tout sans borne utilisateur', () => {
+    const r = resoudrePerimetreKpi('DIRECTION_GENERALE', 'dg1', null);
+    expect(r.niveau).toBe('GLOBAL');
+    expect(r.userIdEffective).toBeNull();
+  });
+  it('R2 — le responsable de service est borné à SON service (écrase tout paramètre)', () => {
+    const r = resoudrePerimetreKpi('RESPONSABLE_SERVICE', 'resp1', 'col2', 'TECHNIQUE');
+    expect(r.niveau).toBe('SERVICE');
+    expect(r.serviceEffective).toBe('TECHNIQUE');
+    // userId param accepté mais toujours INCLUS dans la borne service
+    expect(r.userIdEffective).toBe('col2');
+  });
+  it('R2 — fail-closed : sans service associé, serviceEffective est null (la route refuse)', () => {
+    const r = resoudrePerimetreKpi('RESPONSABLE_SERVICE', 'resp1', null, null);
+    expect(r.niveau).toBe('SERVICE');
+    expect(r.serviceEffective).toBeNull();
+  });
+  it('R2 — le service du compte prime sur un service demandé contradictoire', () => {
+    // le 4e argument représente la valeur du compte ; la route n'appelle la
+    // résolution QU'AVEC la valeur du compte — un paramètre client est ignoré.
+    const r = resoudrePerimetreKpi('RESPONSABLE_SERVICE', 'resp1', null, 'COMPTABILITE');
+    expect(r.serviceEffective).toBe('COMPTABILITE');
+  });
+  it('un rôle inconnu reste sans accès (fail-closed, comme avant)', () => {
+    const r = resoudrePerimetreKpi('UTILISATEUR', 'x1', 'x2');
+    expect(r.niveau).toBe('PERSONNEL');
+    expect(r.userIdEffective).toBe('x1');
+    expect(r.serviceEffective).toBeNull();
+  });
+});

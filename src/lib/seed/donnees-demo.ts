@@ -82,6 +82,9 @@ export const GESTIONNAIRES_DATA = [
   { nom: 'Lova N.', service: 'TECHNIQUE' },
   { nom: 'Fenitra K.', service: 'ACCUEIL' },
   { nom: 'Ony D.', service: 'COMPTABILITE' },
+  // R3 — assignation native du contrôle médical : un gestionnaire du service
+  // Contrôle médical est disponible en démo pour l'assignation des dossiers.
+  { nom: 'Soa E.', service: 'CONTROLE_MEDICAL' },
 ];
 
 export const MOTIFS_REJET = ['Pièces manquantes', 'Montant non conforme', 'Hors contrat', 'Dossier incomplet', 'Soins non couverts'];

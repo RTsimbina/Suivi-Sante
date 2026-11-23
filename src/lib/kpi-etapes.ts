@@ -25,6 +25,9 @@
  *   EN_COMPTABILITE/EN_PAIEMENT → COMPTABILITE ; PAYE/REJETE → terminal.
  * CONTROLE_MEDICAL est hors circuit des statuts : ses étapes sont ouvertes et
  * fermées explicitement par les profils habilités (rôle SANTE / ADMINISTRATEUR).
+ * R3 — l'assignation du gestionnaire de contrôle médical est native
+ * (Dossier.gestionnaireControleMedicalId) : la période ouverte porte cette
+ * assignation et suit ses changements (synchroniserEtapeControleMedical).
  */
 
 import { Prisma, type EtapeTraitement, type EtapeSuspension } from '@prisma/client';
@@ -80,7 +83,12 @@ export interface ContexteSynchronisation {
   /** Statut après l'opération (null = pas de changement de statut) */
   statutApres: string | null;
   /** Gestionnaires assignés APRÈS l'opération (différentiel géré ici) */
-  gestionnairesApres: { ACCUEIL?: string | null; TECHNIQUE?: string | null; COMPTABILITE?: string | null };
+  gestionnairesApres: {
+    ACCUEIL?: string | null;
+    TECHNIQUE?: string | null;
+    COMPTABILITE?: string | null;
+    CONTROLE_MEDICAL?: string | null;
+  };
   /** Utilisateur ayant effectué l'opération (JWT, côté serveur) */
   userId?: string | null;
   /** Rôle de cet utilisateur — sert à attribuer la responsabilité de l'étape */
@@ -96,6 +104,7 @@ export interface GestionnairesDossier {
   ACCUEIL?: string | null;
   TECHNIQUE?: string | null;
   COMPTABILITE?: string | null;
+  CONTROLE_MEDICAL?: string | null;
 }
 
 // ─── Helpers internes ────────────────────────────────────────────────────────
@@ -104,7 +113,8 @@ function gestionnairePourService(g: GestionnairesDossier, service: ServiceKpi): 
   if (service === 'ACCUEIL') return g.ACCUEIL ?? null;
   if (service === 'TECHNIQUE') return g.TECHNIQUE ?? null;
   if (service === 'COMPTABILITE') return g.COMPTABILITE ?? null;
-  return null; // CONTROLE_MEDICAL : pas de champ gestionnaire dédié
+  if (service === 'CONTROLE_MEDICAL') return g.CONTROLE_MEDICAL ?? null;
+  return null;
 }
 
 function roleCorrespondService(role: string | null | undefined, service: ServiceKpi): boolean {
@@ -307,16 +317,76 @@ export async function enregistrerRetourCorrection(
 
 // ─── Contrôle médical (hors circuit des statuts) ─────────────────────────────
 
+/**
+ * Aligne l'étape de contrôle médical OUVERTE sur l'assignation du dossier
+ * (R3 — colonne gestionnaireControleMedicalId, même mécanique que les services
+ * du circuit) :
+ *  - pas d'étape ouverte → rien (l'assignation sera portée à l'ouverture) ;
+ *  - NULL → G : simple complétion, la période reste la même ;
+ *  - G1 → G2 : VRAIE réaffectation — la période du titulaire précédent est
+ *    fermée, une nouvelle période est ouverte pour le nouveau ;
+ *  - G → NULL : désaffectation — fermeture puis réouverture sans gestionnaire
+ *    (invariant : le service garde une étape ouverte).
+ * Idempotent : aucun effet si l'assignation correspond déjà à l'étape ouverte.
+ */
+export async function synchroniserEtapeControleMedical(
+  tx: Tx, dossierId: string, gestionnaireId: string | null,
+): Promise<void> {
+  const ouverte = await tx.etapeTraitement.findFirst({
+    where: { dossierId, service: 'CONTROLE_MEDICAL', dateFin: null, type: 'TRAVAIL' },
+  });
+  if (!ouverte || gestionnaireId === (ouverte.gestionnaireId ?? null)) return;
+  const now = new Date();
+
+  if (!ouverte.gestionnaireId && gestionnaireId) {
+    await tx.etapeTraitement.update({
+      where: { id: ouverte.id },
+      data: { gestionnaireId },
+    });
+    return;
+  }
+
+  await tx.etapeTraitement.update({
+    where: { id: ouverte.id },
+    data: {
+      dateFin: now,
+      dateDebut: ouverte.dateDebut ?? now,
+      motifReaffectation: gestionnaireId
+        ? 'Réaffectation du gestionnaire de contrôle médical'
+        : 'Désaffectation du gestionnaire de contrôle médical',
+    },
+  });
+  await tx.etapeTraitement.create({
+    data: {
+      dossierId,
+      service: 'CONTROLE_MEDICAL',
+      gestionnaireId,
+      userId: ouverte.userId,
+      type: 'TRAVAIL',
+      source: 'CIRCUIT',
+      dateAffectation: now,
+      statutAvant: ouverte.statutAvant,
+    },
+  });
+}
+
 /** Ouvre une étape de contrôle médical (phase DEBUT). */
 export async function ouvrirEtapeControleMedical(tx: Tx, dossierId: string, userId: string): Promise<EtapeTraitement> {
   const existante = await tx.etapeTraitement.findFirst({
     where: { dossierId, service: 'CONTROLE_MEDICAL', dateFin: null },
   });
   if (existante) throw new Error('DEJA_OUVERTE: une étape de contrôle médical est en cours');
+  // R3 : l'assignation native du dossier (gestionnaire de contrôle médical)
+  // porte la responsabilité référentielle de la période dès l'ouverture.
+  const dossier = await tx.dossier.findUnique({
+    where: { id: dossierId },
+    select: { gestionnaireControleMedicalId: true },
+  });
   return tx.etapeTraitement.create({
     data: {
       dossierId,
       service: 'CONTROLE_MEDICAL',
+      gestionnaireId: dossier?.gestionnaireControleMedicalId ?? null,
       userId,
       type: 'TRAVAIL',
       source: 'CIRCUIT',

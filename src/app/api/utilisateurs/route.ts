@@ -14,6 +14,8 @@ import {
 
 const ROLE_LABELS: Record<string, string> = {
   ADMINISTRATEUR: 'Administrateur',
+  DIRECTION_GENERALE: 'Direction Generale',
+  RESPONSABLE_SERVICE: 'Responsable de service',
   ACCUEIL: 'Accueil',
   TECHNIQUE: 'Service Technique',
   COMPTABILITE: 'Comptabilite',
@@ -143,6 +145,7 @@ export async function GET(request: NextRequest) {
           email: true,
           nom: true,
           role: true,
+          serviceResponsable: true,
           actif: true,
           avatar: true,
           dernierLogin: true,
@@ -263,6 +266,9 @@ export async function POST(request: NextRequest) {
     const emailTrimmed = parsed.data.email.toLowerCase();
     const nomTrimmed = nom;
     const societeId = parsed.data.societeId || undefined;
+    // R2 — Responsable de service : le service géré est posé à la création
+    // (le schéma Zod l'exige pour ce rôle, l'interdit ailleurs).
+    const serviceResponsable = parsed.data.serviceResponsable ?? null;
 
     // Verifier l'unicite de l'email
     const existing = await db.utilisateur.findUnique({
@@ -313,6 +319,7 @@ export async function POST(request: NextRequest) {
         nom: nomTrimmed,
         password: hashedPassword,
         role,
+        serviceResponsable,
         actif: true,
       },
       select: {
@@ -320,6 +327,7 @@ export async function POST(request: NextRequest) {
         email: true,
         nom: true,
         role: true,
+        serviceResponsable: true,
         actif: true,
         avatar: true,
         createdAt: true,
@@ -366,6 +374,7 @@ export async function PUT(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const { id, email, nom, role, password } = parsed.data;
     const societeId = parsed.data.societeId || undefined;
+    const serviceResponsable = parsed.data.serviceResponsable;
 
     // Verifier que l'utilisateur existe
     const existing = await db.utilisateur.findUnique({
@@ -453,6 +462,26 @@ export async function PUT(request: NextRequest) {
       data.password = await hash(password, 12);
     }
 
+    // ─── R2 — serviceResponsable (portée « son service ») ────────────────────
+    // Règle croisée : un compte RESPONSABLE_SERVICE DOIT conserver un service
+    // géré (la mise à jour étant partielle, le service peut déjà être posé en
+    // base) ; tout autre rôle ne porte JAMAIS de service (suppression).
+    const roleFinalPourService = (data.role as string | undefined) ?? existing.role;
+    if (roleFinalPourService === 'RESPONSABLE_SERVICE') {
+      if (serviceResponsable !== undefined) data.serviceResponsable = serviceResponsable;
+      if ((data.serviceResponsable ?? existing.serviceResponsable ?? null) === null) {
+        return NextResponse.json(
+          { erreur: 'Un responsable de service doit avoir un service géré.' },
+          { status: 422 }
+        );
+      }
+    } else if (roleFinalPourService !== 'RESPONSABLE_SERVICE' &&
+               (data.role !== undefined || serviceResponsable !== undefined)) {
+      // Changement de rôle hors RESPONSABLE_SERVICE (ou service envoyé à tort) :
+      // aucun service ne doit rester attaché au compte.
+      data.serviceResponsable = null;
+    }
+
     const utilisateur = await db.utilisateur.update({
       where: { id },
       data,
@@ -461,6 +490,7 @@ export async function PUT(request: NextRequest) {
         email: true,
         nom: true,
         role: true,
+        serviceResponsable: true,
         actif: true,
         avatar: true,
         createdAt: true,
@@ -482,6 +512,14 @@ export async function PUT(request: NextRequest) {
     }
     if (data.role !== undefined && existing.role !== data.role) {
       modifications.push({ champ: 'role', ancienne: existing.role, nouvelle: data.role });
+    }
+    if (data.serviceResponsable !== undefined &&
+        (existing.serviceResponsable ?? null) !== (data.serviceResponsable as string | null)) {
+      modifications.push({
+        champ: 'serviceResponsable',
+        ancienne: existing.serviceResponsable ?? null,
+        nouvelle: data.serviceResponsable ?? null,
+      });
     }
     if (data.password !== undefined) {
       modifications.push({ champ: 'password', ancienne: '(hash existant)', nouvelle: '(modifié)' });

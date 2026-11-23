@@ -71,10 +71,13 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'utilisateurs', label: 'Gestion Utilisateurs', icon: Users, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
-  // ─── Module KPI — Performance des collaborateurs (Administration) ────────
-  { key: 'kpi-collaborateurs', label: 'KPI – Performance Collaborateurs', icon: TrendingUp, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
+  // ─── Module KPI — Performance des collaborateurs ─────────────────────────
+  // ADMINISTRATEUR (global + paramétrage) ; DIRECTION_GENERALE (consultation
+  // globale, R1) ; RESPONSABLE_SERVICE (portée forcée côté serveur à son
+  // service, R2 — l'UI n'affiche que son service, la garde est serveur).
+  { key: 'kpi-collaborateurs', label: 'KPI – Performance Collaborateurs', icon: TrendingUp, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE'] },
   // Espace personnel du collaborateur (vues internes uniquement)
-  { key: 'ma-performance', label: 'Ma Performance', icon: Gauge, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
+  { key: 'ma-performance', label: 'Ma Performance', icon: Gauge, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'RESPONSABLE_SERVICE', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Questions', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },

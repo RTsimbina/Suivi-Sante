@@ -128,9 +128,14 @@ export interface AssistantContext {
   prestataireId: string | null;
 }
 
-/** Rôles internes : accès global (comme le reste de la plateforme) */
+/** Rôles internes : accès global (comme le reste de la plateforme).
+ *  DIRECTION_GENERALE et RESPONSABLE_SERVICE (R1/R2) y figurent pour la
+ *  cohérence du scope interne ; ils n'ont pas encore de catalogue dédié
+ *  (questionsDuRole → 0) et restent hors matrice de /api/assistant. */
 export const INTERNAL_ROLES: RoleType[] = [
   'ADMINISTRATEUR',
+  'DIRECTION_GENERALE',
+  'RESPONSABLE_SERVICE',
   'ACCUEIL',
   'TECHNIQUE',
   'COMPTABILITE',

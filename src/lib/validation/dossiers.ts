@@ -58,6 +58,9 @@ export const dossierUpdateSchema = z.object({
   gestionnaireAccueilId: idOptionnel,
   gestionnaireTechniqueId: idOptionnel,
   gestionnaireComptaId: idOptionnel,
+  // R3 — assignation native du contrôle médical (mêmes règles que les
+  // services du circuit ; idOptionnel accepte null = désaffectation).
+  gestionnaireControleMedicalId: idOptionnel,
   assureId: idOptionnel,
   prestataireId: idOptionnel,
   // FIX audit : montantValide / ticketModerateur n'étaient pas contrôlés ici
@@ -73,13 +76,15 @@ export const dossierUpdateSchema = z.object({
 
 export type DossierUpdateInput = z.infer<typeof dossierUpdateSchema>;
 
-/** POST /api/dossiers/assigner-bulk — affectation en masse des gestionnaires. */
+/** POST /api/dossiers/assigner-bulk — affectation en masse des gestionnaires.
+ *  R3 : le champ CONTROLE_MEDICAL est réservé SANTE/ADMINISTRATEUR (contrôle
+ *  applicatif dans la route). */
 export const assignerBulkSchema = z.object({
   dossierIds: z
     .array(idSchema)
     .min(1, "Au moins un dossier doit être sélectionné")
     .max(200, "200 dossiers maximum par lot"),
-  champ: z.enum(["ACCUEIL", "TECHNIQUE", "COMPTABILITE"]),
+  champ: z.enum(["ACCUEIL", "TECHNIQUE", "COMPTABILITE", "CONTROLE_MEDICAL"]),
   gestionnaireId: idSchema,
 });
 

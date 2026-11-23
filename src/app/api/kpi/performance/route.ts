@@ -1,6 +1,8 @@
 /**
- * GET /api/kpi/performance — Bundle complet de performance (Administration).
- * Rôle : ADMINISTRATEUR uniquement (matrice API_PERMISSIONS, default-deny).
+ * GET /api/kpi/performance — Bundle complet de performance.
+ * Rôles (matrice API_PERMISSIONS) : ADMINISTRATEUR + DIRECTION_GENERALE
+ * (consultation globale, R1) + RESPONSABLE_SERVICE (portée FORCÉE côté
+ * serveur à son service, R2 — fail-closed si aucun service associé).
  * Paramètres : conventions de période (periodes.ts) + service, userId,
  * societeId, typeDossier, statut. Les chiffres sont calculés par le moteur
  * kpi-performance — même source que les exports (cohérence garantie).
@@ -9,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { contexteKpi, periodeKpiDepuisRequest, paramUrl } from '@/lib/kpi-api';
+import { contexteKpi, periodeKpiDepuisRequest, paramUrl, serviceResponsableDuCompte } from '@/lib/kpi-api';
 import {
   chargerEtapesPeriode, chargerObjectifs, chargerSeuils, calculerPerformance,
   calculerAlertes, resoudrePerimetreKpi, type FiltresKpi,
@@ -19,23 +21,31 @@ export async function GET(request: NextRequest) {
   const authError = await checkAuth(request);
   if (authError) return authError;
   try {
-    const { role } = contexteKpi(request);
+    const { userId, role } = contexteKpi(request);
     const periode = periodeKpiDepuisRequest(request);
 
     const filtres: FiltresKpi = {};
-    const service = paramUrl(request, 'service');
+    const serviceParam = paramUrl(request, 'service');
     const userIdParam = paramUrl(request, 'userId');
     const societeId = paramUrl(request, 'societeId');
     const typeDossier = paramUrl(request, 'typeDossier');
     const statut = paramUrl(request, 'statut');
 
-    // Périmètre serveur : seul ADMINISTRATEUR accède à cette route (matrice) ;
-    // resoudrePerimetreKpi borne tout de même l'userId consultable.
-    const perimetre = resoudrePerimetreKpi(role, null, userIdParam);
-    if (perimetre.niveau !== 'GLOBAL') {
-      return NextResponse.json({ erreur: 'Accès global réservé aux administrateurs.' }, { status: 403 });
+    // Périmètre serveur : GLOBAL (admin / direction générale), SERVICE
+    // (responsable de service — le service du compte ÉCRASE tout paramètre
+    // contradictoire), PERSONNEL (collaborateur). Fail-closed : un
+    // RESPONSABLE_SERVICE sans service associé est refusé (403).
+    const serviceResponsable = role === 'RESPONSABLE_SERVICE'
+      ? await serviceResponsableDuCompte(userId) : null;
+    const perimetre = resoudrePerimetreKpi(role, userId, userIdParam, serviceResponsable);
+    if (perimetre.niveau === 'PERSONNEL' || (perimetre.niveau === 'SERVICE' && !perimetre.serviceEffective)) {
+      return NextResponse.json({ erreur: 'Accès refusé : aucun périmètre de consultation valide pour ce compte.' }, { status: 403 });
     }
-    if (service) filtres.service = service;
+    if (perimetre.serviceEffective) {
+      filtres.service = perimetre.serviceEffective;
+    } else if (serviceParam) {
+      filtres.service = serviceParam;
+    }
     if (perimetre.userIdEffective) filtres.userId = perimetre.userIdEffective;
     if (societeId) filtres.societeId = societeId;
     if (typeDossier) filtres.typeDossier = typeDossier;

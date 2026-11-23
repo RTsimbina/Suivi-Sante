@@ -8,6 +8,9 @@
  *  - Actions serveur : marquer le début de traitement, suspendre/reprendre
  *    (motif obligatoire), retour pour correction (statut conservé), et pour
  *    les profils SANTE/ADMINISTRATEUR, les phases du contrôle médical.
+ *  - R3 : assignation native du gestionnaire de contrôle médical
+ *    (Dossier.gestionnaireControleMedicalId) — l'étape KPI ouverte suit
+ *    l'assignation côté serveur (complétion / réaffectation / désaffectation).
  * Les horodatages sont générés côté serveur ; aucune étape fermée n'est
  * modifiable depuis l'interface.
  */
@@ -41,7 +44,18 @@ export interface EtapeUI {
   suspensions: { id: string; motif: string; suspenduA: string; reprisA: string | null }[];
 }
 
-interface EtapesBundle { dossier: { statut: string }; etapes: EtapeUI[]; }
+interface EtapesBundle {
+  dossier: {
+    statut: string;
+    /** R3 — assignation native du contrôle médical (gestionnaire de référentiel). */
+    gestionnaireControleMedicalId?: string | null;
+    gestionnaireControleMedical?: { id: string; nom: string } | null;
+  };
+  etapes: EtapeUI[];
+}
+
+/** Gestionnaire de référentiel du service Contrôle médical (R3). */
+interface GestionnaireCM { id: string; nom: string; service: string; }
 
 const serviceColors: Record<string, string> = {
   ACCUEIL: 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300',
@@ -96,6 +110,40 @@ export default function OngletTraitement({ dossierId, statut }: { dossierId: str
   const controleMedicalOuvert = etapes.find((e) => e.service === 'CONTROLE_MEDICAL' && !e.dateFin);
   const peutControleMedical = role === 'SANTE' || role === 'ADMINISTRATEUR';
 
+  // ─── R3 : assignation du gestionnaire de contrôle médical ──────────────────
+  const [gestionnairesCM, setGestionnairesCM] = useState<GestionnaireCM[]>([]);
+  const [assignationEnCours, setAssignationEnCours] = useState(false);
+  useEffect(() => {
+    if (!peutControleMedical) return;
+    fetch('/api/dossiers/gestionnaires?service=CONTROLE_MEDICAL')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: GestionnaireCM[]) => setGestionnairesCM(Array.isArray(list) ? list : []))
+      .catch(() => setGestionnairesCM([]));
+  }, [peutControleMedical]);
+
+  const assignerControleMedical = async (gestionnaireId: string | null) => {
+    setAssignationEnCours(true);
+    setErreur(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/dossiers/${dossierId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gestionnaireControleMedicalId: gestionnaireId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.erreur ?? `Erreur ${res.status}`);
+      setMessage(gestionnaireId ? 'Gestionnaire de contrôle médical assigné.' : 'Gestionnaire de contrôle médical désassigné.');
+      await charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'Erreur inconnue');
+    } finally {
+      setAssignationEnCours(false);
+    }
+  };
+
+  const assignationCM = bundle?.dossier.gestionnaireControleMedical ?? null;
+
   return (
     <div className="space-y-4">
       {/* Actions (côté serveur uniquement) */}
@@ -132,6 +180,45 @@ export default function OngletTraitement({ dossierId, statut }: { dossierId: str
           )}
         </CardContent>
       </Card>
+      {peutControleMedical && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">
+              Assignation du contrôle médical
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                Responsable actuel : {assignationCM ? assignationCM.nom : 'Non assigné'}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor="assign-cm" className="text-xs text-muted-foreground">Gestionnaire (Contrôle médical)</Label>
+              <select
+                id="assign-cm"
+                className="border rounded-md bg-background px-2 py-1.5 text-sm"
+                value={assignationCM?.id ?? ''}
+                disabled={assignationEnCours}
+                onChange={(e) => assignerControleMedical(e.target.value || null)}
+              >
+                <option value="">— Non assigné —</option>
+                {gestionnairesCM.map((g) => (
+                  <option key={g.id} value={g.id}>{g.nom}</option>
+                ))}
+              </select>
+              {gestionnairesCM.length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Aucun gestionnaire « Contrôle médical » — créez-en un dans le référentiel (service Contrôle médical).
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              L&apos;assignation est native (colonne du dossier) : la période KPI ouverte du contrôle médical
+              la porte et suit ses changements (réaffectation tracée). Les phases « début / fin » mesurent
+              le temps actif ; elles restent nécessaires pour la mesure.
+            </p>
+          </CardContent>
+        </Card>
+      )}
       {message && <p className="text-sm text-emerald-600 dark:text-emerald-400">{message}</p>}
       {erreur && <p className="text-sm text-red-600 dark:text-red-400">{erreur}</p>}
 

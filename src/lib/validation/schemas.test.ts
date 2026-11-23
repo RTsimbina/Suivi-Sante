@@ -224,6 +224,44 @@ describe("utilisateurCreateSchema", () => {
     expect(vide.success).toBe(true);
     if (vide.success) expect(vide.data.societeId).toBeUndefined();
   });
+
+  it("R2 — RESPONSABLE_SERVICE sans service géré refusé (règle croisée)", () => {
+    const r = utilisateurCreateSchema.safeParse({
+      email: "resp@b.com", nom: "X", password: "motdepasse1", role: "RESPONSABLE_SERVICE",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("R2 — RESPONSABLE_SERVICE avec un service des 4 services KPI accepté", () => {
+    for (const service of ["ACCUEIL", "TECHNIQUE", "CONTROLE_MEDICAL", "COMPTABILITE"]) {
+      const r = utilisateurCreateSchema.safeParse({
+        email: "resp@b.com", nom: "X", password: "motdepasse1",
+        role: "RESPONSABLE_SERVICE", serviceResponsable: service,
+      });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  it("R2 — service géré hors référentiel refusé ; chaîne vide tolérée pour les autres rôles", () => {
+    const invalide = utilisateurCreateSchema.safeParse({
+      email: "resp@b.com", nom: "X", password: "motdepasse1",
+      role: "RESPONSABLE_SERVICE", serviceResponsable: "DIRECTION",
+    });
+    expect(invalide.success).toBe(false);
+    // Un autre rôle peut envoyer "" (sélecteur masqué) → undefined, accepté
+    const autre = utilisateurCreateSchema.safeParse({
+      email: "a@b.com", nom: "X", password: "motdepasse1",
+      role: "ACCUEIL", serviceResponsable: "",
+    });
+    expect(autre.success).toBe(true);
+  });
+
+  it("R1 — le rôle DIRECTION_GENERALE fait partie de la liste validée", () => {
+    const r = utilisateurCreateSchema.safeParse({
+      email: "dg@b.com", nom: "X", password: "motdepasse1", role: "DIRECTION_GENERALE",
+    });
+    expect(r.success).toBe(true);
+  });
 });
 
 describe("utilisateurPatchSchema", () => {

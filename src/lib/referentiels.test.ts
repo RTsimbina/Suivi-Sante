@@ -24,9 +24,10 @@ import {
 } from './referentiels';
 
 describe('Rôles', () => {
-  it('les 8 rôles ont tous un libellé avec accents', () => {
+  it('les 10 rôles ont tous un libellé avec accents', () => {
     expect(ROLES).toEqual([
-      'ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE',
+      'ADMINISTRATEUR', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE',
+      'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE',
       'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'PRESTATAIRE',
     ]);
     for (const r of ROLES) {
@@ -36,6 +37,9 @@ describe('Rôles', () => {
     // Accents canoniques (divergence historique corrigée)
     expect(ROLE_LABELS.COMPTABILITE).toBe('Comptabilité');
     expect(ROLE_LABELS.SANTE).toBe('Contrôle Santé');
+    // R1 / R2 — libellés des deux nouveaux rôles internes
+    expect(ROLE_LABELS.DIRECTION_GENERALE).toBe('Direction Générale');
+    expect(ROLE_LABELS.RESPONSABLE_SERVICE).toBe('Responsable de service');
   });
 
   it('les rôles internes sont un sous-ensemble des rôles', () => {
@@ -84,8 +88,10 @@ describe('Autres référentiels', () => {
     expect(referentielValide(STATUTS_IMPORT)).toBe(true);
   });
 
-  it('les 3 services Gestionnaire correspondent au workflow', () => {
-    expect(SERVICES_GESTIONNAIRE.map((s) => s.valeur)).toEqual(['ACCUEIL', 'TECHNIQUE', 'COMPTABILITE']);
+  it('les 4 services Gestionnaire correspondent au workflow + contrôle médical (R3)', () => {
+    expect(SERVICES_GESTIONNAIRE.map((s) => s.valeur)).toEqual([
+      'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'CONTROLE_MEDICAL',
+    ]);
   });
 
   it('types bénéficiaire : normalisation des alias imports', () => {

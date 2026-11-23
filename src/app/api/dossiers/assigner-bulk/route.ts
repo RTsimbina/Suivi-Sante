@@ -3,12 +3,16 @@ import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { assignerBulkSchema } from '@/lib/validation';
+import { synchroniserEtapeControleMedical } from '@/lib/kpi-etapes';
 
 /**
  * POST /api/dossiers/assigner-bulk
  *
  * Assigne en masse un gestionnaire à une liste de dossiers.
- * Body : { dossierIds: string[], champ: 'ACCUEIL' | 'TECHNIQUE' | 'COMPTABILITE', gestionnaireId: string }
+ * Body : { dossierIds: string[], champ: 'ACCUEIL' | 'TECHNIQUE' | 'COMPTABILITE' | 'CONTROLE_MEDICAL', gestionnaireId: string }
+ * R3 : le champ CONTROLE_MEDICAL (assignation native du contrôle médical) est
+ * réservé aux rôles SANTE / ADMINISTRATEUR ; l'étape KPI ouverte du contrôle
+ * médical est synchronisée (complétion / réaffectation) après la mise à jour.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +23,16 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonBody(request, assignerBulkSchema);
     if (!parsed.success) return parsed.response;
     const { dossierIds, champ, gestionnaireId } = parsed.data;
+
+    // ─── R3 : garde applicatif champ × rôle (la matrice autorise SANTE pour
+    // toute la route — elle ne peut pas distinguer les champs) ───────────────
+    const userRole = request.headers.get('x-user-role');
+    if (champ === 'CONTROLE_MEDICAL' && userRole !== 'SANTE' && userRole !== 'ADMINISTRATEUR') {
+      return NextResponse.json(
+        { erreur: "L'assignation du contrôle médical est réservée au Contrôle Santé et à l'administrateur." },
+        { status: 403 }
+      );
+    }
 
     // Limiter à 200 dossiers par requête
     const ids = dossierIds.slice(0, 200);
@@ -44,6 +58,7 @@ export async function POST(request: NextRequest) {
       ACCUEIL: 'gestionnaireAccueilId',
       TECHNIQUE: 'gestionnaireTechniqueId',
       COMPTABILITE: 'gestionnaireComptaId',
+      CONTROLE_MEDICAL: 'gestionnaireControleMedicalId',
     } as const;
 
     const prismaField = fieldMap[champ];
@@ -81,6 +96,16 @@ export async function POST(request: NextRequest) {
       const currentH: unknown[] = (() => { try { return JSON.parse(d.historique || '[]'); } catch { return []; } })();
       currentH.push({ date: new Date().toISOString(), statut: 'ASSIGNATION', commentaire: historiqueComment });
       await db.dossier.update({ where: { id: d.id }, data: { historique: JSON.stringify(currentH) } });
+    }
+
+    // ─── R3 : synchronisation de l'étape KPI du contrôle médical ─────────────
+    // L'étape ouverte porte désormais l'assignation (complétion) — les vraies
+    // réaffectations passent par la route PATCH du dossier (désaffectation
+    // incluse), l'assignation en masse ne touche que les dossiers non assignés.
+    if (champ === 'CONTROLE_MEDICAL') {
+      for (const dossierId of nonAssigneIds) {
+        await db.$transaction((tx) => synchroniserEtapeControleMedical(tx, dossierId, gestionnaireId));
+      }
     }
 
     return NextResponse.json({

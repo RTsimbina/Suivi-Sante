@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { formatDate, ROLES, type Utilisateur } from './types';
+import { formatDate, ROLES, serviceResponsableLabel, type Utilisateur } from './types';
 
 interface UtilisateursTableProps {
   utilisateurs: Utilisateur[];
@@ -86,6 +86,12 @@ export default function UtilisateursTable({
                         <Badge className={cn('text-[10px] font-medium', roleInfo?.color || '')}>
                           {user.roleLabel}
                         </Badge>
+                        {/* R2 — Responsable de service : service géré (portée KPI) */}
+                        {user.serviceResponsable && (
+                          <Badge className="ml-1 text-[10px] bg-muted text-muted-foreground border border-border">
+                            {serviceResponsableLabel(user.serviceResponsable)}
+                          </Badge>
+                        )}
                         {isLocked && (
                           <Badge className="ml-1 text-[10px] bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300">
                             <Lock className="h-2.5 w-2.5 mr-0.5" /> Verrouille

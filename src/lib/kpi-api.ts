@@ -5,6 +5,7 @@
  */
 
 import { NextRequest } from 'next/server';
+import { db } from './db';
 import { plageDepuisParams } from './periodes';
 import type { PeriodeKpi } from './kpi-performance';
 
@@ -15,6 +16,20 @@ export function contexteKpi(request: NextRequest): ContexteKpi {
     userId: request.headers.get('x-user-id'),
     role: request.headers.get('x-user-role'),
   };
+}
+
+/**
+ * Service géré d'un compte (R2 — Responsable de service). Résolu CÔTÉ SERVEUR
+ * depuis l'identifiant du JWT (jamais d'un paramètre client) ; null si le
+ * compte n'a pas de service associé → la route doit répondre fail-closed (403).
+ */
+export async function serviceResponsableDuCompte(userId: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const u = await db.utilisateur.findUnique({
+    where: { id: userId },
+    select: { serviceResponsable: true },
+  });
+  return u?.serviceResponsable ?? null;
 }
 
 /** Période depuis les paramètres URL (conventions periodes.ts) ; TOUTES par défaut. */

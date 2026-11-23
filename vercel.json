@@ -5,6 +5,10 @@
       "schedule": "0 4 1 * *"
     },
     {
+      "path": "/api/cron/kpi-alertes",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/mail/process",
       "schedule": "0 5 * * *"
     }

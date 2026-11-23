@@ -238,6 +238,8 @@ export const sexeSchema = z.enum(SEXE_VALUES);
 
 export const ROLES_UTILISATEUR = [
   "ADMINISTRATEUR",
+  "DIRECTION_GENERALE",
+  "RESPONSABLE_SERVICE",
   "ACCUEIL",
   "TECHNIQUE",
   "COMPTABILITE",
@@ -247,6 +249,10 @@ export const ROLES_UTILISATEUR = [
   "PRESTATAIRE",
 ] as const;
 export const roleUtilisateurSchema = z.enum(ROLES_UTILISATEUR);
+
+/** Services pouvant être gérés par un RESPONSABLE_SERVICE (R2) — les 4 services KPI. */
+const SERVICES_RESPONSABLE = ["ACCUEIL", "TECHNIQUE", "CONTROLE_MEDICAL", "COMPTABILITE"] as const;
+export const serviceResponsableSchema = z.enum(SERVICES_RESPONSABLE);
 
 const TYPES_PRESTATAIRE = [
   "HOPITAL",

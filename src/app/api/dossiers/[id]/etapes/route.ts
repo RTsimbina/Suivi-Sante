@@ -20,7 +20,13 @@ export async function GET(
 
   const dossier = await db.dossier.findUnique({
     where: { id },
-    select: { id: true, numeroDossier: true, statut: true, dateReception: true },
+    // R3 : l'assignation native du contrôle médical (gestionnaire de
+    // référentiel) est renvoyée pour l'UI d'assignation de l'onglet Traitement.
+    select: {
+      id: true, numeroDossier: true, statut: true, dateReception: true,
+      gestionnaireControleMedicalId: true,
+      gestionnaireControleMedical: { select: { id: true, nom: true } },
+    },
   });
   if (!dossier) return NextResponse.json({ erreur: 'Dossier introuvable' }, { status: 404 });
 

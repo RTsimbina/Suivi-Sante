@@ -513,24 +513,45 @@ export function calculerAlertes(
 
 // ─── Sécurité : périmètre autorisé (testable unitairement) ───────────────────
 
-export type NiveauPerimetreKpi = 'GLOBAL' | 'PERSONNEL';
+export type NiveauPerimetreKpi = 'GLOBAL' | 'SERVICE' | 'PERSONNEL';
+
+export interface PerimetreKpi {
+  niveau: NiveauPerimetreKpi;
+  userIdEffective: string | null;
+  /** Niveau SERVICE : service autorisé (forcé côté serveur) ; sinon null. */
+  serviceEffective: string | null;
+}
 
 /**
  * Résout le périmètre autorisé d'une requête KPI. UN CÔTÉ SERVEUR uniquement :
  *   - ADMINISTRATEUR → GLOBAL (tous services, tout collaborateur) ;
- *   - rôles internes → PERSONNEL : le collaborateur ne peut JAMAIS consulter
- *     un autre identifiant — tout paramètre utilisateur est écrasé par l'id
- *     du JWT (immunité contre manipulation d'URL/requête) ;
+ *   - DIRECTION_GENERALE (R1) → GLOBAL : consultation globale du module KPI,
+ *     sans droit de paramétrage (objectifs/seuils restent admin, matrice) ;
+ *   - RESPONSABLE_SERVICE (R2) → SERVICE : la consultation est BORNÉE au
+ *     service associé au compte (Utilisateur.serviceResponsable). La route
+ *     échoue (fail-closed) si le rôle n'a pas de service associé ; tout
+ *     paramètre service contradictoire est écrasé par celui du compte ;
+ *   - collaborateurs internes → PERSONNEL : le collaborateur ne peut JAMAIS
+ *     consulter un autre identifiant — tout paramètre utilisateur est écrasé
+ *     par l'id du JWT (immunité contre manipulation d'URL/requête) ;
  *   - rôles externes → jamais autorisés ( filtrés en amont par la matrice).
  */
 export function resoudrePerimetreKpi(
   role: string | null, userIdAuth: string | null, userIdParametre?: string | null,
-): { niveau: NiveauPerimetreKpi; userIdEffective: string | null } {
-  if (role === 'ADMINISTRATEUR') {
-    return { niveau: 'GLOBAL', userIdEffective: userIdParametre ?? null };
+  serviceResponsable?: string | null,
+): PerimetreKpi {
+  if (role === 'ADMINISTRATEUR' || role === 'DIRECTION_GENERALE') {
+    return { niveau: 'GLOBAL', userIdEffective: userIdParametre ?? null, serviceEffective: null };
+  }
+  if (role === 'RESPONSABLE_SERVICE') {
+    return {
+      niveau: 'SERVICE',
+      userIdEffective: userIdParametre ?? null,
+      serviceEffective: serviceResponsable ?? null,
+    };
   }
   if (userIdAuth && ['ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'].includes(role ?? '')) {
-    return { niveau: 'PERSONNEL', userIdEffective: userIdAuth };
+    return { niveau: 'PERSONNEL', userIdEffective: userIdAuth, serviceEffective: null };
   }
-  return { niveau: 'PERSONNEL', userIdEffective: userIdAuth };
+  return { niveau: 'PERSONNEL', userIdEffective: userIdAuth, serviceEffective: null };
 }

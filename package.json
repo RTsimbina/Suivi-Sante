@@ -20,6 +20,7 @@
     "deploy:prod": "bash scripts/deploy-production.sh",
     "db:reset": "prisma migrate reset",
     "db:seed": "npx tsx prisma/seed.ts",
+    "kpi:valider": "npx tsx scripts/valider-objectifs-seuils-kpi.ts",
     "db:baseline": "bash scripts/baseline-production-db.sh",
     "postinstall": "prisma generate"
   },

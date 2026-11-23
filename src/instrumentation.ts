@@ -11,9 +11,13 @@
  */
 
 export async function register() {
-  // En développement uniquement : démarrer le cron en mémoire si explicitement activé
+  // En développement uniquement : démarrer les crons en mémoire si explicitement activés
   if (process.env.NEXT_RUNTIME === 'nodejs' && process.env.NODE_ENV === 'development') {
     const { demarrerCronMensuel } = await import('./lib/cron-email-mensuel');
     demarrerCronMensuel();
+    // R5 — digest quotidien des alertes KPI (même convention : dev local ;
+    // la production passe par Vercel Cron → /api/cron/kpi-alertes).
+    const { demarrerCronAlertesKpi } = await import('./lib/cron-kpi-alertes');
+    demarrerCronAlertesKpi();
   }
 }

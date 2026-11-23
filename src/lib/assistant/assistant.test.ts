@@ -13,6 +13,8 @@ import type { AssistantContext, RoleType } from './types';
 
 const CONTEXTES: Record<RoleType, AssistantContext> = {
   ADMINISTRATEUR: { userId: 'u1', role: 'ADMINISTRATEUR', email: 'a@x.mg', nom: 'Admin', assureId: null, societeId: null, prestataireId: null },
+  DIRECTION_GENERALE: { userId: 'u9', role: 'DIRECTION_GENERALE', email: 'dg@x.mg', nom: 'Direction', assureId: null, societeId: null, prestataireId: null },
+  RESPONSABLE_SERVICE: { userId: 'u10', role: 'RESPONSABLE_SERVICE', email: 'resp@x.mg', nom: 'Responsable', assureId: null, societeId: null, prestataireId: null },
   ACCUEIL: { userId: 'u2', role: 'ACCUEIL', email: 'b@x.mg', nom: 'Accueil', assureId: null, societeId: null, prestataireId: null },
   TECHNIQUE: { userId: 'u3', role: 'TECHNIQUE', email: 'c@x.mg', nom: 'Tech', assureId: null, societeId: null, prestataireId: null },
   COMPTABILITE: { userId: 'u4', role: 'COMPTABILITE', email: 'd@x.mg', nom: 'Compta', assureId: null, societeId: null, prestataireId: null },

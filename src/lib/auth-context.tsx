@@ -9,6 +9,8 @@ export { ROLE_LABELS };
 
 export type RoleType =
   | 'ADMINISTRATEUR'
+  | 'DIRECTION_GENERALE'
+  | 'RESPONSABLE_SERVICE'
   | 'ACCUEIL'
   | 'TECHNIQUE'
   | 'COMPTABILITE'

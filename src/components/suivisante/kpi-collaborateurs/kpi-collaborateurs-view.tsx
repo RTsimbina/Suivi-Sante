@@ -1,8 +1,11 @@
 'use client';
 
 /**
- * kpi-collaborateurs-view.tsx — Rubrique « KPI – Performance des collaborateurs »
- * (partie Administration, rôle ADMINISTRATEUR).
+ * kpi-collaborateurs-view.tsx — Rubrique « KPI – Performance des collaborateurs ».
+ * Rôles (matrice + garde serveur) : ADMINISTRATEUR (global + paramétrage),
+ * DIRECTION_GENERALE (consultation globale, R1), RESPONSABLE_SERVICE (portée
+ * forcée côté serveur à son service, R2 — le filtre service est masqué et tout
+ * paramètre contradictoire est écrasé par l'API).
  * Onglets locaux (navigation-locale) : Tableau de bord, Par service, Individuel,
  * Historique, Objectifs, Alertes. Exports Excel/PDF — même moteur que les
  * écrans (cohérence). Aucune couleur codée en dur hors conventions statuts.
@@ -26,6 +29,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend,
 } from 'recharts';
+import { useAuth } from '@/lib/auth-context';
 import { useOngletLocal } from './navigation-locale';
 import { serviceGestionnaireLabel } from '@/lib/referentiels';
 import {
@@ -53,6 +57,13 @@ const fmtPct = (v: number | null) => (v === null ? '—' : `${v.toFixed(1)} %`);
 export default function KpiCollaborateursView() {
   const [onglet, setOnglet] = useOngletLocal(ONGLETS, 'tableau-bord');
   const [service, setService] = useState('');
+  const { role } = useAuth();
+  // R1/R2 : le paramétrage (objectifs) reste réservé à l'ADMINISTRATEUR —
+  // l'API refuse de toute façon le POST pour les autres rôles (matrice).
+  const estAdmin = role === 'ADMINISTRATEUR';
+  // R2 : le service du RESPONSABLE_SERVICE est imposé côté serveur — masquer
+  // le filtre (les choix contradictoires sont écrasés par l'API).
+  const estResponsableService = role === 'RESPONSABLE_SERVICE';
   const { bundle, objectifs, loading, erreur, recharger, rechargerObjectifs } = useKpiCollaborateursData(service);
   const [dialogOuvert, setDialogOuvert] = useState(false);
   const [collabSelectionne, setCollabSelectionne] = useState<KpiCollaborateurUI | null>(null);
@@ -113,14 +124,19 @@ export default function KpiCollaborateursView() {
           </Button>
         ))}
         <div className="grow" />
-        <select
-          className="border rounded-md bg-background px-2 py-1.5 text-sm"
-          value={service}
-          onChange={(e) => { setService(e.target.value); setCollabSelectionne(null); }}
-        >
-          <option value="">Tous les services</option>
-          {SERVICES_KPI_UI.map((s) => <option key={s} value={s}>{serviceGestionnaireLabel(s === 'CONTROLE_MEDICAL' ? 'SANTE' : s) || s}</option>)}
-        </select>
+        {!estResponsableService && (
+          <select
+            className="border rounded-md bg-background px-2 py-1.5 text-sm"
+            value={service}
+            onChange={(e) => { setService(e.target.value); setCollabSelectionne(null); }}
+          >
+            <option value="">Tous les services</option>
+            {SERVICES_KPI_UI.map((s) => <option key={s} value={s}>{serviceGestionnaireLabel(s === 'CONTROLE_MEDICAL' ? 'SANTE' : s) || s}</option>)}
+          </select>
+        )}
+        {estResponsableService && (
+          <Badge variant="outline" className="text-[11px]">Périmètre : votre service uniquement</Badge>
+        )}
         <Button variant="outline" size="sm" disabled={exportEnCours} onClick={() => faireExport('xlsx')}>
           <Download className="h-4 w-4 mr-1" />Excel
         </Button>
@@ -346,7 +362,9 @@ export default function KpiCollaborateursView() {
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Délais cibles en vigueur (minutes)</CardTitle>
-              <Button size="sm" onClick={() => setDialogOuvert(true)}><Target className="h-4 w-4 mr-1" />Modifier un objectif</Button>
+              {estAdmin && (
+                <Button size="sm" onClick={() => setDialogOuvert(true)}><Target className="h-4 w-4 mr-1" />Modifier un objectif</Button>
+              )}
             </CardHeader>
             <CardContent>
               <table className="w-full text-sm">
@@ -396,7 +414,7 @@ export default function KpiCollaborateursView() {
           </Card>
 
           <DialogObjectifs
-            ouvert={dialogOuvert}
+            ouvert={estAdmin && dialogOuvert}
             onFerme={() => setDialogOuvert(false)}
             onSucces={() => { setDialogOuvert(false); rechargerObjectifs(); recharger(); }}
           />

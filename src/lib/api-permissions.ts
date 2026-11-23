@@ -42,7 +42,9 @@ export const API_PERMISSIONS: Record<
   }
 > = {
   '/api/dossiers/assigner-bulk': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    // SANTE : uniquement pour le champ CONTROLE_MEDICAL (contrôle applicatif
+    // dans la route — un champ Accueil/Technique/Compta reste refusé à SANTE).
   },
   '/api/portail-client': {
     roles: ['PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'ADMINISTRATEUR'],
@@ -73,18 +75,21 @@ export const API_PERMISSIONS: Record<
     // SANTE volontairement exclu : données financières
   },
   // ─── Module KPI — Performance des collaborateurs ─────────────────────────
-  // Consultation GLOBALE (tableaux de bord, exports, alertes, paramétrage) :
-  // ADMINISTRATEUR uniquement — aucun rôle « Direction Générale » n'existe
-  // dans RoleType : l'ajouter à ces entrées suffira quand il sera créé
-  // (décision métier, cf. livrables du module KPI).
+  // Consultation GLOBALE (tableaux de bord, exports, alertes) :
+  // ADMINISTRATEUR + DIRECTION_GENERALE (R1 — consultation globale sans le
+  // compte admin) + RESPONSABLE_SERVICE (R2 — portée FORCÉE côté serveur à
+  // son service, cf. resoudrePerimetreKpi / routes : tout paramètre service
+  // contradictoire est écrasé, fail-closed si aucun service associé).
+  // Le PARAMÉTRAGE (objectifs, seuils) reste réservé à ADMINISTRATEUR :
+  // aucune entrée DIRECTION_GENERALE / RESPONSABLE_SERVICE ici.
   '/api/kpi/performance': {
-    roles: ['ADMINISTRATEUR'],
+    roles: ['ADMINISTRATEUR', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE'],
   },
   '/api/kpi/export': {
-    roles: ['ADMINISTRATEUR'],
+    roles: ['ADMINISTRATEUR', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE'],
   },
   '/api/kpi/alertes': {
-    roles: ['ADMINISTRATEUR'],
+    roles: ['ADMINISTRATEUR', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE'],
   },
   '/api/kpi/objectifs': {
     roles: ['ADMINISTRATEUR'],
@@ -96,7 +101,7 @@ export const API_PERMISSIONS: Record<
   // (côté serveur, cf. /api/kpi/ma-performance) — aucun contournement
   // possible via URL/paramètre, quel que soit le rôle.
   '/api/kpi/ma-performance': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+    roles: ['ADMINISTRATEUR', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },
   // Contrôle médical : étapes hors circuit des statuts, rôles habilités SANTE
   // (rôle « Contrôle Santé ») et ADMINISTRATEUR.

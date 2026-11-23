@@ -10,6 +10,8 @@ export interface Utilisateur {
   nom: string;
   role: string;
   roleLabel: string;
+  /** R2 — Responsable de service : service géré (sinon null). */
+  serviceResponsable: string | null;
   actif: boolean;
   avatar: string | null;
   dernierLogin: string | null;
@@ -30,6 +32,8 @@ export interface FormData {
   // CONTACT_ENTREPRISE uniquement : société à lier si aucun contact
   // d'entreprise n'existe encore avec cet e-mail (création en une étape).
   societeId: string;
+  // RESPONSABLE_SERVICE uniquement : service géré (portée « son service »).
+  serviceResponsable: string;
 }
 
 // Société (référentiel, pour la liaison des comptes Contact Entreprise)
@@ -55,7 +59,26 @@ export const ROLES: { value: string; label: string; color: string }[] = ROLES_RE
   color: ROLE_COLORS[r] || 'bg-muted text-muted-foreground',
 }));
 
-export const EMPTY_FORM: FormData = { email: '', nom: '', password: '', role: 'ACCUEIL', societeId: '' };
+export const EMPTY_FORM: FormData = {
+  email: '',
+  nom: '',
+  password: '',
+  role: 'ACCUEIL',
+  societeId: '',
+  serviceResponsable: '',
+};
+
+/** Options du champ « Service géré » (rôle RESPONSABLE_SERVICE) — les 4 services KPI. */
+export const SERVICES_RESPONSABLE: { value: string; label: string }[] = [
+  { value: 'ACCUEIL', label: 'Accueil' },
+  { value: 'TECHNIQUE', label: 'Service Technique' },
+  { value: 'CONTROLE_MEDICAL', label: 'Contrôle médical' },
+  { value: 'COMPTABILITE', label: 'Comptabilité' },
+];
+
+export function serviceResponsableLabel(service: string | null): string {
+  return SERVICES_RESPONSABLE.find((s) => s.value === service)?.label ?? service ?? '';
+}
 
 export function formatDate(d: string | null): string {
   if (!d) return '—';

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { ROLES, type FormData, type Utilisateur, type SocieteRef, type LiaisonInfo } from './types';
+import { ROLES, SERVICES_RESPONSABLE, type FormData, type Utilisateur, type SocieteRef, type LiaisonInfo } from './types';
 
 interface UtilisateurFormDialogProps {
   open: boolean;
@@ -91,13 +91,35 @@ export default function UtilisateurFormDialog({
                 {ROLES.map(r => (
                   <SelectItem key={r.value} value={r.value}>
                     <span className="flex items-center gap-2">
-                      <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'ACCUEIL' ? 'bg-info-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-accent-500' : 'bg-accent-500')} />
+                      <span className={cn('inline-block h-2 w-2 rounded-full', r.value === 'ADMINISTRATEUR' ? 'bg-red-500' : r.value === 'DIRECTION_GENERALE' ? 'bg-indigo-500' : r.value === 'RESPONSABLE_SERVICE' ? 'bg-teal-500' : r.value === 'ACCUEIL' ? 'bg-info-500' : r.value === 'TECHNIQUE' ? 'bg-amber-500' : r.value === 'COMPTABILITE' ? 'bg-green-500' : r.value === 'SANTE' ? 'bg-teal-500' : r.value === 'PORTAIL_CLIENT' ? 'bg-accent-500' : 'bg-accent-500')} />
                       {r.label}
                     </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {formData.role === 'RESPONSABLE_SERVICE' && (
+              <div className="space-y-1.5 pt-2">
+                <Label htmlFor="user-service" className="text-sm font-medium">Service géré</Label>
+                <Select
+                  value={formData.serviceResponsable || undefined}
+                  onValueChange={v => setFormData(f => ({ ...f, serviceResponsable: v }))}
+                >
+                  <SelectTrigger id="user-service" className="h-9">
+                    <SelectValue placeholder="Choisir le service géré" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERVICES_RESPONSABLE.map(s => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  La consultation KPI (performance, alertes, export) est limitée côté serveur à ce service.
+                </p>
+              </div>
+            )}
             {formData.role === 'PORTAIL_CLIENT' && (
               <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
                 <Info className="h-3 w-3" />

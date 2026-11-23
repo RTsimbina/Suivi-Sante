@@ -7,7 +7,7 @@ import { enNombre, egaux, superieurA, sommer, superieurOuEgal } from "@/lib/mone
 import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { DOSSIER_TRANSITIONS, DOSSIER_ROLE_TRANSITIONS } from '@/lib/statuts';
-import { synchroniserEtapes } from '@/lib/kpi-etapes';
+import { synchroniserEtapes, synchroniserEtapeControleMedical } from '@/lib/kpi-etapes';
 import { dossierUpdateSchema } from "@/lib/validation";
 
 // Matrices centralisées dans src/lib/statuts.ts (DOSSIER_TRANSITIONS / DOSSIER_ROLE_TRANSITIONS)
@@ -34,6 +34,7 @@ export async function PATCH(
       gestionnaireAccueilId,
       gestionnaireTechniqueId,
       gestionnaireComptaId,
+      gestionnaireControleMedicalId,
       assureId,
       montantValide,
       ticketModerateur,
@@ -140,6 +141,16 @@ export async function PATCH(
       updateData.gestionnaireComptaId = gestionnaireComptaId || null;
       if (gestionnaireComptaId && !existing.gestionnaireComptaId) {
         assignComments.push('Assigné à un gestionnaire Comptabilité');
+      }
+    }
+    // ─── R3 — Assignation native du contrôle médical ─────────────────────────
+    // Même mécanique que les services du circuit ; l'étape KPI ouverte du
+    // contrôle médical est synchronisée (complétion / réaffectation /
+    // désaffectation) dans la transaction ci-dessous.
+    if (gestionnaireControleMedicalId !== undefined) {
+      updateData.gestionnaireControleMedicalId = gestionnaireControleMedicalId || null;
+      if (gestionnaireControleMedicalId && !existing.gestionnaireControleMedicalId) {
+        assignComments.push('Assigné à un gestionnaire Contrôle médical');
       }
     }
 
@@ -379,11 +390,24 @@ export async function PATCH(
           COMPTABILITE: updateData.gestionnaireComptaId !== undefined
             ? (updateData.gestionnaireComptaId as string | null)
             : existing.gestionnaireComptaId,
+          CONTROLE_MEDICAL: updateData.gestionnaireControleMedicalId !== undefined
+            ? (updateData.gestionnaireControleMedicalId as string | null)
+            : existing.gestionnaireControleMedicalId,
         },
         userId,
         userRole,
         source: 'CIRCUIT',
       });
+
+      // ─── R3 : synchronisation de l'étape KPI du contrôle médical ──────────
+      // Le contrôle médical est hors circuit des statuts : l'alignement de son
+      // étape ouverte sur l'assignation (complétion / réaffectation /
+      // désaffectation) est fait ici, dans la même transaction.
+      if (updateData.gestionnaireControleMedicalId !== undefined) {
+        await synchroniserEtapeControleMedical(
+          tx, id, (updateData.gestionnaireControleMedicalId as string | null),
+        );
+      }
 
       return dossier;
     });

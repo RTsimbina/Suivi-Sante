@@ -49,6 +49,8 @@ export const CHAMP_LABELS: Record<string, string> = {
 
 export const ROLE_COLORS: Record<string, string> = {
   ADMINISTRATEUR: 'bg-brand-100 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300',
+  DIRECTION_GENERALE: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300',
+  RESPONSABLE_SERVICE: 'bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300',
   ACCUEIL: 'bg-info-100 text-info-700 dark:bg-info-950/40 dark:text-info-300',
   TECHNIQUE: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
   COMPTABILITE: 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300',

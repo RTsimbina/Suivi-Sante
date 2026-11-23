@@ -13,6 +13,13 @@ model Utilisateur {
   nom           String
   password      String
   role          String    @default("UTILISATEUR")
+  // ─── R2 — Responsable de service ─────────────────────────────────────────
+  // Portée « son service uniquement » : pour le rôle RESPONSABLE_SERVICE, le
+  // service géré (ACCUEIL | TECHNIQUE | CONTROLE_MEDICAL | COMPTABILITE) borne
+  // côté serveur la consultation KPI (performance, alertes, export). NULL pour
+  // tous les autres rôles — la résolution du périmètre échoue (fail-closed)
+  // si un RESPONSABLE_SERVICE n'a pas de service associé.
+  serviceResponsable String?
   actif         Boolean   @default(true)
   // ─── Révocation des sessions (P1) ───────────────────────────────────────
   // Sessions NextAuth = JWT signé (8 h) : un jeton émis AVANT une
@@ -79,6 +86,7 @@ model Gestionnaire {
   dossiersAccueil     Dossier[] @relation("GestionnaireAccueil")
   dossiersTechnique   Dossier[] @relation("GestionnaireTechnique")
   dossiersCompta      Dossier[] @relation("GestionnaireCompta")
+  dossiersControleMedical Dossier[] @relation("GestionnaireControleMedical")
   etapesKpi           EtapeTraitement[] @relation("EtapesGestionnaire")
   createdAt           DateTime   @default(now())
 }
@@ -128,6 +136,13 @@ model Dossier {
   categorieDossier           String?
   gestionnaireAccueilId     String?
   gestionnaireAccueil       Gestionnaire? @relation("GestionnaireAccueil", fields: [gestionnaireAccueilId], references: [id])
+  // ─── R3 — Assignation native du Contrôle médical ─────────────────────────
+  // Même mécanique que Accueil/Technique/Compta : un gestionnaire de
+  // référentiel (service CONTROLE_MEDICAL) peut être assigné au dossier. La
+  // période KPI de contrôle médical porte cette assignation (EtapeTraitement.
+  // gestionnaireId) — plus de saisie manuelle sans responsable identifié.
+  gestionnaireControleMedicalId String?
+  gestionnaireControleMedical   Gestionnaire? @relation("GestionnaireControleMedical", fields: [gestionnaireControleMedicalId], references: [id])
   createurId                String?
   createur                  Utilisateur?  @relation("CreateurDossier", fields: [createurId], references: [id])
   assureId                  String?

@@ -17,6 +17,7 @@ import {
   numStatSchema,
   ribSchema,
   roleUtilisateurSchema,
+  serviceResponsableSchema,
   sexeSchema,
   telephoneLibreSchema,
   typeBeneficiaireSchema,
@@ -35,29 +36,55 @@ const societeIdOptionnel = z.preprocess(
   idOptionnel
 );
 
-export const utilisateurCreateSchema = z.object({
-  email: emailSchema,
-  nom: texteCourt(100, "Le nom"),
-  password: motDePasseSchema,
-  role: roleUtilisateurSchema,
-  // CONTACT_ENTREPRISE sans contact existant : permet la création en une
-  // étape du compte + du contact d'entreprise lié (société sélectionnée).
-  societeId: societeIdOptionnel,
-});
+/** serviceResponsable : "" côté client = non sélectionné → undefined.
+ *  Obligatoire pour le rôle RESPONSABLE_SERVICE (R2 — portée « son service »),
+ *  interdit pour tout autre rôle (refus silencieux → null, règle croisée
+ *  vérifiée par superRefine ci-dessous). */
+const serviceResponsableOptionnel = z.preprocess(
+  (v) => (v === "" || v === null ? undefined : v),
+  serviceResponsableSchema.optional()
+);
 
-export const utilisateurUpdateSchema = z.object({
-  id: idSchema,
-  email: emailSchema.optional(),
-  nom: texteCourt(100, "Le nom").optional(),
-  role: roleUtilisateurSchema.optional(),
-  // "" = mot de passe inchangé (comportement du formulaire d'édition)
-  password: z.preprocess(
-    (v) => (v === "" || v === null ? undefined : v),
-    motDePasseSchema.optional()
-  ),
-  // Idem création : liaison one-step d'un CONTACT_ENTREPRISE à une société
-  societeId: societeIdOptionnel,
-});
+export const utilisateurCreateSchema = z
+  .object({
+    email: emailSchema,
+    nom: texteCourt(100, "Le nom"),
+    password: motDePasseSchema,
+    role: roleUtilisateurSchema,
+    // CONTACT_ENTREPRISE sans contact existant : permet la création en une
+    // étape du compte + du contact d'entreprise lié (société sélectionnée).
+    societeId: societeIdOptionnel,
+    serviceResponsable: serviceResponsableOptionnel,
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === "RESPONSABLE_SERVICE" && !data.serviceResponsable) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["serviceResponsable"],
+        message: "Un responsable de service doit avoir un service géré.",
+      });
+    }
+  });
+
+export const utilisateurUpdateSchema = z
+  .object({
+    id: idSchema,
+    email: emailSchema.optional(),
+    nom: texteCourt(100, "Le nom").optional(),
+    role: roleUtilisateurSchema.optional(),
+    // "" = mot de passe inchangé (comportement du formulaire d'édition)
+    password: z.preprocess(
+      (v) => (v === "" || v === null ? undefined : v),
+      motDePasseSchema.optional()
+    ),
+    // Idem création : liaison one-step d'un CONTACT_ENTREPRISE à une société
+    societeId: societeIdOptionnel,
+    // Changement de service géré (rôle RESPONSABLE_SERVICE) ; undefined =
+    // inchangé, null = suppression explicite. La règle croisée « un
+    // RESPONSABLE_SERVICE doit garder un service » est vérifiée par la route
+    // (mise à jour partielle : le service peut déjà être posé en base).
+    serviceResponsable: serviceResponsableOptionnel,
+  });
 
 export const utilisateurPatchSchema = z.object({
   id: idSchema,

@@ -27,9 +27,13 @@ describe('Cohérence croisée — statuts', () => {
 });
 
 describe('Cohérence croisée — rôles', () => {
-  it('roleUtilisateurSchema = ROLES (referentiels.ts, 8 rôles avec PRESTATAIRE)', () => {
+  it('roleUtilisateurSchema = ROLES (referentiels.ts, 10 rôles avec DIRECTION_GENERALE et RESPONSABLE_SERVICE)', () => {
     expect(optionsDuSchema(roleUtilisateurSchema)).toEqual([...ROLES]);
     expect(ROLES).toContain('PRESTATAIRE');
+    // R1 / R2 — les deux nouveaux rôles internes sont connus des deux côtés
+    expect(ROLES).toContain('DIRECTION_GENERALE');
+    expect(ROLES).toContain('RESPONSABLE_SERVICE');
+    expect(ROLES).toHaveLength(10);
   });
 });
 

@@ -139,6 +139,7 @@ export function useUtilisateursData() {
       password: '',
       role: user.role,
       societeId: '',
+      serviceResponsable: user.serviceResponsable ?? '',
     });
     setShowPassword(false);
     setLiaison(null);
@@ -181,6 +182,13 @@ export function useUtilisateursData() {
       // étape du contact lié (ignoré par l'API si un contact existe déjà).
       if (formData.role === 'CONTACT_ENTREPRISE' && formData.societeId) {
         body.societeId = formData.societeId;
+      }
+
+      // RESPONSABLE_SERVICE : transmettre le service géré (portée « son
+      // service » côté serveur) ; l'API exige la présence du champ à la
+      // création et borne les valeurs au référentiel des services.
+      if (formData.role === 'RESPONSABLE_SERVICE' && formData.serviceResponsable) {
+        body.serviceResponsable = formData.serviceResponsable;
       }
 
       if (isEdit) {

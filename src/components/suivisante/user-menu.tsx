@@ -31,6 +31,10 @@ function getRoleBadgeVariant(
   switch (role) {
     case 'ADMINISTRATEUR':
       return 'default';
+    case 'DIRECTION_GENERALE':
+      return 'default';
+    case 'RESPONSABLE_SERVICE':
+      return 'secondary';
     case 'TECHNIQUE':
       return 'secondary';
     case 'COMPTABILITE':
@@ -46,6 +50,10 @@ function getRoleBadgeClass(role: string): string {
   switch (role) {
     case 'ADMINISTRATEUR':
       return 'bg-brand-600 text-white border-brand-600';
+    case 'DIRECTION_GENERALE':
+      return 'bg-indigo-600 text-white border-indigo-600';
+    case 'RESPONSABLE_SERVICE':
+      return 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800';
     case 'ACCUEIL':
       return 'bg-info-100 text-info-700 border-info-200 dark:bg-info-900/40 dark:text-info-300 dark:border-info-800';
     case 'TECHNIQUE':

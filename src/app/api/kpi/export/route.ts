@@ -1,5 +1,7 @@
 /**
- * GET /api/kpi/export?format=xlsx|pdf — Exports du module KPI (ADMINISTRATEUR).
+ * GET /api/kpi/export?format=xlsx|pdf — Exports du module KPI.
+ * Rôles (matrice) : ADMINISTRATEUR + DIRECTION_GENERALE (global, R1) +
+ * RESPONSABLE_SERVICE (portée forcée à son service, R2 — fail-closed).
  * Consomme le même moteur que le tableau de bord → cohérence garantie (§12).
  */
 
@@ -7,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/lib/authorize';
 import { getUserInfoFromRequest } from '@/lib/audit-log';
 import { db } from '@/lib/db';
-import { periodeKpiDepuisRequest, paramUrl } from '@/lib/kpi-api';
+import { contexteKpi, periodeKpiDepuisRequest, paramUrl, serviceResponsableDuCompte } from '@/lib/kpi-api';
 import {
   chargerEtapesPeriode, chargerObjectifs, chargerSeuils, calculerPerformance,
   calculerAlertes, type FiltresKpi,
@@ -23,7 +25,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ erreur: 'Format non supporté (xlsx ou pdf).' }, { status: 400 });
     }
     const periode = periodeKpiDepuisRequest(request);
-    const service = paramUrl(request, 'service');
+    const { userId, role } = contexteKpi(request);
+
+    // Portée serveur : le service du compte RESPONSABLE_SERVICE ÉCRASE tout
+    // paramètre ; fail-closed (403) si le rôle n'a pas de service associé.
+    let service = paramUrl(request, 'service');
+    if (role === 'RESPONSABLE_SERVICE') {
+      const serviceCompte = await serviceResponsableDuCompte(userId);
+      if (!serviceCompte) {
+        return NextResponse.json({ erreur: 'Aucun service associé à votre compte. Contactez votre administrateur.' }, { status: 403 });
+      }
+      service = serviceCompte;
+    }
     const filtres: FiltresKpi = service ? { service } : {};
 
     const [etapes, objectifs, seuils, utilisateurs, auditNom] = await Promise.all([
