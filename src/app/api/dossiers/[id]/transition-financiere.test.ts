@@ -19,6 +19,10 @@ const txMocks = vi.hoisted(() => ({
   baremeFindFirst: vi.fn(),
   dossierFindMany: vi.fn().mockResolvedValue([]),
   dossierUpdate: vi.fn(),
+  // Traçabilité KPI (synchroniserEtapes dans la même transaction)
+  etapeFindMany: vi.fn().mockResolvedValue([]),
+  etapeUpdate: vi.fn().mockResolvedValue({}),
+  etapeCreate: vi.fn().mockResolvedValue({}),
 }));
 
 const dbMocks = vi.hoisted(() => ({
@@ -101,6 +105,11 @@ beforeEach(() => {
       $queryRaw: txMocks.queryRaw,
       bareme: { findFirst: txMocks.baremeFindFirst },
       dossier: { findMany: txMocks.dossierFindMany, update: txMocks.dossierUpdate },
+      etapeTraitement: {
+        findMany: txMocks.etapeFindMany,
+        update: txMocks.etapeUpdate,
+        create: txMocks.etapeCreate,
+      },
     })
   );
   txMocks.dossierUpdate.mockResolvedValue({ id: 'd-1', statut: 'VALIDE' });

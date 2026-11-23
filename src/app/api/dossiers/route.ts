@@ -8,12 +8,8 @@ import {
   avecPerimetreSociete,
 } from "@/lib/data-isolation";
 import { Prisma } from "@prisma/client";
-<<<<<<< HEAD
 import { verifierPlafondAnnuel, fenetreAnnuelle, type PlafondCheckResult } from "@/lib/plafond-check";
-=======
-import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
 import { synchroniserEtapes } from "@/lib/kpi-etapes";
->>>>>>> fc1a06c (feat(kpi): module de performance individuelle des collaborateurs)
 import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { sommer, superieurOuEgal, enNombre } from "@/lib/money";
 import { calculerRemboursement } from "@/lib/services/calcul-remboursement";

@@ -276,110 +276,76 @@ export async function PATCH(
       transitionEntreeConsommation || transitionValide || (montantValideChange && statutConsommant);
 
     // ─── Mise à jour ──────────────────────────────────────────────────────
-<<<<<<< HEAD
-    const updated = transitionSerrialisee
-      ? await db.$transaction(async (tx) => {
-          const baremeTx = await trouverBaremeValide(tx, {
-            societeId: existing.societeId,
-            prestation: existing.typeDossier,
-            date: existing.dateSoins ?? existing.dateReception,
-          });
-          if (baremeTx) {
-            // FOR UPDATE : l'opération concurrente attend le commit, puis
-            // relit une consommation à jour (READ COMMITTED).
-            await tx.$queryRaw`SELECT "id" FROM "Bareme" WHERE "id" = ${baremeTx.id} FOR UPDATE`;
-            // BIZ-2 : même fenêtre annuelle que verifierPlafondAnnuel
-            // (année de la réception du dossier — plus d'année courante).
-            const fenetreTx = fenetreAnnuelle(existing.dateReception ?? new Date());
-            const dossiersAnnee = await tx.dossier.findMany({
-              where: {
-                assureId: assureId || existing.assureId,
-                societeId: existing.societeId,
-                typeDossier: existing.typeDossier,
-                dateReception: {
-                  gte: fenetreTx.debut,
-                  lte: fenetreTx.fin,
-                },
-                statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
-                id: { not: id },
+    // Transaction unique : contrôle de plafond (verrou FOR UPDATE du barème,
+    // re-vérification READ COMMITTED) ET traçabilité KPI (périodes de
+    // responsabilité) committés ensemble — aucune étape orpheline.
+    const updated = await db.$transaction(async (tx) => {
+      if (transitionSerrialisee) {
+        const baremeTx = await trouverBaremeValide(tx, {
+          societeId: existing.societeId,
+          prestation: existing.typeDossier,
+          date: existing.dateSoins ?? existing.dateReception,
+        });
+        if (baremeTx) {
+          // FOR UPDATE : l'opération concurrente attend le commit, puis
+          // relit une consommation à jour (READ COMMITTED).
+          await tx.$queryRaw`SELECT "id" FROM "Bareme" WHERE "id" = ${baremeTx.id} FOR UPDATE`;
+          // BIZ-2 : même fenêtre annuelle que verifierPlafondAnnuel
+          // (année de la réception du dossier — plus d'année courante).
+          const fenetreTx = fenetreAnnuelle(existing.dateReception ?? new Date());
+          const dossiersAnnee = await tx.dossier.findMany({
+            where: {
+              assureId: assureId || existing.assureId,
+              societeId: existing.societeId,
+              typeDossier: existing.typeDossier,
+              dateReception: {
+                gte: fenetreTx.debut,
+                lte: fenetreTx.fin,
               },
-              select: { montantPaye: true, montantValide: true, montantReclame: true },
-            });
-            const consomme = sommer(
-              dossiersAnnee.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame),
+              statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
+              id: { not: id },
+            },
+            select: { montantPaye: true, montantValide: true, montantReclame: true },
+          });
+          const consomme = sommer(
+            dossiersAnnee.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame),
+          );
+          if (transitionEntreeConsommation || transitionValide) {
+            // ─── BIZ-1 : contrôle sur le montant EFFECTIVEMENT consommé ──
+            // Après la transition, le dossier consomme
+            // max(montantReclame, montantValide) — le contrôle porte sur ce
+            // montant, symétriquement à la branche d'entrée en consommation.
+            const maxConsommable = Math.max(
+              enNombre(existing.montantReclame) ?? 0,
+              enNombre(montantValide ?? existing.montantValide) ?? 0,
             );
-            if (transitionEntreeConsommation || transitionValide) {
-              // ─── BIZ-1 : contrôle sur le montant EFFECTIVEMENT consommé ──
-              // Après la transition, le dossier consomme
-              // max(montantReclame, montantValide) — le contrôle porte sur ce
-              // montant, symétriquement à la branche d'entrée en
-              // consommation. Ancien comportement : la transition
-              // EN_ANALYSE → VALIDE ne comparait que la consommation
-              // existante au plafond ; le montant validé n'était jamais borné.
-              // (Decimal.plus et non « + » : valueOf de Decimal renvoie une
-              // chaîne — « + » concaténerait 350000 + 100000 en 350000100000.)
-              const maxConsommable = Math.max(
-                enNombre(existing.montantReclame) ?? 0,
-                enNombre(montantValide ?? existing.montantValide) ?? 0,
+            if (superieurOuEgal(
+              consomme.plus(maxConsommable),
+              baremeTx.plafond,
+            )) {
+              throw new Error(
+                `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la ${transitionValide ? 'validation' : 'passage en analyse'}`,
               );
-              if (superieurOuEgal(
-                consomme.plus(maxConsommable),
-                baremeTx.plafond,
-              )) {
-                throw new Error(
-                  `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la ${transitionValide ? 'validation' : 'passage en analyse'}`,
-                );
-              }
-            } else if (montantValideChange) {
-              // ─── BIZ-1 : montantValide modifié hors transition ──────────
-              // La contribution future du dossier au plafond devient
-              // montantPaye ?? nouveau montantValide ?? montantReclame.
-              const contributionFuture = existing.montantPaye
-                ?? nouveauMontantValide
-                ?? existing.montantReclame;
-              if (superieurOuEgal(
-                consomme.plus(enNombre(contributionFuture) ?? 0),
-                baremeTx.plafond,
-              )) {
-                throw new Error(
-                  `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la modification du montant validé`,
-                );
-              }
+            }
+          } else if (montantValideChange) {
+            // ─── BIZ-1 : montantValide modifié hors transition ──────────
+            // La contribution future du dossier au plafond devient
+            // montantPaye ?? nouveau montantValide ?? montantReclame.
+            const contributionFuture = existing.montantPaye
+              ?? nouveauMontantValide
+              ?? existing.montantReclame;
+            if (superieurOuEgal(
+              consomme.plus(enNombre(contributionFuture) ?? 0),
+              baremeTx.plafond,
+            )) {
+              throw new Error(
+                `PLAFOND_ATTEINT_TRANSACTION: Plafond ${existing.typeDossier} atteint lors de la modification du montant validé`,
+              );
             }
           }
-          return tx.dossier.update({
-            where: { id },
-            data: {
-              ...(statut ? { statut } : {}),
-              ...updateData,
-              historique: JSON.stringify(newHistorique),
-            },
-            include: {
-              societe: true,
-              gestionnaireAccueil: true,
-              gestionnaireTechnique: true,
-              gestionnaireCompta: true,
-            },
-          });
-        })
-      : await db.dossier.update({
-          where: { id },
-          data: {
-            ...(statut ? { statut } : {}),
-            ...updateData,
-            historique: JSON.stringify(newHistorique),
-          },
-          include: {
-            societe: true,
-            gestionnaireAccueil: true,
-            gestionnaireTechnique: true,
-            gestionnaireCompta: true,
-          },
-        });
-=======
-    // Transaction : la mise à jour et la traçabilité KPI (périodes de
-    // responsabilité) sont committées ensemble — aucune étape orpheline.
-    const updated = await db.$transaction(async (tx) => {
+        }
+      }
+
       const dossier = await tx.dossier.update({
         where: { id },
         data: {
@@ -421,7 +387,6 @@ export async function PATCH(
 
       return dossier;
     });
->>>>>>> fc1a06c (feat(kpi): module de performance individuelle des collaborateurs)
 
     // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
     // Valeurs converties comme en base pour éviter les faux positifs de diff
