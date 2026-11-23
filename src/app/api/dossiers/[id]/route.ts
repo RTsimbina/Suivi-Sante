@@ -7,6 +7,7 @@ import { enNombre, egaux, superieurA, sommer, superieurOuEgal } from "@/lib/mone
 import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { parseJsonBody } from "@/lib/validation/parse";
 import { DOSSIER_TRANSITIONS, DOSSIER_ROLE_TRANSITIONS } from '@/lib/statuts';
+import { synchroniserEtapes } from '@/lib/kpi-etapes';
 import { dossierUpdateSchema } from "@/lib/validation";
 
 // Matrices centralisées dans src/lib/statuts.ts (DOSSIER_TRANSITIONS / DOSSIER_ROLE_TRANSITIONS)
@@ -275,6 +276,7 @@ export async function PATCH(
       transitionEntreeConsommation || transitionValide || (montantValideChange && statutConsommant);
 
     // ─── Mise à jour ──────────────────────────────────────────────────────
+<<<<<<< HEAD
     const updated = transitionSerrialisee
       ? await db.$transaction(async (tx) => {
           const baremeTx = await trouverBaremeValide(tx, {
@@ -374,6 +376,52 @@ export async function PATCH(
             gestionnaireCompta: true,
           },
         });
+=======
+    // Transaction : la mise à jour et la traçabilité KPI (périodes de
+    // responsabilité) sont committées ensemble — aucune étape orpheline.
+    const updated = await db.$transaction(async (tx) => {
+      const dossier = await tx.dossier.update({
+        where: { id },
+        data: {
+          ...(statut ? { statut } : {}),
+          ...updateData,
+          historique: JSON.stringify(newHistorique),
+        },
+        include: {
+          societe: true,
+          gestionnaireAccueil: true,
+          gestionnaireTechnique: true,
+          gestionnaireCompta: true,
+        },
+      });
+
+      // ─── KPI : synchronisation des périodes de responsabilité ─────────────
+      // Fermeture de l'étape du service quitté, ouverture de la nouvelle,
+      // réaffectation si un gestionnaire change — chaque période reste
+      // attribuée à son responsable (aucun transfert de temps au dernier).
+      await synchroniserEtapes(tx, {
+        dossierId: id,
+        statutAvant: existing.statut,
+        statutApres: statut ?? null,
+        gestionnairesApres: {
+          ACCUEIL: updateData.gestionnaireAccueilId !== undefined
+            ? (updateData.gestionnaireAccueilId as string | null)
+            : existing.gestionnaireAccueilId,
+          TECHNIQUE: updateData.gestionnaireTechniqueId !== undefined
+            ? (updateData.gestionnaireTechniqueId as string | null)
+            : existing.gestionnaireTechniqueId,
+          COMPTABILITE: updateData.gestionnaireComptaId !== undefined
+            ? (updateData.gestionnaireComptaId as string | null)
+            : existing.gestionnaireComptaId,
+        },
+        userId,
+        userRole,
+        source: 'CIRCUIT',
+      });
+
+      return dossier;
+    });
+>>>>>>> fc1a06c (feat(kpi): module de performance individuelle des collaborateurs)
 
     // ─── Audit champ par champ (1 operationId pour l'opération) ────────────
     // Valeurs converties comme en base pour éviter les faux positifs de diff

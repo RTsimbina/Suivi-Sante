@@ -8,7 +8,12 @@ import {
   avecPerimetreSociete,
 } from "@/lib/data-isolation";
 import { Prisma } from "@prisma/client";
+<<<<<<< HEAD
 import { verifierPlafondAnnuel, fenetreAnnuelle, type PlafondCheckResult } from "@/lib/plafond-check";
+=======
+import { verifierPlafondAnnuel, type PlafondCheckResult } from "@/lib/plafond-check";
+import { synchroniserEtapes } from "@/lib/kpi-etapes";
+>>>>>>> fc1a06c (feat(kpi): module de performance individuelle des collaborateurs)
 import { trouverBaremeValide } from "@/lib/baremes-validite";
 import { sommer, superieurOuEgal, enNombre } from "@/lib/money";
 import { calculerRemboursement } from "@/lib/services/calcul-remboursement";
@@ -330,7 +335,7 @@ export async function POST(request: NextRequest) {
         // ─── Numéro de dossier : GÉNÉRÉ CÔTÉ SERVEUR, dans la transaction ──
         const numeroDossier = await genererNumeroDossier(tx, annee, decalage);
 
-        return tx.dossier.create({
+        const dossierCree = await tx.dossier.create({
       data: {
         numeroDossier,
         dateReception,
@@ -367,6 +372,19 @@ export async function POST(request: NextRequest) {
         gestionnaireCompta: true,
       },
     });
+
+      // ─── KPI : ouverture de la période de responsabilité ACCUEIL ─────────
+      // Traçabilité serveur dans la même transaction que la création.
+      await synchroniserEtapes(tx, {
+        dossierId: dossierCree.id,
+        statutAvant: null,
+        statutApres: 'RECU',
+        gestionnairesApres: { ACCUEIL: gestionnaireAccueilId ?? null },
+        userId,
+        userRole: request.headers.get('x-user-role'),
+        source: 'CIRCUIT',
+      });
+      return dossierCree;
     })); // fin avecRetryNumeroDossier($transaction)
 
     // Attraper l'erreur de plafond de la transaction

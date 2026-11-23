@@ -27,9 +27,14 @@ model Utilisateur {
   failedAttempts  Int       @default(0)
   lockoutUntil    DateTime?
   createdAt       DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  updatedAt     DateTime @updatedAt
   commentaires  Commentaire[]
   dossiersCrees Dossier[]  @relation("CreateurDossier")
+  // ─── KPI Collaborateurs (module « Performance des collaborateurs ») ────
+  etapesKpi      EtapeTraitement[] @relation("EtapesUtilisateur")
+  suspensionsKpi EtapeSuspension[] @relation("SuspensionsUtilisateur")
+  objectifsKpi   ObjectifDelai[]   @relation("ObjectifsUtilisateur")
+  seuilsKpi      SeuilAlerteKpi[]  @relation("SeuilsUtilisateur")
 }
 
 model Societe {
@@ -74,6 +79,7 @@ model Gestionnaire {
   dossiersAccueil     Dossier[] @relation("GestionnaireAccueil")
   dossiersTechnique   Dossier[] @relation("GestionnaireTechnique")
   dossiersCompta      Dossier[] @relation("GestionnaireCompta")
+  etapesKpi           EtapeTraitement[] @relation("EtapesGestionnaire")
   createdAt           DateTime   @default(now())
 }
 
@@ -181,6 +187,7 @@ model Dossier {
   @@index([assureId, typeDossier, dateReception])
   @@index([assureId, dateReception])
   @@index([prestataireId])
+  etapesKpi                 EtapeTraitement[] @relation("EtapesDossier")
 }
 
 model Commentaire {
@@ -596,4 +603,109 @@ model CourrielEvenement {
 
   @@index([courrielId, createdAt])
   @@index([type, createdAt])
+}
+
+// ─── Module KPI — Performance des collaborateurs ─────────────────────────────
+// Traçabilité chronologique du traitement : une ligne par PÉRIODE DE
+// RESPONSABILITÉ (dossier × service), ouverte à l'entrée du dossier dans le
+// service (transition du circuit ou création) et fermée à la sortie ou à la
+// réaffectation. Les suspensions (attente de pièce, validation externe) sont
+// posées à part pour exclure leur durée du temps actif — les retards
+// imputables au collaborateur se distinguent ainsi des attentes externes.
+/// Historique append-only : aucune fonction du code ne modifie une étape
+/// fermée ; les corrections passent par de nouvelles lignes (source MANUEL).
+model EtapeTraitement {
+  id              String   @id @default(cuid())
+  dossier         Dossier  @relation("EtapesDossier", fields: [dossierId], references: [id], onDelete: Cascade)
+  dossierId       String
+  /// ACCUEIL | TECHNIQUE | CONTROLE_MEDICAL | COMPTABILITE (voir referentiels.ts)
+  service         String
+  /// Compte utilisateur responsable de la période (identité KPI individuelle)
+  user            Utilisateur? @relation("EtapesUtilisateur", fields: [userId], references: [id])
+  userId          String?
+  /// Gestionnaire assigné (entité de référentiel, sans compte) — hérité des
+  /// champs gestionnaireXxxId du dossier au moment de l'étape
+  gestionnaire    Gestionnaire? @relation("EtapesGestionnaire", fields: [gestionnaireId], references: [id])
+  gestionnaireId  String?
+  /// TRAVAIL (période nominale) | RETOUR_CORRECTION (événement, dossier renvoyé)
+  type            String   @default("TRAVAIL")
+  /// CIRCUIT (hook des routes) | MIGRATION (backfill historique) | MANUEL
+  source          String   @default("CIRCUIT")
+  statutAvant     String?
+  statutApres     String?
+  /// Entrée de responsabilité (affectation du dossier au service/collaborateur)
+  dateAffectation DateTime
+  /// Début effectif du traitement (action du responsable ; endpoint dédié ;
+  /// sinon posé à la fermeture — règle documentée « traitement instantané »)
+  dateDebut       DateTime?
+  /// Sortie de responsabilité (transition de sortie ou réaffectation) —
+  /// NULL = étape encore ouverte
+  dateFin         DateTime?
+  motifReaffectation String?
+  motifRetour     String?
+  suspensions     EtapeSuspension[]
+  createdAt       DateTime @default(now())
+
+  @@index([dossierId])
+  @@index([service, dateAffectation])
+  @@index([userId, dateFin])
+  @@index([gestionnaireId])
+}
+
+/// Fenêtre de suspension d'une étape : la durée suspendue est EXCLUE du temps
+/// actif et de la responsabilité imputable (motif obligatoire, horodatage
+/// serveur, reprise datée — aucune valeur n'est modifiable après coup).
+model EtapeSuspension {
+  id        String   @id @default(cuid())
+  etape     EtapeTraitement @relation(fields: [etapeId], references: [id], onDelete: Cascade)
+  etapeId   String
+  /// Motif obligatoire (attente pièce, validation externe, autre service…)
+  motif     String
+  suspenduA DateTime
+  /// NULL = toujours suspendu
+  reprisA   DateTime?
+  par       Utilisateur? @relation("SuspensionsUtilisateur", fields: [parId], references: [id])
+  parId     String?
+
+  @@index([etapeId])
+}
+
+/// Délai cible de traitement, VERSIONNÉ : toute modification ferme la version
+/// en vigueur (valideAu = now) et crée une nouvelle ligne — l'historique des
+/// anciennes valeurs est conservé pour recalculer les KPI d'époque.
+model ObjectifDelai {
+  id           String   @id @default(cuid())
+  /// ACCUEIL | TECHNIQUE | CONTROLE_MEDICAL | COMPTABILITE
+  service      String
+  /// Restriction optionnelle à un type de dossier ; NULL = tous les types
+  typeDossier  String?
+  /// Délai cible en minutes (ex. ACCUEIL 30, TECHNIQUE 240, COMPTABILITE 120)
+  delaiMinutes Int
+  valideDu     DateTime @default(now())
+  /// NULL = version en vigueur
+  valideAu     DateTime?
+  /// Motif du changement (tracé, exigé par la procédure interne)
+  motif        String?
+  creePar      Utilisateur @relation("ObjectifsUtilisateur", fields: [creeParId], references: [id])
+  creeParId    String
+
+  @@index([service, valideDu])
+}
+
+/// Seuil d'alerte configurable PAR SERVICE. Valeurs par défaut semées au
+/// premier démarrage ; modifiables par les profils habilités (ADMINISTRATEUR).
+model SeuilAlerteKpi {
+  id          String   @id @default(cuid())
+  /// Service visé, ou GLOBAL pour les seuils transverses
+  service     String
+  /// PROCHE_CIBLE (% du délai cible) | ACCUMULATION (nb dossiers ouverts)
+  /// | DEGRADATION (points de taux de respect) | HAUSSE_RETOURS (%)
+  typeAlerte  String
+  valeur      Float
+  modifiePar  Utilisateur? @relation("SeuilsUtilisateur", fields: [modifieParId], references: [id])
+  modifieParId String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([service, typeAlerte])
+  @@index([service])
 }

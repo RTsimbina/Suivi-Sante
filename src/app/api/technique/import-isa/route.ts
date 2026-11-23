@@ -3,6 +3,7 @@ import { checkAuth } from "@/lib/authorize";
 import { db } from "@/lib/db";
 import { readExcelRows } from "@/lib/excel";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { synchroniserEtapes } from "@/lib/kpi-etapes";
 import { enNombre } from "@/lib/money";
 import { parseFormData } from "@/lib/validation/parse";
 import { importFichierSeulSchema } from "@/lib/validation";
@@ -224,6 +225,22 @@ export async function POST(request: NextRequest) {
           where: { numeroDossier },
           data: updateData,
         });
+        // ─── KPI : synchronisation (RECU → EN_ANALYSE auto, réaffectations) ──
+        try {
+          await synchroniserEtapes(db, {
+            dossierId: existingDossier.id,
+            statutAvant: existingDossier.statut,
+            statutApres: (updateData.statut as string) ?? null,
+            gestionnairesApres: {
+              ACCUEIL: existingDossier.gestionnaireAccueilId,
+              TECHNIQUE: (updateData.gestionnaireTechniqueId as string) ?? existingDossier.gestionnaireTechniqueId,
+              COMPTABILITE: existingDossier.gestionnaireComptaId,
+            },
+            source: 'CIRCUIT',
+          });
+        } catch (e) {
+          console.error('Étape KPI (import-isa) :', e);
+        }
 
         nbSucces++;
         importDossiers.push({

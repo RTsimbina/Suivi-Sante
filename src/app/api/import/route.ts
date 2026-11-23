@@ -5,6 +5,7 @@ import { DOSSIER_STATUT_VALEURS, DOSSIER_TRANSITIONS } from "@/lib/statuts";
 import { readExcelRows } from "@/lib/excel";
 import { Prisma } from "@prisma/client";
 import { verifierPlafondAnnuel } from "@/lib/plafond-check";
+import { synchroniserEtapes } from "@/lib/kpi-etapes";
 import { parseFormData } from "@/lib/validation/parse";
 import { importDossiersSchema } from "@/lib/validation";
 
@@ -218,6 +219,24 @@ export async function POST(request: NextRequest) {
             where: { numeroDossier },
             data: updateData as Prisma.DossierUpdateInput,
           });
+          // ─── KPI : synchronisation des périodes de responsabilité ─────────
+          // Best-effort : l'import ne doit pas échouer sur la traçabilité
+          // (synchronisation idempotente, réparable par rejeu/backfill).
+          try {
+            await synchroniserEtapes(db, {
+              dossierId: existing.id,
+              statutAvant: existing.statut,
+              statutApres: ((updateData as Record<string, unknown>).statut as string) ?? null,
+              gestionnairesApres: {
+                ACCUEIL: existing.gestionnaireAccueilId,
+                TECHNIQUE: existing.gestionnaireTechniqueId,
+                COMPTABILITE: existing.gestionnaireComptaId,
+              },
+              source: 'CIRCUIT',
+            });
+          } catch (e) {
+            console.error('Étape KPI (import, mise à jour) :', e);
+          }
         } else {
           // Création nouveau dossier
           const createData: Record<string, unknown> = {
@@ -310,7 +329,21 @@ export async function POST(request: NextRequest) {
             createData.historique = JSON.stringify(historiqueEntries);
           }
 
-          await db.dossier.create({ data: createData as Prisma.DossierCreateInput });
+          const dossierImporte = await db.dossier.create({ data: createData as Prisma.DossierCreateInput });
+          // ─── KPI : étape ACCUEIL initiale du dossier importé ───────────────
+          try {
+            await synchroniserEtapes(db, {
+              dossierId: dossierImporte.id,
+              statutAvant: null,
+              statutApres: 'RECU',
+              gestionnairesApres: {
+                ACCUEIL: (createData.gestionnaireAccueilId as string | null) ?? null,
+              },
+              source: 'CIRCUIT',
+            });
+          } catch (e) {
+            console.error('Étape KPI (import, création) :', e);
+          }
         }
 
         nbSucces++;

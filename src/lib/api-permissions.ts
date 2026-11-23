@@ -72,6 +72,37 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
     // SANTE volontairement exclu : données financières
   },
+  // ─── Module KPI — Performance des collaborateurs ─────────────────────────
+  // Consultation GLOBALE (tableaux de bord, exports, alertes, paramétrage) :
+  // ADMINISTRATEUR uniquement — aucun rôle « Direction Générale » n'existe
+  // dans RoleType : l'ajouter à ces entrées suffira quand il sera créé
+  // (décision métier, cf. livrables du module KPI).
+  '/api/kpi/performance': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  '/api/kpi/export': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  '/api/kpi/alertes': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  '/api/kpi/objectifs': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  '/api/kpi/seuils': {
+    roles: ['ADMINISTRATEUR'],
+  },
+  // Espace personnel : l'identifiant mesuré est TOUJOURS celui du JWT
+  // (côté serveur, cf. /api/kpi/ma-performance) — aucun contournement
+  // possible via URL/paramètre, quel que soit le rôle.
+  '/api/kpi/ma-performance': {
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
+  },
+  // Contrôle médical : étapes hors circuit des statuts, rôles habilités SANTE
+  // (rôle « Contrôle Santé ») et ADMINISTRATEUR.
+  '/api/controle-medical': {
+    roles: ['SANTE', 'ADMINISTRATEUR'],
+  },
   '/api/ia': {
     roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'],
   },

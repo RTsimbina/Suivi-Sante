@@ -29,6 +29,7 @@ import { useDossierDetail } from './dossiers/use-dossier-detail';
 import { useDossierCommentaires } from './dossiers/use-dossier-commentaires';
 import { useDossierJustificatifs } from './dossiers/use-dossier-justificatifs';
 import { useDossierAlertesIa } from './dossiers/use-dossier-alertes-ia';
+import OngletTraitement from './kpi-collaborateurs/onglet-traitement';
 
 interface DossierDetailProps {
   dossierId: string;
@@ -103,6 +104,7 @@ export default function DossierDetail({ dossierId, onClose }: DossierDetailProps
                 onEnvoyer={justificatifs.envoyer}
               />
             )}
+            {activeTab === 'traitement' && <OngletTraitement dossierId={dossierId} statut={dossier.statut} />}
           </div>
         </ScrollArea>
       </DialogContent>

@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
   Heart, Stethoscope, Building2, Zap, HeartPulse, Mail, Shield, Users,
+  TrendingUp, Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,8 +40,10 @@ import SanteView from '@/components/suivisante/sante-view';
 import ReceptionView from '@/components/suivisante/reception-view';
 import JournalView from '@/components/suivisante/journal-view';
 import ProfilView from '@/components/suivisante/profil-view';
+import KpiCollaborateursView from '@/components/suivisante/kpi-collaborateurs/kpi-collaborateurs-view';
+import MaPerformanceView from '@/components/suivisante/kpi-collaborateurs/ma-performance-view';
 
-type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'utilisateurs' | 'profil' | 'configuration' | 'sante' | 'journal';
+type View = 'direction' | 'dossiers' | 'kanban' | 'technique' | 'comptabilite' | 'import' | 'reception' | 'reporting' | 'ia' | 'chat' | 'portail' | 'assures' | 'prestataires' | 'societes' | 'utilisateurs' | 'profil' | 'configuration' | 'sante' | 'journal' | 'kpi-collaborateurs' | 'ma-performance';
 
 interface Kpis {
   direction: { totalRecus: number; totalTraites: number; totalPayes: number; totalRejetes: number; delaiMoyenGlobal: number; montantTotalReclame: number; montantTotalPaye: number; tauxRejet: number };
@@ -68,13 +71,17 @@ const allNavItems: { key: View; label: string; icon: typeof LayoutDashboard; bad
   { key: 'utilisateurs', label: 'Gestion Utilisateurs', icon: Users, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'configuration', label: 'Configuration Bots', icon: Zap, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
   { key: 'journal', label: 'Journal de Bord', icon: Shield, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
+  // ─── Module KPI — Performance des collaborateurs (Administration) ────────
+  { key: 'kpi-collaborateurs', label: 'KPI – Performance Collaborateurs', icon: TrendingUp, section: 'CONFIGURATION', roles: ['ADMINISTRATEUR'] },
+  // Espace personnel du collaborateur (vues internes uniquement)
+  { key: 'ma-performance', label: 'Ma Performance', icon: Gauge, section: 'PILOTAGE', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'ia', label: 'Intelligence IA', icon: Brain, badge: 'IA', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'chat', label: 'Assistant IA', icon: MessageCircle, badge: 'Questions', section: 'IA', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
   { key: 'portail', label: 'Portail Client', icon: Globe, badge: 'Demo', section: 'CLIENT', roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE'] },
 ];
 
 /** Vues concernées par le filtre de période (la barre n'y est affichée que pour elles). */
-const VUES_AVEC_PERIODE: View[] = ['direction', 'dossiers', 'kanban', 'technique', 'comptabilite', 'reception', 'reporting', 'ia', 'journal', 'sante'];
+const VUES_AVEC_PERIODE: View[] = ['direction', 'dossiers', 'kanban', 'technique', 'comptabilite', 'reception', 'reporting', 'ia', 'journal', 'sante', 'kpi-collaborateurs', 'ma-performance'];
 
 /** Date de référence du filtre de période, définie explicitement par module. */
 const DATE_REFERENCE_PAR_VUE: Partial<Record<View, string>> = {
@@ -88,6 +95,8 @@ const DATE_REFERENCE_PAR_VUE: Partial<Record<View, string>> = {
   reception: 'Date du courriel',
   reporting: 'Date de début des contrats',
   journal: 'Date de modification',
+  'kpi-collaborateurs': "Date d'affectation des dossiers",
+  'ma-performance': "Date d'affectation des dossiers",
 };
 
 export default function Home() {
@@ -352,6 +361,8 @@ function ContenuSante() {
           {isViewAllowed && view === 'configuration' && <ConfigurationView />}
           {isViewAllowed && view === 'journal' && <JournalView />}
           {isViewAllowed && view === 'sante' && <SanteView />}
+          {isViewAllowed && view === 'kpi-collaborateurs' && <KpiCollaborateursView />}
+          {isViewAllowed && view === 'ma-performance' && <MaPerformanceView />}
         </main>
       </div>
     </div>

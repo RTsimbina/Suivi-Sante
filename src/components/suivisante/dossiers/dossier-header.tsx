@@ -13,14 +13,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  FileText, Building2, Calendar, Clock, MessageSquare, Paperclip, Brain,
+  FileText, Building2, Calendar, Clock, MessageSquare, Paperclip, Brain, Timer,
 } from 'lucide-react';
 import { formatDate, statutLabel, statutColor } from '../format';
 import { cn } from '@/lib/utils';
 import { DOSSIER_STATUT_VALEURS } from '@/lib/statuts';
 import type { DossierDetail } from './types';
 
-export type OngletDossier = 'info' | 'ia' | 'historique' | 'commentaires' | 'justificatifs';
+export type OngletDossier = 'info' | 'ia' | 'historique' | 'commentaires' | 'justificatifs' | 'traitement';
 
 interface DossierHeaderProps {
   dossier: DossierDetail;
@@ -45,6 +45,7 @@ export default function DossierHeader({
     { key: 'historique', label: `Historique (${dossier.historiqueParsed?.length || 0})`, icon: Clock },
     { key: 'commentaires', label: `Commentaires (${dossier.commentaires?.length || 0})`, icon: MessageSquare },
     { key: 'justificatifs', label: `Pièces (${dossier.justificatifs?.length || 0})`, icon: Paperclip },
+    { key: 'traitement', label: 'Traitement', icon: Timer },
   ];
 
   return (
