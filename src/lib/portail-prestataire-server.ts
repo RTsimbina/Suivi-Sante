@@ -17,7 +17,8 @@
 // est re-vérifié ici (défense en profondeur) pour toute requête directe.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import type { JWT } from 'next-auth/jwt';
+import { lireTokenSession } from '@/lib/jwt-session';
 import { db } from '@/lib/db';
 import { resoudreLiaisonPrestataireAvecControle } from '@/lib/liaison-prestataire';
 import { ERREUR_SANS_PRESTATAIRE } from '@/lib/data-isolation';
@@ -52,10 +53,7 @@ export type ResolutionPrestataire =
 export async function resoudreIdentitePortailPrestataire(
   request: NextRequest
 ): Promise<ResolutionPrestataire> {
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+  const token = await lireTokenSession(request);
 
   if (!token) {
     return {

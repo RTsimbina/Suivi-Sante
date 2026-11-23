@@ -197,7 +197,13 @@ describe.skipIf(!URL_RECETTE)('Module KPI — intégration PostgreSQL réelle', 
     const request = new Request('http://localhost/api/kpi/objectifs', {
       method: 'POST', headers: { 'user-agent': 'vitest-int' },
     });
-    const ancienne = await db.objectifDelai.findFirst({ where: { service: 'TECHNIQUE', typeDossier: null, valideAu: null } });
+    // Le test doit être auto-suffisant (base de recette propre) : si aucune
+    // version TECHNIQUE n'est en vigueur (pas de backfill exécuté), on crée
+    // soi-même la valeur initiale — c'est sa fermeture qui est vérifiée.
+    const ancienne = await db.objectifDelai.findFirst({ where: { service: 'TECHNIQUE', typeDossier: null, valideAu: null } })
+      ?? await db.objectifDelai.create({
+        data: { service: 'TECHNIQUE', typeDossier: null, delaiMinutes: 240, motif: 'Valeur initiale de test (recette)', creeParId: ADMIN },
+      });
     const nouvelle = await db.$transaction(async (tx) => {
       if (ancienne) {
         await tx.objectifDelai.update({ where: { id: ancienne.id }, data: { valideAu: new Date() } });

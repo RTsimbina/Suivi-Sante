@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { lireTokenSession } from '@/lib/jwt-session';
 import { db } from '@/lib/db';
 import { buildContext, validerParams, extrairePeriode, isRoleExterne } from '@/lib/assistant/context';
 import { listerQuestions, executerQuestion } from '@/lib/assistant/engine';
@@ -21,7 +21,7 @@ import type { RoleType } from '@/lib/auth-context';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = await lireTokenSession(request);
     if (!token) {
       return NextResponse.json({ erreur: 'Non authentifié. Veuillez vous reconnecter.' }, { status: 401 });
     }
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = await lireTokenSession(request);
     if (!token) {
       return NextResponse.json({ erreur: 'Non authentifié. Veuillez vous reconnecter.' }, { status: 401 });
     }

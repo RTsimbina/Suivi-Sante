@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { lireTokenSession } from '@/lib/jwt-session';
 import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
@@ -664,10 +665,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Empêcher la suppression de son propre compte
-    const token = await (await import('next-auth/jwt')).getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
+    const token = await lireTokenSession(request);
     if (token?.id === id) {
       return NextResponse.json(
         { erreur: 'Vous ne pouvez pas supprimer votre propre compte.' },

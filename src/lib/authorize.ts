@@ -1,4 +1,5 @@
-import { getToken, type JWT } from 'next-auth/jwt';
+import type { JWT } from 'next-auth/jwt';
+import { lireTokenSession } from '@/lib/jwt-session';
 import { NextRequest } from 'next/server';
 import { db } from './db';
 import { verifierSessionUtilisateur } from './session-revocation';
@@ -41,10 +42,7 @@ export async function authorizeRequest(
   const { pathname } = request.nextUrl;
 
   // 1. Vérifier le token JWT
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+  const token = await lireTokenSession(request);
 
   if (!token) {
     return {

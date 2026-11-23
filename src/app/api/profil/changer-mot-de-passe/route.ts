@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { lireTokenSession } from '@/lib/jwt-session';
 import { compare, hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 import { parseJsonBody } from '@/lib/validation/parse';
@@ -11,10 +11,7 @@ import { verifierSessionUtilisateur } from '@/lib/session-revocation';
 // Vérifie l'ancien mdp, hache le nouveau, trace dans HistoriqueParametre
 export async function POST(request: NextRequest) {
   try {
-    const token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
+    const token = await lireTokenSession(request);
     if (!token?.email) {
       return NextResponse.json({ erreur: 'Non authentifié' }, { status: 401 });
     }

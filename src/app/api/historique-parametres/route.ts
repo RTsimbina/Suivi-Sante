@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/authorize';
-import { getToken } from 'next-auth/jwt';
 import { writeExcelFromJson } from '@/lib/excel';
 import { plageDepuisParams } from '@/lib/periodes';
 

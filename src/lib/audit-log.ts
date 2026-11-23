@@ -1,4 +1,5 @@
 import { db } from './db';
+import { lireTokenSession } from '@/lib/jwt-session';
 import {
   type AuditAction,
   type AuditNiveau,
@@ -322,7 +323,7 @@ export async function getUserInfoFromRequest(
 ): Promise<{ nom: string; id: string; role?: string }> {
   try {
     const { getToken } = await import('next-auth/jwt');
-    const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
+    const token = await lireTokenSession(request as any);
     if (token) {
       return {
         nom: (token.nom as string) || (token.email as string) || 'inconnu',

@@ -206,6 +206,9 @@ async function main() {
     { nom: 'Lova N.', service: 'TECHNIQUE' },
     { nom: 'Fenitra K.', service: 'ACCUEIL' },
     { nom: 'Ony D.', service: 'COMPTABILITE' },
+    // R3 — assignation native du contrôle médical : un gestionnaire du service
+    // Contrôle médical est disponible pour l'assignation des dossiers.
+    { nom: 'Soa E.', service: 'CONTROLE_MEDICAL' },
   ];
 
   const gestionnaires: Record<string, { id: string; service: string }> = {};

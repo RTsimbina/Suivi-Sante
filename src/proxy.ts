@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import type { JWT } from 'next-auth/jwt';
+import { lireTokenSession } from '@/lib/jwt-session';
 import type { NextRequest } from 'next/server';
 import { matchPermission } from '@/lib/api-permissions';
 import { ciblePostConnexion } from '@/lib/navigation';
@@ -89,7 +90,7 @@ export default async function proxy(request: NextRequest) {
     // Si déjà connecté et sur /login, rediriger vers sa destination initiale
     // (callbackUrl local, jamais /login lui-même — sinon boucle) ou l'accueil
     if (pathname === '/login') {
-      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+      const token = await lireTokenSession(request);
       if (token) {
         const cible = ciblePostConnexion(request.nextUrl.searchParams.get('callbackUrl')) ?? '/';
         return NextResponse.redirect(new URL(cible, request.url));
@@ -138,10 +139,7 @@ export default async function proxy(request: NextRequest) {
 
   // ─── À partir d'ici, tout nécessite une authentification ────────────────
 
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+  const token = await lireTokenSession(request);
 
   // 4. Pas de token → 401 pour API, redirect pour pages
   if (!token) {
