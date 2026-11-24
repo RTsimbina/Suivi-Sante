@@ -210,6 +210,26 @@ export function seuilPour(seuils: SeuilLigne[], service: string, typeAlerte: key
  * Étapes chevauchant la période (affectation avant `fin`, sortie après `debut`
  * ou encore ouvertes), avec suspensions et dossier associé.
  */
+/**
+ * Volume maximal d'étapes chargées en mémoire par une période du moteur KPI.
+ * Le moteur agrège en JavaScript (multi-passes) : au-delà de ce seuil, la
+ * requête est refusée AVANT le chargement (comptage SQL) avec une erreur
+ * explicite au lieu d'épuiser la mémoire du processus (crash OOM constaté
+ * sur /api/kpis avec 1 000 000 de dossiers). ~150 k étapes ≈ un mois
+ * d'activité sur le jeu de démonstration ; le seuil laisse une large marge.
+ */
+export const LIMITE_ETAPES_PERIODE = 500_000;
+
+export class KpiVolumeEtapesDepasse extends Error {
+  constructor(readonly total: number, readonly limite: number = LIMITE_ETAPES_PERIODE) {
+    super(
+      `Période trop large pour le moteur KPI : ${total} étapes à charger (limite ${limite}). ` +
+      'Restreindre la période (mensuel) ou filtrer par service/utilisateur.',
+    );
+    this.name = 'KpiVolumeEtapesDepasse';
+  }
+}
+
 export async function chargerEtapesPeriode(periode: PeriodeKpi, filtres: FiltresKpi = {}, tx?: Tx): Promise<EtapeChargee[]> {
   const where: Prisma.EtapeTraitementWhereInput = {
     dateAffectation: { lt: periode.fin },
@@ -217,6 +237,9 @@ export async function chargerEtapesPeriode(periode: PeriodeKpi, filtres: Filtres
   };
   if (filtres.service) where.service = filtres.service;
   if (filtres.userId) where.userId = filtres.userId;
+  // ─── Garde anti-OOM : comptage SQL AVANT tout chargement mémoire ────
+  const volume = await (tx ?? db).etapeTraitement.count({ where });
+  if (volume > LIMITE_ETAPES_PERIODE) throw new KpiVolumeEtapesDepasse(volume);
   const dossier: Prisma.DossierWhereInput = {};
   if (filtres.societeId) dossier.societeId = filtres.societeId;
   if (filtres.typeDossier) dossier.typeDossier = filtres.typeDossier;

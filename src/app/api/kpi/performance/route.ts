@@ -14,7 +14,7 @@ import { checkAuth } from '@/lib/authorize';
 import { contexteKpi, periodeKpiDepuisRequest, paramUrl, serviceResponsableDuCompte } from '@/lib/kpi-api';
 import {
   chargerEtapesPeriode, chargerObjectifs, chargerSeuils, calculerPerformance,
-  calculerAlertes, resoudrePerimetreKpi, type FiltresKpi,
+  calculerAlertes, resoudrePerimetreKpi, type FiltresKpi, KpiVolumeEtapesDepasse,
 } from '@/lib/kpi-performance';
 
 export async function GET(request: NextRequest) {
@@ -70,6 +70,13 @@ export async function GET(request: NextRequest) {
       objectifs,
     });
   } catch (e) {
+    // Période trop large pour le moteur (garde anti-OOM de chargerEtapesPeriode)
+    if (e instanceof KpiVolumeEtapesDepasse) {
+      return NextResponse.json(
+        { erreur: e.message, totalEtapes: e.total, limite: e.limite },
+        { status: 413 },
+      );
+    }
     console.error('Erreur /api/kpi/performance :', e);
     return NextResponse.json({ erreur: 'Erreur lors du calcul des performances.' }, { status: 500 });
   }

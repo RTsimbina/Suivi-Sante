@@ -12,7 +12,7 @@ import { db } from '@/lib/db';
 import { contexteKpi, periodeKpiDepuisRequest, paramUrl, serviceResponsableDuCompte } from '@/lib/kpi-api';
 import {
   chargerEtapesPeriode, chargerObjectifs, chargerSeuils, calculerPerformance,
-  calculerAlertes, type FiltresKpi,
+  calculerAlertes, type FiltresKpi, KpiVolumeEtapesDepasse,
 } from '@/lib/kpi-performance';
 import { genererExcelKpi, genererPdfKpi } from '@/lib/kpi-export';
 
@@ -73,6 +73,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (e) {
+    if (e instanceof KpiVolumeEtapesDepasse) {
+      return NextResponse.json({ erreur: e.message, totalEtapes: e.total, limite: e.limite }, { status: 413 });
+    }
     console.error('Erreur /api/kpi/export :', e);
     return NextResponse.json({ erreur: 'Erreur lors de la génération de l\u2019export.' }, { status: 500 });
   }

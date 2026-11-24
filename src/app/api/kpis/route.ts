@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         safe("getAvgDelaiPaiement", () => getAvgDelaiPaiement(plage), 0),
         safe("getAvgDelaiTransfert", () => getAvgDelaiTransfert(plage), 0),
         safe("getAvgDelaiAnalyse", () => getAvgDelaiAnalyse(plage), 0),
-        safe("getGestionnaireProductivite", () => getGestionnaireProductivite(where), emptyProductivite),
+        safe("getGestionnaireProductivite", () => getGestionnaireProductivite(plage, perimetre), emptyProductivite),
       ]);
 
     const c = (s: string) => statuts[s] || 0;

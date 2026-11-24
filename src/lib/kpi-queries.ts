@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { enNombre, sommer, superieurA, inferieurA, moins } from "@/lib/money";
-import { partiesLocales, type PlagePeriode } from "./periodes";
+import { partiesLocales, filtreDateChamp, type PlagePeriode } from "./periodes";
+import { avecPerimetreSociete, type PerimetreSociete } from "./data-isolation";
 
 /* ──────────────────────────────────────────────────────────────
    Helpers
@@ -181,7 +182,7 @@ export async function getAvgDelaiAnalyse(plage?: PlagePeriode | null): Promise<n
 }
 
 /* ──────────────────────────────────────────────────────────────
-   6. Gestionnaire productivité  (3 Prisma groupBy – no raw SQL)
+   6. Gestionnaire productivité  (3 Prisma groupBy + 1 raw SQL d'agrégats)
    ────────────────────────────────────────────────────────────── */
 
 interface GroupedRow {
@@ -206,8 +207,30 @@ function buildProductiviteFromGroups(
     .sort((a, b) => b.nbDossiers - a.nbDossiers);
 }
 
-export async function getGestionnaireProductivite(where?: Prisma.DossierWhereInput) {
-  // 1. Group dossiers by each gestionnaire field (respect du filtre de période)
+/**
+ * Productivité par gestionnaire : compteurs/montants via 3 groupBy SQL, temps
+ * moyens via 1 requête SQL d'agrégation (UNION ALL de 3 AVG GROUP BY).
+ *
+ * ⚠️ Performance : la version historique chargeait TOUS les dossiers du
+ * périmètre en mémoire (findMany sans take) pour calculer les temps moyens en
+ * JavaScript — sur 1 000 000 de dossiers cela épuise la mémoire du processus
+ * Node (crash OOM de /api/kpis). L'agrégation est désormais intégralement
+ * exécutée par PostgreSQL : la requête ne retourne que quelques lignes
+ * (une par gestionnaire × service), quel que soit le volume de dossiers.
+ * Les filtres (période sur dateReception + périmètre société) sont reproduits
+ * à l'identique côté SQL pour que les deux étapes de calcul voient le même
+ * périmètre.
+ */
+export async function getGestionnaireProductivite(
+  plage?: PlagePeriode | null,
+  perimetre?: PerimetreSociete,
+) {
+  // 1. Périmètre Prisma (compteurs et montants) — identique à la route.
+  const base = filtreDateChamp("dateReception", plage ?? null);
+  const where = (perimetre
+    ? avecPerimetreSociete(base, perimetre)
+    : base) as Prisma.DossierWhereInput;
+
   const [accueilGroups, techniqueGroups, comptaGroups] = await Promise.all([
     db.dossier.groupBy({
       by: ['gestionnaireAccueilId'],
@@ -229,7 +252,7 @@ export async function getGestionnaireProductivite(where?: Prisma.DossierWhereInp
     }),
   ]);
 
-  // 2. Fetch all gestionnaire names in one query
+  // 2. Noms des gestionnaires en une requête
   const allIds = [
     ...accueilGroups.map((r) => r.gestionnaireAccueilId),
     ...techniqueGroups.map((r) => r.gestionnaireTechniqueId),
@@ -242,52 +265,57 @@ export async function getGestionnaireProductivite(where?: Prisma.DossierWhereInp
     : [];
   const nomMap = new Map(gestionnaires.map((g) => [g.id, g.nom]));
 
-  // 3. Compute average treatment times per gestionnaire (single query)
-  // dateReception is required (non-null) in schema, no need to filter
-  const timedDossiers = await db.dossier.findMany({
-    where,
-    select: {
-      gestionnaireAccueilId: true,
-      gestionnaireTechniqueId: true,
-      gestionnaireComptaId: true,
-      dateReception: true,
-      dateTraitementTechnique: true,
-      datePaiement: true,
-    },
-  });
+  // 3. Temps moyens par gestionnaire × service — 100 % en SQL.
+  //    ACCUEIL et TECHNIQUE : réception → dateTraitementTechnique ;
+  //    COMPTABILITE : réception → datePaiement. dateReception est non nulle
+  //    (schéma), aucun filtrage supplémentaire nécessaire.
+  const dateCond = plage
+    ? Prisma.sql` AND "dateReception" >= ${plage.debut} AND "dateReception" < ${plage.fin}`
+    : Prisma.empty;
+  const socCond =
+    perimetre?.restricted && perimetre.societeId
+      ? Prisma.sql` AND "societeId" = ${perimetre.societeId}`
+      : Prisma.empty;
 
-  const accTimeMap = new Map<string, { total: number; count: number }>();
-  const techTimeMap = new Map<string, { total: number; count: number }>();
-  const comptaTimeMap = new Map<string, { total: number; count: number }>();
+  const timeRows: { gid: string | null; service: string; avg_jours: number | Prisma.Decimal | null }[] =
+    await db.$queryRaw`
+    SELECT sub.gid, sub.service, ROUND(AVG(sub.jours)::numeric, 2) AS avg_jours
+    FROM (
+      SELECT d."gestionnaireAccueilId" AS gid, 'ACCUEIL'::text AS service,
+             EXTRACT(EPOCH FROM (d."dateTraitementTechnique" - d."dateReception")) / 86400.0 AS jours
+      FROM "Dossier" d
+      WHERE d."dateTraitementTechnique" IS NOT NULL${dateCond}${socCond}
+      UNION ALL
+      SELECT d."gestionnaireTechniqueId", 'TECHNIQUE'::text,
+             EXTRACT(EPOCH FROM (d."dateTraitementTechnique" - d."dateReception")) / 86400.0
+      FROM "Dossier" d
+      WHERE d."dateTraitementTechnique" IS NOT NULL${dateCond}${socCond}
+      UNION ALL
+      SELECT d."gestionnaireComptaId", 'COMPTABILITE'::text,
+             EXTRACT(EPOCH FROM (d."datePaiement" - d."dateReception")) / 86400.0
+      FROM "Dossier" d
+      WHERE d."datePaiement" IS NOT NULL${dateCond}${socCond}
+    ) sub
+    GROUP BY sub.gid, sub.service
+  `;
+  // Clé identique à l'ancienne logique : NULL → '__none__' (« Non assigné »).
+  const timeMap = new Map<string, number>();
+  for (const r of timeRows) {
+    timeMap.set(`${r.service}:${r.gid ?? '__none__'}`, round2(r.avg_jours));
+  }
 
-  for (const d of timedDossiers) {
-    // RECEPTION & TECHNIQUE: dateReception → dateTraitementTechnique
-    if (d.dateTraitementTechnique) {
-      const jours = (d.dateTraitementTechnique.getTime() - d.dateReception!.getTime()) / MS_DAY;
-      const accKey = d.gestionnaireAccueilId || '__none__';
-      const accEntry = accTimeMap.get(accKey) || { total: 0, count: 0 };
-      accEntry.total += jours;
-      accEntry.count++;
-      accTimeMap.set(accKey, accEntry);
-
-      const techKey = d.gestionnaireTechniqueId || '__none__';
-      const techEntry = techTimeMap.get(techKey) || { total: 0, count: 0 };
-      techEntry.total += jours;
-      techEntry.count++;
-      techTimeMap.set(techKey, techEntry);
-    }
-    // COMPTABILITE: dateReception → datePaiement
-    if (d.datePaiement) {
-      const jours = (d.datePaiement.getTime() - d.dateReception!.getTime()) / MS_DAY;
-      const comptaKey = d.gestionnaireComptaId || '__none__';
-      const comptaEntry = comptaTimeMap.get(comptaKey) || { total: 0, count: 0 };
-      comptaEntry.total += jours;
-      comptaEntry.count++;
-      comptaTimeMap.set(comptaKey, comptaEntry);
+  // 4. Enrichissement — mêmes clés que les groupBy ci-dessus.
+  function enrichTimes(
+    items: { gestionnaireNom: string; tempsMoyenTraitement: number }[],
+    service: string,
+    ids: (string | null)[],
+  ) {
+    for (let i = 0; i < items.length; i++) {
+      items[i].tempsMoyenTraitement = timeMap.get(`${service}:${ids[i] || '__none__'}`) ?? 0;
     }
   }
 
-  // 4. Build result arrays — _sum converti en number à la frontière (affichage)
+  // 5. Result arrays — _sum converti en number à la frontière (affichage)
   const reception = buildProductiviteFromGroups(
     accueilGroups.map((r) => ({ gestionnaireId: r.gestionnaireAccueilId, _count: r._count, _sum: { montantValide: enNombre(r._sum.montantValide), montantReclame: enNombre(r._sum.montantReclame) } })),
     'RECEPTION', nomMap,
@@ -301,22 +329,9 @@ export async function getGestionnaireProductivite(where?: Prisma.DossierWhereInp
     'COMPTABILITE', nomMap,
   );
 
-  // 5. Enrich with average times
-  function enrichTimes(
-    items: { gestionnaireNom: string; tempsMoyenTraitement: number }[],
-    ids: (string | null)[],
-    timeMap: Map<string, { total: number; count: number }>,
-  ) {
-    for (let i = 0; i < items.length; i++) {
-      const gid = ids[i] || '__none__';
-      const t = timeMap.get(gid);
-      items[i].tempsMoyenTraitement = t && t.count > 0 ? round2(t.total / t.count) : 0;
-    }
-  }
-
-  enrichTimes(reception, accueilGroups.map(r => r.gestionnaireAccueilId), accTimeMap);
-  enrichTimes(technique, techniqueGroups.map(r => r.gestionnaireTechniqueId), techTimeMap);
-  enrichTimes(compta, comptaGroups.map(r => r.gestionnaireComptaId), comptaTimeMap);
+  enrichTimes(reception, 'ACCUEIL', accueilGroups.map(r => r.gestionnaireAccueilId));
+  enrichTimes(technique, 'TECHNIQUE', techniqueGroups.map(r => r.gestionnaireTechniqueId));
+  enrichTimes(compta, 'COMPTABILITE', comptaGroups.map(r => r.gestionnaireComptaId));
 
   return [...reception, ...technique, ...compta];
 }

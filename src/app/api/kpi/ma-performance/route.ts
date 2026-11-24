@@ -11,7 +11,7 @@ import { checkAuth } from '@/lib/authorize';
 import { contexteKpi, periodeKpiDepuisRequest } from '@/lib/kpi-api';
 import {
   chargerEtapesPeriode, chargerObjectifs, calculerPerformance, tempsActifMs,
-  objectifPour, type FiltresKpi,
+  objectifPour, type FiltresKpi, KpiVolumeEtapesDepasse,
 } from '@/lib/kpi-performance';
 import { db } from '@/lib/db';
 
@@ -66,6 +66,9 @@ export async function GET(request: NextRequest) {
       attention,
     });
   } catch (e) {
+    if (e instanceof KpiVolumeEtapesDepasse) {
+      return NextResponse.json({ erreur: e.message, totalEtapes: e.total, limite: e.limite }, { status: 413 });
+    }
     console.error('Erreur /api/kpi/ma-performance :', e);
     return NextResponse.json({ erreur: 'Erreur lors du calcul de votre performance.' }, { status: 500 });
   }

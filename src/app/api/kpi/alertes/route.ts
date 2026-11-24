@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/lib/authorize';
 import { contexteKpi, periodeKpiDepuisRequest, paramUrl, serviceResponsableDuCompte } from '@/lib/kpi-api';
 import {
-  chargerEtapesPeriode, chargerObjectifs, chargerSeuils, calculerAlertes,
+  chargerEtapesPeriode, chargerObjectifs, chargerSeuils, calculerAlertes, KpiVolumeEtapesDepasse,
 } from '@/lib/kpi-performance';
 
 export async function GET(request: NextRequest) {
@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
     const alertes = calculerAlertes(etapes, periode, objectifs, seuils);
     return NextResponse.json({ periode: { debut: periode.debut.toISOString(), fin: periode.fin.toISOString() }, alertes });
   } catch (e) {
+    if (e instanceof KpiVolumeEtapesDepasse) {
+      return NextResponse.json({ erreur: e.message, totalEtapes: e.total, limite: e.limite }, { status: 413 });
+    }
     console.error('Erreur /api/kpi/alertes :', e);
     return NextResponse.json({ erreur: 'Erreur lors du calcul des alertes.' }, { status: 500 });
   }
