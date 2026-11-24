@@ -198,10 +198,15 @@ model Dossier {
   // annuelle par type d'acte (verifierPlafondAnnuel) ; (assureId,
   // dateReception) : consommation globale tous actes ; prestataireId :
   // jointures et filtres prestataire.
+  // (createdAt) : tri par défaut des listes (orderBy createdAt desc) ;
+  // (statut, createdAt) : kanban et listes globales filtrées par statut —
+  // indispensables au volume de démonstration (1 M dossiers).
   @@index([societeId, statut, dateReception])
   @@index([assureId, typeDossier, dateReception])
   @@index([assureId, dateReception])
   @@index([prestataireId])
+  @@index([createdAt])
+  @@index([statut, createdAt])
   etapesKpi                 EtapeTraitement[] @relation("EtapesDossier")
 }
 
@@ -214,6 +219,8 @@ model Commentaire {
   contenu     String
   prive       Boolean  @default(false)
   createdAt   DateTime @default(now())
+
+  @@index([dossierId])
 }
 
 model Justificatif {
@@ -226,6 +233,8 @@ model Justificatif {
   tailleKo    Float?
   uploadedBy  String?
   createdAt   DateTime @default(now())
+
+  @@index([dossierId])
 }
 
 model ImportHistorique {
