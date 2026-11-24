@@ -94,6 +94,49 @@ export function fenetreAnnuelle(dateReference: Date): { debut: Date; fin: Date; 
   };
 }
 
+// ─── Définition canonique de la consommation (A-05) ─────────────────────────
+
+/**
+ * Statuts qui CONSOMMENT le plafond annuel — SOURCE UNIQUE (A-05).
+ *
+ * Règle métier centrale : seuls les dossiers réellement pris en charge
+ * consomment le plafond.
+ *   - RECU      : simple réception, pas encore traité → ne consomme PAS ;
+ *   - REJETE    : refusé → ne consomme PAS ;
+ *   - EN_ANALYSE → VALIDE → EN_COMPTABILITE → EN_PAIEMENT → PAYE : consomme.
+ *
+ * Toute vue affichant une consommation (vérification d'assuré, simulateur,
+ * circuit de traitement) doit importer cette constante — plus aucun filtre
+ * de statut écrit en local.
+ */
+export const STATUTS_CONSOMMATION = [
+  'EN_ANALYSE',
+  'VALIDE',
+  'EN_COMPTABILITE',
+  'EN_PAIEMENT',
+  'PAYE',
+] as const;
+
+/**
+ * Clause WHERE canonique de la consommation annuelle — SOURCE UNIQUE (A-05).
+ *
+ * Partagée par le moteur verifierPlafondAnnuel() et les vues de contrôle :
+ * fenêtre annuelle (BIZ-2) + statuts consommateurs + périmètre assuré, en
+ * un seul endroit pour garantir un calcul identique sur tous les chemins.
+ */
+export function whereConsommationAnnuelle(
+  fenetre: { debut: Date; fin: Date },
+  opts: { assureId?: string; excludeDossierId?: string } = {}
+): Record<string, unknown> {
+  const where: Record<string, unknown> = {
+    dateReception: { gte: fenetre.debut, lte: fenetre.fin },
+    statut: { in: STATUTS_CONSOMMATION },
+  };
+  if (opts.assureId) where.assureId = opts.assureId;
+  if (opts.excludeDossierId) where.id = { not: opts.excludeDossierId };
+  return where;
+}
+
 // ─── Fonction principale ───────────────────────────────────────────────────
 
 /**
@@ -206,22 +249,10 @@ export async function verifierPlafondAnnuel(opts: {
   // ─── 4. Calculer la consommation annuelle ────────────────────────────────
   // BIZ-2 : la fenêtre provient de fenetreAnnuelle() — même année de
   // dateReception sur le moteur central et les re-vérifications transaction.
-  const whereBase: Record<string, unknown> = {
-    dateReception: { gte: fenetre.debut, lte: fenetre.fin },
-    // Seuls les dossiers traités (au moins EN_ANALYSE) consomment le plafond.
-    // RECU = simplement reçu, pas encore validé → ne compte pas.
-    statut: { in: ['EN_ANALYSE', 'VALIDE', 'EN_COMPTABILITE', 'EN_PAIEMENT', 'PAYE'] },
-  };
-
-  // Si on a un assureId, filtrer par assuré
-  if (assureId) {
-    (whereBase as Record<string, unknown>).assureId = assureId;
-  }
-
-  // Exclure un dossier spécifique (pour les mises à jour)
-  if (excludeDossierId) {
-    (whereBase as Record<string, unknown>).id = { not: excludeDossierId };
-  }
+  // A-05 : fenêtre + statuts consommateurs viennent de la définition
+  // canonique whereConsommationAnnuelle() — partagée avec la vue de contrôle
+  // santé (vérification d'assuré) pour un calcul strictement identique.
+  const whereBase = whereConsommationAnnuelle(fenetre, { assureId, excludeDossierId });
 
   // Consommation par type d'acte
   const dossiersActe = await db.dossier.findMany({

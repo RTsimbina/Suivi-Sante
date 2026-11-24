@@ -4,6 +4,7 @@ import { checkAuth } from '@/lib/authorize';
 import { parseJsonBody } from '@/lib/validation/parse';
 import { verifierAssureSchema } from '@/lib/validation';
 import { dedupliquerEnVigueur } from '@/lib/baremes-validite';
+import { fenetreAnnuelle, STATUTS_CONSOMMATION } from '@/lib/plafond-check';
 import { enNombre, sommer, Decimal, appliquerTaux, reliquat as calculerReliquat } from '@/lib/money';
 import { journaillerConsultationNss } from '@/lib/nss';
 
@@ -68,23 +69,31 @@ export async function POST(request: NextRequest) {
     // Plafond annuel global = somme EXACTE des plafonds de prestation (plan P3)
     const plafondAnnuelGlobal = sommer(baremes.map(b => b.plafond));
 
-    // ── 4. Calculer la consommation annuelle de l'assuré ──
-    const debutAnnee = new Date(new Date().getFullYear(), 0, 1);
-    const finAnnee = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
-
+    // ── 4. Consommation annuelle — DÉFINITION DU MOTEUR CENTRAL (A-05) ──
+    // La fenêtre (fenetreAnnuelle) et les statuts consommateurs
+    // (STATUTS_CONSOMMATION) viennent de plafond-check.ts, la source unique
+    // partagée avec verifierPlafondAnnuel() : vérification d'assuré,
+    // simulateur et circuit de traitement appliquent désormais la MÊME règle.
+    // Conséquence : un dossier RECU (simple réception, pas encore traité) ne
+    // consomme plus — comme dans le simulateur et le circuit.
+    const fenetre = fenetreAnnuelle(new Date());
     const dossiersAnnee = await db.dossier.findMany({
       where: {
         assureId: assure.id,
-        dateReception: { gte: debutAnnee, lte: finAnnee },
-        statut: { not: 'REJETE' },
+        dateReception: { gte: fenetre.debut, lte: fenetre.fin },
       },
       include: { prestataire: { select: { nom: true, type: true } } },
       orderBy: { dateReception: 'desc' },
     });
+    // Seuls les statuts consommateurs entrent dans les totaux ; la liste
+    // « dossiers récents » conserve tous les statuts pour le contexte métier.
+    const consommables = dossiersAnnee.filter(d =>
+      (STATUTS_CONSOMMATION as readonly string[]).includes(d.statut)
+    );
 
     // Montant total consommé (montantPaye si payé, sinon montantValide, sinon montantReclame) — somme exacte
     const totalConsomme = sommer(
-      dossiersAnnee.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
+      consommables.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
     );
 
     // Taux de consommation global (Decimal exact, converti pour affichage)
@@ -102,7 +111,7 @@ export async function POST(request: NextRequest) {
     }> = {};
 
     for (const b of baremes) {
-      const dossiersType = dossiersAnnee.filter(d => d.typeDossier === b.prestation);
+      const dossiersType = consommables.filter(d => d.typeDossier === b.prestation);
       const consomme = enNombre(sommer(
         dossiersType.map(d => d.montantPaye ?? d.montantValide ?? d.montantReclame)
       )) ?? 0;
@@ -171,7 +180,10 @@ export async function POST(request: NextRequest) {
       assureId: assure.id,
       societeId: assure.societeId,
       beneficiaire: `${assure.prenom || ''} ${assure.nom}`.trim(),
-      modifiePar: request.headers.get('x-user-name') || 'inconnu',
+      // A-07 : en-tête injecté par le middleware = « x-user-nom » (et non
+      // l'ancien « x-user-name », jamais alimenté → « inconnu » dans le
+      // journal d'audit NSS).
+      modifiePar: request.headers.get('x-user-nom') || 'inconnu',
       // P2-03C : la trace exige l'IDENTIFIANT de l'utilisateur (nom + rôle seuls
       // ne suffisent pas pour l'investigation — l'id est non falsifiable,
       // injecté par le middleware depuis le JWT).
