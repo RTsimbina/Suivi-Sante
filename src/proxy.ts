@@ -21,6 +21,23 @@ const PUBLIC_API_PREFIXES = [
   '/api/session/lockout', // Vérification verrouillage
 ];
 
+// ─── En-têtes d'identité — injection middleware uniquement (A-07) ───────────
+// Liste canonique des en-têtes d'identité que le middleware déduit du JWT de
+// session. Inclut l'ancien « x-user-name » (remplacé par « x-user-nom ») pour
+// purger aussi les faux en-têtes historiques encore envoyés par un client.
+// A-07 : ces en-têtes sont SUPPRIMÉS de chaque requête entrante puis
+// ré-injectés depuis le token validé — l'identité ne peut jamais venir du
+// client (falsification impossible par requête HTTP construite à la main).
+const EN_TETES_IDENTITE = [
+  'x-user-id',
+  'x-user-role',
+  'x-user-email',
+  'x-user-nom',
+  'x-user-name',
+  'x-user-societeid',
+  'x-user-prestataireid',
+] as const;
+
 // ─── Middleware principal ───────────────────────────────────────────────────
 
 export default async function proxy(request: NextRequest) {
@@ -79,6 +96,12 @@ export default async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('Content-Security-Policy', csp);
   requestHeaders.set('x-nonce', nonce);
+  // A-07 — Purger TOUT en-tête d'identité fourni par le client avant tout
+  // passage : les routes publiques/machine (auth, webhooks, health, mail,
+  // cron) ne doivent jamais voir une identité qu'elles n'ont pas validée.
+  for (const enTete of EN_TETES_IDENTITE) {
+    requestHeaders.delete(enTete);
+  }
 
   const response = NextResponse.next({
     request: { headers: requestHeaders },
@@ -115,7 +138,13 @@ export default async function proxy(request: NextRequest) {
       (await enTeteEgalSecret(authHeader, 'MAIL_API_KEY')) ||
       (await enTeteEgalSecret(authHeader, 'CRON_SECRET'));
     if (machineOk) {
-      return NextResponse.next({ headers: securityHeaders });
+      // A-07 : transmettre les en-têtes de requête PURGÉS (sans x-user-*),
+    // pas les originaux — sinon un client forgeait son identité vers ces
+    // routes machine.
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+      headers: securityHeaders,
+    });
     }
   }
 
@@ -134,7 +163,13 @@ export default async function proxy(request: NextRequest) {
     if (!machineOk && !devSansSecret) {
       return Response.json({ erreur: 'Non autorisé' }, { status: 401 });
     }
-    return NextResponse.next({ headers: securityHeaders });
+    // A-07 : transmettre les en-têtes de requête PURGÉS (sans x-user-*),
+    // pas les originaux — sinon un client forgeait son identité vers ces
+    // routes machine.
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+      headers: securityHeaders,
+    });
   }
 
   // ─── À partir d'ici, tout nécessite une authentification ────────────────
@@ -186,6 +221,12 @@ export default async function proxy(request: NextRequest) {
 
     // Injecter les infos utilisateur dans les headers pour les routes API
     const requestHeaders = new Headers(request.headers);
+    // A-07 : purger TOUT en-tête d'identité client (y compris l'ancien
+    // « x-user-name », non réinjecté) AVANT d'injecter l'identité du JWT —
+    // sinon un en-tête forgé non canonique passerait jusqu'à la route.
+    for (const enTete of EN_TETES_IDENTITE) {
+      requestHeaders.delete(enTete);
+    }
     requestHeaders.set('x-user-id', userId);
     requestHeaders.set('x-user-role', userRole);
     requestHeaders.set('x-user-email', userEmail);

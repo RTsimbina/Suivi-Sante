@@ -18,6 +18,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import proxy from '@/proxy';
 import { NextRequest } from 'next/server';
+import { encode } from 'next-auth/jwt';
 
 // process.env est typé readonly par les types Next → cast mutable pour les tests
 const env = process.env as unknown as Record<string, string | undefined>;
@@ -108,5 +109,72 @@ describe('proxy — comportement inchangé hors crons', () => {
     // Sans Bearer ni session → 401 (et non un passage libre)
     const res = await proxy(requete('/api/mail/send'));
     expect(res.status).toBe(401);
+  });
+});
+
+// ─── A-07 — En-têtes d'identité : purge systématique des x-user-* client ────
+// Next.js encode la réécriture des en-têtes de requête du middleware dans les
+// méta-en-têtes de la réponse : « x-middleware-request-<nom> » porte la valeur
+// finale transmise au routeur. Un en-tête purgé → méta-en-tête ABSENT (null).
+describe('proxy — A-07 purge des en-têtes d’identité forgés', () => {
+  const FORGÉS = {
+    'x-user-id': 'id-forgé',
+    'x-user-role': 'ADMINISTRATEUR',
+    'x-user-nom': 'Monsieur Forgé',
+    'x-user-name': 'Ancien en-tête forgé',
+    'x-user-societeid': 'soc-faussée',
+  };
+
+  it('purge les x-user-* forgés sur une API publique (/api/health)', async () => {
+    const res = await proxy(requete('/api/health', FORGÉS));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-middleware-request-x-user-id')).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-user-role')).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-user-nom')).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-user-name')).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-user-societeid')).toBeNull();
+  });
+
+  it('purge les x-user-* forgés sur le passe machine cron (Bearer valide)', async () => {
+    const res = await proxy(
+      requete('/api/cron/rapport-mensuel', {
+        authorization: `Bearer ${CRON_SECRET_TEST}`,
+        ...FORGÉS,
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-middleware-request-x-user-role')).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-user-name')).toBeNull();
+    expect(res.headers.get('x-middleware-request-x-user-societeid')).toBeNull();
+  });
+
+  it('réinjecte l’identité du JWT sur une API protégée et ÉCRASE les en-têtes forgés', async () => {
+    const jeton = await encode({
+      token: {
+        id: 'usr-1',
+        email: 'admin@suivisante.mg',
+        nom: 'Admin Réel',
+        role: 'ADMINISTRATEUR',
+        societeId: 'soc-reelle',
+        prestataireId: '',
+      },
+      secret: 'secret-nextauth-de-test',
+      maxAge: 60,
+    });
+    const req = new NextRequest('http://localhost/api/dossiers', {
+      headers: {
+        cookie: `next-auth.session-token=${jeton}`,
+        ...FORGÉS,
+      },
+    });
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    // L'identité transmise à la route vient du JWT signé, pas du client :
+    expect(res.headers.get('x-middleware-request-x-user-role')).toBe('ADMINISTRATEUR');
+    expect(res.headers.get('x-middleware-request-x-user-nom')).toBe('Admin Réel');
+    expect(res.headers.get('x-middleware-request-x-user-id')).toBe('usr-1');
+    expect(res.headers.get('x-middleware-request-x-user-societeid')).toBe('soc-reelle');
+    // L'ancien en-tête x-user-name (jamais réinjecté) reste purgé :
+    expect(res.headers.get('x-middleware-request-x-user-name')).toBeNull();
   });
 });

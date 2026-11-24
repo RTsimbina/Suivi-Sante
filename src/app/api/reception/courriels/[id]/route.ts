@@ -79,7 +79,10 @@ export async function PATCH(
     if (objet !== undefined) updateData.objet = objet ?? null;
 
     if (statut && (statut === "TRAITE" || statut === "REJETE")) {
-      const userName = request.headers.get("x-user-name") || "Système";
+      // A-07 : l'identité vient de l'en-tête injecté par le middleware depuis
+      // le JWT validé (« x-user-nom ») — l'ancien « x-user-name » n'était
+      // jamais alimenté et traitePar restait « Système ».
+      const userName = request.headers.get("x-user-nom") || "Système";
       updateData.dateTraitement = new Date();
       updateData.traitePar = userName;
     }
