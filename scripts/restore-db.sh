@@ -33,6 +33,25 @@ fi
 DB_NAME="$(echo "$DATABASE_URL" | sed -E 's#.*/([^/?]+)(\?.*)?$#\1#')"
 URL_DISPLAY="$(echo "$DATABASE_URL" | sed -E 's#//[^@]+@#//***@#')"
 
+# ── Vérification de l'empreinte de la sauvegarde (mission sauvegardes) ──
+# backup-db.sh écrit <fichier>.sha256 à côté du dump. On vérifie AVANT
+# toute opération destructive : une sauvegarde corrompue au transfert est
+# refusée au lieu d'écraser la base avec du contenu illisible.
+if command -v sha256sum >/dev/null 2>&1; then
+  if [ -f "$FILE.sha256" ]; then
+    echo "── Vérification SHA-256 de la sauvegarde…"
+    if (cd "$(dirname "$FILE")" && sha256sum -c "$(basename "$FILE").sha256" >/dev/null 2>&1); then
+      echo "   OK : empreinte vérifiée ($(cut -d' ' -f1 "$FILE.sha256"))"
+    else
+      echo "ERREUR : l'empreinte SHA-256 ne correspond pas — sauvegarde corrompue au transfert."
+      echo "        Ne restaurez PAS ce fichier ; utilisez une autre sauvegarde vérifiable."
+      exit 1
+    fi
+  else
+    echo "AVERTISSEMENT : pas de fichier $FILE.sha256 — intégrité non vérifiable (sauvegarde antérieure à backup-db.sh durci)."
+  fi
+fi
+
 echo "════════════════════════════════════════════════════════════"
 echo "  RESTAURATION D'URGENCE — OPÉRATION DESTRUCTIVE"
 echo "════════════════════════════════════════════════════════════"
