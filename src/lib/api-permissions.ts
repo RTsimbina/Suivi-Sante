@@ -66,7 +66,11 @@ export const API_PERMISSIONS: Record<
       POST: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Créer un dossier
       PUT: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
       DELETE: ['ADMINISTRATEUR'],
-      PATCH: ['ADMINISTRATEUR', 'TECHNIQUE', 'COMPTABILITE'], // Changer statut
+      PATCH: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'], // Changer statut
+      // ACCUEIL sur PATCH (A-03) : uniquement le glisser-déposer Kanban —
+      // transitions RECU → EN_ANALYSE / REJETE (DOSSIER_ROLE_TRANSITIONS).
+      // La route /api/dossiers/[id] borne ce rôle au seul champ `statut` :
+      // aucune modification générale de dossier n'est ouverte à ACCUEIL.
       // PORTAIL_CLIENT et CONTACT_ENTREPRISE : lecture seule (GET)
     },
   },
@@ -327,7 +331,13 @@ export const API_PERMISSIONS: Record<
     roles: ['ADMINISTRATEUR', 'SANTE', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE'],
   },
   '/api/profil': {
-    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE'],
+    // DIRECTION_GENERALE + RESPONSABLE_SERVICE ajoutés (A-08) : les 2 rôles
+    // créés par les évolutions R1/R2 n'avaient accès NI à la consultation de
+    // leur profil NI au changement de mot de passe (403 fail-closed). Le
+    // préfixe couvre aussi /profil/changer-mot-de-passe, /historique, /avatar.
+    // L'identité reste résolue côté serveur depuis le JWT (token.email) :
+    // chacun ne consulte et modifie que son propre compte.
+    roles: ['ADMINISTRATEUR', 'ACCUEIL', 'TECHNIQUE', 'COMPTABILITE', 'SANTE', 'PORTAIL_CLIENT', 'CONTACT_ENTREPRISE', 'DIRECTION_GENERALE', 'RESPONSABLE_SERVICE'],
   },
   '/api/utilisateurs': {
     roles: ['ADMINISTRATEUR'],

@@ -46,6 +46,37 @@ export async function PATCH(
       motifRejet,
     } = parsed.data;
 
+    // ─── A-03 : ACCUEIL borne au SEUL changement de statut ──────────────────
+    // La matrice API (api-permissions.ts) autorise ACCUEIL sur PATCH pour le
+    // glisser-déposer Kanban. Sans cette porte, le même PATCH lui ouvrirait
+    // tous les autres champs (montants, ticket modérateur, assignations,
+    // assuré, prestataire…) — aucune modification générale de dossier n'est
+    // accordée à ce rôle. Les transitions restent de toute façon contrôlées
+    // par DOSSIER_TRANSITIONS + DOSSIER_ROLE_TRANSITIONS plus bas (403).
+    if (userRole === 'ACCUEIL') {
+      const autreChampPresent = [
+        gestionnaireAccueilId,
+        gestionnaireTechniqueId,
+        gestionnaireComptaId,
+        gestionnaireControleMedicalId,
+        assureId,
+        montantValide,
+        ticketModerateur,
+        nSS,
+        prestataireId,
+        dateSoins,
+        moyenPaiement,
+        observations,
+        motifRejet,
+      ].some((champ) => champ !== undefined);
+      if (!statut || autreChampPresent) {
+        return NextResponse.json(
+          { erreur: "Le rôle 'ACCUEIL' ne peut modifier que le statut du dossier." },
+          { status: 403 }
+        );
+      }
+    }
+
     const existing = await db.dossier.findUnique({
       where: { id },
       include: { societe: true },
