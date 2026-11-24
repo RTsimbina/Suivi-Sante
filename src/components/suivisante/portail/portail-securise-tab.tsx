@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Building2, Shield, BarChart3, TrendingUp, Users, FolderOpen, CreditCard, Receipt, FileText,
+  Building2, Shield, BarChart3, TrendingUp, Users, FolderOpen, CreditCard, Receipt, FileText, RefreshCw,
 } from 'lucide-react';
 import { formatMontant, statutLabel } from '../format';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,10 @@ export default function PortailSecuriseTab() {
   const [dossiers, setDossiers] = useState<PortailDossier[]>([]);
   const [loading, setLoading] = useState(false);
   const [kpiLoading, setKpiLoading] = useState(false);
+  // A-01 : échec HTTP ≠ liste vide — l'erreur API (401/403/500) est affichée
+  // distinctement avec relance, jamais « Aucun dossier trouvé ».
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [relance, setRelance] = useState(0);
 
   useEffect(() => {
     fetch('/api/societes').then(r => r.json()).then(data => {
@@ -41,10 +45,21 @@ export default function PortailSecuriseTab() {
 
     (async () => {
       try {
+        setErreur(null);
         const [dossRes, contratsRes] = await Promise.all([
           fetch(`/api/dossiers?societeId=${selectedSociete}&limit=200`, { signal: controller.signal }),
           fetch('/api/contrats', { signal: controller.signal }),
         ]);
+        // A-01 : vérifier response.ok AVANT de traiter le corps (modèle :
+        // ma-performance-view.tsx) — un échec HTTP ne devient jamais une liste vide.
+        if (!dossRes.ok) {
+          const body = await dossRes.json().catch(() => ({}));
+          throw new Error(body.erreur ?? `Erreur ${dossRes.status} de l'API dossiers`);
+        }
+        if (!contratsRes.ok) {
+          const body = await contratsRes.json().catch(() => ({}));
+          throw new Error(body.erreur ?? `Erreur ${contratsRes.status} de l'API contrats`);
+        }
         const dossData = await dossRes.json();
         const contratsData = await contratsRes.json();
 
@@ -87,14 +102,21 @@ export default function PortailSecuriseTab() {
         solde: c.soldeDisponible ?? (c.budgetAnnuel || 0) - (c.budgetUtilise || 0),
         nbDossiers: c._count?.appelsDeFonds || 0,
       })));
-      } catch { /* aborted or network error */ } finally {
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          console.error('[PORTAIL] Chargement impossible :', e);
+          setErreur(e instanceof Error ? e.message : 'Erreur inconnue');
+          setDossiers([]);
+          setContrats([]);
+        }
+      } finally {
         setLoading(false);
         setKpiLoading(false);
       }
     })();
 
     return () => controller.abort();
-  }, [selectedSociete]);
+  }, [selectedSociete, relance]);
 
   return (
     <div className="space-y-4">
@@ -125,6 +147,21 @@ export default function PortailSecuriseTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* A-01 : état d'erreur distinct avec relance (jamais une liste vide) */}
+      {selectedSociete && erreur && !loading && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="p-6 text-center">
+            <p className="text-sm text-destructive">{erreur}</p>
+            <button
+              onClick={() => setRelance(n => n + 1)}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium border border-input rounded-md px-3 py-1.5 hover:bg-muted/50"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />Réessayer
+            </button>
+          </CardContent>
+        </Card>
+      )}
 
       {!selectedSociete && (
         <Card className="border-dashed border-border">
@@ -274,6 +311,10 @@ export default function PortailSecuriseTab() {
               {loading ? (
                 <div className="space-y-3">
                   {Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : erreur ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-destructive">{erreur}</p>
                 </div>
               ) : dossiers.length === 0 ? (
                 <div className="text-center py-8">

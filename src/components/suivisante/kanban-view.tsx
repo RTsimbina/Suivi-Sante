@@ -23,7 +23,7 @@ import {
 } from '@dnd-kit/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, UserPlus } from 'lucide-react';
+import { AlertTriangle, RefreshCw, UserPlus } from 'lucide-react';
 import { KanbanColumn, KanbanSkeleton } from './kanban/kanban-column';
 import { DragOverlayCard } from './kanban/kanban-cards';
 import AssignDialog from './kanban/assign-dialog';
@@ -43,6 +43,18 @@ export default function KanbanView() {
   // ── Loading skeleton ─────────────────────────────────────────────────────
   if (board.loading) {
     return <KanbanSkeleton statuts={STATUTS_ORDER} />;
+  }
+
+  // ── Erreur de chargement (A-01) : distinct d'un board vide ───────────────
+  if (board.erreur) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
+        <p className="text-sm text-destructive">{board.erreur}</p>
+        <Button variant="outline" size="sm" className="mt-3" onClick={board.fetchDossiers}>
+          <RefreshCw className="h-4 w-4 mr-1" />Réessayer
+        </Button>
+      </div>
+    );
   }
 
   // ── Board ─────────────────────────────────────────────────────────────────

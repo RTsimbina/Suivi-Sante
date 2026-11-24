@@ -19,11 +19,15 @@ export function useKanbanBoard() {
   const { queryString: qsPeriode } = usePeriode();
   const [dossiers, setDossiers] = useState<Dossier[]>([]);
   const [loading, setLoading] = useState(true);
+  // A-01 : échec API ≠ board vide — l'erreur est exposée à la vue qui affiche
+  // un état d'erreur dédié (jamais un Kanban « sans dossiers » sur un 401/500).
+  const [erreur, setErreur] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [gestionnaires, setGestionnaires] = useState<Gestionnaire[]>([]);
 
   const fetchDossiers = useCallback(async () => {
     setLoading(true);
+    setErreur(null);
     try {
       const params = new URLSearchParams({ limit: '200' });
       // Filtre de période partagé (date de référence : date de réception)
@@ -31,9 +35,17 @@ export function useKanbanBoard() {
         for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
       }
       const res = await fetch(`/api/dossiers?${params.toString()}`);
+      // A-01 : vérifier response.ok AVANT de traiter le corps (modèle :
+      // ma-performance-view.tsx) — un échec HTTP ne devient jamais une liste vide.
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.erreur ?? `Erreur ${res.status} de l'API dossiers`);
+      }
       const data = await res.json();
       setDossiers(data.dossiers || []);
-    } catch {
+    } catch (e) {
+      console.error('[KANBAN] Chargement impossible :', e);
+      setErreur(e instanceof Error ? e.message : 'Erreur inconnue');
       setDossiers([]);
     } finally {
       setLoading(false);
@@ -138,7 +150,7 @@ export function useKanbanBoard() {
   }
 
   return {
-    dossiers, loading,
+    dossiers, loading, erreur,
     gestionnaires, fetchDossiers,
     activeId, setActiveId, activeDossier,
     handleDragStart, handleDragEnd,

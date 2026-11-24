@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { DOSSIER_STATUT_VALEURS } from '@/lib/statuts';
 import { formatDate, formatMontant, statutLabel, statutColor, typeDossierLabel } from './format';
 import { SharedPagination, PAGE_SIZE, type PaginationState } from '@/components/ui/shared-pagination';
@@ -36,12 +36,16 @@ export default function DossiersView() {
   const [search, setSearch] = useState('');
   const [statutFilter, setStatutFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  // A-01 : une erreur API (401/403/500, réseau) est distincte d'une liste
+  // vide — jamais de « Aucun dossier trouvé » sur un échec de chargement.
+  const [erreur, setErreur] = useState<string | null>(null);
   // Détail de dossier — le composant DossierDetail (dialog) était orphelin :
   // aucune ligne du tableau n'ouvrait le détail (détail inatteignable, audit).
   const [detailDossierId, setDetailDossierId] = useState<string | null>(null);
 
   const fetchDossiers = useCallback(async () => {
     setLoading(true);
+    setErreur(null);
     try {
       const params = new URLSearchParams({ page: String(pagination.page), limit: String(pagination.limit) });
       if (search) params.set('search', search);
@@ -51,12 +55,22 @@ export default function DossiersView() {
         for (const [cle, valeur] of new URLSearchParams(qsPeriode)) params.set(cle, valeur);
       }
       const res = await fetch(`/api/dossiers?${params.toString()}`);
+      // A-01 : vérifier response.ok AVANT de traiter le corps — un 401/403/500
+      // se présente sinon comme une liste vide (« Aucun dossier trouvé »).
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.erreur ?? `Erreur ${res.status} de l'API dossiers`);
+      }
       const data = await res.json();
       setDossiers(data.dossiers || []);
       if (data.pagination) {
         setPagination(data.pagination);
       }
-    } catch {
+    } catch (e) {
+      // Échec HTTP ou réseau : état d'erreur dédié + détail technique en
+      // console pour le diagnostic (modèle : ma-performance-view.tsx).
+      console.error('[DOSSIERS] Chargement impossible :', e);
+      setErreur(e instanceof Error ? e.message : 'Erreur inconnue');
       setDossiers([]);
     } finally {
       setLoading(false);
@@ -119,6 +133,14 @@ export default function DossiersView() {
           {loading ? (
             <div className="space-y-2">
               {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : erreur ? (
+            // A-01 : état d'erreur distinct, avec relance (jamais « Aucun dossier trouvé »)
+            <div className="py-8 text-center">
+              <p className="text-sm text-destructive">{erreur}</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={fetchDossiers}>
+                <RefreshCw className="h-4 w-4 mr-1" />Réessayer
+              </Button>
             </div>
           ) : (
             <>
