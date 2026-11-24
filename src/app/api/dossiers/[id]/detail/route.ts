@@ -37,7 +37,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           orderBy: { createdAt: "desc" },
           include: { auteur: { select: { id: true, nom: true, role: true } } },
         },
-        justificatifs: { orderBy: { createdAt: "desc" } },
+        // P3 — les justificatifs ne renvoient QUE leurs métadonnées : le
+        // champ chemin (data URI complet en mode DB, jusqu'à ~13 Mo par
+        // fichier) n'a pas à transiter dans la réponse de détail. Le contenu
+        // binaire est toujours demandé à part via /api/upload?id=, qui
+        // applique le périmètre société — sinon chaque consultation d'un
+        // dossier chargait tous les justificatifs en mémoire.
+        justificatifs: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            type: true,
+            nomFichier: true,
+            tailleKo: true,
+            uploadedBy: true,
+            createdAt: true,
+          },
+        },
       },
     });
 

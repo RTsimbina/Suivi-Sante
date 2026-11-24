@@ -6,16 +6,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const blobMocks = vi.hoisted(() => ({
   put: vi.fn(),
+  getDownloadUrl: vi.fn(),
 }));
 
 vi.mock('@vercel/blob', () => ({
   put: blobMocks.put,
+  getDownloadUrl: blobMocks.getDownloadUrl,
 }));
 
 import {
   detecterTypeReel,
   resoudreMimeType,
   extensionAutorisee,
+  nomFichierSecurise,
   stockerJustificatif,
   lireContenuJustificatif,
   ErreurStockage,
@@ -112,8 +115,61 @@ describe('stockerJustificatif', () => {
     expect(res.chemin).toBe('https://abc.public.blob.vercel-storage.com/justificatifs/x/facture.pdf');
     expect(res.chemin).not.toContain('base64');
     expect(blobMocks.put).toHaveBeenCalledTimes(1);
+    // Durcissement mission stockage : ACCÈS PRIVÉ (URL signée obligatoire)
     expect(blobMocks.put.mock.calls[0][2]).toEqual(
-      expect.objectContaining({ contentType: 'application/pdf', access: 'public', addRandomSuffix: false })
+      expect.objectContaining({ contentType: 'application/pdf', access: 'private', addRandomSuffix: false })
+    );
+  });
+
+  it('mode BLOB : la clé est construite avec le NOM SÉCURISÉ (traversée impossible)', async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_test';
+    blobMocks.put.mockResolvedValue({ url: 'https://abc.public.blob.vercel-storage.com/ok' });
+
+    await stockerJustificatif(PDF_VALIDE, {
+      dossierId: 'dos-1',
+      nomFichier: '../../etc/passwd; evil.pdf',
+      mimeType: 'application/pdf',
+    });
+
+    const cle = blobMocks.put.mock.calls[0][0] as string;
+    expect(cle.startsWith('justificatifs/dos-1/')).toBe(true);
+    expect(cle).not.toContain('..');
+    expect(cle).not.toContain(';');
+    expect(cle).not.toContain('/etc/');
+    expect(cle.endsWith('.pdf')).toBe(true);
+  });
+});
+
+// ─── Noms de fichiers sécurisés (durcissement mission stockage) ─────────────
+describe('nomFichierSecurise', () => {
+  it('ne garde que le dernier segment : traversée / et \\ interdite', () => {
+    expect(nomFichierSecurise('../../etc/passwd.pdf')).toBe('passwd.pdf');
+    expect(nomFichierSecurise('..\\..\\windows\\facture.pdf')).toBe('facture.pdf');
+    expect(nomFichierSecurise('/var/data/facture.pdf')).toBe('facture.pdf');
+  });
+
+  it('supprime métacaractères et caractères de contrôle (injection Content-Disposition)', () => {
+    const sortie = nomFichierSecurise('fa;cture "x".pdf\r\n injecting');
+    expect(sortie).not.toMatch(/[;"\r\n\\]/);
+    expect(sortie).toContain('facture');
+    expect(sortie).toContain('.pdf');
+  });
+
+  it('évince « .. » résiduel et repli sur un nom sûr si le nom devient vide', () => {
+    expect(nomFichierSecurise('..')).toBe('justificatif');
+    expect(nomFichierSecurise('')).toBe('justificatif');
+    expect(nomFichierSecurise('a..b.pdf')).toBe('a.b.pdf');
+  });
+
+  it('borne la longueur en préservant l\'extension', () => {
+    const sortie = nomFichierSecurise('x'.repeat(300) + '.pdf');
+    expect(sortie.length).toBeLessThanOrEqual(120);
+    expect(sortie.endsWith('.pdf')).toBe(true);
+  });
+
+  it('laisse intact un nom propre', () => {
+    expect(nomFichierSecurise('facture clinique - mars 2026.pdf')).toBe(
+      'facture clinique - mars 2026.pdf'
     );
   });
 });
@@ -126,7 +182,7 @@ describe('lireContenuJustificatif', () => {
     expect(bytes.equals(Buffer.from(PDF_VALIDE))).toBe(true);
   });
 
-  it('proxy un justificatif stocké en BLOB sans exposer l\u2019URL', async () => {
+  it('proxy un justificatif stocké en BLOB sans exposer l\u2019URL (accès direct si pas de token)', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(Buffer.from(PDF_VALIDE), {
       status: 200,
       headers: { 'content-type': 'application/pdf' },
@@ -138,6 +194,31 @@ describe('lireContenuJustificatif', () => {
     expect(bytes.equals(Buffer.from(PDF_VALIDE))).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith('https://abc.public.blob.vercel-storage.com/f.pdf');
     vi.unstubAllGlobals();
+  });
+
+  it('proxy un justificatif BLOB PRIVÉ via une URL SIGNÉE quand le token est présent', async () => {
+    process.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_test';
+    blobMocks.getDownloadUrl.mockReturnValue(
+      'https://abc.public.blob.vercel-storage.com/f.pdf?signée=1&exp=3600'
+    );
+    const fetchMock = vi.fn().mockResolvedValue(new Response(Buffer.from(PDF_VALIDE), {
+      status: 200,
+      headers: { 'content-type': 'application/pdf' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { bytes } = await lireContenuJustificatif('https://abc.public.blob.vercel-storage.com/f.pdf');
+    expect(blobMocks.getDownloadUrl).toHaveBeenCalledWith('https://abc.public.blob.vercel-storage.com/f.pdf');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://abc.public.blob.vercel-storage.com/f.pdf?signée=1&exp=3600'
+    );
+    expect(bytes.equals(Buffer.from(PDF_VALIDE))).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('lève FORMAT_INVALIDE pour un data URI malformé', async () => {
+    await expect(lireContenuJustificatif('data:application/pdf;pas-base64,x')).rejects.toThrow(ErreurStockage);
+    await expect(lireContenuJustificatif('file:///etc/passwd')).rejects.toThrow(ErreurStockage);
   });
 
   it('lève FICHIER_DISTANT_INACCESSIBLE si le stockage objet répond en erreur', async () => {

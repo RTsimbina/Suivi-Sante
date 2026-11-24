@@ -86,9 +86,24 @@ export async function POST(request: NextRequest) {
       { expiresIn: RESET_TOKEN_EXPIRY }
     );
 
-    // Construire le lien de réinitialisation
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+    // Construire le lien de réinitialisation. NEXTAUTH_URL doit être l'URL
+    // publique exacte de l'environnement : le repli localhost n'est toléré
+    // qu'en développement (valeur par défaut qui masquerait une mauvaise
+    // configuration en production — liens morts envoyés aux utilisateurs).
+    const baseUrl = process.env.NEXTAUTH_URL;
+    if (!baseUrl && process.env.NODE_ENV === 'production') {
+      console.error(
+        '[AUTH] NEXTAUTH_URL absent en production : lien de réinitialisation non émis.',
+      );
+      return NextResponse.json(
+        { message: 'Erreur de configuration du serveur.' },
+        { status: 500 }
+      );
+    }
+    if (!baseUrl) {
+      console.warn('[AUTH] NEXTAUTH_URL absent — repli développement http://localhost:3000');
+    }
+    const resetLink = `${baseUrl ?? 'http://localhost:3000'}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
     // Tenter l'envoi via le service de messagerie centralisé
     // (validation → anti-abus → rate-limiting → file d'attente → retry SMTP)

@@ -9,6 +9,7 @@ import {
 import {
   detecterTypeReel,
   extensionAutorisee,
+  nomFichierSecurise,
   resoudreMimeType,
   stockerJustificatif,
   lireContenuJustificatif,
@@ -55,6 +56,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ erreur: 'Type de justificatif manquant' }, { status: 400 });
     }
 
+    // Nom de fichier sécurisé : le nom client ne sert JAMAIS de chemin
+    // (aucune traversée de répertoires possible — un seul segment est
+    // conservé) ni de vecteur d'injection (Content-Disposition, clé blob).
+    const nomFichier = nomFichierSecurise(file.name);
+
     const typesAutorises = ['FACTURE', 'ORDONNANCE', 'RIB', 'CARNET_SOINS', 'DECOMPTE', 'AUTRE'];
     if (!typesAutorises.includes(type)) {
       return NextResponse.json({ erreur: 'Type de justificatif invalide' }, { status: 400 });
@@ -68,8 +74,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérification extension
-    if (!extensionAutorisee(file.name)) {
+    // Vérification extension (sur le nom sécurisé)
+    if (!extensionAutorisee(nomFichier)) {
       return NextResponse.json(
         { erreur: 'Extension non autorisée. Extensions acceptées : .pdf, .jpg, .jpeg, .png, .webp' },
         { status: 400 }
@@ -77,7 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     // MIME final : déclaré s'il est whitelisté, sinon déduit de l'extension
-    const mimeType = resoudreMimeType(file.name, file.type);
+    const mimeType = resoudreMimeType(nomFichier, file.type);
     if (!mimeType) {
       return NextResponse.json(
         { erreur: 'Type de fichier non supporté. Formats acceptés : PDF, JPEG, PNG, WebP' },
@@ -130,7 +136,7 @@ export async function POST(request: NextRequest) {
     try {
       resultat = await stockerJustificatif(bytes, {
         dossierId,
-        nomFichier: file.name,
+        nomFichier,
         mimeType,
       });
     } catch (e) {
@@ -144,12 +150,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Créer l'entrée Justificatif en base (chemin = clé/URL en mode BLOB,
-    // data URI en mode DB fallback)
+    // data URI en mode DB fallback) — nom = version sécurisée
     const justificatif = await db.justificatif.create({
       data: {
         dossierId,
         type,
-        nomFichier: file.name,
+        nomFichier,
         chemin: resultat.chemin,
         tailleKo: resultat.tailleKo,
         uploadedBy,
@@ -161,7 +167,7 @@ export async function POST(request: NextRequest) {
       entite: 'Justificatif',
       entiteId: justificatif.id,
       action: 'CREATION',
-      resume: `Justificatif ${type} ajouté au dossier ${dossier.numeroDossier} : ${file.name}`,
+      resume: `Justificatif ${type} ajouté au dossier ${dossier.numeroDossier} : ${nomFichier}`,
       module: 'Dossiers',
       objet: dossier.numeroDossier,
       societeId: dossier.societeId,

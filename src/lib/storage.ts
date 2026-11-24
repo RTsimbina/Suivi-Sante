@@ -69,6 +69,32 @@ export function extensionAutorisee(nomFichier: string): boolean {
   return EXTENSIONS_AUTORISES.has(extensionDe(nomFichier));
 }
 
+// ─── Noms de fichiers sécurisés (durcissement stockage) ─────────────────────
+
+/**
+ * Neutralise un nom de fichier fourni par le client avant tout usage :
+ *   - seul le dernier segment est conservé (aucune traversée de répertoires,
+ *     ni « / », ni « \ », ni « .. » — le nom sert de clé de stockage objet et
+ *     de nom de téléchargement, jamais de chemin) ;
+ *   - caractères de contrôle et métacaractères shell/HTML supprimés ;
+ *   - longueur bornée en préservant l'extension ;
+ *   - repli « justificatif » si le nom devient vide.
+ */
+export function nomFichierSecurise(nomFichier: string): string {
+  const segment = nomFichier.split(/[\\/]+/).pop() ?? '';
+  const epure = segment
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/["'`;*?<>|:#$&!{}[\]]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\.{2,}/g, '.');
+  if (!epure || epure === '.') return 'justificatif';
+  const MAX_NOM = 120;
+  if (epure.length <= MAX_NOM) return epure;
+  const ext = extensionDe(epure);
+  return epure.slice(0, MAX_NOM - ext.length) + ext;
+}
+
 // ─── Magic bytes : le contenu réel doit correspondre au format déclaré ──────
 // Empêche les fichiers déguisés (HTML/script renommé .pdf, polyglottes…) —
 // le MIME déclaré et l'extension sont fournis par le client, le contenu
@@ -112,11 +138,16 @@ export async function stockerJustificatif(
   if (stockageBlobDisponible()) {
     // Import dynamique : le module n'est chargé que si le stockage objet est configuré.
     const { put } = await import('@vercel/blob');
-    // Nom aléatoire : empêche les collisions et les chemins prévisibles.
-    const cle = `justificatifs/${opts.dossierId}/${randomUUID()}-${opts.nomFichier}`;
+    // Nom sécurisé + aléatoire : empêche collisions, traversée et chemins prévisibles.
+    const nomFiable = nomFichierSecurise(opts.nomFichier);
+    const cle = `justificatifs/${opts.dossierId}/${randomUUID()}-${nomFiable}`;
     const blob = await put(cle, Buffer.from(bytes), {
       contentType: opts.mimeType,
-      access: 'public',
+      // ACCÈS PRIVÉ : le blob ne répond qu'à une URL signée courte durée
+      // (getDownloadUrl, émise serveur avec le token). Une URL qui fuiterait
+      // (journal, base, copie d'écran) ne permet PAS de télécharger le
+      // justificatif d'une autre société — contrairement à « public ».
+      access: 'private',
       addRandomSuffix: false,
     });
     return {
@@ -156,9 +187,21 @@ export async function lireContenuJustificatif(chemin: string): Promise<{ bytes: 
     return { bytes: Buffer.from(m[2], 'base64'), mimeType: m[1] };
   }
 
-  // URL de stockage objet (Vercel Blob)
+  // URL de stockage objet (Vercel Blob). Les blobs sont PRIVÉS : quand le
+  // token serveur est disponible, l'URL stockée est convertie en URL signée
+  // courte durée (getDownloadUrl) — jamais accessible sans signature. Le
+  // repli en accès direct couvre les URL publiques historiques ou externes.
   if (chemin.startsWith('http://') || chemin.startsWith('https://')) {
-    const res = await fetch(chemin);
+    let url = chemin;
+    if (stockageBlobDisponible()) {
+      try {
+        const { getDownloadUrl } = await import('@vercel/blob');
+        url = getDownloadUrl(chemin);
+      } catch {
+        // Signature impossible (URL non-Blob, historique publique) : accès direct.
+      }
+    }
+    const res = await fetch(url);
     if (!res.ok) throw new ErreurStockage('FICHIER_DISTANT_INACCESSIBLE');
     const bytes = Buffer.from(await res.arrayBuffer());
     return { bytes, mimeType: res.headers.get('content-type') };

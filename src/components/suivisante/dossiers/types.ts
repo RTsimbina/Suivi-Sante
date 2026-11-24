@@ -52,7 +52,9 @@ export interface JustificatifDossier {
   id: string;
   type: string;
   nomFichier: string;
-  chemin: string;
+  // Le contenu binaire (chemin) n'est plus renvoyé par la réponse de détail :
+  // le téléchargement passe par /api/upload?id= qui contrôle le périmètre.
+  chemin?: string;
   tailleKo: number | null;
   createdAt: string;
 }

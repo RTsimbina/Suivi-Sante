@@ -18,6 +18,7 @@ const dbMocks = vi.hoisted(() => ({
 
 const blobMocks = vi.hoisted(() => ({
   put: vi.fn(),
+  getDownloadUrl: vi.fn(),
 }));
 
 const auditMocks = vi.hoisted(() => ({
@@ -48,6 +49,7 @@ vi.mock('@/lib/audit-log', () => ({
 
 vi.mock('@vercel/blob', () => ({
   put: blobMocks.put,
+  getDownloadUrl: blobMocks.getDownloadUrl,
 }));
 
 import { POST, GET } from './route';
@@ -202,6 +204,18 @@ describe('POST /api/upload — périmètre société et audit (A-04)', () => {
     expect(body.erreur).toContain('stockage');
     expect(dbMocks.justificatifCreate).not.toHaveBeenCalled();
     expect(auditMocks.logAuditOperation).not.toHaveBeenCalled();
+  });
+
+  it('SANITISE le nom de fichier client (traversée et métacaractères neutralisés)', async () => {
+    const file = fichierPdf(PDF_VALIDE, '../../etc/passwd; injection.pdf');
+    const res = await POST(requeteUpload(file));
+    expect(res.status).toBe(200);
+    // Le nom stocké en base est la version sécurisée : ni traversée ni métacaractères
+    const nomStocké = dbMocks.justificatifCreate.mock.calls[0][0].data.nomFichier;
+    expect(nomStocké).not.toContain('/');
+    expect(nomStocké).not.toContain(';');
+    expect(nomStocké.endsWith('.pdf')).toBe(true);
+    expect(res.status === 200 && (await res.json()).nomFichier).toBe(nomStocké);
   });
 });
 
