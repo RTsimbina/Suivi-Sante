@@ -54,6 +54,9 @@ jobs:
     outputs:
       statut: ${{ steps.resume.outputs.statut }}
     steps:
+      - name: Checkout du dépôt (helper scripts/neon-rotation-uri.py)
+        uses: actions/checkout@v4
+
       - name: Découvrir la branche de production et le rôle propriétaire
         run: |
           set -euo pipefail
