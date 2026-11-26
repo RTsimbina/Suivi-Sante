@@ -72,27 +72,44 @@ jobs:
           echo "ROLE=$ROLE" >> "$GITHUB_ENV"
 
       - name: Réinitialiser le mot de passe (rotation)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
           API="https://console.neon.tech/api/v2"
-          RESP=$(curl -sf -X POST \
+          CODE=$(curl -s -o /tmp/neon_resp.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer ${NEON_API_KEY}" \
             -H "Content-Type: application/json" \
             "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/roles/$ROLE/reset_password" \
             -d '{}')
-          URI=$(echo "$RESP" | jq -r '.connection_uri // .connection_string // empty')
-          if [ -z "$URI" ]; then
-            echo "KO : la réponse de rotation ne contient pas d'URI"; exit 1
+          echo "Neon API → HTTP ${CODE}"
+          if [ "${CODE}" != "200" ] && [ "${CODE}" != "201" ]; then
+            echo "KO : l'API Neon a refusé la rotation (HTTP ${CODE})."
+            jq -r '.message // .error // .detail // empty' /tmp/neon_resp.json 2>/dev/null \
+              | sed -E 's/:[^:@/]+@/:***@/g' || true
+            exit 1
           fi
-          # Masquage systématique (URI complète ET mot de passe seul)
-          echo "::add-mask::$URI"
-          PASSWD=$(printf '%s' "$URI" | sed -n 's|^[a-z]*://[^:]*:\([^@]*\)@.*|\1|p')
-          [ -n "$PASSWD" ] && echo "::add-mask::$PASSWD"
-          # URI pooled pour le runtime Vercel : hôte « -pooler » + pgbouncer
-          URI_POOLED=$(printf '%s' "$URI" \
-            | sed -E 's|\.aws\.neon\.tech(/|$)|-pooler.aws.neon.tech\1|')
-          URI_POOLED="${URI_POOLED%%\?*}?sslmode=require"
-          echo "::add-mask::$URI_POOLED"
+          # Format actuel de l'API Neon (schéma RoleOperations) : le nouveau mot
+          # de passe est dans .role.password — l'ancien champ .connection_uri
+          # n'existe plus dans les réponses récentes de l'API.
+          NEWPASS=$(jq -r '.role.password // empty' /tmp/neon_resp.json)
+          if [ -z "$NEWPASS" ]; then
+            echo "KO : .role.password absent de la réponse de rotation."
+            jq -r 'keys | join(", ")' /tmp/neon_resp.json 2>/dev/null || true
+            exit 1
+          fi
+          echo "::add-mask::${NEWPASS}"
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "KO : secret DATABASE_URL absent — impossible de reconstruire l'URI."
+            exit 1
+          fi
+          # URI DIRECTE reconstruite (hôte/base/params conservés, -pooler retiré)
+          URI=$(OLD_URI="$DATABASE_URL" ROLE="$ROLE" NEWPASS="$NEWPASS" \
+            python3 scripts/neon-rotation-uri.py)
+          echo "::add-mask::${URI}"
+          # URI POOLED pour le runtime (ep-xxx → ep-xxx-pooler)
+          URI_POOLED=$(POOLED_SRC="$URI" python3 scripts/neon-rotation-uri.py --pooled)
+          echo "::add-mask::${URI_POOLED}"
           # Écriture dans des fichiers temporaires (jamais en env global de job)
           echo "$URI"      > /tmp/uri_direct.txt
           echo "$URI_POOLED" > /tmp/uri_pooled.txt
