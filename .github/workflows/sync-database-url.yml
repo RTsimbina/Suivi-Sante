@@ -1,0 +1,135 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Alignement du secret GitHub DATABASE_URL sur l'URI Vercel active
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Contexte (incident du 25-26/11/2026) : plusieurs rotations du mot de passe
+# Neon ont laissé le secret GitHub DATABASE_URL avec un mot de passe mort
+# (rejeté par pg_dump : « password authentication failed ») tandis que l'URI
+# active vit côté Vercel (posée manuellement). Toute migration ou seed depuis
+# GitHub Actions échoue donc à la porte de sauvegarde.
+#
+# Ce workflow, SANS rotation et SANS coupure :
+#   1. Lit DATABASE_URL (cible production) depuis l'API Vercel avec
+#      ?decrypt=true (secrets VERCEL_TOKEN + VERCEL_PROJECT_ID requis) ;
+#   2. Convertit l'URI pooled en URI DIRECTE (convention du dépôt : le secret
+#      GitHub porte l'hôte sans -pooler, cf. migrate.yml qui retire lui-même
+#      « -pooler. ») ;
+#   3. Réécrit le secret GitHub DATABASE_URL (GH_SECRETS_WRITER) ;
+#   4. Vérifie sa fraîcheur (updated_at).
+#
+# Sécurité : l'URI et son mot de passe sont masqués (::add-mask), jamais
+# affichés ; le fichier temporaire est détruit (shred). La valeur reste
+# illisible dans les logs — seule la date de mise à jour du secret est montrée.
+#
+# Remarque : les secrets d'un run sont figés au démarrage du job — le contrôle
+# de connectivité réel se fait au run migrate.yml SUIVANT (pg_dump de
+# sauvegarde), pas dans ce run.
+#
+# Secrets requis :
+#   VERCEL_TOKEN        jeton Vercel scope équipe (rtsimbina's projects)
+#   VERCEL_PROJECT_ID   prj_… (Settings → General → Project ID)
+#   GH_SECRETS_WRITER   PAT avec droit d'écriture des secrets du dépôt
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Alignement secret DATABASE_URL (Vercel → GitHub)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmer:
+        description: "Taper SYNC pour confirmer l'écrasement du secret DATABASE_URL"
+        type: string
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-database-url
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Contrôle de confirmation
+        run: |
+          if [ "${{ inputs.confirmer }}" != "SYNC" ]; then
+            echo "::error::Confirmation absente — tapez SYNC dans l'input « confirmer »."
+            exit 1
+          fi
+
+      - name: Lire DATABASE_URL (production) depuis l'API Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "KO : secrets VERCEL_TOKEN / VERCEL_PROJECT_ID absents du dépôt."
+            exit 1
+          fi
+          HTTP=$(curl -s -o /tmp/vercel-env.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env?decrypt=true")
+          echo "API Vercel /env → HTTP ${HTTP}"
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Lecture impossible (HTTP ${HTTP})."
+            echo "  Causes possibles : jeton créé avec scope « Personal Account » au lieu de"
+            echo "  la team, ou jeton expiré. Recréez-le sur vercel.com → Settings → Tokens"
+            echo "  avec le scope « rtsimbina's projects »."
+            exit 1
+          fi
+          URI=$(jq -r '[.envs[] | select(.name=="DATABASE_URL" and ((.target // []) | index("production")))] | sort_by(.createdAt // 0) | last | .value // empty' /tmp/vercel-env.json)
+          rm -f /tmp/vercel-env.json
+          if [ -z "$URI" ]; then
+            echo "::error::DATABASE_URL (cible production) introuvable ou non décryptable."
+            echo "  Si la variable est marquée « Sensitive » sur Vercel, l'API ne peut pas la"
+            echo "  décrypter → action manuelle : copier l'URI depuis Vercel → Settings →"
+            echo "  Environment Variables et l'inscrire dans le secret GitHub DATABASE_URL."
+            exit 1
+          fi
+          # Masquage systématique (URI complète ET mot de passe seul)
+          echo "::add-mask::$URI"
+          PASSWD=$(printf '%s' "$URI" | sed -n 's|^[a-z]*://[^:]*:\([^@?]*\)@.*|\1|p')
+          [ -n "$PASSWD" ] && echo "::add-mask::$PASSWD"
+          # Convention du dépôt : secret GitHub = URI DIRECTE (hôte sans -pooler)
+          URI_DIRECT=$(printf '%s' "$URI" | sed 's/-pooler\././')
+          case "$URI_DIRECT" in
+            *sslmode=*) : ;;
+            *) URI_DIRECT="${URI_DIRECT%%\?*}?sslmode=require" ;;
+          esac
+          echo "::add-mask::$URI_DIRECT"
+          printf '%s' "$URI_DIRECT" > /tmp/uri_direct.txt
+          chmod 600 /tmp/uri_direct.txt
+          echo "Lecture OK : DATABASE_URL production récupéré (valeur masquée),"
+
+      - name: Écrire le secret GitHub DATABASE_URL
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_WRITER }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "KO : secret GH_SECRETS_WRITER absent — impossible de réécrire DATABASE_URL."
+            exit 1
+          fi
+          gh secret set DATABASE_URL --repo RTsimbina/Suivi-Sante < /tmp/uri_direct.txt
+          shred -u /tmp/uri_direct.txt 2>/dev/null || rm -f /tmp/uri_direct.txt
+          echo "Secret DATABASE_URL réécrit (valeur masquée, jamais affichée)."
+
+      - name: Vérifier la fraîcheur du secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_WRITER }}
+        run: |
+          set -euo pipefail
+          UPDATED=$(curl -sf -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/RTsimbina/Suivi-Sante/actions/secrets" \
+            | jq -r '.secrets[] | select(.name=="DATABASE_URL") | .updated_at')
+          if [ -z "$UPDATED" ]; then
+            echo "::error::Impossible de relire DATABASE_URL.updated_at."
+            exit 1
+          fi
+          echo "DATABASE_URL.updated_at = ${UPDATED} — SYNC OK."
+          echo "Prochaine étape : lancer « Migration base de données » (migrate.yml),"
+          echo "sa sauvegarde pg_dump sert de test de connectivité réel."
