@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagnostic authentification Neon (lecture seule, aucun secret affiché)
+# ─────────────────────────────────────────────────────────────────────────────
+# Objectif : trancher pourquoi le mot de passe propagé par la rotation est
+# rejeté par la base (« password authentication failed ») :
+#   1. Les OPÉRATIONS Neon récentes : le reset a-t-il été appliqué (finished)
+#      ou a-t-il échoué/resté pending ?
+#   2. Le RÔLE neondb_owner : updated_at (dernière modification du mot de passe)
+#   3. Tests SQL RÉELS avec le secret DATABASE_URL : direct et pooled.
+# Le mot de passe n'est JAMAIS affiché (psql ne l'imprime pas dans ses erreurs ;
+# l'URI est masquée par GitHub Actions car issue d'un secret).
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Diagnostic authentification Neon
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: green-moon-61901921
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Installer le client PostgreSQL
+        run: |
+          sudo apt-get update -qq >/dev/null 2>&1 || true
+          sudo apt-get install -y -qq postgresql-client >/dev/null 2>&1
+          psql --version
+
+      - name: Opérations Neon récentes et état du rôle
+        run: |
+          set -euo pipefail
+          API="https://console.neon.tech/api/v2"
+          AUTH="Authorization: Bearer ${NEON_API_KEY}"
+          echo "── 15 dernières opérations du projet (id | action | état | date) :"
+          curl -sS -H "$AUTH" \
+            "$API/projects/${NEON_PROJECT_ID}/operations?limit=15" \
+            | jq -r '.operations[] | "\(.id) | \(.action) | \(.status) | \(.created_at) | br=\(.branch_id // "?")"' || true
+          BRANCH=$(curl -sS -H "$AUTH" \
+            "$API/projects/${NEON_PROJECT_ID}/branches" \
+            | jq -r '.branches[] | select(.default==true) | .id')
+          echo "── Branche par défaut : ${BRANCH}"
+          echo "── Rôle neondb_owner (métadonnées, mot de passe jamais retourné) :"
+          curl -sS -H "$AUTH" \
+            "$API/projects/${NEON_PROJECT_ID}/branches/${BRANCH}/roles/neondb_owner" \
+            | jq -r '.role | "name=\(.name) | created_at=\(.created_at) | updated_at=\(.updated_at)"' || true
+
+      - name: Tests SQL réels (secret actuel — direct et pooled)
+        run: |
+          set -euo pipefail
+          echo "── Test connexion DIRECTE (hôte sans -pooler) :"
+          psql "$DATABASE_URL" -t -c "SELECT 'DIRECTE OK — ' || current_user || ' @ ' || current_database()" 2>&1 | tail -3 || true
+          URI_POOLED=$(printf '%s' "$DATABASE_URL" | sed -E 's|(ep-[a-z0-9-]+)\.aws\.neon\.tech|\1-pooler.aws.neon.tech|')
+          echo "── Test connexion POOLED :"
+          psql "$URI_POOLED" -t -c "SELECT 'POOLED OK — ' || current_user" 2>&1 | tail -3 || true
+          echo "── Fin des tests (échecs = mot de passe invalide ou endpoint indisponible)."
