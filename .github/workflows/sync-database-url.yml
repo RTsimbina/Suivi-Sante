@@ -70,7 +70,7 @@ jobs:
             echo "KO : secrets VERCEL_TOKEN / VERCEL_PROJECT_ID absents du dépôt."
             exit 1
           fi
-          HTTP=$(curl -s -o /tmp/vercel-env.json -w "%{http_code}" \
+          HTTP=$(curl -sS -o /tmp/vercel-env.json -w "%{http_code}" \
             -H "Authorization: Bearer ${VERCEL_TOKEN}" \
             "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env?decrypt=true")
           echo "API Vercel /env → HTTP ${HTTP}"
@@ -81,15 +81,19 @@ jobs:
             echo "  avec le scope « rtsimbina's projects »."
             exit 1
           fi
-          URI=$(jq -r '[.envs[] | select(.name=="DATABASE_URL" and ((.target // []) | index("production")))] | sort_by(.createdAt // 0) | last | .value // empty' /tmp/vercel-env.json)
-          rm -f /tmp/vercel-env.json
+          URI=$(jq -r '[.envs[] | select(.name=="DATABASE_URL" and (((.target // []) | index("production")) or ((.target // []) | length == 0)))] | sort_by(.createdAt // 0) | last | .value // empty' /tmp/vercel-env.json)
           if [ -z "$URI" ]; then
+            echo "── Diagnostic (noms et cibles uniquement, VALEURS JAMAIS AFFICHÉES) :"
+            jq -r '.envs[] | "  \(.name) | cibles=\(.target // "toutes") | valeur=\(if (.value // "") != "" then "décryptée" else "null ou vide" end)"' /tmp/vercel-env.json || true
             echo "::error::DATABASE_URL (cible production) introuvable ou non décryptable."
-            echo "  Si la variable est marquée « Sensitive » sur Vercel, l'API ne peut pas la"
-            echo "  décrypter → action manuelle : copier l'URI depuis Vercel → Settings →"
-            echo "  Environment Variables et l'inscrire dans le secret GitHub DATABASE_URL."
+            echo "  Si sa valeur est « null ou vide », la variable est « Sensitive » sur Vercel :"
+            echo "  l'API ne peut pas la décrypter → action manuelle : copier l'URI depuis"
+            echo "  Vercel → Settings → Environment Variables et l'inscrire dans le secret"
+            echo "  GitHub DATABASE_URL (Settings → Secrets and variables → Actions)."
+            rm -f /tmp/vercel-env.json
             exit 1
           fi
+          rm -f /tmp/vercel-env.json
           # Masquage systématique (URI complète ET mot de passe seul)
           echo "::add-mask::$URI"
           PASSWD=$(printf '%s' "$URI" | sed -n 's|^[a-z]*://[^:]*:\([^@?]*\)@.*|\1|p')
