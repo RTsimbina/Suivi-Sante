@@ -50,12 +50,40 @@ jobs:
             "$API/projects/${NEON_PROJECT_ID}/branches/${BRANCH}/roles/neondb_owner" \
             | jq -r '.role | "name=\(.name) | created_at=\(.created_at) | updated_at=\(.updated_at)"' || true
 
-      - name: Tests SQL réels (secret actuel — direct et pooled)
+      - name: Endpoints et branches (mapping hôte → branche, sans secrets)
         run: |
           set -euo pipefail
-          echo "── Test connexion DIRECTE (hôte sans -pooler) :"
-          psql "$DATABASE_URL" -t -c "SELECT 'DIRECTE OK — ' || current_user || ' @ ' || current_database()" 2>&1 | tail -3 || true
-          URI_POOLED=$(printf '%s' "$DATABASE_URL" | sed -E 's|(ep-[a-z0-9-]+)\.aws\.neon\.tech|\1-pooler.aws.neon.tech|')
-          echo "── Test connexion POOLED :"
-          psql "$URI_POOLED" -t -c "SELECT 'POOLED OK — ' || current_user" 2>&1 | tail -3 || true
-          echo "── Fin des tests (échecs = mot de passe invalide ou endpoint indisponible)."
+          API="https://console.neon.tech/api/v2"
+          AUTH="Authorization: Bearer ${NEON_API_KEY}"
+          echo "── Branches du projet :"
+          curl -sS -H "$AUTH" "$API/projects/${NEON_PROJECT_ID}/branches" \
+            | jq -r '.branches[] | "id=\(.id) | primary=\(.primary // false) | default=\(.default // false) | \(.name)"' || true
+          echo "── Endpoints (hôte | branche | statut) :"
+          curl -sS -H "$AUTH" "$API/projects/${NEON_PROJECT_ID}/endpoints" \
+            | jq -r '.endpoints[] | "\(.host // .id) | br=\(.branch_id) | \(.status)"' || true
+
+      - name: Discrimination mot de passe (brut vs encodé, jamais affichés)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq >/dev/null 2>&1 || true
+          sudo apt-get install -y -qq postgresql-client >/dev/null 2>&1
+          # Décompose l'URI du secret : les mots de passe transitent UNIQUEMENT par env.
+          export RAWPASS=$(DATABASE_URL="$DATABASE_URL" python3 - <<'PY'
+          import os, urllib.parse
+          u = urllib.parse.urlsplit(os.environ["DATABASE_URL"])
+          print(urllib.parse.unquote(u.password or ""))
+          PY
+          )
+          export STOREDPASS=$(DATABASE_URL="$DATABASE_URL" python3 - <<'PY'
+          import os, urllib.parse
+          u = urllib.parse.urlsplit(os.environ["DATABASE_URL"])
+          print(u.password or "")
+          PY
+          )
+          HOST=$(DATABASE_URL="$DATABASE_URL" python3 -c "import os,urllib.parse; print(urllib.parse.urlsplit(os.environ['DATABASE_URL']).hostname)")
+          USER=$(DATABASE_URL="$DATABASE_URL" python3 -c "import os,urllib.parse; print(urllib.parse.urlsplit(os.environ['DATABASE_URL']).username)")
+          echo "── Test A : mot de passe BRUT (décodé depuis le secret) :"
+          PGPASSWORD="$RAWPASS" psql -h "$HOST" -U "$USER" -d neondb -t -c "SELECT 'A OK — ' || current_user" 2>&1 | tail -2 || true
+          echo "── Test B : mot de passe encodé tel quel dans le secret :"
+          PGPASSWORD="$STOREDPASS" psql -h "$HOST" -U "$USER" -d neondb -t -c "SELECT 'B OK — ' || current_user" 2>&1 | tail -2 || true
+          echo "── Lecture : A OK = problème d'encodage URI ; A KO partout = mot de passe du mauvais rôle/branche."
