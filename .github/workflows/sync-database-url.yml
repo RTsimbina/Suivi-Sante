@@ -81,15 +81,30 @@ jobs:
             echo "  avec le scope « rtsimbina's projects »."
             exit 1
           fi
-          URI=$(jq -r '[.envs[] | select(.name=="DATABASE_URL" and (((.target // []) | index("production")) or ((.target // []) | length == 0)))] | sort_by(.createdAt // 0) | last | .value // empty' /tmp/vercel-env.json)
+          # L'API v9 expose la variable sous « key » (et non « name ») ; la liste
+          # ne renvoie pas les valeurs → lecture individuelle si nécessaire.
+          URI=$(jq -r '[.envs[] | select(.key=="DATABASE_URL" and (((.target // []) | index("production")) or ((.target // []) | length == 0)))] | sort_by(.createdAt // 0) | last | .value // empty' /tmp/vercel-env.json)
+          ENV_ID=$(jq -r '[.envs[] | select(.key=="DATABASE_URL" and (((.target // []) | index("production")) or ((.target // []) | length == 0)))] | sort_by(.createdAt // 0) | last | .id // empty' /tmp/vercel-env.json)
+          if [ -z "$URI" ] && [ -n "$ENV_ID" ]; then
+            echo "Valeur absente de la liste — lecture individuelle de la variable (${ENV_ID})…"
+            HTTP2=$(curl -sS -o /tmp/vercel-env-one.json -w "%{http_code}" \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env/${ENV_ID}?decrypt=true") || HTTP2="curl-échec"
+            echo "API Vercel /env/${ENV_ID} → HTTP ${HTTP2}"
+            if [ "$HTTP2" = "200" ]; then
+              URI=$(jq -r '.value // .env.value // empty' /tmp/vercel-env-one.json)
+            fi
+            rm -f /tmp/vercel-env-one.json
+          fi
           if [ -z "$URI" ]; then
-            echo "── Diagnostic (noms et cibles uniquement, VALEURS JAMAIS AFFICHÉES) :"
-            jq -r '.envs[] | "  \(.name) | cibles=\(.target // "toutes") | valeur=\(if (.value // "") != "" then "décryptée" else "null ou vide" end)"' /tmp/vercel-env.json || true
+            echo "── Diagnostic (clés et cibles uniquement, VALEURS JAMAIS AFFICHÉES) :"
+            jq -r '.envs[] | "  \(.key // "?") | cibles=\(.target // "toutes") | type=\(.type // "?") | valeur=\(if (.value // "") != "" then "décryptée" else "null ou vide" end)"' /tmp/vercel-env.json || true
             echo "::error::DATABASE_URL (cible production) introuvable ou non décryptable."
-            echo "  Si sa valeur est « null ou vide », la variable est « Sensitive » sur Vercel :"
-            echo "  l'API ne peut pas la décrypter → action manuelle : copier l'URI depuis"
-            echo "  Vercel → Settings → Environment Variables et l'inscrire dans le secret"
-            echo "  GitHub DATABASE_URL (Settings → Secrets and variables → Actions)."
+            echo "  Si sa valeur reste « null ou vide » dans les deux lectures, la variable"
+            echo "  est « Sensitive » sur Vercel : l'API ne peut pas la décrypter → action"
+            echo "  manuelle : copier l'URI depuis Vercel → Settings → Environment Variables"
+            echo "  et l'inscrire dans le secret GitHub DATABASE_URL (Settings → Secrets"
+            echo "  and variables → Actions)."
             rm -f /tmp/vercel-env.json
             exit 1
           fi
