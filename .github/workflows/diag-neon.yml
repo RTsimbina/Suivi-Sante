@@ -1,13 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Diagnostic Neon — opérations, endpoints (état du compute), test SQL réel
+# Diagnostic Neon — projets, endpoints, rôle propriétaire, tests SQL réels
 # ─────────────────────────────────────────────────────────────────────────────
-# Outil d'exploitation pour l'incident de connexion production :
-#   1. Liste les dernières OPÉRATIONS Neon (reset_password en attente/échec ?)
-#   2. Liste les ENDPOINTS du projet et l'état de leur compute (suspended ?)
-#   3. Test SQL réel avec le secret DATABASE_URL : connexion DIRECTE puis
-#      POOLED (pg_isready + SELECT 1) — n'affiche jamais l'URI ni le mot de passe.
-#   4. Vérifie la cohérence entre le secret et la réponse de l'API Neon
-#      (longueur du mot de passe uniquement, jamais sa valeur).
+# Outil d'exploitation pour les incidents de connexion production.
+# Toute la logique vit dans scripts/neon-diag.mjs (jamais de secret affiché).
 #
 # Secrets requis : NEON_API_KEY, DATABASE_URL
 # Lancer : Actions → « Diagnostic Neon » → Run workflow.
@@ -42,46 +37,5 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -qq -y postgresql-client >/dev/null
           psql --version
 
-      - name: Dernières opérations Neon (statut reset)
-        run: |
-          API="https://console.neon.tech/api/v2"
-          curl -sf -H "Authorization: Bearer ${NEON_API_KEY}" \
-            "$API/projects/$NEON_PROJECT_ID/operations?limit=12" \
-            | jq -r '.operations[] | "\(.created_at) \(.action) \(.type) → \(.status) (endpoint: \(.endpoint_id // "-"))"'
-
-      - name: Endpoints et état des computes
-        run: |
-          API="https://console.neon.tech/api/v2"
-          curl -sf -H "Authorization: Bearer ${NEON_API_KEY}" \
-            "$API/projects/$NEON_PROJECT_ID/endpoints" \
-            | jq -r '.endpoints[] | "\(.id) host=\(.host) branch=\(.branch_id) compute=\(.compute_state // "?") état=\(.state // "?") disabled=\(.disabled // false)"'
-
-      - name: Informations sur le rôle propriétaire
-        run: |
-          API="https://console.neon.tech/api/v2"
-          BRANCH=$(curl -sf -H "Authorization: Bearer ${NEON_API_KEY}" \
-            "$API/projects/$NEON_PROJECT_ID/branches" \
-            | jq -r '.branches[] | select(.default==true) | .id')
-          echo "Branche par défaut : $BRANCH"
-          curl -sf -H "Authorization: Bearer ${NEON_API_KEY}" \
-            "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/roles/neondb_owner" \
-            | jq '{name, protected, authentication_method, updated_at}'
-
-      - name: Cohérence du secret (sans exposer la valeur)
-        run: |
-          python3 -c 'import os, urllib.parse; u = urllib.parse.urlsplit(os.environ["DATABASE_URL"]); pw = urllib.parse.unquote(u.password or ""); db = u.path[1:] if u.path else ""; print("host=%s port=%s db=%s user=%s" % (u.hostname, u.port or 5432, db, u.username)); print("mot_de_passe: %d caracteres (valeur jamais affichee)" % len(pw)); print("params: %s" % u.query); print("host pooled: %s" % ("oui" if "-pooler." in (u.hostname or "") else "non"))'
-
-      - name: Test SQL réel — connexion DIRECTE
-        run: |
-          URI=$(printf '%s' "$DATABASE_URL" | sed 's/-pooler\././')
-          echo "::add-mask::$URI"
-          pg_isready -d "$URI" --timeout=20 && echo "pg_isready DIRECTE: OK" || echo "pg_isready DIRECTE: ÉCHEC"
-          psql "$URI" -c "SELECT current_database(), version();" -t 2>&1 | head -4
-
-      - name: Test SQL réel — connexion POOLED
-        run: |
-          URI=$(printf '%s' "$DATABASE_URL" | sed 's/\.aws\.neon\.tech/-pooler.aws.neon.tech/')
-          case "$URI" in *-pooler*) ;; *) URI=$(printf '%s' "$DATABASE_URL" | sed 's/\.c-\([0-9]*\)\./-pooler.c-\1./');; esac
-          echo "::add-mask::$URI"
-          pg_isready -d "$URI" --timeout=20 && echo "pg_isready POOLED: OK" || echo "pg_isready POOLED: ÉCHEC"
-          psql "$URI" -c "SELECT 1;" -t 2>&1 | head -4
+      - name: Diagnostic complet (projets, endpoints, rôle, tests SQL)
+        run: node scripts/neon-diag.mjs
