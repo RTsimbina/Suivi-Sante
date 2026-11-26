@@ -177,6 +177,33 @@ jobs:
           echo "⚠️ Un REDEPLOY Vercel est nécessaire pour prendre effet."
           echo "   (ou laissez le prochain deploy le faire — à coordonner)"
 
+      - name: Redéployer l'application Vercel (variables prises en compte)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "⚠️ ACTION MANUELLE REQUISE : Vercel → Deployments → Redeploy."
+            echo "   Sans redéploiement, l'application continue d'utiliser l'ancien"
+            echo "   mot de passe (invalide) et reste indisponible."
+            exit 0
+          fi
+          HTTP=$(curl -sS -o /tmp/redeploy.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.vercel.com/v13/deployments" \
+            -d '{"name":"smart-flow-ia","target":"production","gitSource":{"type":"github","org":"RTsimbina","repo":"Suivi-Sante","ref":"main"}}') || HTTP="échec-curl"
+          echo "POST /v13/deployments → HTTP ${HTTP}"
+          if [ "$HTTP" = "200" ] || [ "$HTTP" = "201" ]; then
+            jq -r '"Déploiement lancé : id=\(.id) état=\(.readyState // "QUEUED") url=\(.url // "")"' /tmp/redeploy.json || true
+            echo "Les variables mises à jour (DATABASE_URL rotatée) prennent effet sur ce déploiement."
+          else
+            sed -n '1,6p' /tmp/redeploy.json 2>/dev/null || true
+            echo "⚠️ Redéploiement non déclenché (HTTP ${HTTP}) → Redeploy manuel sur Vercel."
+          fi
+          rm -f /tmp/redeploy.json
+
       - name: Valider la connectivité (migration)
         if: ${{ github.event.inputs.verifier_migrate == 'true' }}
         env:
