@@ -178,7 +178,7 @@ jobs:
             for r in rules[:15]:
                 etat = 'ACTIVE' if (r.get('active') is not False) else 'inactive'
                 print(f"  - règle id={r.get('id')} nom={r.get('name')!r} état={etat} action={((r.get('action') or {}).get('action') if isinstance(r.get('action'), dict) else r.get('action'))}")
-            PY
+          PY
           fi
 
       - name: Sonde finale /api/health (fin des 429 ?)
