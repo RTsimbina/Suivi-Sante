@@ -55,7 +55,7 @@ jobs:
             echo "::error::Secret VERCEL_APP_URL requis."; exit 1
           fi
           if [ -z "${VERCEL_PROTECTION_BYPASS:-}" ]; then
-            echo "::error::Secret VERCEL_PROTECTION_BYPASS requis (Protection Bypass for Automation côté Vercel)."; exit 1
+            echo "::warning::Secret VERCEL_PROTECTION_BYPASS absent : test sans contournement (réussit seulement si la Deployment Protection Vercel est désactivée)."
           fi
 
       - name: Tests de connexion (une tentative par compte)
@@ -63,6 +63,8 @@ jobs:
           set -uo pipefail
           CATEG="${{ inputs.categorie }}"
           IFS=',' read -ra EMAILS <<< "${{ inputs.emails }}"
+          BYP=()
+          if [ -n "${VERCEL_PROTECTION_BYPASS:-}" ]; then BYP=(-H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}"); fi
           MDP_INTERNE="SuiviSante@2026"
           MDP_EXTERNE="Contact@2026"
 
@@ -70,14 +72,14 @@ jobs:
             local email="$1" mdp="$2" categorie="$3"
             local jar; jar=$(mktemp)
             local csrf http session
-            csrf=$(curl -sS --max-time 30 -c "$jar" -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+            csrf=$(curl -sS --max-time 30 -c "$jar" "${BYP[@]}" \
               "$VERCEL_APP_URL/api/auth/csrf" | sed -n 's/.*"csrfToken":"\([^"]*\)".*/\1/p' || true)
             if [ -z "$csrf" ]; then
               echo "| \`$email\` | $categorie | ⚠️ CSRF indisponible (checkpoint ?) | — |"
               rm -f "$jar"; return
             fi
             http=$(curl -sS --max-time 30 -b "$jar" -c "$jar" -o /dev/null -w '%{http_code}' \
-              -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+              "${BYP[@]}" \
               -H 'Content-Type: application/x-www-form-urlencoded' \
               -H 'User-Agent: Mozilla/5.0 (test-comptes-demo)' \
               --data-urlencode "csrfToken=$csrf" \
@@ -85,7 +87,7 @@ jobs:
               --data-urlencode "password=$mdp" \
               --data-urlencode "json=true" \
               "$VERCEL_APP_URL/api/auth/callback/credentials")
-            session=$(curl -sS --max-time 30 -b "$jar" -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+            session=$(curl -sS --max-time 30 -b "$jar" "${BYP[@]}" \
               "$VERCEL_APP_URL/api/auth/session")
             rm -f "$jar"
             if echo "$session" | grep -q '"role"'; then
@@ -112,6 +114,12 @@ jobs:
             sleep 2
           done
           cat resultats.md
+          # Annotation lisible sans ouvrir les journaux (aucun secret : e-mails de démo + verdicts).
+          R=$(grep -E '^\| `' resultats.md | sed -E 's/\| `([^`]*)` \| ([A-Z]+) \| ([^|]*)\|.*/\1 [\2] \3/' | tr -s ' ')
+          OK=$(echo "$R" | grep -c 'CONNECTÉ' || true); KO=$(echo "$R" | grep -vc 'CONNECTÉ' || true)
+          R="$OK connecté(s), $KO en échec"$'\n'"$R"
+          R="${R//'%'/'%25'}"; R="${R//$'\r'/'%0D'}"; R="${R//$'\n'/'%0A'}"
+          echo "::notice title=Résultats connexion démo::$R"
 
       - name: Publier le rapport (résumé du run)
         if: always()
