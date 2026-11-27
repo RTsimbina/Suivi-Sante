@@ -56,6 +56,7 @@ Next.js 16 (App Router) · React 19 · TypeScript · Prisma 6 · PostgreSQL
 | `npm run db:migrate` | Créer / tester une migration en développement |
 | `npm run db:migrate:status` | État des migrations sur la base courante |
 | `npm run db:backup` / `db:restore` | Sauvegarde / restauration d'urgence |
+| `SEED_DEMO=OUI npx tsx prisma/seed-demo.ts` | Comptes de démonstration (idempotent — jamais sur la production, voir [docs/comptes-demonstration.md](docs/comptes-demonstration.md)) |
 
 ### Exigences avant toute pull request
 
@@ -64,6 +65,11 @@ Next.js 16 (App Router) · React 19 · TypeScript · Prisma 6 · PostgreSQL
 - toute nouvelle fonctionnalité ou correction s'accompagne de nouveaux tests
   (routes API, schémas Zod de validation, composants selon le cas) ;
 - pas de `console.log` résiduel ni de code commenté mort.
+
+> Tout compte ajouté au catalogue de démonstration (`src/lib/comptes-demo.ts`)
+> doit passer les tests de `src/lib/comptes-demo.test.ts` (rôle du référentiel,
+> e-mail unique, matrice de permissions serveur) et être ajouté au script E2E
+> `scripts/test-comptes-demo-e2e.mjs`.
 
 ## Conventions de commit
 

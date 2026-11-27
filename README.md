@@ -26,16 +26,20 @@ Next.js 16 (App Router) · React 19 · TypeScript · Prisma 6 · PostgreSQL (Neo
 
 ## Rôles utilisateurs et isolation des données
 
-Huit rôles, deux mondes — le personnel interne voit l'ensemble de la plateforme,
-les rôles externes sont bornés à leur propre périmètre :
+Dix rôles, deux mondes — le personnel interne voit l'ensemble de la plateforme,
+les rôles externes sont bornés à leur propre périmètre. Le référentiel faisant
+foi est `ROLES` (`src/lib/referentiels.ts`) : le login est fail-closed, un
+compte portant un rôle hors référentiel ne peut pas se connecter.
 
 | Rôle | Libellé | Périmètre |
 |---|---|---|
 | `ADMINISTRATEUR` | Administrateur | Interne — accès global |
+| `DIRECTION_GENERALE` | Direction Générale | Interne — consultation KPI globale (performance, alertes, exports), sans gestion métier |
+| `RESPONSABLE_SERVICE` | Responsable de service | Interne — KPI bornés à SON service (`Utilisateur.serviceResponsable` : ACCUEIL / TECHNIQUE / CONTROLE_MEDICAL / COMPTABILITE), périmètre forcé côté serveur |
 | `ACCUEIL` | Accueil | Interne — accès global |
 | `TECHNIQUE` | Service Technique | Interne — accès global |
-| `COMPTABILITE` | Comptabilité | Interne — accès global |
-| `SANTE` | Contrôle Santé | Interne — accès global |
+| `COMPTABILITE` | Comptabilité | Interne — accès global (comptabilisation + finance) |
+| `SANTE` | Contrôle Santé | Interne — contrôle médical, hors routes financières |
 | `PORTAIL_CLIENT` | Client / Assuré | Externe — uniquement ses propres données |
 | `CONTACT_ENTREPRISE` | Entreprise Cliente | Externe — uniquement les assurés de sa société |
 | `PRESTATAIRE` | Prestataire | Externe — uniquement ses sociétés conventionnées |
@@ -249,6 +253,8 @@ dégrade proprement (réponse de repli) sans affecter le reste de la plateforme.
 | Commande | Rôle |
 |---|---|
 | `npm run db:seed` | Injecte les données de test (`prisma/seed.ts`) |
+| `SEED_DEMO=OUI npx tsx prisma/seed-demo.ts` | Comptes de démonstration + associations de données (idempotent, dev/test uniquement) |
+| `node scripts/test-comptes-demo-e2e.mjs` | Tests E2E réels des 31 comptes de démonstration (serveur local requis) |
 | `npm run db:reset` | Réinitialise la base de développement (`prisma migrate reset`) |
 | `npm run db:generate` | Génère le client Prisma seul |
 | `npm run db:push` | Synchronisation directe du schéma — développement uniquement, jamais en production |
@@ -258,6 +264,7 @@ dégrade proprement (réponse de repli) sans affecter le reste de la plateforme.
 
 ## Documentation associée
 
+- **[docs/comptes-demonstration.md](docs/comptes-demonstration.md)** — comptes de démonstration : catalogue, procédure d'initialisation idempotente, tableau des 31 comptes (rôle / service / usage / statut de validation), données associées
 - **[docs/procedure-deploiement.md](docs/procedure-deploiement.md)** — procédure de mise en production complète
 - **[docs/checklist-deploiement.md](docs/checklist-deploiement.md)** — checklist de tests après déploiement
 - **[docs/github-actions.md](docs/github-actions.md)** — fonctionnement des six workflows
