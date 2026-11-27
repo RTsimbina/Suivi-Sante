@@ -101,6 +101,26 @@ jobs:
           fi
           echo "Garde : base de démonstration confirmée par l'opérateur."
 
+      - name: Réveil de la base Neon (compute en veille)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO || secrets.DATABASE_URL }}
+        run: |
+          echo "::add-mask::${DATABASE_URL}"
+          # Neon suspend le compute après quelques minutes d'inactivité ; le premier
+          # accès peut dépasser le délai de connexion par défaut de Prisma (5 s) et
+          # produire « Can't reach database server ». On réveille la base d'abord.
+          pg_isready -d "$DATABASE_URL" --timeout=60 || true
+          for i in 1 2 3 4 5 6; do
+            if psql "$DATABASE_URL" -tAc "SELECT 1" >/dev/null 2>&1; then
+              echo "Base joignable (tentative $i)."
+              exit 0
+            fi
+            echo "Base pas encore prête (tentative $i/6), nouvel essai dans 10 s…"
+            sleep 10
+          done
+          echo "::error title=Base injoignable::Neon n'a pas répondu après 6 tentatives (mot de passe, IP Allow ou endpoint à vérifier)."
+          exit 1
+
       - name: Seed des comptes de démonstration (idempotent, non destructif)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO || secrets.DATABASE_URL }}
@@ -114,6 +134,12 @@ jobs:
           else
             echo "Mots de passe existants conservés (mot de passe posé uniquement à la création)."
           fi
+          # Délai de connexion Prisma étendu (défaut 5 s) pour absorber un réveil Neon.
+          case "$DATABASE_URL" in
+            *connect_timeout=*) ;;
+            *\?*) export DATABASE_URL="${DATABASE_URL}&connect_timeout=30" ;;
+            *)    export DATABASE_URL="${DATABASE_URL}?connect_timeout=30" ;;
+          esac
           npx tsx prisma/seed-demo.ts
 
       - name: Synthèse
