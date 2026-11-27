@@ -147,7 +147,9 @@ export function ComptesDemo({
                 </p>
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {comptes.map((compte) => {
-                    const mdpCompte = MOT_DE_PASSE_DEMO[compte.categorie];
+                    // Compte partagé verrouillé : son mot de passe n'est pas celui du
+                    // catalogue tant que le seed n'a pas été lancé avec « réinitialiser_admin ».
+                    const mdpCompte = compte.motDePasseVerrouille ? '' : MOT_DE_PASSE_DEMO[compte.categorie];
                     return (
                       <div
                         key={compte.email}
@@ -175,11 +177,13 @@ export function ComptesDemo({
                             libelle={`Copier l'identifiant ${compte.email}`}
                             compact
                           />
-                          <BoutonCopier
-                            valeur={mdpCompte}
-                            libelle={`Copier le mot de passe de ${compte.email}`}
-                            compact
-                          />
+                          {mdpCompte && (
+                            <BoutonCopier
+                              valeur={mdpCompte}
+                              libelle={`Copier le mot de passe de ${compte.email}`}
+                              compact
+                            />
+                          )}
                         </span>
                       </div>
                     );

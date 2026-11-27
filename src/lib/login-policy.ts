@@ -90,7 +90,7 @@ function loginIpKey(ip: string): string {
 }
 
 /** Niveau 1 : clé du compte (e-mail normalisé). */
-function loginEmailKey(email: string): string {
+export function loginEmailKey(email: string): string {
   return `login:email:${normalizeEmail(email)}`;
 }
 

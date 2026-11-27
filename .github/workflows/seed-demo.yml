@@ -40,6 +40,11 @@ on:
         type: boolean
         required: false
         default: true
+      reinitialiser_admin:
+        description: "REINIT_MDP_ADMIN_DEMO=OUI — réinitialiser AUSSI le mot de passe de admin@suivisante.mg (environnement de démonstration UNIQUEMENT)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -78,6 +83,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SEED_DEMO: "OUI"
           REINIT_MDP_DEMO: ${{ inputs.reinitialiser_mots_de_passe == true && 'OUI' || '' }}
+          REINIT_MDP_ADMIN_DEMO: ${{ inputs.reinitialiser_admin == true && 'OUI' || '' }}
         run: |
           echo "::add-mask::${DATABASE_URL}"
           if [ -n "$REINIT_MDP_DEMO" ]; then

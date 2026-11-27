@@ -36,6 +36,8 @@ import {
   emailDemoNormalise,
   emailsDemoParService,
 } from '../src/lib/comptes-demo';
+import { resetRateLimit } from '../src/lib/rate-limit';
+import { loginEmailKey } from '../src/lib/login-policy';
 import { resoudreLiaisonContactEntreprise } from '../src/lib/liaison-externe';
 import { resoudreLiaisonPrestataireAvecControle } from '../src/lib/liaison-prestataire';
 
@@ -90,6 +92,10 @@ async function semerComptes(): Promise<Map<string, { id: string; role: string }>
   const pwdInt = await hash(PWD_INTERNE, 12);
   const pwdExt = await hash(PWD_EXTERNE, 12);
   const reinitMdp = process.env.REINIT_MDP_DEMO === 'OUI';
+  // Le compte administrateur partagé (motDePasseVerrouille) n'est réinitialisé
+  // que sur demande explicite : sans cela son mot de passe d'origine est conservé
+  // et la connexion avec le mot de passe de démonstration échoue.
+  const reinitAdmin = process.env.REINIT_MDP_ADMIN_DEMO === 'OUI';
   const map = new Map<string, { id: string; role: string }>();
 
   for (const compte of COMPTES_DEMO) {
@@ -111,10 +117,26 @@ async function semerComptes(): Promise<Map<string, { id: string; role: string }>
       role: compte.role,
       ...(compte.role === 'RESPONSABLE_SERVICE' ? { serviceResponsable: compte.serviceResponsable } : {}),
     };
-    if (reinitMdp && !compte.motDePasseVerrouille) update.password = pwd;
+    const reparer = reinitMdp && (!compte.motDePasseVerrouille || reinitAdmin);
+    if (reparer) {
+      // Mode réparation explicite : mot de passe de démo + compte réactivé +
+      // verrou de tentatives levé. Sans cela un compte désactivé ou verrouillé
+      // (5 échecs / 15 min) refuse la connexion même avec le bon mot de passe.
+      update.password = pwd;
+      update.actif = true;
+      update.failedAttempts = 0;
+      update.lockoutUntil = null;
+    }
 
     const user = await db.utilisateur.upsert({ where: { email: compte.email }, update, create: dataCreate });
     map.set(email, { id: user.id, role: user.role });
+    if (reparer) {
+      try {
+        await resetRateLimit(loginEmailKey(email));
+      } catch (e) {
+        console.warn(`  ! compteur de tentatives non remis à zéro pour ${email} :`, (e as Error).message);
+      }
+    }
   }
   return map;
 }
