@@ -157,27 +157,27 @@ jobs:
           [ $RC -ne 0 ] && CODE="000"
           echo "GET /v1/security/firewall/config → HTTP ${CODE}"
           if [ "${CODE}" = "200" ]; then
-            python3 - <<'PY'
-            import json
-            try:
-                cfg = json.load(open('/tmp/config_apres.json'))
-            except Exception:
-                raise SystemExit(0)
-            acm = cfg.get('attackModeEnabled')
-            if acm is False:
-                print("Statut APRÈS : Attack Challenge Mode = inactif ✅")
-            elif acm is True:
-                print("::warning::Statut APRÈS : attackModeEnabled encore à true — la propagation peut prendre quelques secondes ; re-sonder avant de conclure.")
-            else:
-                print("Champ attackModeEnabled non exposé — confirmer via le sondage final.")
-            print("firewallEnabled =", cfg.get('firewallEnabled'))
-            print("attackModeActiveUntil =", cfg.get('attackModeActiveUntil'))
-            ips = cfg.get('ips') or []
-            rules = cfg.get('rules') or []
-            print(f"règles firewall : {len(rules)} ; entrées IPS : {len(ips)}")
-            for r in rules[:15]:
-                etat = 'ACTIVE' if (r.get('active') is not False) else 'inactive'
-                print(f"  - règle id={r.get('id')} nom={r.get('name')!r} état={etat} action={((r.get('action') or {}).get('action') if isinstance(r.get('action'), dict) else r.get('action'))}")
+          python3 - <<'PY'
+          import json
+          try:
+              cfg = json.load(open('/tmp/config_apres.json'))
+          except Exception:
+              raise SystemExit(0)
+          acm = cfg.get('attackModeEnabled')
+          if acm is False:
+              print("Statut APRÈS : Attack Challenge Mode = inactif ✅")
+          elif acm is True:
+              print("::warning::Statut APRÈS : attackModeEnabled encore à true — la propagation peut prendre quelques secondes ; re-sonder avant de conclure.")
+          else:
+              print("Champ attackModeEnabled non exposé — confirmer via le sondage final.")
+          print("firewallEnabled =", cfg.get('firewallEnabled'))
+          print("attackModeActiveUntil =", cfg.get('attackModeActiveUntil'))
+          ips = cfg.get('ips') or []
+          rules = cfg.get('rules') or []
+          print(f"règles firewall : {len(rules)} ; entrées IPS : {len(ips)}")
+          for r in rules[:15]:
+              etat = 'ACTIVE' if (r.get('active') is not False) else 'inactive'
+              print(f"  - règle id={r.get('id')} nom={r.get('name')!r} état={etat} action={((r.get('action') or {}).get('action') if isinstance(r.get('action'), dict) else r.get('action'))}")
           PY
           fi
 
