@@ -55,7 +55,7 @@ jobs:
             "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?upsert=true" \
             -d "{\"key\":\"NEXT_PUBLIC_ENV_DEMO\",\"value\":\"${VALEUR}\",\"type\":\"plain\",\"target\":[\"production\",\"preview\",\"development\"]}")
           echo "API Vercel /env (upsert) → HTTP ${HTTP}"
-          if [ "$HTTP" != "200" ]; then
+          if [ "$HTTP" != "200" ] && [ "$HTTP" != "201" ]; then
             head -c 400 /tmp/env-resp.json; echo
             exit 1
           fi
