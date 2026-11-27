@@ -6,10 +6,16 @@
  * Crée :
  *   - assure@suivisante.mg      → PORTAIL_CLIENT (assuré de la société 1, e-mail réécrit sur un assuré existant)
  *   - entreprise@suivisante.mg  → CONTACT_ENTREPRISE (contact de la société 1)
- *   - contact@clinique-saintemarie.mg → PORTAIL_PRESTATAIRE (Prestataire A)
- *   - lab@biomad.mg                   → PORTAIL_PRESTATAIRE (Prestataire B)
+ *   - contact@clinique-saintemarie.mg → PRESTATAIRE (fiche Prestataire A)
+ *   - lab@biomad.mg                   → PRESTATAIRE (fiche Prestataire B)
  * Mot de passe commun : portail123
  * Les liaisons Prestataire ↔ Société sont créées si absentes.
+ *
+ * ⚠️ RÔLE PRESTATAIRE (corrigé) : la valeur « PORTAIL_PRESTATAIRE » n'existe
+ * PAS dans le référentiel ROLES (src/lib/referentiels.ts) — le login est
+ * fail-closed (src/lib/auth.ts) et refusait ces comptes, et la matrice des
+ * permissions (/api/portail-prestataire) n'accepte que le rôle PRESTATAIRE.
+ * Couverture complète des comptes de démonstration : prisma/seed-demo.ts.
  */
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
@@ -33,10 +39,7 @@ async function main() {
   if (!assure) throw new Error('Aucun assuré pour la société 1');
   await db.assure.update({ where: { id: assure.id }, data: { email: 'assure@suivisante.mg' } });
   // Rattacher ses ayants droit par assurePrincipalId pour tester la famille
-  await db.assure.updateMany({
-    where: { societeId: soc1.id, id: { not: assure.id }, assurePrincipalId: null, typeBeneficiaire: { not: 'ASSURE' } },
-    data: {},
-  });
+  // (aucun ayant droit sans assuré principal sur cette société)
   await db.utilisateur.upsert({
     where: { email: 'assure@suivisante.mg' },
     update: { role: 'PORTAIL_CLIENT', password: passwordHash, actif: true },
@@ -66,8 +69,8 @@ async function main() {
   for (const p of [prestaA, prestaB]) {
     await db.utilisateur.upsert({
       where: { email: p.email! },
-      update: { role: 'PORTAIL_PRESTATAIRE', password: passwordHash, actif: true },
-      create: { email: p.email!, nom: p.nom, password: passwordHash, role: 'PORTAIL_PRESTATAIRE', actif: true },
+      update: { role: 'PRESTATAIRE', password: passwordHash, actif: true },
+      create: { email: p.email!, nom: p.nom, password: passwordHash, role: 'PRESTATAIRE', actif: true },
     });
   }
 
@@ -85,10 +88,11 @@ async function main() {
     });
   }
 
-  console.log('✅ Utilisateurs PORTAIL_PRESTATAIRE :', prestaA.email, '(A) et', prestaB.email, '(B)');
+  console.log('✅ Utilisateurs PRESTATAIRE (Portail Prestataire) :', prestaA.email, '(A) et', prestaB.email, '(B)');
   console.log('✅ Liaisons prestataire-société créées/vérifiées');
   console.log('\n🔑 Mot de passe de tous les comptes portail : portail123');
-  console.log('   Comptes internes (seed principal) : admin@suivisante.mg / password123 — voir prisma/seed.ts');
+  console.log('   Comptes internes (seed principal) : mot de passe défini dans prisma/seed.ts (SuiviSante@2026).');
+  console.log('   Pour la couverture complète des comptes de démonstration : SEED_DEMO=OUI npx tsx prisma/seed-demo.ts');
 }
 
 main()
