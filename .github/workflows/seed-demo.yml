@@ -1,0 +1,97 @@
+# ─── Comptes de démonstration (seed idempotent, non destructif) ──────────────
+#
+# Exécute prisma/seed-demo.ts sur la base cible (DATABASE_URL) :
+#   • crée/complète les 31 comptes du catalogue src/lib/comptes-demo.ts
+#     (upserts par e-mail — aucune suppression, aucun compte hors catalogue
+#     touché) ;
+#   • associe à chaque collaborateur des données réelles (étapes KPI,
+#     gestionnaires, objectifs de délais, liaisons portails) ;
+#   • IDEMPOTENT : ré-exécutable sans doublon ni effet de bord.
+#
+# Option REINIT_MDP_DEMO (input reinitialiser_mots_de_passe, défaut : true) :
+#   réinitialise les mots de passe des comptes du catalogue avec les valeurs
+#   canoniques (interne SuiviSante@2026, externe Contact@2026) SAUF les
+#   comptes marqués motDePasseVerrouille (admin@suivisante.mg — mot de passe
+#   réel conservé). Sans l'option, le mot de passe n'est posé qu'À LA
+#   CRÉATION ; un compte existant garde son mot de passe actuel.
+#
+# PRÉREQUIS : la base est migrée (workflow « Migration base de données »
+# au vert) — le seed écrit notamment dans EtapeTraitement.
+#
+# Sécurité : identique au seed local — garde SEED_DEMO=OUI obligatoire
+# (acquittement explicite), URI masquée, jamais affichée.
+#
+# Secret requis : DATABASE_URL (postgresql://… — masqué dans les logs).
+# Lancer : GitHub → Actions → « Comptes de démonstration » → Run workflow.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Comptes de démonstration (seed idempotent)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmer:
+        description: "Taper OUI pour confirmer (SEED_DEMO=OUI — upserts idempotents, aucune suppression)"
+        type: string
+        required: true
+        default: ""
+      reinitialiser_mots_de_passe:
+        description: "REINIT_MDP_DEMO=OUI — réinitialiser les mots de passe des comptes du catalogue (hors admin, verrouillé)"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-seed-demo
+  cancel-in-progress: false
+
+jobs:
+  seed-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Générer le client Prisma
+        run: npx prisma generate
+
+      - name: Contrôle de confirmation
+        run: |
+          if [ "${{ inputs.confirmer }}" != "OUI" ]; then
+            echo "::error::Confirmation absente — tapez OUI dans l'input « confirmer »."
+            exit 1
+          fi
+
+      - name: Seed des comptes de démonstration (idempotent, non destructif)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEED_DEMO: "OUI"
+          REINIT_MDP_DEMO: ${{ inputs.reinitialiser_mots_de_passe == true && 'OUI' || '' }}
+        run: |
+          echo "::add-mask::${DATABASE_URL}"
+          if [ -n "$REINIT_MDP_DEMO" ]; then
+            echo "Option REINIT_MDP_DEMO=OUI : mots de passe du catalogue réinitialisés (hors admin, motDePasseVerrouille)."
+          else
+            echo "Mots de passe existants conservés (mot de passe posé uniquement à la création)."
+          fi
+          npx tsx prisma/seed-demo.ts
+
+      - name: Synthèse
+        if: always()
+        run: |
+          echo "Le seed affiche en fin d'exécution :"
+          echo "• les 31 comptes du catalogue (rôle / e-mail / service) ;"
+          echo "• les liaisons portails (assuré, contact, prestataire) ;"
+          echo "• le résultat des vérifications intégrées (échec = workflow en échec)."
+          echo "Mot de passe à la création : interne SuiviSante@2026, externe Contact@2026."

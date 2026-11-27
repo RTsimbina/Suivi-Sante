@@ -27,10 +27,11 @@
 #
 # Deux modes (workflow_dispatch) :
 #   • adopter_existant = true  (PREMIÈRE exécution) : enregistre les
-#     migrations DÉJÀ matérialisées dans la base (via db push) comme
-#     « appliquées » (migrate resolve --applied), SAUF la plus récente
-#     (20260916120000_email_contact_principal) qui est, elle, réellement
-#     appliquée par migrate deploy. Puis `prisma migrate status`.
+#     migrations ANTÉRIEURES au couper 20260916120000 comme « appliquées »
+#     (déjà matérialisées par db push jusqu'à l'incident du 16/09) et laisse
+#     TOUTES celles à partir de ce couper en attente (13 migrations : KPI
+#     collaborateurs, révocation de session, index…) — elles sont réellement
+#     appliquées par `migrate deploy` dans le même run. Puis `migrate status`.
 #   • adopter_existant = false (exécutions suivantes) : `migrate deploy`
 #     standard — n'applique que les migrations en attente, idempotent.
 #   • resoudre_echec = <nom de migration> (RÉCUPÉRATION P3018) : marque la
@@ -212,21 +213,29 @@ jobs:
       - name: Adoption de la chaîne (première exécution, base db push)
         if: ${{ inputs.adopter_existant == true }}
         env:
-          MIGRATIONS_A_APPLIQUER: "20260916120000_email_contact_principal"
+          # Couper temporel : les migrations ANTÉRIEURES à ce timestamp ont été
+          # matérialisées par `db push` (historique jusqu'à l'incident du
+          # 16/09/2026) ; celles À PARTIR de ce timestamp n'ont JAMAIS été
+          # exécutées sur la base (pas plus par db push, retiré du build, que
+          # par migrate) → elles restent EN ATTENTE et sont réellement
+          # appliquées par `migrate deploy` ci-dessous.
+          # Correction du 27/11/2026 : l'ancienne logique marquait « appliquées »
+          # toutes les migrations sauf la plus récente — elle aurait donc
+          # ré-enregistré sans les exécuter les 12 migrations postérieures au
+          # couper (KPI collaborateurs/EtapeTraitement, révocation de session,
+          # index…), laissant la base incomplète (P2022/P2021 en production).
+          COUPER_ADOPTION: "20260916120000"
         run: |
           set -euo pipefail
-          # Toutes les migrations SAUF la plus récente sont DÉJÀ matérialisées
-          # dans la base (historique `db push`) : on les enregistre comme
-          # appliquées sans rejouer leur SQL. La plus récente reste en attente
-          # et sera réellement appliquée par `migrate deploy` ci-dessous.
           for d in prisma/migrations/*/ ; do
             M=$(basename "$d")
             [ "$M" = "migration_lock.toml" ] && continue
-            if [ "$M" = "$MIGRATIONS_A_APPLIQUER" ]; then
-              echo "→ $M : laissée EN ATTENTE (appliquée réellement par migrate deploy)."
+            TS=${M%%_*}
+            if [ "$TS" -ge "$COUPER_ADOPTION" ] 2>/dev/null; then
+              echo "→ $M : laissée EN ATTENTE (sera réellement appliquée par migrate deploy)."
               continue
             fi
-            echo "→ $M : enregistrement comme déjà appliquée."
+            echo "→ $M : enregistrement comme déjà appliquée (matérialisée par db push)."
             npx prisma migrate resolve --applied "$M" 2>&1 | grep -v '^$' || \
               echo "   (déjà enregistrée — ignoré)"
           done

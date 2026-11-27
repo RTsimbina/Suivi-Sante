@@ -1,0 +1,87 @@
+# ─── Activation de l'environnement de démonstration (NEXT_PUBLIC_ENV_DEMO) ──
+#
+# NEXT_PUBLIC_ENV_DEMO est inlinée AU BUILD par Next.js : la modifier ne prend
+# effet qu'après un REDÉPLOIEMENT. Ce workflow :
+#   1. pose (upsert) NEXT_PUBLIC_ENV_DEMO sur Vercel — cibles production,
+#      preview et development ;
+#   2. déclenche un redéploiement de production (POST /v13/deployments,
+#      même payload éprouvé que rotation-neon.yml).
+#
+# Effet : le bloc « Comptes de démonstration » (identifiants du catalogue,
+# mots de passe de test, boutons de copie) s'affiche sur la page de connexion
+# quand la valeur est OUI — et disparaît pour toute autre valeur (production
+# stricte). Aucun identifiant n'est jamais exposé hors démonstration.
+#
+# Secrets requis : VERCEL_TOKEN + VERCEL_PROJECT_ID (déjà configurés).
+# Lancer : GitHub → Actions → « Activer environnement de démonstration ».
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Activer environnement de démonstration
+
+on:
+  workflow_dispatch:
+    inputs:
+      valeur:
+        description: "Valeur de NEXT_PUBLIC_ENV_DEMO (OUI = bloc visible sur /login ; autre/vide = masqué)"
+        type: string
+        required: false
+        default: "OUI"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: activer-env-demo
+  cancel-in-progress: false
+
+jobs:
+  activer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VALEUR: ${{ inputs.valeur }}
+    steps:
+      - name: Poser NEXT_PUBLIC_ENV_DEMO sur Vercel (upsert, production + preview)
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ] || [ -z "${VERCEL_PROJECT_ID:-}" ]; then
+            echo "::error::Secrets VERCEL_TOKEN / VERCEL_PROJECT_ID requis (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          HTTP=$(curl -sS -o /tmp/env-resp.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Content-Type: application/json" \
+            "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env?upsert=true" \
+            -d "{\"key\":\"NEXT_PUBLIC_ENV_DEMO\",\"value\":\"${VALEUR}\",\"type\":\"plain\",\"target\":[\"production\",\"preview\",\"development\"]}")
+          echo "API Vercel /env (upsert) → HTTP ${HTTP}"
+          if [ "$HTTP" != "200" ]; then
+            head -c 400 /tmp/env-resp.json; echo
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_ENV_DEMO=${VALEUR} posé sur production + preview + development."
+
+      - name: Redéployer la production (la variable ne prend effet qu'au build)
+        run: |
+          set -euo pipefail
+          HTTP=$(curl -sS -o /tmp/redeploy.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" -H "Content-Type: application/json" \
+            "https://api.vercel.com/v13/deployments" \
+            -d '{"name":"smart-flow-ia","target":"production","gitSource":{"type":"github","org":"RTsimbina","repo":"Suivi-Sante","ref":"main"}}') || HTTP="échec-curl"
+          echo "POST /v13/deployments → HTTP ${HTTP}"
+          if [ "$HTTP" = "200" ] || [ "$HTTP" = "201" ]; then
+            jq -r '"Déploiement lancé : id=\(.id) état=\(.readyState // "QUEUED") url=\(.url // "")"' /tmp/redeploy.json || true
+          else
+            head -c 400 /tmp/redeploy.json 2>/dev/null || true; echo
+            echo "::error::Redéploiement non déclenché → « Redeploy » manuel sur Vercel (la variable est déjà posée)."
+          fi
+          rm -f /tmp/redeploy.json
+
+      - name: Synthèse
+        run: |
+          echo "Après READY du déploiement (~2-4 min), recharger /login :"
+          if [ "${VALEUR}" = "OUI" ]; then
+            echo "→ le bloc « Comptes de démonstration » (31 comptes + boutons de copie) est visible."
+          else
+            echo "→ le bloc est masqué (aucun identifiant affiché)."
+          fi
