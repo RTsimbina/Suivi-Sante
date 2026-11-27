@@ -106,16 +106,16 @@ jobs:
             email=$(echo "$email" | xargs)
             [ -z "$email" ] && continue
             if [ "$CATEG" = "INTERNE" ] || [ "$CATEG" = "LES_DEUX (un passage par catégorie)" ]; then
-              tester "$email" "$MDP_INTERNE" "INTERNE"
+              tester "$email" "$MDP_INTERNE" "INTERNE" | tee -a resultats.md
             fi
             if [ "$CATEG" = "EXTERNE" ] || [ "$CATEG" = "LES_DEUX (un passage par catégorie)" ]; then
-              tester "$email" "$MDP_EXTERNE" "EXTERNE"
+              tester "$email" "$MDP_EXTERNE" "EXTERNE" | tee -a resultats.md
             fi
             sleep 2
           done
           cat resultats.md
           # Annotation lisible sans ouvrir les journaux (aucun secret : e-mails de démo + verdicts).
-          R=$(grep -E '^\| `' resultats.md | sed -E 's/\| `([^`]*)` \| ([A-Z]+) \| ([^|]*)\|.*/\1 [\2] \3/' | tr -s ' ')
+          R=$(grep -E '^\| `' resultats.md | sed -E 's/\| `([^`]*)` \| ([A-Z]+) \| ([^|]*)\|.*/\1 [\2] \3/' | tr -s ' ' || true)
           OK=$(echo "$R" | grep -c 'CONNECTÉ' || true); KO=$(echo "$R" | grep -vc 'CONNECTÉ' || true)
           R="$OK connecté(s), $KO en échec"$'\n'"$R"
           R="${R//'%'/'%25'}"; R="${R//$'\r'/'%0D'}"; R="${R//$'\n'/'%0A'}"
