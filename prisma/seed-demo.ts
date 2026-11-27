@@ -631,5 +631,17 @@ async function main(): Promise<void> {
 }
 
 main()
-  .catch((e) => { console.error('\n❌ ÉCHEC :', e); process.exitCode = 1; })
+  .catch((e) => {
+    console.error('\n❌ ÉCHEC :', e);
+    // Annotation GitHub Actions : fait remonter la cause réelle dans l'onglet
+    // « Annotations » du run (sans l'URL de connexion, masquée par précaution).
+    const err = e as { name?: string; code?: string; message?: string };
+    const brut = `${err?.name ?? 'Error'}${err?.code ? ` [${err.code}]` : ''} : ${err?.message ?? String(e)}`;
+    const propre = brut
+      .replace(/postgres(ql)?:\/\/\S+/gi, '<url-masquée>')
+      .replace(/\s+/g, ' ')
+      .slice(-600);
+    console.log(`::error title=Échec du seed de démonstration::${propre}`);
+    process.exitCode = 1;
+  })
   .finally(async () => { await db.$disconnect(); });
