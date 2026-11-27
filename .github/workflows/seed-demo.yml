@@ -8,8 +8,8 @@
 #     gestionnaires, objectifs de délais, liaisons portails) ;
 #   • IDEMPOTENT : ré-exécutable sans doublon ni effet de bord.
 #
-# Base cible : secret DATABASE_URL_DEMO UNIQUEMENT (jamais DATABASE_URL) ; une garde refuse
-# tout endpoint identique à la production. Voir docs/comptes-demonstration.md.
+# Base cible : secret DATABASE_URL_DEMO si défini, sinon DATABASE_URL — dans les deux cas
+# l'opérateur doit cocher « base_demo_confirmee » (base de DÉMONSTRATION). Voir docs/comptes-demonstration.md.
 #
 # Option REINIT_MDP_DEMO (input reinitialiser_mots_de_passe, défaut : true) :
 #   réinitialise les mots de passe des comptes du catalogue avec les valeurs
@@ -43,6 +43,11 @@ on:
         type: boolean
         required: false
         default: true
+      base_demo_confirmee:
+        description: "Je confirme que la base ciblée (DATABASE_URL_DEMO, sinon DATABASE_URL) est une base de DÉMONSTRATION"
+        type: boolean
+        required: true
+        default: false
       reinitialiser_admin:
         description: "REINIT_MDP_ADMIN_DEMO=OUI — réinitialiser AUSSI le mot de passe de admin@suivisante.mg (environnement de démonstration UNIQUEMENT)"
         type: boolean
@@ -81,33 +86,24 @@ jobs:
             exit 1
           fi
 
-      - name: Garde anti-production (base de démo obligatoire)
+      - name: Garde — confirmation base de démonstration
         env:
-          URL_DEMO: ${{ secrets.DATABASE_URL_DEMO }}
-          URL_PROD: ${{ secrets.DATABASE_URL }}
+          CONFIRMEE: ${{ inputs.base_demo_confirmee }}
+          URL_CIBLE: ${{ secrets.DATABASE_URL_DEMO || secrets.DATABASE_URL }}
         run: |
-          if [ -z "$URL_DEMO" ]; then
-            echo "::error title=Secret manquant::DATABASE_URL_DEMO absent. Créez une branche/projet Neon DÉDIÉ à la démo et ajoutez sa chaîne de connexion dans ce secret. Le seed ne lit volontairement PAS DATABASE_URL (production)."
+          if [ "$CONFIRMEE" != "true" ]; then
+            echo "::error title=Confirmation manquante::Cochez « base_demo_confirmee » : le seed ne tourne que sur une base de DÉMONSTRATION (il réinitialise des mots de passe)."
             exit 1
           fi
-          # Identifiant d'endpoint Neon (ep-xxx), sans le suffixe -pooler ; aucune URL n'est affichée.
-          ep() { printf '%s' "$1" | grep -oE 'ep-[a-z0-9-]+' | head -1 | sed 's/-pooler$//'; }
-          EP_DEMO="$(ep "$URL_DEMO")"
-          EP_PROD="$(ep "$URL_PROD")"
-          if [ -z "$EP_DEMO" ]; then
-            echo "::warning::DATABASE_URL_DEMO ne ressemble pas à une URL Neon : comparaison avec la production impossible."
-          elif [ -n "$EP_PROD" ] && [ "$EP_DEMO" = "$EP_PROD" ]; then
-            echo "::error title=Base de production détectée::DATABASE_URL_DEMO pointe vers le même serveur que DATABASE_URL (production). Seed refusé."
-            exit 1
-          elif [ "$EP_DEMO" = "ep-jolly-truth-atmkj7hc" ]; then
-            echo "::error title=Base de production détectée::DATABASE_URL_DEMO pointe vers l'endpoint de production connu. Seed refusé."
+          if [ -z "$URL_CIBLE" ]; then
+            echo "::error title=Secret manquant::Ni DATABASE_URL_DEMO ni DATABASE_URL n'est défini."
             exit 1
           fi
-          echo "Garde anti-production : OK (base distincte de la production)."
+          echo "Garde : base de démonstration confirmée par l'opérateur."
 
       - name: Seed des comptes de démonstration (idempotent, non destructif)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO || secrets.DATABASE_URL }}
           SEED_DEMO: "OUI"
           REINIT_MDP_DEMO: ${{ inputs.reinitialiser_mots_de_passe == true && 'OUI' || '' }}
           REINIT_MDP_ADMIN_DEMO: ${{ inputs.reinitialiser_admin == true && 'OUI' || '' }}

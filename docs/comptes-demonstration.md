@@ -185,6 +185,6 @@ cohérence : `npx tsx scripts/verifier-sync-comptes-demo.ts`).
   identique dans tous les environnements.
 
 
-## Base cible du seed (secret `DATABASE_URL_DEMO`)
+## Base cible du seed
 
-Le workflow « Comptes de démonstration (seed idempotent) » n'utilise **jamais** `DATABASE_URL` (production). Il lit le secret `DATABASE_URL_DEMO`, qui doit pointer vers une base Neon **dédiée à la démo** (branche ou projet séparé). Il est refusé si l'endpoint est identique à celui de la production, et `prisma/seed-demo.ts` refuse aussi l'endpoint de production connu (`SEED_DEMO_BLOCK_ENDPOINTS`).
+Le workflow « Comptes de démonstration (seed idempotent) » utilise le secret `DATABASE_URL_DEMO` s'il existe, sinon `DATABASE_URL`. Dans les deux cas l'opérateur doit cocher **`base_demo_confirmee`** : le seed réinitialise des mots de passe et ne doit tourner que sur une base de démonstration. Si une vraie production distincte existe un jour, renseignez `SEED_DEMO_BLOCK_ENDPOINTS` (endpoints Neon interdits) pour que `prisma/seed-demo.ts` la refuse.

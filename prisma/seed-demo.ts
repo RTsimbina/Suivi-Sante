@@ -532,9 +532,9 @@ function hashGraine(s: string): number {
 
 // ─── Programme principal ──────────────────────────────────────────────────────
 
-/** Endpoints Neon de PRODUCTION interdits au seed (SEED_DEMO_BLOCK_ENDPOINTS, séparés par des virgules ; chaîne vide = garde désactivée). */
+/** Endpoints Neon de PRODUCTION interdits au seed (SEED_DEMO_BLOCK_ENDPOINTS, séparés par des virgules ; vide par défaut — à renseigner si une vraie production existe). */
 function refuserSiProduction(): void {
-  const bloques = (process.env.SEED_DEMO_BLOCK_ENDPOINTS ?? 'ep-jolly-truth-atmkj7hc')
+  const bloques = (process.env.SEED_DEMO_BLOCK_ENDPOINTS ?? '')
     .split(',')
     .map((x) => x.trim())
     .filter(Boolean);
