@@ -1,0 +1,121 @@
+# ─── Test de connexion réel des comptes de démonstration (production) ────────
+#
+# Exécute pour chaque e-mail fourni un flux NextAuth COMPLET contre
+# VERCEL_APP_URL (contournement automation Vercel via VERCEL_PROTECTION_BYPASS,
+# comme healthcheck.yml) :
+#   GET /api/auth/csrf → POST /api/auth/callback/credentials → GET /api/auth/session
+# et rapporte CONNECTÉ (rôle renvoyé par la session) ou REFUSÉ.
+#
+# Mot de passe : canonique selon la catégorie d'entrée (interne ou externe) —
+# mêmes valeurs que prisma/seed-demo.ts et la page de connexion. Une SEULE
+# tentative par compte (aucun risque de verrouillage).
+#
+# Secrets requis : VERCEL_APP_URL, VERCEL_PROTECTION_BYPASS.
+# Lancer : GitHub → Actions → « Test connexion comptes démo » → Run workflow.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Test connexion comptes démo
+
+on:
+  workflow_dispatch:
+    inputs:
+      emails:
+        description: "E-mails séparés par des virgules (ex : accueil@suivisante.mg,contact.sanlam@sanlam.mg)"
+        type: string
+        required: true
+        default: "accueil@suivisante.mg,technique@suivisante.mg,compta@suivisante.mg,sante@suivisante.mg,contact.sanlam@sanlam.mg,portail.sanlam@suivisante.mg"
+      categorie:
+        description: "Catégorie du mot de passe à tester"
+        type: choice
+        options:
+          - INTERNE
+          - EXTERNE
+          - LES_DEUX (un passage par catégorie)
+        default: INTERNE
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-connexion-demo
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+      VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+    steps:
+      - name: Vérifier les secrets
+        run: |
+          if [ -z "${VERCEL_APP_URL:-}" ]; then
+            echo "::error::Secret VERCEL_APP_URL requis."; exit 1
+          fi
+          if [ -z "${VERCEL_PROTECTION_BYPASS:-}" ]; then
+            echo "::error::Secret VERCEL_PROTECTION_BYPASS requis (Protection Bypass for Automation côté Vercel)."; exit 1
+          fi
+
+      - name: Tests de connexion (une tentative par compte)
+        run: |
+          set -uo pipefail
+          CATEG="${{ inputs.categorie }}"
+          IFS=',' read -ra EMAILS <<< "${{ inputs.emails }}"
+          MDP_INTERNE="SuiviSante@2026"
+          MDP_EXTERNE="Contact@2026"
+
+          tester() {
+            local email="$1" mdp="$2" categorie="$3"
+            local jar; jar=$(mktemp)
+            local csrf http session
+            csrf=$(curl -sS --max-time 30 -c "$jar" -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+              "$VERCEL_APP_URL/api/auth/csrf" | sed -n 's/.*"csrfToken":"\([^"]*\)".*/\1/p' || true)
+            if [ -z "$csrf" ]; then
+              echo "| \`$email\` | $categorie | ⚠️ CSRF indisponible (checkpoint ?) | — |"
+              rm -f "$jar"; return
+            fi
+            http=$(curl -sS --max-time 30 -b "$jar" -c "$jar" -o /dev/null -w '%{http_code}' \
+              -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              -H 'User-Agent: Mozilla/5.0 (test-comptes-demo)' \
+              --data-urlencode "csrfToken=$csrf" \
+              --data-urlencode "email=$email" \
+              --data-urlencode "password=$mdp" \
+              --data-urlencode "json=true" \
+              "$VERCEL_APP_URL/api/auth/callback/credentials")
+            session=$(curl -sS --max-time 30 -b "$jar" -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+              "$VERCEL_APP_URL/api/auth/session")
+            rm -f "$jar"
+            if echo "$session" | grep -q '"role"'; then
+              local role; role=$(echo "$session" | sed -n 's/.*"role":"\([^"]*\)".*/\1/p')
+              echo "| \`$email\` | $categorie | ✅ CONNECTÉ | rôle session : $role |"
+            else
+              echo "| \`$email\` | $categorie | ❌ REFUSÉ | HTTP $http |"
+            fi
+          }
+
+          echo "### Résultats des tests de connexion (production)" > resultats.md
+          echo "" >> resultats.md
+          echo "| Compte | Catégorie | Résultat | Détail |" >> resultats.md
+          echo "|---|---|---|---|" >> resultats.md
+          for email in "${EMAILS[@]}"; do
+            email=$(echo "$email" | xargs)
+            [ -z "$email" ] && continue
+            if [ "$CATEG" = "INTERNE" ] || [ "$CATEG" = "LES_DEUX (un passage par catégorie)" ]; then
+              tester "$email" "$MDP_INTERNE" "INTERNE"
+            fi
+            if [ "$CATEG" = "EXTERNE" ] || [ "$CATEG" = "LES_DEUX (un passage par catégorie)" ]; then
+              tester "$email" "$MDP_EXTERNE" "EXTERNE"
+            fi
+            sleep 2
+          done
+          cat resultats.md
+
+      - name: Publier le rapport (résumé du run)
+        if: always()
+        run: |
+          if [ -f resultats.md ]; then
+            cat resultats.md >> "$GITHUB_STEP_SUMMARY"
+          fi
