@@ -5,7 +5,7 @@
  * (identifiants incorrects / compte verrouillé) et redirections par rôle.
  */
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginPage from './page';
@@ -26,6 +26,16 @@ vi.mock('next-themes', () => ({
 }));
 
 const mockSignIn = vi.mocked(signIn);
+
+/** Stub du presse-papiers (jsdom n'en fournit pas). */
+function stubClipboard() {
+  const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    configurable: true,
+  });
+  return writeText;
+}
 
 /** Remplace window.location (non navigable sous jsdom) par un stub lisible */
 function stubLocation() {
@@ -71,6 +81,10 @@ describe('Page de connexion', () => {
     stubLocation();
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('affiche les champs email / mot de passe et le bouton de connexion', () => {
     render(<LoginPage />);
     expect(screen.getByLabelText('Adresse e-mail')).toBeInTheDocument();
@@ -79,21 +93,82 @@ describe('Page de connexion', () => {
     expect(screen.getByRole('button', { name: /Mot de passe oublié/ })).toBeInTheDocument();
   });
 
-  it('affiche les 5 comptes de démonstration', () => {
+  it('n’affiche PAS le bloc comptes de démonstration hors environnement de démo', () => {
+    // NEXT_PUBLIC_ENV_DEMO non défini (production) : aucun identifiant ni
+    // mot de passe ne doit apparaître sur la page de connexion.
     render(<LoginPage />);
-    expect(screen.getByText('admin@suivisante.mg')).toBeInTheDocument();
-    expect(screen.getByText('accueil@suivisante.mg')).toBeInTheDocument();
-    expect(screen.getByText('technique@suivisante.mg')).toBeInTheDocument();
-    expect(screen.getByText('compta@suivisante.mg')).toBeInTheDocument();
-    expect(screen.getByText('sante@suivisante.mg')).toBeInTheDocument();
+    expect(screen.queryByText(/Comptes de démonstration/)).not.toBeInTheDocument();
+    expect(screen.queryByText('admin@suivisante.mg')).not.toBeInTheDocument();
+    expect(screen.queryByText('SuiviSante@2026')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contact@2026')).not.toBeInTheDocument();
   });
 
-  it('pré-remplit le formulaire au clic sur un compte de démonstration', async () => {
-    const user = userEvent.setup();
-    render(<LoginPage />);
-    await user.click(screen.getByText('admin@suivisante.mg'));
-    expect(screen.getByLabelText('Adresse e-mail')).toHaveValue('admin@suivisante.mg');
-    expect(screen.getByLabelText('Mot de passe')).toHaveValue('SuiviSante@2026');
+  describe('environnement de démonstration (NEXT_PUBLIC_ENV_DEMO=OUI)', () => {
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_ENV_DEMO', 'OUI');
+    });
+
+    it('affiche les comptes de démonstration synchronisés avec le catalogue (31 comptes)', () => {
+      render(<LoginPage />);
+      // Échantillon couvrant les deux groupes et les nouveaux profils
+      expect(screen.getByText(/Comptes de démonstration \(31\)/)).toBeInTheDocument();
+      expect(screen.getByText('admin@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('accueil@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('technique5@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('finance1@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('dg@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('rs-controle-medical@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('portail.bni@suivisante.mg')).toBeInTheDocument();
+      expect(screen.getByText('facturation@hopital-principal.mg')).toBeInTheDocument();
+      // Profils affichés avec leur libellé de rôle (référentiel)
+      expect(screen.getByText('Direction Générale')).toBeInTheDocument();
+      expect(screen.getByText('Responsable de service · Contrôle médical')).toBeInTheDocument();
+      // Les mots de passe de démonstration sont visibles (env de démo)
+      expect(screen.getByText('SuiviSante@2026')).toBeInTheDocument();
+      expect(screen.getByText('Contact@2026')).toBeInTheDocument();
+    });
+
+    it('pré-remplit le formulaire au clic sur un compte de démonstration', async () => {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+      await user.click(screen.getByText('admin@suivisante.mg'));
+      expect(screen.getByLabelText('Adresse e-mail')).toHaveValue('admin@suivisante.mg');
+      expect(screen.getByLabelText('Mot de passe')).toHaveValue('SuiviSante@2026');
+    });
+
+    it('pré-remplit le mot de passe externe pour un compte portail', async () => {
+      const user = userEvent.setup();
+      render(<LoginPage />);
+      await user.click(screen.getByText('portail.bni@suivisante.mg'));
+      expect(screen.getByLabelText('Adresse e-mail')).toHaveValue('portail.bni@suivisante.mg');
+      expect(screen.getByLabelText('Mot de passe')).toHaveValue('Contact@2026');
+    });
+
+    it('copie l’identifiant via le bouton de copie de la carte', async () => {
+      const user = userEvent.setup();
+      const writeText = stubClipboard();
+      render(<LoginPage />);
+      await user.click(screen.getByRole('button', { name: "Copier l'identifiant admin@suivisante.mg" }));
+      expect(writeText).toHaveBeenCalledWith('admin@suivisante.mg');
+      // Retour visuel « Copié » sur le bouton
+      expect(screen.getByRole('button', { name: /Copié/ })).toBeInTheDocument();
+    });
+
+    it('copie le mot de passe via le bouton de copie de la carte', async () => {
+      const user = userEvent.setup();
+      const writeText = stubClipboard();
+      render(<LoginPage />);
+      await user.click(screen.getByRole('button', { name: 'Copier le mot de passe de dg@suivisante.mg' }));
+      expect(writeText).toHaveBeenCalledWith('SuiviSante@2026');
+    });
+
+    it('copie le mot de passe du groupe depuis l’en-tête du groupe', async () => {
+      const user = userEvent.setup();
+      const writeText = stubClipboard();
+      render(<LoginPage />);
+      await user.click(screen.getByRole('button', { name: /Copier le mot de passe du groupe « Comptes externes/ }));
+      expect(writeText).toHaveBeenCalledWith('Contact@2026');
+    });
   });
 
   it('bascule la visibilité du mot de passe (accessible au clavier)', async () => {

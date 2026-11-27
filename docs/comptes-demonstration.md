@@ -148,7 +148,25 @@ Le seed associe à chaque profil des données issues du jeu métier :
 | Unitaires (21 tests) | Invariants du catalogue (rôles du référentiel, e-mails uniques, `serviceResponsable` réservé) + matrice de permissions serveur par rôle (`matchPermission`, fail-closed) | `npx vitest run src/lib/comptes-demo.test.ts` |
 | E2E réels (86 vérifications) | Connexion NextAuth des 31 comptes, sondes autorisé/refusé, isolation portails, KPI alimentés, cycle actif (désactivation→révocation), redirections | `BASE=http://localhost:3000 node scripts/test-comptes-demo-e2e.mjs` |
 
-## 6. Points d'attention
+## 6. Affichage sur la page de connexion
+
+Le bloc « Comptes de démonstration » de la page `/login` est **généré depuis le
+catalogue** (`src/lib/comptes-demo.ts`) — aucune liste en dur : l'affichage ne
+peut pas diverger des comptes réellement créés par le seed (contrôle de
+cohérence : `npx tsx scripts/verifier-sync-comptes-demo.ts`).
+
+- **Garde d'environnement** : le bloc (identifiants + mots de passe + boutons
+  de copie) ne s'affiche QUE si `NEXT_PUBLIC_ENV_DEMO=OUI` (variable de build,
+  `.env.example`). Sur tout autre environnement — production comprise — le
+  bloc ne rend rien : aucun identifiant ni mot de passe affiché.
+- **Boutons de copie** : chaque carte propose la copie de l'identifiant et du
+  mot de passe (Clipboard API avec repli `execCommand`), plus un bouton de
+  copie du mot de passe par groupe ; le clic sur la carte pré-remplit le
+  formulaire comme auparavant.
+- **Tests** : `src/app/login/page.test.tsx` vérifie le masquage hors démo,
+  l'affichage synchronisé (31 comptes), le pré-remplissage et les copies.
+
+## 7. Points d'attention
 
 - **Rate limiting du login** : la politique par défaut limite à 30 tentatives
   par IP / 15 minutes (`LOGIN_IP_LIMIT`, `src/lib/login-policy.ts`). Les tests

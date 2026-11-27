@@ -13,9 +13,11 @@ import { ComptesDemo } from '@/components/login/comptes-demo';
 import { loginContent } from '@/components/login/content';
 import { ciblePostConnexion } from '@/lib/navigation';
 
-// Comptes de démonstration : affichés dans tous les environnements — la base
-// est (re)seedée par le workflow « Jeu de données de test (reset + seed) »,
-// les identifiants affichés correspondent aux comptes réellement présents.
+// Comptes de démonstration : le bloc ne s'affiche que si
+// NEXT_PUBLIC_ENV_DEMO=OUI (environnement de démonstration / recette) —
+// aucun identifiant ni mot de passe affiché sur les autres environnements.
+// Contenu synchronisé avec le catalogue src/lib/comptes-demo.ts (même
+// source de vérité que le seed prisma/seed-demo.ts).
 
 /** Formulaire de connexion (séparé pour lire l'URL sous une limite Suspense). */
 function FormulaireLogin() {
@@ -288,7 +290,8 @@ function FormulaireLogin() {
               </CardContent>
             </Card>
 
-            {/* Comptes de démonstration — tous environnements */}
+            {/* Comptes de démonstration — visibles seulement si
+                NEXT_PUBLIC_ENV_DEMO=OUI (démonstration / recette) */}
             <ComptesDemo
               onPrefill={(courriel, motDePasse) => {
                 setEmail(courriel);
