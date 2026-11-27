@@ -110,15 +110,18 @@ jobs:
           # accès peut dépasser le délai de connexion par défaut de Prisma (5 s) et
           # produire « Can't reach database server ». On réveille la base d'abord.
           pg_isready -d "$DATABASE_URL" --timeout=60 || true
+          ERR=""
           for i in 1 2 3 4 5 6; do
-            if psql "$DATABASE_URL" -tAc "SELECT 1" >/dev/null 2>&1; then
+            if ERR="$(psql "$DATABASE_URL" -tAc "SELECT 1" 2>&1 >/dev/null)"; then
               echo "Base joignable (tentative $i)."
               exit 0
             fi
             echo "Base pas encore prête (tentative $i/6), nouvel essai dans 10 s…"
             sleep 10
           done
-          echo "::error title=Base injoignable::Neon n'a pas répondu après 6 tentatives (mot de passe, IP Allow ou endpoint à vérifier)."
+          # Message psql (hôte, utilisateur, cause) — l'URL éventuelle est masquée, aucun mot de passe n'y figure.
+          DETAIL="$(printf '%s' "$ERR" | tr '\n' ' ' | sed -E 's#postgres(ql)?://[^ ]+#<url-masquée>#g' | cut -c1-500)"
+          echo "::error title=Base injoignable::Neon n'a pas répondu après 6 tentatives. Détail psql : ${DETAIL}"
           exit 1
 
       - name: Seed des comptes de démonstration (idempotent, non destructif)
