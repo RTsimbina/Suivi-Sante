@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_PROJECT_ID: green-moon-61901921
+      NEON_PROJECT_ID: spring-mud-40589280
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - name: Checkout du dépôt

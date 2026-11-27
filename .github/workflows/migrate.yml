@@ -114,7 +114,7 @@ jobs:
           # Sinon, fallback : construction via l'API Neon (host + rôle ; le
           # mot de passe manque alors → erreur explicite).
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NEON_PROJECT_ID: green-moon-61901921
+          NEON_PROJECT_ID: spring-mud-40589280
         run: |
           set -euo pipefail
           if [ -n "${DATABASE_URL:-}" ]; then
