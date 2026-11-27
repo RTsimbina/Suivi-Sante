@@ -293,7 +293,7 @@ function FormulaireLogin() {
             {/* Comptes de démonstration — visibles seulement si
                 NEXT_PUBLIC_ENV_DEMO=OUI (démonstration / recette) */}
             <ComptesDemo
-              onPrefill={(courriel, motDePasse) => {
+              onChoisirCompte={(courriel, motDePasse) => {
                 setEmail(courriel);
                 setPassword(motDePasse);
                 setError('');

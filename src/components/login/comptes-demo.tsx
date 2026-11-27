@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Comptes de démonstration — page de connexion.
+ * Comptes de démonstration — page de connexion et page d'accueil.
  * ────────────────────────────────────────────────────────────────────────────
  * SOURCE DE VÉRITÉ : le catalogue src/lib/comptes-demo.ts (COMPTES_DEMO), le
  * même que le seed (prisma/seed-demo.ts) et la documentation — l'affichage ne
@@ -16,11 +16,18 @@
  * Mots de passe : mêmes valeurs que prisma/seed-demo.ts (PWD_INTERNE /
  * PWD_EXTERNE) et scripts/reset_seed.mjs — réservés aux environnements de
  * développement / test, posés à la CRÉATION des comptes par le seed.
+ *
+ * DEUX VARIANTES :
+ *   - défaut (page /login) : ouverte, grille 2 colonnes, clic = pré-remplit
+ *     le formulaire ;
+ *   - compact (sidebar de la page d'accueil) : repliée par défaut, 1 colonne,
+ *     hauteur bornée, clic = action du parent (connexion directe au profil).
  */
 import { useState } from 'react';
 import { Check, ChevronDown, Copy } from 'lucide-react';
 import { COMPTES_DEMO, type CompteDemo } from '@/lib/comptes-demo';
 import { ROLE_LABELS } from '@/lib/referentiels';
+import { cn } from '@/lib/utils';
 
 /** Mots de passe de démonstration par catégorie (voir en-tête). */
 const MOT_DE_PASSE_DEMO: Record<CompteDemo['categorie'], string> = {
@@ -76,7 +83,7 @@ async function copierTexte(valeur: string): Promise<boolean> {
 }
 
 /** Bouton de copie avec retour visuel « Copié » (2 s). */
-function BoutonCopier({ valeur, libelle, compact }: { valeur: string; libelle: string; compact?: boolean }) {
+function BoutonCopier({ valeur, libelle, petit }: { valeur: string; libelle: string; petit?: boolean }) {
   const [copie, setCopie] = useState(false);
 
   async function gererCopie() {
@@ -93,7 +100,7 @@ function BoutonCopier({ valeur, libelle, compact }: { valeur: string; libelle: s
       aria-label={copie ? `Copié — ${libelle}` : libelle}
       title={copie ? 'Copié !' : 'Copier'}
       className={`flex shrink-0 items-center justify-center rounded-full text-suivi-ink-soft transition-colors hover:text-suivi-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-suivi-brand dark:focus-visible:outline-suivi-brand-clair ${
-        compact ? 'h-8 w-8' : 'h-6 w-6'
+        petit ? 'h-8 w-8' : 'h-6 w-6'
       }`}
     >
       {copie ? (
@@ -106,9 +113,19 @@ function BoutonCopier({ valeur, libelle, compact }: { valeur: string; libelle: s
 }
 
 export function ComptesDemo({
-  onPrefill,
+  onChoisirCompte,
+  compact = false,
+  libelleAide = 'Cliquez sur un compte pour pré-remplir le formulaire, sur ⧉ pour copier l\u2019identifiant ou le mot de passe. Identifiants valables uniquement sur cet environnement de démonstration.',
+  libelleAction = 'Cliquez pour pré-remplir le formulaire.',
 }: {
-  onPrefill: (email: string, password: string) => void;
+  /** Action sur clic d'une carte : pré-remplissage (login) ou connexion directe (accueil). */
+  onChoisirCompte: (email: string, password: string) => void;
+  /** Variante sidebar de la page d'accueil : repliée par défaut, 1 colonne, hauteur bornée. */
+  compact?: boolean;
+  /** Texte d'aide du pied de bloc. */
+  libelleAide?: string;
+  /** Complément d'infobulle sur chaque carte. */
+  libelleAction?: string;
 }) {
   // Garde d'environnement : lu AU RENDU (inliné statiquement à la build par
   // Next.js — la condition devient constante dans le bundle de production).
@@ -116,10 +133,15 @@ export function ComptesDemo({
   const envDemo = process.env.NEXT_PUBLIC_ENV_DEMO === 'OUI';
   if (!envDemo || COMPTES_DEMO.length === 0) return null;
 
-  return (
-    // <details> ouvert par défaut : les comptes sont directement visibles
-    // (le contenu reste repliable, donc les tests et le clavier passent).
-    <details open className="group mt-4 rounded-2xl border border-dashed border-border bg-card">
+  const bloc = (
+    // Mode login : <details> ouvert par défaut (les comptes sont directement
+    // visibles, le contenu reste repliable, donc les tests et le clavier
+    // passent). Mode compact (sidebar) : replié par défaut pour ne pas
+    // masquer la navigation.
+    <details
+      open={!compact}
+      className={cn('group rounded-2xl border border-dashed border-border bg-card', !compact && 'mt-4')}
+    >
       <summary className="flex min-h-11 cursor-pointer select-none list-none items-center justify-center gap-2 rounded-2xl px-4 text-xs font-medium text-suivi-ink-soft transition-colors hover:text-suivi-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-suivi-brand dark:focus-visible:outline-suivi-brand-clair [&::-webkit-details-marker]:hidden">
         Comptes de démonstration ({COMPTES_DEMO.length})
         <ChevronDown
@@ -127,7 +149,12 @@ export function ComptesDemo({
           aria-hidden="true"
         />
       </summary>
-      <div className="border-t border-dashed border-border p-4">
+      <div
+        className={cn(
+          'border-t border-dashed border-border',
+          compact ? 'max-h-80 overflow-y-auto p-3' : 'p-4',
+        )}
+      >
         <div className="space-y-3">
           {GROUPES_DEMO.map((groupe) => {
             const comptes = COMPTES_DEMO.filter((c) => c.categorie === groupe.cle);
@@ -145,7 +172,7 @@ export function ComptesDemo({
                     libelle={`Copier le mot de passe du groupe « ${groupe.titre} »`}
                   />
                 </p>
-                <div className="grid gap-1.5 sm:grid-cols-2">
+                <div className={compact ? 'grid gap-1.5' : 'grid gap-1.5 sm:grid-cols-2'}>
                   {comptes.map((compte) => {
                     const mdpCompte = MOT_DE_PASSE_DEMO[compte.categorie];
                     return (
@@ -153,11 +180,11 @@ export function ComptesDemo({
                         key={compte.email}
                         className="flex min-h-11 items-center justify-between gap-1 rounded-lg border border-border bg-card transition-colors has-[button:active]:border-suivi-brand focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-suivi-brand dark:focus-within:outline-suivi-brand-clair"
                       >
-                        {/* Zone cliquable principale : pré-remplit le formulaire */}
+                        {/* Zone cliquable principale : action du parent */}
                         <button
                           type="button"
-                          onClick={() => onPrefill(compte.email, mdpCompte)}
-                          title={`${compte.nom} — ${compte.service}. ${compte.usage}. Cliquez pour pré-remplir le formulaire.`}
+                          onClick={() => onChoisirCompte(compte.email, mdpCompte)}
+                          title={`${compte.nom} — ${compte.service}. ${compte.usage}. ${libelleAction}`}
                           className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left transition-colors hover:border-suivi-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-suivi-brand dark:focus-visible:outline-suivi-brand-clair"
                         >
                           <span className="min-w-0 break-all font-mono text-xs font-medium">
@@ -167,18 +194,18 @@ export function ComptesDemo({
                             {libelleRole(compte)}
                           </span>
                         </button>
-                        {/* Boutons de copie — frères du bouton de pré-remplissage
+                        {/* Boutons de copie — frères du bouton d'action
                             (jamais imbriqués : un <button> ne peut pas en contenir un autre) */}
                         <span className="flex shrink-0 items-center pr-1.5">
                           <BoutonCopier
                             valeur={compte.email}
                             libelle={`Copier l'identifiant ${compte.email}`}
-                            compact
+                            petit
                           />
                           <BoutonCopier
                             valeur={mdpCompte}
                             libelle={`Copier le mot de passe de ${compte.email}`}
-                            compact
+                            petit
                           />
                         </span>
                       </div>
@@ -189,12 +216,16 @@ export function ComptesDemo({
             );
           })}
         </div>
-        <p className="mt-3 text-center text-[11px] text-suivi-ink-soft">
-          Cliquez sur un compte pour pré-remplir le formulaire, sur ⧉ pour copier
-          l&apos;identifiant ou le mot de passe. Identifiants valables uniquement sur cet
-          environnement de démonstration.
-        </p>
+        <p className="mt-3 text-center text-[11px] text-suivi-ink-soft">{libelleAide}</p>
       </div>
     </details>
   );
+
+  // Variante sidebar : bandeau à part entière de l'<aside> (bordure haute,
+  // padding) — rendu SEULEMENT quand le bloc est visible (garde ci-dessus),
+  // donc aucune bande vide en production.
+  if (compact) {
+    return <div className="shrink-0 border-t px-3 py-2">{bloc}</div>;
+  }
+  return bloc;
 }

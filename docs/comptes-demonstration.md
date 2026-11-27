@@ -148,7 +148,7 @@ Le seed associe à chaque profil des données issues du jeu métier :
 | Unitaires (21 tests) | Invariants du catalogue (rôles du référentiel, e-mails uniques, `serviceResponsable` réservé) + matrice de permissions serveur par rôle (`matchPermission`, fail-closed) | `npx vitest run src/lib/comptes-demo.test.ts` |
 | E2E réels (86 vérifications) | Connexion NextAuth des 31 comptes, sondes autorisé/refusé, isolation portails, KPI alimentés, cycle actif (désactivation→révocation), redirections | `BASE=http://localhost:3000 node scripts/test-comptes-demo-e2e.mjs` |
 
-## 6. Affichage sur la page de connexion
+## 6. Affichage : page de connexion et page d’accueil
 
 Le bloc « Comptes de démonstration » de la page `/login` est **généré depuis le
 catalogue** (`src/lib/comptes-demo.ts`) — aucune liste en dur : l'affichage ne
@@ -163,8 +163,15 @@ cohérence : `npx tsx scripts/verifier-sync-comptes-demo.ts`).
   mot de passe (Clipboard API avec repli `execCommand`), plus un bouton de
   copie du mot de passe par groupe ; le clic sur la carte pré-remplit le
   formulaire comme auparavant.
-- **Tests** : `src/app/login/page.test.tsx` vérifie le masquage hors démo,
-  l'affichage synchronisé (31 comptes), le pré-remplissage et les copies.
+- **Page d'accueil (sidebar)** : le même bloc, variante compacte repliée par
+  défaut (1 colonne, hauteur bornée), est affiché dans la barre latérale du
+  tableau de bord — même garde d'environnement. Le clic sur un compte y
+  CONNECTE DIRECTEMENT avec ce profil (`signIn` + rechargement complet) :
+  pratique pour changer de rôle en démonstration sans repasser par `/login`.
+- **Tests** : `src/app/login/page.test.tsx` (page de connexion) et
+  `src/components/login/comptes-demo.test.tsx` (composant, deux variantes)
+  vérifient le masquage hors démo, l'affichage synchronisé (31 comptes), le
+  pré-remplissage, la connexion directe et les copies.
 
 ## 7. Points d'attention
 

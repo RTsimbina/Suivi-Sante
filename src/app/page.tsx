@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import {
   LayoutDashboard, Inbox, Wrench, Calculator, Brain, MessageCircle,
   FileText, Menu, X, Sparkles, Globe, Kanban, Upload, FileBarChart, Plus,
@@ -19,6 +20,7 @@ import { PeriodeProvider, usePeriode } from '@/lib/periode-context';
 import { resoudreVue, PARAM_VUE } from '@/lib/navigation';
 import PeriodFilter from '@/components/suivisante/period-filter';
 import UserMenu from '@/components/suivisante/user-menu';
+import { ComptesDemo } from '@/components/login/comptes-demo';
 import UtilisateursView from '@/components/suivisante/utilisateurs-view';
 import { ThemeToggle } from '@/components/theme-toggle';
 import DirectionView from '@/components/suivisante/direction-view';
@@ -193,6 +195,17 @@ function ContenuSante() {
     fetch(url).then(r => r.json()).then(setKpis).catch(() => {});
   }
 
+  // ─── Comptes de démonstration (sidebar, env démo uniquement) ──────────────
+  // Connexion DIRECTE avec le profil choisi : signIn remplace la session
+  // courante par celle du compte, puis un rechargement complet réinitialise
+  // le shell (rôle, menus, redirections portails). Le bloc ne s'affiche que
+  // si NEXT_PUBLIC_ENV_DEMO=OUI — le composant s'auto-gate : jamais rendu en
+  // production, aucun identifiant affiché hors démonstration.
+  async function connecterCompteDemo(courriel: string, motDePasse: string) {
+    await signIn('credentials', { email: courriel, password: motDePasse, redirect: false });
+    window.location.href = '/';
+  }
+
   // Group nav items by section
   const sections = navItems.reduce<Record<string, typeof navItems>>((acc, item) => {
     const section = item.section || 'OTHER';
@@ -281,6 +294,16 @@ function ContenuSante() {
             ))}
           </nav>
         </ScrollArea>
+
+        {/* Comptes de démonstration — variante compacte de la sidebar :
+            visible uniquement si NEXT_PUBLIC_ENV_DEMO=OUI (le composant
+            s'auto-gate), replié par défaut, clic = connexion directe. */}
+        <ComptesDemo
+          compact
+          onChoisirCompte={connecterCompteDemo}
+          libelleAide="Cliquez sur un compte pour vous connecter directement avec ce profil. Identifiants valables uniquement sur cet environnement de démonstration."
+          libelleAction="Cliquez pour vous connecter avec ce profil."
+        />
 
         {/* Footer */}
         <div className="p-3 border-t">
