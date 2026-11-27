@@ -12,6 +12,20 @@
  *     + test du nouveau mot de passe contre les endpoints du projet référencé
  *     par NEON_PROJECT_ID.
  */
+// Résumé dans les annotations GitHub : tout ce que le script affiche est aussi
+// restitué dans une annotation « Diagnostic Neon » (lisible sans ouvrir les journaux).
+// Le script n'affiche jamais de secret (URI masquées) : le résumé n'en contient donc pas.
+const _tampon = [];
+for (const niveau of ['log', 'error']) {
+  const orig = console[niveau].bind(console);
+  console[niveau] = (...a) => { _tampon.push(a.map(String).join(' ')); orig(...a); };
+}
+process.on('exit', () => {
+  const texte = _tampon.join('\n').slice(-3500);
+  const encode = texte.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  process.stdout.write(`::notice title=Diagnostic Neon::${encode}\n`);
+});
+
 const API = 'https://console.neon.tech/api/v2';
 const KEY = process.env.NEON_API_KEY || '';
 const PROJECT_REF = process.env.NEON_PROJECT_ID || '';
