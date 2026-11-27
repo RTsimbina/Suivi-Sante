@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
-import * as crypto from 'crypto';
 import { PARENT_TYPES, ALL_SOUS_TYPES } from '../src/lib/prestations';
 
 const db = new PrismaClient();
@@ -75,6 +74,11 @@ function generateNSS(): string {
 
 async function main() {
   console.log('🌱 Début du seeding Suivi Santé...');
+  // IDEMPOTENCE : chaque bloc vérifie l'existence AVANT de créer — le seed
+  // peut être relancé sans dupliquer les données ni violer les contraintes
+  // uniques (sociétés/prestataires nomNormalise, NSS, numeroDossier,
+  // (societeId, prestation, version)). Les données existantes ne sont jamais
+  // supprimées ni écrasées.
 
   // ── 1. Utilisateurs démo ──
   const passwordHash = await hash('SuiviSante@2026', 10);
@@ -100,6 +104,10 @@ async function main() {
   console.log(`  ✅ ${utilisateursData.length} utilisateurs démo créés`);
 
   // ── 2. Sociétés ──
+  // Recherche par nom exact AVANT création : l'ancien upsert (where id = slug,
+  // create id = aléatoire) ne retrouvait jamais ses propres lignes et créait
+  // des doublons à chaque relance. nomNormalise alimente l'unicité insensible
+  // à la casse/accents (migration 20261029100000).
   const societesData = [
     'TELMA Madagascar', 'JIRAMA', 'Airtel Madagascar', 'BOA Madagascar',
     'BNI Madagascar', 'Société Générale MDG', 'Total Energies MDG',
@@ -108,22 +116,35 @@ async function main() {
     'SIFOR Madagascar', 'Banque de l\'Océan Indien',
   ];
 
+  const normaliserNomSeed = (nom: string) => nom
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
   const societes: Record<string, string> = {};
   for (const nom of societesData) {
-    const s = await db.societe.upsert({
-      where: { id: nom.replace(/[^a-zA-Z]/g, '').toLowerCase().slice(0, 20) },
-      update: { nom },
-      create: { id: crypto.randomBytes(8).toString('hex'), nom },
-    });
+    let s = await db.societe.findFirst({ where: { OR: [{ nom }, { nomNormalise: normaliserNomSeed(nom) }] } });
+    if (!s) {
+      s = await db.societe.create({ data: { nom, nomNormalise: normaliserNomSeed(nom) || null, actif: true } });
+    }
     societes[nom] = s.id;
   }
-  console.log(`  ✅ ${societesData.length} sociétés créées`);
+  console.log(`  ✅ ${societesData.length} sociétés assurées (créées ou déjà présentes)`);
 
   // ── 3. Barèmes (liés aux sociétés) ──
+  // Unicité (societeId, prestation, version) : on ne crée que les barèmes
+  // version 1 absents — une relance ne duplique rien.
   let baremeCount = 0;
   const societeIds = Object.values(societes);
   for (const societeId of societeIds) {
     for (const b of BAREMES_DATA) {
+      const existant = await db.bareme.findFirst({
+        where: { societeId, prestation: b.prestation, version: 1 },
+      });
+      if (existant) continue;
       // Variations aléatoires des taux par société (±10%)
       const tauxVariation = b.tauxCouverture + randomInt(-10, 10);
       const plafondVariation = Math.round(b.plafond * (0.8 + Math.random() * 0.4));
@@ -140,34 +161,49 @@ async function main() {
       baremeCount++;
     }
   }
-  console.log(`  ✅ ${baremeCount} barèmes créés (${BAREMES_DATA.length} prestations × ${societesData.length} sociétés)`);
+  console.log(`  ✅ ${baremeCount} barèmes créés (${BAREMES_DATA.length} prestations × ${societesData.length} sociétés — absents uniquement)`);
 
   // ── 4. Prestataires médicaux ──
+  // Recherche par nom normalisé AVANT création (même raison que les sociétés :
+  // l'ancien upsert créait des doublons à chaque relance).
   const prestatairesMap: Record<string, string> = {};
   for (const p of PRESTATAIRES_DATA) {
-    const created = await db.prestataire.upsert({
-      where: { id: p.nom.replace(/[^a-zA-Z]/g, '').toLowerCase().slice(0, 20) },
-      update: {},
-      create: { id: crypto.randomBytes(8).toString('hex'), ...p },
-    });
+    const nomNormalise = normaliserNomSeed(p.nom);
+    let created = await db.prestataire.findFirst({ where: { OR: [{ nom: p.nom }, { nomNormalise }] } });
+    if (!created) {
+      created = await db.prestataire.create({ data: { ...p, nomNormalise } });
+    }
     prestatairesMap[p.nom] = created.id;
   }
-  // Ajouter quelques prestataires supplémentaires
+  // Ajouter quelques prestataires supplémentaires (si absents)
   const prestatairesExtra = [
     { nom: 'Hôpital Andrianarisoa', type: 'HOPITAL', telephone: '020 23 456 78', email: 'contact@hopital-andria.mg', adresse: 'Ambohimanarina', nif: '4011234567' },
     { nom: 'Pharmacie du Centre', type: 'PHARMACIE', telephone: '020 22 345 67', email: 'info@pharmacie-centre.mg', adresse: 'Ankatso', nif: '4012345678' },
     { nom: 'Labo Analyses Plus', type: 'LABORATOIRE', telephone: '034 12 345 67', email: 'lab@analysesplus.mg', adresse: 'Mahamasina', nif: '4013456789' },
   ];
   for (const p of prestatairesExtra) {
-    const created = await db.prestataire.create({ data: p });
+    const nomNormalise = normaliserNomSeed(p.nom);
+    const existant = await db.prestataire.findFirst({ where: { OR: [{ nom: p.nom }, { nomNormalise }] } });
+    if (existant) {
+      prestatairesMap[p.nom] = existant.id;
+      continue;
+    }
+    const created = await db.prestataire.create({ data: { ...p, nomNormalise } });
     prestatairesMap[p.nom] = created.id;
   }
-  console.log(`  ✅ ${PRESTATAIRES_DATA.length + prestatairesExtra.length} prestataires créés`);
+  console.log(`  ✅ ${PRESTATAIRES_DATA.length + prestatairesExtra.length} prestataires assurés`);
 
   // ── 5. Assurés (3-5 par société) ──
+  // Une société qui a déjà des assurés est laissée telle quelle (aucune
+  // donnée existante n'est complétée ni dupliquée).
   const assuresBySociete: Record<string, string[]> = {};
   let assureCount = 0;
   for (const [nomSociete, societeId] of Object.entries(societes)) {
+    const dejaLa = await db.assure.count({ where: { societeId } });
+    if (dejaLa > 0) {
+      assuresBySociete[societeId] = (await db.assure.findMany({ where: { societeId }, select: { id: true } })).map((a) => a.id);
+      continue;
+    }
     const nbAssures = randomInt(3, 6);
     assuresBySociete[societeId] = [];
     for (let a = 0; a < nbAssures; a++) {
@@ -195,6 +231,8 @@ async function main() {
   console.log(`  ✅ ${assureCount} assurés créés (${Math.round(assureCount / societesData.length)}/société en moyenne)`);
 
   // ── 6. Gestionnaires ──
+  // Référentiel non supprimable : on ne crée un gestionnaire que s'il manque
+  // (recherche par nom + service).
   const gestionnairesData = [
     { nom: 'Ravao A.', service: 'ACCUEIL' },
     { nom: 'Nirina R.', service: 'ACCUEIL' },
@@ -213,33 +251,46 @@ async function main() {
 
   const gestionnaires: Record<string, { id: string; service: string }> = {};
   for (const g of gestionnairesData) {
+    const existant = await db.gestionnaire.findFirst({ where: { nom: g.nom, service: g.service } });
+    if (existant) {
+      gestionnaires[g.nom] = { id: existant.id, service: g.service };
+      continue;
+    }
     const created = await db.gestionnaire.create({ data: g });
     gestionnaires[g.nom] = { id: created.id, service: g.service };
   }
-  console.log(`  ✅ ${gestionnairesData.length} gestionnaires créés`);
+  console.log(`  ✅ ${gestionnairesData.length} gestionnaires assurés`);
 
   // ── 7. Contrats ──
+  // Un contrat par société : référence déterministe, créé seulement s'il manque.
   const contrats: string[] = [];
   for (const [nom, societeId] of Object.entries(societes)) {
-    const budget = randomFloat(50_000_000, 500_000_000);
-    const contrat = await db.contrat.create({
-      data: {
-        societeId,
-        reference: `CTR-${nom.slice(0, 4).toUpperCase()}-2026`,
-        budgetAnnuel: budget,
-        budgetUtilise: randomFloat(budget * 0.1, budget * 0.7),
-        dateDebut: new Date('2026-01-01'),
-        dateFin: new Date('2026-12-31'),
-        statut: 'ACTIF',
-      },
-    });
+    const reference = `CTR-${nom.slice(0, 4).toUpperCase()}-2026`;
+    let contrat = await db.contrat.findFirst({ where: { societeId, reference } });
+    if (!contrat) {
+      const budget = randomFloat(50_000_000, 500_000_000);
+      contrat = await db.contrat.create({
+        data: {
+          societeId,
+          reference,
+          budgetAnnuel: budget,
+          budgetUtilise: randomFloat(budget * 0.1, budget * 0.7),
+          dateDebut: new Date('2026-01-01'),
+          dateFin: new Date('2026-12-31'),
+          statut: 'ACTIF',
+        },
+      });
+    }
     contrats.push(contrat.id);
   }
-  console.log(`  ✅ ${contrats.length} contrats créés`);
+  console.log(`  ✅ ${contrats.length} contrats assurés`);
 
   // ── 8. Appels de fonds ──
+  // Un contrat déjà pourvu d'appels n'est pas complété (idempotence).
   let appelCount = 0;
   for (const contratId of contrats.slice(0, 8)) {
+    const dejaLa = await db.appelDeFonds.count({ where: { contratId } });
+    if (dejaLa > 0) continue;
     const nbAppels = randomInt(1, 4);
     for (let i = 0; i < nbAppels; i++) {
       const estRegle = Math.random() > 0.3;
@@ -287,6 +338,10 @@ async function main() {
   }
 
   for (let i = 1; i <= 250; i++) {
+    const numero = generateNumeroDossier(i);
+    if (await db.dossier.findUnique({ where: { numeroDossier: numero } })) {
+      continue; // dossier déjà présent (idempotence — numéro unique en base)
+    }
     const statut = weightedRandomStatut();
     const dateReception = randomDate(new Date('2026-01-02'), new Date('2026-06-24'));
     const montantReclame = randomFloat(15_000, 8_500_000);
@@ -338,7 +393,7 @@ async function main() {
 
     await db.dossier.create({
       data: {
-        numeroDossier: generateNumeroDossier(i),
+        numeroDossier: numero,
         dateReception,
         societeId: dossierSocieteId,
         beneficiaire: `${randomItem(NOMS_MALAGASY)} ${randomItem(PRENOMS_MALAGASY)}`,
@@ -374,11 +429,12 @@ async function main() {
   }
   console.log(`  ✅ ${dossierCount} dossiers créés (liés aux assurés et prestataires)`);
 
-  // ── 10. Commentaires (pour quelques dossiers) ──
+  // ── 10. Commentaires (pour quelques dossiers, sans doublon) ──
   const someDossiers = await db.dossier.findMany({ take: 30 });
   const users = await db.utilisateur.findMany();
   let commentCount = 0;
   for (const d of someDossiers) {
+    if (await db.commentaire.count({ where: { dossierId: d.id } }) > 0) continue;
     const nbComments = randomInt(1, 3);
     for (let j = 0; j < nbComments; j++) {
       const commentTexts = [
@@ -428,6 +484,7 @@ async function main() {
   ];
   let courrielCount = 0;
   for (const c of courrielsData) {
+    if (await db.courriel.findFirst({ where: { objet: c.objet } })) continue;
     await db.courriel.create({
       data: {
         ...c,
