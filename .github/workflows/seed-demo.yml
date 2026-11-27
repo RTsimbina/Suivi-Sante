@@ -8,6 +8,9 @@
 #     gestionnaires, objectifs de délais, liaisons portails) ;
 #   • IDEMPOTENT : ré-exécutable sans doublon ni effet de bord.
 #
+# Base cible : secret DATABASE_URL_DEMO UNIQUEMENT (jamais DATABASE_URL) ; une garde refuse
+# tout endpoint identique à la production. Voir docs/comptes-demonstration.md.
+#
 # Option REINIT_MDP_DEMO (input reinitialiser_mots_de_passe, défaut : true) :
 #   réinitialise les mots de passe des comptes du catalogue avec les valeurs
 #   canoniques (interne SuiviSante@2026, externe Contact@2026) SAUF les
@@ -78,9 +81,33 @@ jobs:
             exit 1
           fi
 
+      - name: Garde anti-production (base de démo obligatoire)
+        env:
+          URL_DEMO: ${{ secrets.DATABASE_URL_DEMO }}
+          URL_PROD: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$URL_DEMO" ]; then
+            echo "::error title=Secret manquant::DATABASE_URL_DEMO absent. Créez une branche/projet Neon DÉDIÉ à la démo et ajoutez sa chaîne de connexion dans ce secret. Le seed ne lit volontairement PAS DATABASE_URL (production)."
+            exit 1
+          fi
+          # Identifiant d'endpoint Neon (ep-xxx), sans le suffixe -pooler ; aucune URL n'est affichée.
+          ep() { printf '%s' "$1" | grep -oE 'ep-[a-z0-9-]+' | head -1 | sed 's/-pooler$//'; }
+          EP_DEMO="$(ep "$URL_DEMO")"
+          EP_PROD="$(ep "$URL_PROD")"
+          if [ -z "$EP_DEMO" ]; then
+            echo "::warning::DATABASE_URL_DEMO ne ressemble pas à une URL Neon : comparaison avec la production impossible."
+          elif [ -n "$EP_PROD" ] && [ "$EP_DEMO" = "$EP_PROD" ]; then
+            echo "::error title=Base de production détectée::DATABASE_URL_DEMO pointe vers le même serveur que DATABASE_URL (production). Seed refusé."
+            exit 1
+          elif [ "$EP_DEMO" = "ep-jolly-truth-atmkj7hc" ]; then
+            echo "::error title=Base de production détectée::DATABASE_URL_DEMO pointe vers l'endpoint de production connu. Seed refusé."
+            exit 1
+          fi
+          echo "Garde anti-production : OK (base distincte de la production)."
+
       - name: Seed des comptes de démonstration (idempotent, non destructif)
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO }}
           SEED_DEMO: "OUI"
           REINIT_MDP_DEMO: ${{ inputs.reinitialiser_mots_de_passe == true && 'OUI' || '' }}
           REINIT_MDP_ADMIN_DEMO: ${{ inputs.reinitialiser_admin == true && 'OUI' || '' }}

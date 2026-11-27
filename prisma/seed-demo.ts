@@ -532,7 +532,22 @@ function hashGraine(s: string): number {
 
 // ─── Programme principal ──────────────────────────────────────────────────────
 
+/** Endpoints Neon de PRODUCTION interdits au seed (SEED_DEMO_BLOCK_ENDPOINTS, séparés par des virgules ; chaîne vide = garde désactivée). */
+function refuserSiProduction(): void {
+  const bloques = (process.env.SEED_DEMO_BLOCK_ENDPOINTS ?? 'ep-jolly-truth-atmkj7hc')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const endpoint = (process.env.DATABASE_URL ?? '').match(/ep-[a-z0-9-]+/)?.[0]?.replace(/-pooler$/, '');
+  if (endpoint && bloques.includes(endpoint)) {
+    console.error('❌ Base de PRODUCTION détectée — seed de démonstration refusé.');
+    console.log('::error title=Base de production détectée::Le seed de démonstration ne doit jamais tourner sur la production.');
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
+  refuserSiProduction();
   if (process.env.SEED_DEMO !== 'OUI') {
     console.error('❌ Sécurité : ce seed modifie les comptes de la base courante.');
     console.error('   Confirmez avec : SEED_DEMO=OUI npx tsx prisma/seed-demo.ts');
