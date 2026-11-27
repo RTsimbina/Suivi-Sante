@@ -1,0 +1,43 @@
+# ─── Diagnostic LECTURE SEULE de la connexion des comptes de démonstration ───
+# Vérifie en base, pour chacun des 31 comptes du catalogue : présence, e-mail
+# normalisé, compte actif, rôle valide, verrou, mot de passe attendu, liaison portail.
+# N'écrit rien. Résultat dans l'annotation « Diagnostic connexion démo ».
+# Base lue : DATABASE_URL_DEMO si défini, sinon DATABASE_URL.
+name: Diagnostic connexion démo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diag-connexion-demo
+  cancel-in-progress: false
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_DEMO || secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Installer les dépendances
+        run: npm ci
+      - name: Générer le client Prisma
+        run: npx prisma generate
+      - name: Diagnostic (lecture seule)
+        run: |
+          echo "::add-mask::${DATABASE_URL}"
+          pg_isready -d "$DATABASE_URL" --timeout=60 || true
+          case "$DATABASE_URL" in
+            *connect_timeout=*) ;;
+            *\?*) export DATABASE_URL="${DATABASE_URL}&connect_timeout=30" ;;
+            *)    export DATABASE_URL="${DATABASE_URL}?connect_timeout=30" ;;
+          esac
+          npx tsx scripts/diag-connexion-demo.ts
