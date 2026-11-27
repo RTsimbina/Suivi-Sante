@@ -190,7 +190,7 @@ jobs:
           MDP_REPONSE=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
             -H "$AUTH" -H "Accept: application/json" \
             -w '\n%{http_code}' \
-            "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/roles/${ROLE}/reveal-password")
+            "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/roles/${ROLE}/reveal_password")
           CODE_MDP=$(echo "$MDP_REPONSE" | tail -n1)
           if [ "$CODE_MDP" != "200" ]; then
             echo "::error::reveal-password → HTTP $CODE_MDP. Réponse :"
