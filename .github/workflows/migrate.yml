@@ -182,7 +182,7 @@ jobs:
           ENDPOINTS=$(curl -sS --retry 5 --retry-delay 3 --retry-all-errors \
             -H "$AUTH" -H "Accept: application/json" \
             "$API/projects/$PROJECT_ID/branches/$BRANCH_ID/endpoints")
-          HOST=$(echo "$ENDPOINTS" | jq -r '[.endpoints[] | select(.host | contains("pooler") | not)][0].host // .endpoints[0].host // ""')
+          HOST=$(echo "$ENDPOINTS" | jq -r '([.endpoints[] | select(.type == "read_write") | select(.host | contains("pooler") | not)][0].host) // ([.endpoints[] | select(.type == "read_write")][0].host) // ""')
           if [ -z "$HOST" ]; then
             echo "::error::Aucun endpoint Neon trouvé sur la branche $BRANCH_ID."
             exit 1
